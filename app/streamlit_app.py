@@ -446,7 +446,7 @@ def main():
                             st.warning('Unable to filter loaded data by selected years; using full dataset instead.')
 
                         # Keep only relevant columns (include Market Capitalization for cap-weighted portfolios)
-                        cols_to_keep = ['Ticker', 'Year']
+                        cols_to_keep = ['Ticker', 'Year', 'Next_Year_Return']
                         if 'Ending Price' in rdata.columns:
                             cols_to_keep.append('Ending Price')
                         elif 'Ending_Price' in rdata.columns:

@@ -135,31 +135,41 @@ def calculate_holdings(factor, aum, market, restrict_fossil_fuels=False, top_pct
 
     return portfolio_new
 
-def calculate_growth(portfolio, next_market, current_market, verbosity=0):
-    # Calculate start value using the current market
-    total_start_value = 0
-    for factor_portfolio in portfolio:
-        total_start_value += factor_portfolio.present_value(current_market)
+def calculate_growth(portfolio, current_market, verbosity=0):
+    """
+    Calculates portfolio growth using the forward-looking 'Next_Year_Return' column.
+    """
+    total_weighted_rtn = 0
+    total_investment_value = 0
 
-    # Calculate end value using next market, handling missing stocks
-    total_end_value = 0
     for factor_portfolio in portfolio:
         for inv in factor_portfolio.investments:
             ticker = inv["ticker"]
-            end_price = next_market.get_price(ticker)
-            if end_price is not None:
-                total_end_value += inv["number_of_shares"] * end_price
-            else:
+            
+            # Retrieve the pre-calculated total return from the current market object
+            try:
+                # Dividing by 100 because the data is in percentage format (e.g., 20.0 for 20%)
+                stock_rtn = current_market.stocks.loc[ticker, "Next_Year_Return"] / 100
+                
+                # Weight the return by the dollar value of the position at the start of the year
                 entry_price = current_market.get_price(ticker)
-                if entry_price is not None:
-                    total_end_value += inv["number_of_shares"] * entry_price
-                    if verbosity == 3:
-                        print(f"{ticker} - Missing in {next_market.t}, liquidating at entry price: {entry_price}")
+                if entry_price:
+                    position_value = inv["number_of_shares"] * entry_price
+                    total_weighted_rtn += stock_rtn * position_value
+                    total_investment_value += position_value
+                    
+            except KeyError:
+                if verbosity >= 2:
+                    print(f"Warning: {ticker} return data missing, treating as 0%.")
+                continue
 
-    # Calculate growth
-    growth = (total_end_value - total_start_value) / total_start_value if total_start_value else 0
-    return growth, total_start_value, total_end_value
-
+    # Calculate aggregate growth for the year
+    growth = total_weighted_rtn / total_investment_value if total_investment_value > 0 else 0
+    
+    # Calculate end value to maintain compatibility with the rebalancing loop
+    total_end_value = total_investment_value * (1 + growth)
+    
+    return growth, total_investment_value, total_end_value
 
 def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, verbosity=0, restrict_fossil_fuels=False, top_pct=10, which='top', use_market_cap_weight=False):
     aum = initial_aum
@@ -197,23 +207,23 @@ def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, verbos
             )
             yearly_portfolio.append(factor_portfolio)
 
-        if year < end_year:
-            next_market = MarketObject(data.loc[data['Year'] == year + 1], year + 1)
-            growth, total_start_value, total_end_value = calculate_growth(yearly_portfolio, next_market, market, verbosity)
+ 
+        # No need for next_market anymore; all data is in the current 'market' object
+        growth, total_start_value, total_end_value = calculate_growth(yearly_portfolio, market, verbosity)
 
-            if verbosity is not None and verbosity >= 2:
-                print(f"Year {year} to {year + 1}: Growth: {growth:.2%}, "
-                      f"Start Value: ${total_start_value:.2f}, End Value: ${total_end_value:.2f}")
+        if verbosity is not None and verbosity >= 2:
+            print(f"Year {year} to {year + 1}: Growth: {growth:.2%}, "
+                    f"Start Value: ${total_start_value:.2f}, End Value: ${total_end_value:.2f}")
 
-            aum = total_end_value  # Liquidate and reinvest
+        aum = total_end_value  # Liquidate and reinvest
 
-            # Append annual return (growth) to portfolio_returns
-            portfolio_returns.append(growth)
+        # Append annual return (growth) to portfolio_returns
+        portfolio_returns.append(growth)
 
-            # Get benchmark return for the year (replace it as needed)
-            benchmark_return = get_benchmark_return(year)  # Define this function based on benchmark data
-            benchmark_returns.append(benchmark_return)
-            portfolio_values.append(aum)  # add current AUM to the list
+        # Get benchmark return for the year (replace it as needed)
+        benchmark_return = get_benchmark_return(year)  # Define this function based on benchmark data
+        benchmark_returns.append(benchmark_return)
+        portfolio_values.append(aum)  # add current AUM to the list
 
         years.append(year+1) #adding next year to match portfolio_values
 
