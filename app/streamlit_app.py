@@ -356,7 +356,7 @@ def main():
         show_loading = st.checkbox("Show data loading progress", value=True)
 
     # Main content area
-    tab1, tab2, tab3, tab4 = st.tabs(["Analysis", "Results", "Optimizer", "About"])
+    tab1, tab2, tab3 = st.tabs(["Analysis", "Results", "About"])
     
     with tab1:
         st.header("Factor Selection")
