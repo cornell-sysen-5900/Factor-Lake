@@ -1,3 +1,4 @@
+import streamlit as st
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 from src.market_object import MarketObject
@@ -95,11 +96,11 @@ def plot_top_bottom_percent(rdata,
             start_year = years[0]
             end_year = years[-1]
             # Top series using rebalance logic with user-selected percent
-            res_top = rebalance_portfolio(rdata, factors, start_year, end_year, initial_investment, verbosity=0, restrict_fossil_fuels=restrict_fossil_fuels, top_pct=percent, which='top')
+            res_top = rebalance_portfolio(rdata, factors, start_year, end_year, initial_investment, verbosity=0, restrict_fossil_fuels=restrict_fossil_fuels, top_pct=percent, which='top', use_market_cap_weight=st.session_state.use_cap_weight)
             top_values = res_top.get('portfolio_values', [initial_investment])
             # Bottom series using rebalance logic with user-selected percent
             if show_bottom:
-                res_bot = rebalance_portfolio(rdata, factors, start_year, end_year, initial_investment, verbosity=0, restrict_fossil_fuels=restrict_fossil_fuels, top_pct=percent, which='bottom')
+                res_bot = rebalance_portfolio(rdata, factors, start_year, end_year, initial_investment, verbosity=0, restrict_fossil_fuels=restrict_fossil_fuels, top_pct=percent, which='bottom', use_market_cap_weight=st.session_state.use_cap_weight)
                 bottom_values = res_bot.get('portfolio_values', [initial_investment])
             skip_inline_selection = True
         except Exception:
