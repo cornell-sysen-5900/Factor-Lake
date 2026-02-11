@@ -34,6 +34,9 @@ def load_data(restrict_fossil_fuels=False, use_supabase=True, table_name='Full P
             
             # Standardize column names to match existing code expectations
             rdata = _standardize_column_names(rdata)
+            
+            # New return logic: 0 if null next year return
+            rdata['Next_Year_Return'] = rdata['Next_Year_Return'].fillna(0)
 
             # Apply sector restriction logic (post-standardization)
             if restrict_fossil_fuels:
@@ -143,6 +146,9 @@ def load_data(restrict_fossil_fuels=False, use_supabase=True, table_name='Full P
 
             # Standardize to the same column names we expect from Supabase
             rdata = _standardize_column_names(rdata)
+            
+            # New return logic: 0 if null next year return
+            rdata['Next_Year_Return'] = rdata['Next_Year_Return'].fillna(0)
 
             # Apply sector restriction logic (post-standardization)
             if restrict_fossil_fuels:
@@ -231,7 +237,7 @@ def _standardize_column_names(df):
         '1-Yr_Asset_Growth': '1-Yr Asset Growth %',
         '1-Yr_CapEX_Growth': '1-Yr CapEX Growth %',
         'Book-Price': 'Book/Price',
-        'Next-Years_Return': "Next-Year's Return %",
+        'Next-Years_Return': "Next_Year_Return",
         'Next-Years_Active_Return': "Next-Year's Active Return %",
 
         # Financial data columns
@@ -367,7 +373,7 @@ class MarketObject():
             'ROE using 9/30 Data', 'ROA using 9/30 Data', '12-Mo Momentum %', '1-Mo Momentum %',
             'Price to Book Using 9/30 Data', 'Next FY Earns/P', '1-Yr Price Vol %', 'Accruals/Assets',
             'ROA %', '1-Yr Asset Growth %', '1-Yr CapEX Growth %', 'Book/Price',
-            "Next-Year's Return %", "Next-Year's Active Return %"
+            "Next_Year_Return", "Next-Year's Active Return %"
         ]
         # Keep Ticker-Region so we can index uniquely when present
         # Include Market Capitalization for cap-weighted portfolios

@@ -316,8 +316,8 @@ def main():
             end_year = st.number_input(
                 "End Year",
                 min_value=2002,
-                max_value=2023,
-                value=2023,
+                max_value=2024,
+                value=2024,
                 step=1,
                 format="%d",
                 key="end_year_input",
@@ -446,7 +446,7 @@ def main():
                             st.warning('Unable to filter loaded data by selected years; using full dataset instead.')
 
                         # Keep only relevant columns (include Market Capitalization for cap-weighted portfolios)
-                        cols_to_keep = ['Ticker', 'Year']
+                        cols_to_keep = ['Ticker', 'Year', 'Next_Year_Return']
                         if 'Ending Price' in rdata.columns:
                             cols_to_keep.append('Ending Price')
                         elif 'Ending_Price' in rdata.columns:
@@ -668,7 +668,8 @@ def main():
                                         verbosity=0,
                                         restrict_fossil_fuels=st.session_state.restrict_ff,
                                         top_pct=cohort_pct,
-                                        which='top'
+                                        which='top',
+                                        use_market_cap_weight=st.session_state.use_cap_weight
                                     )
                                     res_bot = rebalance_portfolio(
                                         st.session_state.rdata,
@@ -679,7 +680,8 @@ def main():
                                         verbosity=0,
                                         restrict_fossil_fuels=st.session_state.restrict_ff,
                                         top_pct=cohort_pct,
-                                        which='bottom'
+                                        which='bottom',
+                                        use_market_cap_weight=st.session_state.use_cap_weight
                                     ) if show_bottom_cohort else None
                                     if isinstance(res_top, dict) and 'portfolio_values' in res_top:
                                         tv = list(res_top.get('portfolio_values', []))
@@ -710,7 +712,8 @@ def main():
                                     verbosity=0,
                                     restrict_fossil_fuels=st.session_state.restrict_ff,
                                     top_pct=cohort_pct,
-                                    which='top'
+                                    which='top',
+                                    use_market_cap_weight=st.session_state.use_cap_weight
                                 )
                             except Exception:
                                 res_top = None
@@ -726,7 +729,8 @@ def main():
                                         verbosity=0,
                                         restrict_fossil_fuels=st.session_state.restrict_ff,
                                         top_pct=cohort_pct,
-                                        which='bottom'
+                                        which='bottom',
+                                        use_market_cap_weight=st.session_state.use_cap_weight
                                     )
                             except Exception:
                                 res_bot = None
@@ -919,6 +923,7 @@ def main():
         else:
             st.info("Run an analysis from the Analysis tab to see results here")
     
+   
     with tab3:
         st.header("About Factor-Lake Portfolio Analysis")
         
@@ -993,7 +998,11 @@ def main():
         3. **Load** the market data
         4. **Run** the portfolio analysis
         5. **View** results and download performance data
-            
+        
+        ### Return Methodology
+        
+        The portfolio's performance is derived from the **Next-Year's Return %** column within the dataset. This metric captures the total percentage return, including dividends, from the initial data capture date through a one-year investment window. To ensure the backtest remains robust against survivorship bias, we account for tickers with missing return data—often the result of delisting due to mergers, acquisitions, or bankruptcy—by assigning them a return of 0%. This approach ensures that every selected security impacts the final AUM, providing a realistic representation of historical performance.
+        
         ### Data Sources
             
         - **Supabase**: Cloud-hosted database with historical market data
@@ -1010,8 +1019,8 @@ def main():
             
         ---
             
-        **Version:** 1.0.0  
-        **Last Updated:** November 2025
+        **Version:** 1.1.0  
+        **Last Updated:** Feb 2026
         """)
 
 if __name__ == "__main__":
