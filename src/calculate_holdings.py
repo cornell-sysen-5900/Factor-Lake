@@ -359,7 +359,8 @@ def calculate_information_ratio(portfolio_returns, benchmark_returns, verbosity=
     # Ensure inputs are numpy arrays for mathematical operations
     verbosity = 0 if verbosity is None else verbosity
     portfolio_returns = np.array(portfolio_returns)
-    benchmark_returns = np.array(benchmark_returns)
+    #benchmark_returns = np.array(benchmark_returns)
+    benchmark_returns = np.array(benchmark_returns) / 100
 
     # Calculate active returns
     active_returns = portfolio_returns - benchmark_returns
