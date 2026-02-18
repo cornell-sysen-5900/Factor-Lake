@@ -871,7 +871,7 @@ def main():
                              help="Risk-adjusted return for Russell 2000")
                 
                 # Win rate and information ratio
-                col1, col2, col3 = st.columns(3)
+                col1, col2, col3, col4 = st.columns(4)
                 
                 with col1:
                     st.metric("Yearly Win Rate", 
@@ -887,6 +887,18 @@ def main():
                                  help="Active return per unit of active risk")
                 
                 with col3:
+                    if results.get('portfolio_beta') is not None:
+                        st.metric(
+                            "Portfolio Beta",
+                            f"{results['portfolio_beta']:.3f}",
+                            help=(
+                                "Sensitivity of portfolio returns to the Russell 2000. "
+                                "Beta = 1 moves with the market. "
+                                "> 1 is more volatile. < 1 is more defensive."
+                            )
+                        )
+
+                with col4:
                     st.metric("Risk-Free Rate Source", 
                              results.get('risk_free_rate_source', 'N/A'),
                              delta=None,
