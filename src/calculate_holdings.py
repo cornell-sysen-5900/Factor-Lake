@@ -1,3 +1,4 @@
+from scipy import stats
 from .market_object import MarketObject
 from .portfolio import Portfolio
 import numpy as np
@@ -277,7 +278,13 @@ def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, verbos
     benchmark_annualized = (np.prod(1 + benchmark_returns_np))**(1 / len(benchmark_returns_np)) - 1
     benchmark_volatility = np.std(benchmark_returns_np, ddof=1)
     sharpe_benchmark = benchmark_annualized / benchmark_volatility if benchmark_volatility > 0 else 0
-    
+
+    # ── Portfolio Beta vs Russell 2000 ──
+    portfolio_beta = None
+    if len(portfolio_returns_np) >= 3:
+        coeffs = np.polyfit(benchmark_returns_np, portfolio_returns_np, 1)
+        portfolio_beta = float(coeffs[0])
+
     # Calculate yearly win rate
     yearly_wins = 0
     yearly_comparisons = []
@@ -298,6 +305,7 @@ def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, verbos
     if verbosity is not None and verbosity >= 1:
         print(f"\n==== Advanced Backtest Stats ====")
         print(f"Risk-Free Rate Source: {risk_free_rate_source}")
+        print(f"Portfolio Beta (vs Russell 2000): {portfolio_beta:.4f}" if portfolio_beta is not None else "Portfolio Beta: N/A")
         print(f"Max Drawdown (Portfolio): {max_drawdown_portfolio * 100:.2f}%")
         print(f"Max Drawdown (Benchmark): {max_drawdown_benchmark * 100:.2f}%")
         print(f"Sharpe Ratio (Portfolio): {sharpe_portfolio:.4f}")
@@ -313,6 +321,7 @@ def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, verbos
         'benchmark_returns': benchmark_returns,
         'years': years,
         'portfolio_values': portfolio_values,
+        'portfolio_beta': portfolio_beta,
         'max_drawdown_portfolio': max_drawdown_portfolio,
         'max_drawdown_benchmark': max_drawdown_benchmark,
         'sharpe_portfolio': sharpe_portfolio,
@@ -350,7 +359,8 @@ def calculate_information_ratio(portfolio_returns, benchmark_returns, verbosity=
     # Ensure inputs are numpy arrays for mathematical operations
     verbosity = 0 if verbosity is None else verbosity
     portfolio_returns = np.array(portfolio_returns)
-    benchmark_returns = np.array(benchmark_returns)
+    #benchmark_returns = np.array(benchmark_returns)
+    benchmark_returns = np.array(benchmark_returns) / 100
 
     # Calculate active returns
     active_returns = portfolio_returns - benchmark_returns
