@@ -1,6 +1,11 @@
-# portfolio_growth_plot.py
+"""
+DEPRECATED / UNUSED
+-------------------
+This file is currently NOT used by the main application. 
+The plotting logic has been moved directly into `app/streamlit_app.py` 
+within the results tab (tab2)
+"""
 
-from matplotlib.pylab import double
 import matplotlib.pyplot as plt
 
 
@@ -56,13 +61,12 @@ def plot_portfolio_growth(years,
             else:
                 initial_investment = 1.0
 
-        # Normalize return units: support both percent (e.g. 34.62) and decimal (0.3462)
+        # Normalize return units
         def to_decimal(x):
             try:
-                v = double(x)
-            except Exception:
+                return float(x) / 100.0
+            except (ValueError, TypeError):
                 return 0.0
-            return v if abs(v) <= 1 else v / 100.0
 
         # Expected common case: benchmark_returns has length len(years)-1
         if len(br) == max(0, len(years) - 1):
@@ -88,6 +92,56 @@ def plot_portfolio_growth(years,
             # Try to align by trimming or expanding years
             common_len = min(len(years), len(benchmark_values))
             plt.plot(years[:common_len], benchmark_values[:common_len], marker='s', linestyle='--', color='r', label=benchmark_label)
+
+    # === UPDATED ADDITION BLOCK ===
+    try:
+        print("DEBUG: Attempting to overlay benchmarks from benchmarks.py...")
+        from src.benchmarks import get_benchmark_list
+        
+        start_year = years[0]
+        end_year = years[-1]
+        
+        # We need data from the year after the start through the year after the end
+        # Added +2 because range() is exclusive of the stop value
+        value_returns = get_benchmark_list(3, start_year + 1, end_year + 2) 
+        growth_returns = get_benchmark_list(2, start_year + 1, end_year + 2)
+        
+
+        print(f"DEBUG: Years {start_year} to {end_year}")
+        print(f"DEBUG: Found {len(value_returns)} value returns and {len(growth_returns)} growth returns")
+
+        def _to_dec_extra(x):
+            try: return float(x) / 100.0
+            except: return 0.0
+
+        # Note: Index 3 is Value, Index 2 is Growth based on your benchmarks.py mapping
+        extra_benchmarks = [
+            ('Value Index', value_returns, 'g', '^'),
+            ('Growth Index', growth_returns, 'orange', 'D')
+        ]
+        
+        start_val = initial_investment if initial_investment is not None else (portfolio_values[0] if portfolio_values else 1.0)
+
+        for label, rets, color, marker in extra_benchmarks:
+            # If the list is empty, this block is skipped
+            if rets and len(rets) > 0:
+                b_vals = [start_val]
+                
+                # Logic to iterate through returns and build the growth curve
+                for r in rets:
+                    b_vals.append(b_vals[-1] * (1 + _to_dec_extra(r)))
+                
+                # Match the length to the years provided
+                common_len = min(len(years), len(b_vals))
+                if common_len > 0:
+                    plt.plot(years[:common_len], b_vals[:common_len], 
+                             marker=marker, linestyle=':', color=color, 
+                             alpha=0.6, label=label)
+            else:
+                print(f"DEBUG: No data found for {label}")
+
+    except Exception as e:
+        print(f"Could not overlay benchmarks: {e}")
 
     plt.title(f"Portfolio Growth Over Time ({factor_set_name})\nFossil fuel restriction: {restriction_text}")
     plt.xlabel('Year')
