@@ -800,7 +800,7 @@ def main():
                                     st.metric(f"Top {cohort_pct}% CAGR", f"{top_metrics['cagr']:.2f}%")
                                     if benchmark_final is not None:
                                         alpha_top = ((top_metrics['end'] / benchmark_final) - 1) * 100
-                                        st.metric(f"Top {cohort_pct}% Alpha vs Russell 2000", f"{alpha_top:.2f}%")
+                                        st.metric(f"Top {cohort_pct}% Cumulative Outperformance", f"{alpha_top:.2f}%")
                                 else:
                                     st.write(f"Top {cohort_pct}%: no final AUM available")
                             with col_bot:
@@ -810,7 +810,7 @@ def main():
                                     st.metric(f"Bottom {cohort_pct}% CAGR", f"{bot_metrics['cagr']:.2f}%")
                                     if benchmark_final is not None:
                                         alpha_bot = ((bot_metrics['end'] / benchmark_final) - 1) * 100
-                                        st.metric(f"Bottom {cohort_pct}% Alpha vs Russell 2000", f"{alpha_bot:.2f}%")
+                                        st.metric(f"Bottom {cohort_pct}% Cumulative Outperformance", f"{alpha_bot:.2f}%")
                                 else:
                                     st.write(f"Bottom {cohort_pct}%: no final AUM available")
 
