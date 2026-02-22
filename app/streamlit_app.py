@@ -559,7 +559,7 @@ def main():
                     # Convert percentages to decimals before calculating
                     benchmark_final = st.session_state.initial_aum * np.prod([1 + r/100 for r in results['benchmark_returns']])
                     alpha = ((final_value / benchmark_final) - 1) * 100
-                    st.metric("Alpha vs Russell 2000", f"{alpha:.2f}%")
+                    st.metric("Cumulative Outperformance", f"{alpha:.2f}%")
                 else:
                     st.metric("Rebalances", str(len(results['years'])))
             
@@ -572,30 +572,59 @@ def main():
             
             years = results['years']
             portfolio_values = results['portfolio_values']
+            initial_aum = st.session_state.initial_aum
             
             ax.plot(years, portfolio_values, marker='o', linewidth=2, markersize=6, label='Portfolio', color='#1f77b4')
             
-            # Add benchmark if available
+            # 1. Existing Russell 2000 Benchmark
             if 'benchmark_returns' in results and results['benchmark_returns']:
-                benchmark_values = [st.session_state.initial_aum]
+                benchmark_values = [initial_aum]
                 for ret in results['benchmark_returns']:
-                    # Convert percentage to decimal (ret is stored as percentage like 34.62)
                     benchmark_values.append(benchmark_values[-1] * (1 + ret / 100))
                 ax.plot(years, benchmark_values, marker='s', linewidth=2, markersize=4, 
                        label='Russell 2000', linestyle='--', alpha=0.7, color='#ff7f0e')
+
+            # === ADDED: VALUE AND GROWTH OVERLAYS ===
+# === FIXED: VALUE AND GROWTH OVERLAYS ===
+            try:
+                from src.benchmarks import get_benchmark_list
+                
+                # Fetch returns (Index 3: Value, Index 2: Growth)
+                val_rets = get_benchmark_list(3, years[0] + 1, years[-1] + 2)
+                gro_rets = get_benchmark_list(2, years[0] + 1, years[-1] + 2)
+
+                indices_to_plot = [
+                    ('Value Index', val_rets, 'g', '^'),
+                    ('Growth Index', gro_rets, 'orange', 'D')
+                ]
+
+                for label, rets, color, marker in indices_to_plot:
+                    if rets:
+                        vals = [initial_aum]
+                        for r in rets:
+                            vals.append(vals[-1] * (1 + float(r) / 100))
+                        
+                        # Align lengths: Ensure we only plot the intersection of years and values
+                        common_len = min(len(years), len(vals))
+                        ax.plot(years[:common_len], vals[:common_len], 
+                               marker=marker, linestyle=':', linewidth=1.5, 
+                               alpha=0.6, label=label, color=color)
+            except Exception as e:
+                st.error(f"Error loading extra benchmarks: {e}")
+            # ========================================
+            # ========================================
             
             ax.set_xlabel('Year', fontsize=12)
             ax.set_ylabel('Portfolio Value ($)', fontsize=12)
             ax.set_title(f'Portfolio Growth: {", ".join(st.session_state.selected_factors)}', fontsize=14, fontweight='bold')
             ax.legend(loc='best')
             ax.grid(True, alpha=0.3)
+            
             from matplotlib.ticker import FuncFormatter
             ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: f'${x:,.0f}'))
             
             st.pyplot(fig)
-            
             st.divider()
-            
             # Top/Bottom Cohort Analysis
             st.subheader("Top vs Bottom Cohort Analysis")
             
@@ -771,7 +800,7 @@ def main():
                                     st.metric(f"Top {cohort_pct}% CAGR", f"{top_metrics['cagr']:.2f}%")
                                     if benchmark_final is not None:
                                         alpha_top = ((top_metrics['end'] / benchmark_final) - 1) * 100
-                                        st.metric(f"Top {cohort_pct}% Alpha vs Russell 2000", f"{alpha_top:.2f}%")
+                                        st.metric(f"Top {cohort_pct}% Cumulative Outperformance", f"{alpha_top:.2f}%")
                                 else:
                                     st.write(f"Top {cohort_pct}%: no final AUM available")
                             with col_bot:
@@ -781,7 +810,7 @@ def main():
                                     st.metric(f"Bottom {cohort_pct}% CAGR", f"{bot_metrics['cagr']:.2f}%")
                                     if benchmark_final is not None:
                                         alpha_bot = ((bot_metrics['end'] / benchmark_final) - 1) * 100
-                                        st.metric(f"Bottom {cohort_pct}% Alpha vs Russell 2000", f"{alpha_bot:.2f}%")
+                                        st.metric(f"Bottom {cohort_pct}% Cumulative Outperformance", f"{alpha_bot:.2f}%")
                                 else:
                                     st.write(f"Bottom {cohort_pct}%: no final AUM available")
 

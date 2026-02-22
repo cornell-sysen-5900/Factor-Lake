@@ -454,26 +454,34 @@ def plot_top_bottom_percent(rdata,
             details['years'].append(year)
             details['per_year'].append(per_year)
 
-    # Build benchmark dollar series (same approach as other plotting code)
+    # === ROBUST BENCHMARK ALIGNMENT ===
     benchmark_values = None
     if benchmark_returns is not None:
-        def to_decimal(x):
-            try:
-                v = float(x)
-            except Exception:
-                return 0.0
-            return v if abs(v) <= 1 else v / 100.0
-
         br = list(benchmark_returns)
-        if len(br) == max(0, len(years) - 1):
-            benchmark_values = [initial_investment]
-            for r in br:
-                benchmark_values.append(benchmark_values[-1] * (1 + to_decimal(r)))
-        elif len(br) == len(years):
-            benchmark_values = [initial_investment]
-            for r in br[:-1]:
-                benchmark_values.append(benchmark_values[-1] * (1 + to_decimal(r)))
+        benchmark_values = [initial_investment]
+        
+        # Years: [2000, 2001, ..., 2022] (Length N)
+        # Returns: [36.5, 18.76, ...] (Length N-1)
+        for i in range(len(years) - 1):
+            if i < len(br):
+                # We know these are percentages (e.g. 36.5)
+                # Divide by 100 to get the multiplier (1.365)
+                ret_decimal = float(br[i]) / 100.0
+                next_val = benchmark_values[-1] * (1 + ret_decimal)
+                benchmark_values.append(next_val)
+            else:
+                # Fallback to keep array lengths equal
+                benchmark_values.append(benchmark_values[-1])
 
+    # Plotting check
+    if benchmark_values is not None:
+        plt.plot(years, benchmark_values, marker='s', linestyle='--', color='r', 
+                 label=benchmark_label, linewidth=1.2)
+
+    # === DEBUG PRINT (Check terminal/console) ===
+    # print(f"DEBUG: Years count: {len(years)}, Bench values count: {len(benchmark_values)}")
+                
+            
     # Plot
     plt.figure(figsize=(11, 5))
     ax = plt.gca()
