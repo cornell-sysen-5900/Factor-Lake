@@ -377,8 +377,8 @@ def main():
                 with fcol2:
                     if checked:
                         is_bottom = st.toggle(
-                            "Bottom Decile", key=f"{key}_dir", value=False,
-                            help="OFF = Top Decile (positive factor tilt), ON = Bottom Decile (negative factor tilt)"
+                            "Low to High", key=f"{key}_dir", value=False,
+                            help="OFF = High to Low (positive factor tilt), ON = Low to High (negative factor tilt)"
                         )
                     else:
                         is_bottom = False
@@ -437,7 +437,7 @@ def main():
         # Display selected factors with their decile direction
         if selected_factor_names:
             factor_labels = [
-                f"{name} ({'Top' if factor_directions[name] == 'top' else 'Bottom'})"
+                f"{name} ({'High to Low' if factor_directions[name] == 'top' else 'Low to High'})"
                 for name in selected_factor_names
             ]
             st.success(f"Selected {len(selected_factor_names)} factor(s): {', '.join(factor_labels)}")
@@ -450,66 +450,73 @@ def main():
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             if st.button("Load Data", use_container_width=True, type="primary"):
-                with st.spinner("Loading market data..."):
-                    try:
-                        sectors_to_use = selected_sectors if sector_filter_enabled else None
-
-                        rdata = load_data(
-                            restrict_fossil_fuels=restrict_fossil_fuels,
-                            use_supabase=True,
-                            data_path=None,
-                            show_loading_progress=show_loading,
-                            sectors=sectors_to_use
-                        )
-
-                        # Data preprocessing
-                        rdata['Ticker'] = rdata['Ticker-Region'].dropna().apply(
-                            lambda x: x.split('-')[0].strip()
-                        )
-                        rdata['Year'] = pd.to_datetime(rdata['Date']).dt.year
-
-                        # If the user selected an analysis period, filter the loaded data to that range
+                if not st.session_state.data_loaded:
+                    with st.spinner("Loading market data..."):
                         try:
-                            rdata = rdata[(rdata['Year'] >= int(start_year)) & (rdata['Year'] <= int(end_year))]
-                        except Exception:
-                            # If filtering fails, keep full dataset but warn the user
-                            st.warning('Unable to filter loaded data by selected years; using full dataset instead.')
+                            sectors_to_use = selected_sectors if sector_filter_enabled else None
 
-                        # Keep only relevant columns (include Market Capitalization for cap-weighted portfolios)
-                        cols_to_keep = ['Ticker', 'Year', 'Next_Year_Return']
-                        if 'Ending Price' in rdata.columns:
-                            cols_to_keep.append('Ending Price')
-                        elif 'Ending_Price' in rdata.columns:
-                            rdata['Ending Price'] = rdata['Ending_Price']
-                            cols_to_keep.append('Ending Price')
+                            rdata = load_data(
+                                restrict_fossil_fuels=restrict_fossil_fuels,
+                                use_supabase=True,
+                                data_path=None,
+                                show_loading_progress=show_loading,
+                                sectors=sectors_to_use
+                            )
+
+                            # Data preprocessing
+                            rdata['Ticker'] = rdata['Ticker-Region'].dropna().apply(
+                                lambda x: x.split('-')[0].strip()
+                            )
+                            rdata['Year'] = pd.to_datetime(rdata['Date']).dt.year
+
+                            # If the user selected an analysis period, filter the loaded data to that range
+                            try:
+                                rdata = rdata[(rdata['Year'] >= int(start_year)) & (rdata['Year'] <= int(end_year))]
+                            except Exception:
+                                # If filtering fails, keep full dataset but warn the user
+                                st.warning('Unable to filter loaded data by selected years; using full dataset instead.')
+
+                            # Keep only relevant columns (include Market Capitalization for cap-weighted portfolios)
+                            cols_to_keep = ['Ticker', 'Year', 'Next_Year_Return']
+                            if 'Ending Price' in rdata.columns:
+                                cols_to_keep.append('Ending Price')
+                            elif 'Ending_Price' in rdata.columns:
+                                rdata['Ending Price'] = rdata['Ending_Price']
+                                cols_to_keep.append('Ending Price')
+                            
+                            # Add Market Capitalization if available (needed for cap-weighted portfolios)
+                            if 'Market Capitalization' in rdata.columns:
+                                cols_to_keep.append('Market Capitalization')
+                            elif 'Market_Capitalization' in rdata.columns:
+                                rdata['Market Capitalization'] = rdata['Market_Capitalization']
+                                cols_to_keep.append('Market Capitalization')
+
+                            for factor in FACTOR_MAP.keys():
+                                if factor in rdata.columns:
+                                    cols_to_keep.append(factor)
+
+                            rdata = rdata[cols_to_keep]
+
+                            st.session_state.rdata = rdata
+                            st.session_state.data_loaded = True
+
+
+                            st.success(f"Data loaded successfully! {len(rdata)} records from {rdata['Year'].min()} to {rdata['Year'].max()}")
+
+                        except Exception as e:
+                            st.error(f"Error loading data: {str(e)}")
+                            st.exception(e)
+                
+                
+            # Show data preview
+            if st.session_state.data_loaded:
+                display_df = st.session_state.rdata
+                with st.expander("Data Preview"):
+                    st.dataframe(display_df.head(100), use_container_width=True)
+                    st.write(f"**Shape:** {display_df.shape[0]} rows × {display_df.shape[1]} columns")
+                    st.write(f"**Years:** {sorted(display_df['Year'].unique())}")
+                    st.write(f"**Unique Tickers:** {display_df['Ticker'].nunique()}")
                         
-                        # Add Market Capitalization if available (needed for cap-weighted portfolios)
-                        if 'Market Capitalization' in rdata.columns:
-                            cols_to_keep.append('Market Capitalization')
-                        elif 'Market_Capitalization' in rdata.columns:
-                            rdata['Market Capitalization'] = rdata['Market_Capitalization']
-                            cols_to_keep.append('Market Capitalization')
-
-                        for factor in FACTOR_MAP.keys():
-                            if factor in rdata.columns:
-                                cols_to_keep.append(factor)
-
-                        rdata = rdata[cols_to_keep]
-
-                        st.session_state.rdata = rdata
-                        st.session_state.data_loaded = True
-
-                        st.success(f"Data loaded successfully! {len(rdata)} records from {rdata['Year'].min()} to {rdata['Year'].max()}")
-
-                        # Show data preview
-                        with st.expander("Data Preview"):
-                            st.dataframe(rdata.head(100), use_container_width=True)
-                            st.write(f"**Shape:** {rdata.shape[0]} rows × {rdata.shape[1]} columns")
-                            st.write(f"**Years:** {sorted(rdata['Year'].unique())}")
-                            st.write(f"**Unique Tickers:** {rdata['Ticker'].nunique()}")
-                    except Exception as e:
-                        st.error(f"Error loading data: {str(e)}")
-                        st.exception(e)
         
         st.write("---")
         
@@ -563,7 +570,7 @@ def main():
             with col1:
                 saved_dirs = st.session_state.get('factor_directions', {})
                 factor_captions = [
-                    f"{f} ({'Top' if saved_dirs.get(f, 'top') == 'top' else 'Bottom'})"
+                    f"{f} ({'High to Low' if saved_dirs.get(f, 'High to Low') == 'High to Low' else 'Low to High'})"
                     for f in st.session_state.selected_factors
                 ]
                 st.caption(f"**Factors:** {', '.join(factor_captions)}")
