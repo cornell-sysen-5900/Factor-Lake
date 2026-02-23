@@ -5,16 +5,17 @@ Interactive web interface for running factor-based portfolio backtests
 import sys
 import os
 
-# Load environment variables from .env file
+# Load environment variables from .env file (check app/ dir, then project root)
 from pathlib import Path
-env_path = Path(__file__).parent / '.env'
-if env_path.exists():
-    with open(env_path) as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith('#') and '=' in line:
-                key, value = line.split('=', 1)
-                os.environ[key] = value
+for _candidate in [Path(__file__).parent / '.env', Path(__file__).resolve().parent.parent / '.env']:
+    if _candidate.exists():
+        with open(_candidate) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ.setdefault(key, value)
+        break
 
 # Add src directory to path by searching parent directories until a `src` folder
 # is found. This makes the app runnable from different working directories
@@ -41,7 +42,10 @@ from datetime import datetime
 def check_password():
     """Returns `True` if the user had the correct password."""
     
-    configured_password = st.secrets.get("password", os.environ.get("ADMIN_PASSWORD"))
+    try:
+        configured_password = st.secrets["password"]
+    except (FileNotFoundError, KeyError):
+        configured_password = os.environ.get("ADMIN_PASSWORD")
 
     def password_entered():
         """Checks whether a password entered by the user is correct."""
@@ -362,55 +366,81 @@ def main():
         st.header("Factor Selection")
         st.write("Select one or more factors for your portfolio strategy:")
         
+        # Helper: render a factor checkbox with an inline direction toggle
+        def factor_category(factors_config):
+            selections = {}
+            directions = {}
+            for name, key in factors_config:
+                fcol1, fcol2 = st.columns([3, 2])
+                with fcol1:
+                    checked = st.checkbox(name, key=key)
+                with fcol2:
+                    if checked:
+                        is_bottom = st.toggle(
+                            "Bottom Decile", key=f"{key}_dir", value=False,
+                            help="OFF = Top Decile (positive factor tilt), ON = Bottom Decile (negative factor tilt)"
+                        )
+                    else:
+                        is_bottom = False
+                selections[name] = checked
+                directions[name] = 'bottom' if is_bottom else 'top'
+            return selections, directions
+
         # Create columns for factor selection
         col1, col2 = st.columns(2)
         
         with col1:
             st.subheader("Momentum Factors")
-            momentum_factors = {
-                '12-Mo Momentum %': st.checkbox('12-Mo Momentum %', key='12m'),
-                '6-Mo Momentum %': st.checkbox('6-Mo Momentum %', key='6m'),
-                '1-Mo Momentum %': st.checkbox('1-Mo Momentum %', key='1m')
-            }
+            momentum_factors, momentum_dirs = factor_category([
+                ('12-Mo Momentum %', '12m'),
+                ('6-Mo Momentum %', '6m'),
+                ('1-Mo Momentum %', '1m'),
+            ])
             st.subheader("Profitability Factors")
-            profitability_factors = {
-                'ROE using 9/30 Data': st.checkbox('ROE using 9/30 Data', key='roe'),
-                'ROA using 9/30 Data': st.checkbox('ROA using 9/30 Data', key='roa'),
-                'ROA %': st.checkbox('ROA %', key='roa_pct')
-            }
+            profitability_factors, profitability_dirs = factor_category([
+                ('ROE using 9/30 Data', 'roe'),
+                ('ROA using 9/30 Data', 'roa'),
+                ('ROA %', 'roa_pct'),
+            ])
             st.subheader("Growth Factors")
-            growth_factors = {
-                '1-Yr Asset Growth %': st.checkbox('1-Yr Asset Growth %', key='asset_growth'),
-                '1-Yr CapEX Growth %': st.checkbox('1-Yr CapEX Growth %', key='capex_growth')
-            }
+            growth_factors, growth_dirs = factor_category([
+                ('1-Yr Asset Growth %', 'asset_growth'),
+                ('1-Yr CapEX Growth %', 'capex_growth'),
+            ])
         with col2:
             st.subheader("Value Factors")
-            value_factors = {
-                'Price to Book Using 9/30 Data': st.checkbox('Price to Book Using 9/30 Data', key='ptb'),
-                'Book/Price': st.checkbox('Book/Price', key='btp'),
-                'Next FY Earns/P': st.checkbox('Next FY Earns/P', key='fey')
-            }
+            value_factors, value_dirs = factor_category([
+                ('Price to Book Using 9/30 Data', 'ptb'),
+                ('Book/Price', 'btp'),
+                ('Next FY Earns/P', 'fey'),
+            ])
             st.subheader("Quality Factors")
-            quality_factors = {
-                'Accruals/Assets': st.checkbox('Accruals/Assets', key='accruals'),
-                '1-Yr Price Vol %': st.checkbox('1-Yr Price Vol %', key='vol')
-            }
-        # Only include the specified 13 factors
+            quality_factors, quality_dirs = factor_category([
+                ('Accruals/Assets', 'accruals'),
+                ('1-Yr Price Vol %', 'vol'),
+            ])
+
         all_factor_selections = {
-            **momentum_factors,
-            **profitability_factors,
-            **growth_factors,
-            **value_factors,
-            **quality_factors
+            **momentum_factors, **profitability_factors, **growth_factors,
+            **value_factors, **quality_factors
+        }
+        all_factor_directions = {
+            **momentum_dirs, **profitability_dirs, **growth_dirs,
+            **value_dirs, **quality_dirs
         }
         
         selected_factor_names = [name for name, selected in all_factor_selections.items() if selected]
+        factor_directions = {name: all_factor_directions[name] for name in selected_factor_names}
         
         st.write("---")
         
-        # Display selected factors
+        # Display selected factors with their decile direction
         if selected_factor_names:
-            st.success(f"Selected {len(selected_factor_names)} factor(s): {', '.join(selected_factor_names)}")
+            factor_labels = [
+                f"{name} ({'Top' if factor_directions[name] == 'top' else 'Bottom'})"
+                for name in selected_factor_names
+            ]
+            st.success(f"Selected {len(selected_factor_names)} factor(s): {', '.join(factor_labels)}")
         else:
             st.warning("Please select at least one factor to run the analysis")
         
@@ -505,11 +535,13 @@ def main():
                                     initial_aum=initial_aum,
                                     verbosity=verbosity_level,
                                     restrict_fossil_fuels=restrict_fossil_fuels,
-                                    use_market_cap_weight=use_market_cap_weight
+                                    use_market_cap_weight=use_market_cap_weight,
+                                    factor_directions=factor_directions
                                 )
                                 
                                 st.session_state.results = results
                                 st.session_state.selected_factors = selected_factor_names
+                                st.session_state.factor_directions = factor_directions
                                 st.session_state.restrict_ff = restrict_fossil_fuels
                                 st.session_state.initial_aum = initial_aum
                                 st.session_state.use_cap_weight = use_market_cap_weight
@@ -529,7 +561,12 @@ def main():
             # Display configuration info
             col1, col2 = st.columns([3, 1])
             with col1:
-                st.caption(f"**Factors:** {', '.join(st.session_state.selected_factors)}")
+                saved_dirs = st.session_state.get('factor_directions', {})
+                factor_captions = [
+                    f"{f} ({'Top' if saved_dirs.get(f, 'top') == 'top' else 'Bottom'})"
+                    for f in st.session_state.selected_factors
+                ]
+                st.caption(f"**Factors:** {', '.join(factor_captions)}")
             with col2:
                 weighting_label = "Market Cap Weighted" if st.session_state.get('use_cap_weight', False) else "Equal Weighted"
                 st.caption(f"**Weighting:** {weighting_label}")
