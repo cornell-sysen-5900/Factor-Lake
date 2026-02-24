@@ -5,16 +5,17 @@ Interactive web interface for running factor-based portfolio backtests
 import sys
 import os
 
-# Load environment variables from .env file
+# Load environment variables from .env file (check app/ dir, then project root)
 from pathlib import Path
-env_path = Path(__file__).parent / '.env'
-if env_path.exists():
-    with open(env_path) as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith('#') and '=' in line:
-                key, value = line.split('=', 1)
-                os.environ[key] = value
+for _candidate in [Path(__file__).parent / '.env', Path(__file__).resolve().parent.parent / '.env']:
+    if _candidate.exists():
+        with open(_candidate) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ.setdefault(key, value)
+        break
 
 # Add src directory to path by searching parent directories until a `src` folder
 # is found. This makes the app runnable from different working directories
@@ -41,7 +42,10 @@ from datetime import datetime
 def check_password():
     """Returns `True` if the user had the correct password."""
     
-    configured_password = st.secrets.get("password", os.environ.get("ADMIN_PASSWORD"))
+    try:
+        configured_password = st.secrets["password"]
+    except (FileNotFoundError, KeyError):
+        configured_password = os.environ.get("ADMIN_PASSWORD")
 
     def password_entered():
         """Checks whether a password entered by the user is correct."""
@@ -362,55 +366,81 @@ def main():
         st.header("Factor Selection")
         st.write("Select one or more factors for your portfolio strategy:")
         
+        # Helper: render a factor checkbox with an inline direction toggle
+        def factor_category(factors_config):
+            selections = {}
+            directions = {}
+            for name, key in factors_config:
+                fcol1, fcol2 = st.columns([3, 2])
+                with fcol1:
+                    checked = st.checkbox(name, key=key)
+                with fcol2:
+                    if checked:
+                        is_bottom = st.toggle(
+                            "Low to High", key=f"{key}_dir", value=False,
+                            help="OFF = High to Low (positive factor tilt), ON = Low to High (negative factor tilt)"
+                        )
+                    else:
+                        is_bottom = False
+                selections[name] = checked
+                directions[name] = 'bottom' if is_bottom else 'top'
+            return selections, directions
+
         # Create columns for factor selection
         col1, col2 = st.columns(2)
         
         with col1:
             st.subheader("Momentum Factors")
-            momentum_factors = {
-                '12-Mo Momentum %': st.checkbox('12-Mo Momentum %', key='12m'),
-                '6-Mo Momentum %': st.checkbox('6-Mo Momentum %', key='6m'),
-                '1-Mo Momentum %': st.checkbox('1-Mo Momentum %', key='1m')
-            }
+            momentum_factors, momentum_dirs = factor_category([
+                ('12-Mo Momentum %', '12m'),
+                ('6-Mo Momentum %', '6m'),
+                ('1-Mo Momentum %', '1m'),
+            ])
             st.subheader("Profitability Factors")
-            profitability_factors = {
-                'ROE using 9/30 Data': st.checkbox('ROE using 9/30 Data', key='roe'),
-                'ROA using 9/30 Data': st.checkbox('ROA using 9/30 Data', key='roa'),
-                'ROA %': st.checkbox('ROA %', key='roa_pct')
-            }
+            profitability_factors, profitability_dirs = factor_category([
+                ('ROE using 9/30 Data', 'roe'),
+                ('ROA using 9/30 Data', 'roa'),
+                ('ROA %', 'roa_pct'),
+            ])
             st.subheader("Growth Factors")
-            growth_factors = {
-                '1-Yr Asset Growth %': st.checkbox('1-Yr Asset Growth %', key='asset_growth'),
-                '1-Yr CapEX Growth %': st.checkbox('1-Yr CapEX Growth %', key='capex_growth')
-            }
+            growth_factors, growth_dirs = factor_category([
+                ('1-Yr Asset Growth %', 'asset_growth'),
+                ('1-Yr CapEX Growth %', 'capex_growth'),
+            ])
         with col2:
             st.subheader("Value Factors")
-            value_factors = {
-                'Price to Book Using 9/30 Data': st.checkbox('Price to Book Using 9/30 Data', key='ptb'),
-                'Book/Price': st.checkbox('Book/Price', key='btp'),
-                'Next FY Earns/P': st.checkbox('Next FY Earns/P', key='fey')
-            }
+            value_factors, value_dirs = factor_category([
+                ('Price to Book Using 9/30 Data', 'ptb'),
+                ('Book/Price', 'btp'),
+                ('Next FY Earns/P', 'fey'),
+            ])
             st.subheader("Quality Factors")
-            quality_factors = {
-                'Accruals/Assets': st.checkbox('Accruals/Assets', key='accruals'),
-                '1-Yr Price Vol %': st.checkbox('1-Yr Price Vol %', key='vol')
-            }
-        # Only include the specified 13 factors
+            quality_factors, quality_dirs = factor_category([
+                ('Accruals/Assets', 'accruals'),
+                ('1-Yr Price Vol %', 'vol'),
+            ])
+
         all_factor_selections = {
-            **momentum_factors,
-            **profitability_factors,
-            **growth_factors,
-            **value_factors,
-            **quality_factors
+            **momentum_factors, **profitability_factors, **growth_factors,
+            **value_factors, **quality_factors
+        }
+        all_factor_directions = {
+            **momentum_dirs, **profitability_dirs, **growth_dirs,
+            **value_dirs, **quality_dirs
         }
         
         selected_factor_names = [name for name, selected in all_factor_selections.items() if selected]
+        factor_directions = {name: all_factor_directions[name] for name in selected_factor_names}
         
         st.write("---")
         
-        # Display selected factors
+        # Display selected factors with their decile direction
         if selected_factor_names:
-            st.success(f"Selected {len(selected_factor_names)} factor(s): {', '.join(selected_factor_names)}")
+            factor_labels = [
+                f"{name} ({'High to Low' if factor_directions[name] == 'top' else 'Low to High'})"
+                for name in selected_factor_names
+            ]
+            st.success(f"Selected {len(selected_factor_names)} factor(s): {', '.join(factor_labels)}")
         else:
             st.warning("Please select at least one factor to run the analysis")
         
@@ -420,66 +450,74 @@ def main():
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             if st.button("Load Data", use_container_width=True, type="primary"):
-                with st.spinner("Loading market data..."):
-                    try:
-                        sectors_to_use = selected_sectors if sector_filter_enabled else None
-
-                        rdata = load_data(
-                            restrict_fossil_fuels=restrict_fossil_fuels,
-                            use_supabase=True,
-                            data_path=None,
-                            show_loading_progress=show_loading,
-                            sectors=sectors_to_use
-                        )
-
-                        # Data preprocessing
-                        rdata['Ticker'] = rdata['Ticker-Region'].dropna().apply(
-                            lambda x: x.split('-')[0].strip()
-                        )
-                        rdata['Year'] = pd.to_datetime(rdata['Date']).dt.year
-
-                        # If the user selected an analysis period, filter the loaded data to that range
+                # Prevemt re-loading if data is already loaded
+                if not st.session_state.data_loaded:
+                    with st.spinner("Loading market data..."):
                         try:
-                            rdata = rdata[(rdata['Year'] >= int(start_year)) & (rdata['Year'] <= int(end_year))]
-                        except Exception:
-                            # If filtering fails, keep full dataset but warn the user
-                            st.warning('Unable to filter loaded data by selected years; using full dataset instead.')
+                            sectors_to_use = selected_sectors if sector_filter_enabled else None
 
-                        # Keep only relevant columns (include Market Capitalization for cap-weighted portfolios)
-                        cols_to_keep = ['Ticker', 'Year', 'Next_Year_Return']
-                        if 'Ending Price' in rdata.columns:
-                            cols_to_keep.append('Ending Price')
-                        elif 'Ending_Price' in rdata.columns:
-                            rdata['Ending Price'] = rdata['Ending_Price']
-                            cols_to_keep.append('Ending Price')
+                            rdata = load_data(
+                                restrict_fossil_fuels=restrict_fossil_fuels,
+                                use_supabase=True,
+                                data_path=None,
+                                show_loading_progress=show_loading,
+                                sectors=sectors_to_use
+                            )
+
+                            # Data preprocessing
+                            rdata['Ticker'] = rdata['Ticker-Region'].dropna().apply(
+                                lambda x: x.split('-')[0].strip()
+                            )
+                            rdata['Year'] = pd.to_datetime(rdata['Date']).dt.year
+
+                            # If the user selected an analysis period, filter the loaded data to that range
+                            try:
+                                rdata = rdata[(rdata['Year'] >= int(start_year)) & (rdata['Year'] <= int(end_year))]
+                            except Exception:
+                                # If filtering fails, keep full dataset but warn the user
+                                st.warning('Unable to filter loaded data by selected years; using full dataset instead.')
+
+                            # Keep only relevant columns (include Market Capitalization for cap-weighted portfolios)
+                            cols_to_keep = ['Ticker', 'Year', 'Next_Year_Return']
+                            if 'Ending Price' in rdata.columns:
+                                cols_to_keep.append('Ending Price')
+                            elif 'Ending_Price' in rdata.columns:
+                                rdata['Ending Price'] = rdata['Ending_Price']
+                                cols_to_keep.append('Ending Price')
+                            
+                            # Add Market Capitalization if available (needed for cap-weighted portfolios)
+                            if 'Market Capitalization' in rdata.columns:
+                                cols_to_keep.append('Market Capitalization')
+                            elif 'Market_Capitalization' in rdata.columns:
+                                rdata['Market Capitalization'] = rdata['Market_Capitalization']
+                                cols_to_keep.append('Market Capitalization')
+
+                            for factor in FACTOR_MAP.keys():
+                                if factor in rdata.columns:
+                                    cols_to_keep.append(factor)
+
+                            rdata = rdata[cols_to_keep]
+
+                            st.session_state.rdata = rdata
+                            st.session_state.data_loaded = True
+
+
+                            st.success(f"Data loaded successfully! {len(rdata)} records from {rdata['Year'].min()} to {rdata['Year'].max()}")
+
+                        except Exception as e:
+                            st.error(f"Error loading data: {str(e)}")
+                            st.exception(e)
+                
+                
+        # Show data preview
+        if st.session_state.data_loaded:
+            display_df = st.session_state.rdata
+            with st.expander("Data Preview"):
+                st.dataframe(display_df.head(100), use_container_width=True)
+                st.write(f"**Shape:** {display_df.shape[0]} rows × {display_df.shape[1]} columns")
+                st.write(f"**Years:** {sorted(display_df['Year'].unique())}")
+                st.write(f"**Unique Tickers:** {display_df['Ticker'].nunique()}")
                         
-                        # Add Market Capitalization if available (needed for cap-weighted portfolios)
-                        if 'Market Capitalization' in rdata.columns:
-                            cols_to_keep.append('Market Capitalization')
-                        elif 'Market_Capitalization' in rdata.columns:
-                            rdata['Market Capitalization'] = rdata['Market_Capitalization']
-                            cols_to_keep.append('Market Capitalization')
-
-                        for factor in FACTOR_MAP.keys():
-                            if factor in rdata.columns:
-                                cols_to_keep.append(factor)
-
-                        rdata = rdata[cols_to_keep]
-
-                        st.session_state.rdata = rdata
-                        st.session_state.data_loaded = True
-
-                        st.success(f"Data loaded successfully! {len(rdata)} records from {rdata['Year'].min()} to {rdata['Year'].max()}")
-
-                        # Show data preview
-                        with st.expander("Data Preview"):
-                            st.dataframe(rdata.head(100), use_container_width=True)
-                            st.write(f"**Shape:** {rdata.shape[0]} rows × {rdata.shape[1]} columns")
-                            st.write(f"**Years:** {sorted(rdata['Year'].unique())}")
-                            st.write(f"**Unique Tickers:** {rdata['Ticker'].nunique()}")
-                    except Exception as e:
-                        st.error(f"Error loading data: {str(e)}")
-                        st.exception(e)
         
         st.write("---")
         
@@ -505,11 +543,13 @@ def main():
                                     initial_aum=initial_aum,
                                     verbosity=verbosity_level,
                                     restrict_fossil_fuels=restrict_fossil_fuels,
-                                    use_market_cap_weight=use_market_cap_weight
+                                    use_market_cap_weight=use_market_cap_weight,
+                                    factor_directions=factor_directions
                                 )
                                 
                                 st.session_state.results = results
                                 st.session_state.selected_factors = selected_factor_names
+                                st.session_state.factor_directions = factor_directions
                                 st.session_state.restrict_ff = restrict_fossil_fuels
                                 st.session_state.initial_aum = initial_aum
                                 st.session_state.use_cap_weight = use_market_cap_weight
@@ -529,7 +569,12 @@ def main():
             # Display configuration info
             col1, col2 = st.columns([3, 1])
             with col1:
-                st.caption(f"**Factors:** {', '.join(st.session_state.selected_factors)}")
+                saved_dirs = st.session_state.get('factor_directions', {})
+                factor_captions = [
+                    f"{f} ({'High to Low' if saved_dirs.get(f, 'High to Low') == 'High to Low' else 'Low to High'})"
+                    for f in st.session_state.selected_factors
+                ]
+                st.caption(f"**Factors:** {', '.join(factor_captions)}")
             with col2:
                 weighting_label = "Market Cap Weighted" if st.session_state.get('use_cap_weight', False) else "Equal Weighted"
                 st.caption(f"**Weighting:** {weighting_label}")
@@ -585,7 +630,6 @@ def main():
                        label='Russell 2000', linestyle='--', alpha=0.7, color='#ff7f0e')
 
             # === ADDED: VALUE AND GROWTH OVERLAYS ===
-# === FIXED: VALUE AND GROWTH OVERLAYS ===
             try:
                 from src.benchmarks import get_benchmark_list
                 
@@ -630,8 +674,7 @@ def main():
             
             with st.expander("View Top/Bottom Portfolio Performance", expanded=False):
                 st.markdown("""
-                This visualization compares the performance of the **top N%** and **bottom N%** 
-                of stocks selected by your factors against the benchmark and the main portfolio.
+                This visualization compares the performance of the **top N%** (your selection) and **bottom N%** (the inverse) of stocks against the benchmark.
                 """)
                 
                 col1, col2 = st.columns(2)
@@ -642,198 +685,100 @@ def main():
                         max_value=100,
                         value=10,
                         step=1,
-                        help="Percentage of stocks to include in top/bottom cohorts (1-100%)"
+                        help="Percentage of stocks to include in top/bottom cohorts"
                     )
                 with col2:
-                    show_bottom_cohort = st.checkbox("Show Bottom Cohort", value=True, help="Display the bottom-performing cohort")
+                    show_bottom_cohort = st.checkbox("Show Bottom Cohort", value=True)
                 
                 if st.button("Generate Top/Bottom Analysis", key="top_bottom_btn"):
                     with st.spinner("Generating cohort analysis..."):
                         try:
-                            # Get factor objects (instantiate classes)
+                            # 1. Setup factors and timeframe
                             factor_objects = [FACTOR_MAP[name]() for name in st.session_state.selected_factors]
-
-                            # Get years from results (ensure user re-runs analysis after changing the period)
                             analysis_years = results['years']
+                            
+                            # 2. Define inverse directions for the bottom cohort
+                            original_dirs = st.session_state.factor_directions or {}
+                            flipped_dirs = {
+                                k: ('bottom' if v == 'top' else 'top') 
+                                for k, v in original_dirs.items()
+                            }
 
-                            # First pass: get diagnostics to understand selection and dropped tickers
-                            details = plot_top_bottom_percent(
-                                rdata=st.session_state.rdata,
+                            # 3. Calculate Top Cohort (Selection)
+                            res_top = rebalance_portfolio(
+                                data=st.session_state.rdata,
                                 factors=factor_objects,
-                                years=analysis_years,
-                                percent=cohort_pct,
-                                show_bottom=show_bottom_cohort,
+                                start_year=analysis_years[0],
+                                end_year=analysis_years[-1],
+                                initial_aum=st.session_state.initial_aum,
+                                verbosity=0,
                                 restrict_fossil_fuels=st.session_state.restrict_ff,
-                                benchmark_returns=results.get('benchmark_returns'),
-                                benchmark_label='Russell 2000',
-                                initial_investment=st.session_state.initial_aum,
-                                verbose=False,
-                                baseline_portfolio_values=results['portfolio_values'],
-                                use_rebalance_for_selection=True,
-                                return_details=True
+                                top_pct=cohort_pct,
+                                which='top',
+                                factor_directions=original_dirs,
+                                use_market_cap_weight=st.session_state.use_cap_weight
                             )
 
-                            # Instead of showing raw diagnostics JSON, present concise metrics:
-                            # final AUM and percent gain for Top and Bottom cohorts (final year).
-                            top_start = top_end = bot_start = bot_end = None
-                            # Extract numbers from details if present
-                            if isinstance(details, dict) and 'per_year' in details and details['per_year']:
-                                last = details['per_year'][-1]
-                                top = last.get('top', {})
-                                bot = last.get('bottom', {})
-                                top_start = top.get('start')
-                                top_end = top.get('end')
-                                bot_start = bot.get('start') if bot else None
-                                bot_end = bot.get('end') if bot else None
-                            else:
-                                # Fallback: call rebalance_portfolio directly to compute top/bottom series
-                                try:
-                                    res_top = rebalance_portfolio(
-                                        st.session_state.rdata,
-                                        factor_objects,
-                                        start_year=analysis_years[0],
-                                        end_year=analysis_years[-1],
-                                        initial_aum=st.session_state.initial_aum,
-                                        verbosity=0,
-                                        restrict_fossil_fuels=st.session_state.restrict_ff,
-                                        top_pct=cohort_pct,
-                                        which='top',
-                                        use_market_cap_weight=st.session_state.use_cap_weight
-                                    )
-                                    res_bot = rebalance_portfolio(
-                                        st.session_state.rdata,
-                                        factor_objects,
-                                        start_year=analysis_years[0],
-                                        end_year=analysis_years[-1],
-                                        initial_aum=st.session_state.initial_aum,
-                                        verbosity=0,
-                                        restrict_fossil_fuels=st.session_state.restrict_ff,
-                                        top_pct=cohort_pct,
-                                        which='bottom',
-                                        use_market_cap_weight=st.session_state.use_cap_weight
-                                    ) if show_bottom_cohort else None
-                                    if isinstance(res_top, dict) and 'portfolio_values' in res_top:
-                                        tv = list(res_top.get('portfolio_values', []))
-                                        if len(tv) >= 2:
-                                            top_start = tv[-2]
-                                            top_end = tv[-1]
-                                        elif len(tv) == 1:
-                                            top_start = top_end = tv[0]
-                                    if res_bot and isinstance(res_bot, dict) and 'portfolio_values' in res_bot:
-                                        bv = list(res_bot.get('portfolio_values', []))
-                                        if len(bv) >= 2:
-                                            bot_start = bv[-2]
-                                            bot_end = bv[-1]
-                                        elif len(bv) == 1:
-                                            bot_start = bot_end = bv[0]
-                                except Exception:
-                                    pass
-
-                            # Display overall growth metrics (start -> finish) for Top/Bottom using rebalance results
-                            try:
-                                # Compute top/bottom rebalance series to get full portfolio values
-                                res_top = rebalance_portfolio(
-                                    st.session_state.rdata,
-                                    factor_objects,
+                            # 4. Calculate Bottom Cohort (Inverse)
+                            res_bot = None
+                            if show_bottom_cohort:
+                                res_bot = rebalance_portfolio(
+                                    data=st.session_state.rdata,
+                                    factors=factor_objects,
                                     start_year=analysis_years[0],
                                     end_year=analysis_years[-1],
                                     initial_aum=st.session_state.initial_aum,
                                     verbosity=0,
                                     restrict_fossil_fuels=st.session_state.restrict_ff,
                                     top_pct=cohort_pct,
-                                    which='top',
+                                    which='bottom',
+                                    factor_directions=flipped_dirs,
                                     use_market_cap_weight=st.session_state.use_cap_weight
                                 )
-                            except Exception:
-                                res_top = None
-                            try:
-                                res_bot = None
-                                if show_bottom_cohort:
-                                    res_bot = rebalance_portfolio(
-                                        st.session_state.rdata,
-                                        factor_objects,
-                                        start_year=analysis_years[0],
-                                        end_year=analysis_years[-1],
-                                        initial_aum=st.session_state.initial_aum,
-                                        verbosity=0,
-                                        restrict_fossil_fuels=st.session_state.restrict_ff,
-                                        top_pct=cohort_pct,
-                                        which='bottom',
-                                        use_market_cap_weight=st.session_state.use_cap_weight
-                                    )
-                            except Exception:
-                                res_bot = None
 
-                            # helper to compute metrics from rebalance result
-                            def cohort_metrics(res):
+                            # 5. Helper to extract metric data
+                            def get_stats(res):
                                 if not res or 'portfolio_values' not in res:
                                     return None
-                                vals = list(res.get('portfolio_values', []))
-                                if not vals:
-                                    return None
-                                start = vals[0]
-                                end = vals[-1]
-                                total_return = ((end / start) - 1) * 100 if start and start > 0 else 0.0
-                                years_n = len(results['years']) if 'years' in results else max(1, len(analysis_years))
-                                try:
-                                    cagr = (((end / start) ** (1 / years_n)) - 1) * 100 if start and start > 0 else 0.0
-                                except Exception:
-                                    cagr = 0.0
-                                return {'start': start, 'end': end, 'total_return': total_return, 'cagr': cagr}
+                                vals = list(res['portfolio_values'])
+                                if len(vals) < 2: return None
+                                start, end = vals[0], vals[-1]
+                                years_n = max(1, len(analysis_years) - 1)
+                                cagr = (((end / start) ** (1 / years_n)) - 1) * 100
+                                return {'end': end, 'cagr': cagr}
 
-                            top_metrics = cohort_metrics(res_top)
-                            bot_metrics = cohort_metrics(res_bot) if res_bot is not None else None
+                            top_s = get_stats(res_top)
+                            bot_s = get_stats(res_bot)
 
-                            # compute benchmark final for alpha calc
-                            benchmark_final = None
-                            if 'benchmark_returns' in results and results['benchmark_returns']:
-                                try:
-                                    benchmark_final = st.session_state.initial_aum * np.prod([1 + r/100 for r in results['benchmark_returns']])
-                                except Exception:
-                                    benchmark_final = None
+                            # 6. Display Metrics
+                            m_col1, m_col2 = st.columns(2)
+                            with m_col1:
+                                if top_s:
+                                    st.metric(f"Top {cohort_pct}% (Selected) Value", f"${top_s['end']:,.2f}")
+                                    st.metric(f"Top {cohort_pct}% CAGR", f"{top_s['cagr']:.2f}%")
+                            with m_col2:
+                                if bot_s:
+                                    st.metric(f"Bottom {cohort_pct}% (Inverse) Value", f"${bot_s['end']:,.2f}")
+                                    st.metric(f"Bottom {cohort_pct}% CAGR", f"{bot_s['cagr']:.2f}%")
 
-                            col_top, col_bot = st.columns([1, 1])
-                            with col_top:
-                                if top_metrics:
-                                    st.metric(f"Top {cohort_pct}% Final Value", f"${top_metrics['end']:,.2f}")
-                                    st.metric(f"Top {cohort_pct}% Total Return", f"{top_metrics['total_return']:.2f}%")
-                                    st.metric(f"Top {cohort_pct}% CAGR", f"{top_metrics['cagr']:.2f}%")
-                                    if benchmark_final is not None:
-                                        alpha_top = ((top_metrics['end'] / benchmark_final) - 1) * 100
-                                        st.metric(f"Top {cohort_pct}% Cumulative Outperformance", f"{alpha_top:.2f}%")
-                                else:
-                                    st.write(f"Top {cohort_pct}%: no final AUM available")
-                            with col_bot:
-                                if bot_metrics:
-                                    st.metric(f"Bottom {cohort_pct}% Final Value", f"${bot_metrics['end']:,.2f}")
-                                    st.metric(f"Bottom {cohort_pct}% Total Return", f"{bot_metrics['total_return']:.2f}%")
-                                    st.metric(f"Bottom {cohort_pct}% CAGR", f"{bot_metrics['cagr']:.2f}%")
-                                    if benchmark_final is not None:
-                                        alpha_bot = ((bot_metrics['end'] / benchmark_final) - 1) * 100
-                                        st.metric(f"Bottom {cohort_pct}% Cumulative Outperformance", f"{alpha_bot:.2f}%")
-                                else:
-                                    st.write(f"Bottom {cohort_pct}%: no final AUM available")
-
-                            # Second pass: generate and display the figure
+                            # 7. Generate Plot using precomputed results
                             fig_cohort = plot_top_bottom_percent(
                                 rdata=st.session_state.rdata,
                                 factors=factor_objects,
                                 years=analysis_years,
                                 percent=cohort_pct,
                                 show_bottom=show_bottom_cohort,
-                                restrict_fossil_fuels=st.session_state.restrict_ff,
                                 benchmark_returns=results.get('benchmark_returns'),
                                 benchmark_label='Russell 2000',
                                 initial_investment=st.session_state.initial_aum,
-                                verbose=False,
-                                baseline_portfolio_values=results['portfolio_values'],
-                                use_rebalance_for_selection=True,
-                                return_details=False
+                                baseline_portfolio_values=results.get('portfolio_values'),
+                                precomputed_top=res_top,
+                                precomputed_bot=res_bot
                             )
 
-                            if fig_cohort is not None:
+                            if fig_cohort:
                                 st.pyplot(fig_cohort)
-                                st.success(f"Cohort analysis complete! Comparing top {cohort_pct}% vs bottom {cohort_pct}% cohorts.")
+                                st.success("Analysis synchronized and completed successfully.")
 
                         except Exception as e:
                             st.error(f"Error generating cohort analysis: {str(e)}")

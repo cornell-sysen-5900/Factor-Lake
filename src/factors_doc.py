@@ -38,7 +38,7 @@ FACTOR_DOCS = {
     'Price to Book Using 9/30 Data': {
         'thesis': "A lower price-to-book (P/B) implies the stock is cheaper relative to its book value; economically we expect higher book-to-price (inverse of P/B) to indicate value. If P/B is used, it should be inverted so that higher values mean more attractive.",
         'implementation': 'Price to Book Using 9/30 Data',
-        'higher_is_better': False,  # Price-to-Book should be inverted for a value factor
+        'higher_is_better': True,  # Price-to-Book should be inverted for a value factor
     },
     'Next FY Earns/P': {
         'thesis': 'Earnings yield (next fiscal year earnings / price) indicates how cheaply the market prices future earnings; higher values suggest more attractive valuation considering future earnings.',
@@ -48,12 +48,12 @@ FACTOR_DOCS = {
     '1-Yr Price Vol %': {
         'thesis': 'Higher trailing 1-year price volatility may indicate higher risk or mispricing; depending on strategy, higher vol can be less attractive for risk-averse portfolios. Here we treat lower volatility as preferable.',
         'implementation': '1-Yr Price Vol %',
-        'higher_is_better': False,
+        'higher_is_better': True,
     },
     'Accruals/Assets': {
         'thesis': 'High accruals relative to assets can indicate lower earnings quality; lower accrual ratios are generally preferable, so the factor should be inverted (lower is better).',
         'implementation': 'Accruals/Assets',
-        'higher_is_better': False,
+        'higher_is_better': True,
     },
     'ROA %': {
         'thesis': 'Return on assets (percentage) measures profitability relative to asset base; higher ROA suggests better operating performance.',

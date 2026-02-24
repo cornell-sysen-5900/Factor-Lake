@@ -173,10 +173,14 @@ def calculate_growth(portfolio, current_market, verbosity=0):
     
     return growth, total_investment_value, total_end_value
 
-def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, benchmark_index=1, verbosity=0, restrict_fossil_fuels=False, top_pct=10, which='top', use_market_cap_weight=False):
+def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, benchmark_index=1, verbosity=0, restrict_fossil_fuels=False, top_pct=10, which='top', use_market_cap_weight=False, factor_directions=None):
     """
     Executes a multi-year backtest. 
     Calculates Sharpe and Beta using year-specific excess returns.
+
+    Args:
+        factor_directions: optional dict mapping factor column_name -> 'top'/'bottom'.
+            When provided, overrides the global ``which`` on a per-factor basis.
     """
     aum = initial_aum
     years = [start_year]
@@ -192,13 +196,18 @@ def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, benchm
         yearly_portfolio = []
 
         for factor in factors:
+            factor_which = which
+            if factor_directions:
+                col_name = getattr(factor, 'column_name', str(factor))
+                factor_which = factor_directions.get(col_name, which)
+
             factor_portfolio = calculate_holdings(
                 factor=factor,
                 aum=aum / len(factors),
                 market=market,
                 restrict_fossil_fuels=restrict_fossil_fuels,
                 top_pct=top_pct,
-                which=which,
+                which=factor_which,
                 use_market_cap_weight=use_market_cap_weight
             )
             yearly_portfolio.append(factor_portfolio)
