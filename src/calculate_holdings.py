@@ -137,9 +137,12 @@ def calculate_holdings(factor, aum, market, restrict_fossil_fuels=False, top_pct
 
     return portfolio_new
 
-def calculate_growth(portfolio, current_market, verbosity=0):
+def calculate_growth(portfolio, current_market, next_market=None, verbosity=0):
     """
-    Calculates portfolio growth using the forward-looking 'Next_Year_Return' column.
+    Calculates portfolio growth for a single period.
+    
+    When next_market is provided (POC mode): uses price-to-price returns.
+    When next_market is None (Legacy mode): uses pre-computed Next_Year_Return column.
     """
     total_weighted_rtn = 0
     total_investment_value = 0
@@ -148,32 +151,39 @@ def calculate_growth(portfolio, current_market, verbosity=0):
         for inv in factor_portfolio.investments:
             ticker = inv["ticker"]
             
-            # Retrieve the pre-calculated total return from the current market object
-            try:
-                # Dividing by 100 because the data is in percentage format (e.g., 20.0 for 20%)
-                stock_rtn = current_market.stocks.loc[ticker, "Next_Year_Return"] / 100
+            entry_price = current_market.get_price(ticker)
+            
+            if next_market is not None:
+                # --- POC mode: price-to-price returns ---
+                exit_price = next_market.get_price(ticker)
                 
-                # Weight the return by the dollar value of the position at the start of the year
-                entry_price = current_market.get_price(ticker)
-                if entry_price:
+                if entry_price and entry_price > 0:
+                    if exit_price and exit_price > 0:
+                        stock_rtn = (exit_price / entry_price) - 1
+                    else:
+                        stock_rtn = 0.0  # Assume capital returned near last active price
+                    
                     position_value = inv["number_of_shares"] * entry_price
                     total_weighted_rtn += stock_rtn * position_value
                     total_investment_value += position_value
+            else:
+                # --- Legacy mode: use Next_Year_Return column ---
+                if entry_price and entry_price > 0:
+                    try:
+                        stock_rtn = current_market.stocks.loc[ticker, "Next_Year_Return"] / 100
+                    except KeyError:
+                        stock_rtn = 0.0
                     
-            except KeyError:
-                if verbosity >= 2:
-                    print(f"Warning: {ticker} return data missing, treating as 0%.")
-                continue
+                    position_value = inv["number_of_shares"] * entry_price
+                    total_weighted_rtn += stock_rtn * position_value
+                    total_investment_value += position_value
 
-    # Calculate aggregate growth for the year
     growth = total_weighted_rtn / total_investment_value if total_investment_value > 0 else 0
-    
-    # Calculate end value to maintain compatibility with the rebalancing loop
     total_end_value = total_investment_value * (1 + growth)
     
     return growth, total_investment_value, total_end_value
 
-def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, benchmark_index=1, verbosity=0, restrict_fossil_fuels=False, top_pct=10, which='top', use_market_cap_weight=False, factor_directions=None):
+def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, benchmark_index=1, verbosity=0, restrict_fossil_fuels=False, top_pct=10, which='top', use_market_cap_weight=False, factor_directions=None, frequency='Yearly', data_mode='poc'):
     """
     Executes a multi-year backtest. 
     Calculates Sharpe and Beta using year-specific excess returns.
@@ -183,55 +193,176 @@ def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, benchm
             When provided, overrides the global ``which`` on a per-factor basis.
     """
     aum = initial_aum
-    years = [start_year]
-    portfolio_returns = []  
-    portfolio_values = [aum]  
     
     verbosity = 0 if verbosity is None else verbosity
     risk_free_rate_source = "FRED 4 Week T-Bill (Oct 1)"
 
-    # --- 1. Annual Rebalancing Loop ---
-    for year in range(start_year, end_year):
-        market = MarketObject(data.loc[data['Year'] == year], year)
-        yearly_portfolio = []
+    if data_mode == 'legacy':
+        # ====================================================================
+        # LEGACY MODE: Year-based loop using Next_Year_Return column
+        # ====================================================================
+        years = [str(start_year)]
+        portfolio_returns = []
+        portfolio_values = [aum]
 
-        for factor in factors:
-            factor_which = which
-            if factor_directions:
-                col_name = getattr(factor, 'column_name', str(factor))
-                factor_which = factor_directions.get(col_name, which)
+        for year in range(start_year, end_year):
+            market = MarketObject(data.loc[data['Year'] == year], year)
+            yearly_portfolio = []
 
-            factor_portfolio = calculate_holdings(
-                factor=factor,
-                aum=aum / len(factors),
-                market=market,
-                restrict_fossil_fuels=restrict_fossil_fuels,
-                top_pct=top_pct,
-                which=factor_which,
-                use_market_cap_weight=use_market_cap_weight
-            )
-            yearly_portfolio.append(factor_portfolio)
+            for factor in factors:
+                factor_which = which
+                if factor_directions:
+                    col_name = getattr(factor, 'column_name', str(factor))
+                    factor_which = factor_directions.get(col_name, which)
 
-        # Calculate annual growth
-        growth, total_start_value, total_end_value = calculate_growth(yearly_portfolio, market, verbosity)
+                factor_portfolio = calculate_holdings(
+                    factor=factor,
+                    aum=aum / len(factors),
+                    market=market,
+                    restrict_fossil_fuels=restrict_fossil_fuels,
+                    top_pct=top_pct,
+                    which=factor_which,
+                    use_market_cap_weight=use_market_cap_weight
+                )
+                yearly_portfolio.append(factor_portfolio)
 
-        if verbosity >= 2:
-            print(f"Year {year} to {year + 1}: Growth: {growth:.2%}, Start: ${total_start_value:.2f}, End: ${total_end_value:.2f}")
+            # Legacy: calculate_growth with next_market=None uses Next_Year_Return
+            growth, total_start_value, total_end_value = calculate_growth(yearly_portfolio, market, None, verbosity)
 
-        aum = total_end_value  
-        portfolio_returns.append(growth)
-        portfolio_values.append(aum)
-        years.append(year + 1)
+            if verbosity >= 2:
+                print(f"Year {year} to {year + 1}: Growth: {growth:.2%}, Start: ${total_start_value:.2f}, End: ${total_end_value:.2f}")
 
-    # --- 2. Data Alignment (Benchmarks & Risk-Free) ---
-    # Fetched from benchmarks.py to ensure data integrity across the range
-    rf_list = get_benchmark_list(4, start_year, end_year)
-    bench_list = get_benchmark_list(benchmark_index, start_year + 1, end_year + 1)
+            aum = total_end_value
+            portfolio_returns.append(growth)
+            portfolio_values.append(aum)
+            years.append(str(year + 1))
 
-    # Convert to NumPy for performance math
-    portfolio_returns_np = np.array(portfolio_returns)
-    rf_rates_np = np.array(rf_list)
-    benchmark_returns_np = np.array(bench_list) / 100 
+        # Legacy benchmarks from benchmarks.py (returns are in %, convert to decimals)
+        rf_list = get_benchmark_list(4, start_year, end_year)
+        bench_list = [r / 100 for r in get_benchmark_list(benchmark_index, start_year + 1, end_year + 1)]
+
+        portfolio_returns_np = np.array(portfolio_returns)
+        rf_rates_np = np.array(rf_list)
+        benchmark_returns_np = np.array(bench_list)
+
+    else:
+        # ====================================================================
+        # POC MODE: Date-based loop using price-to-price returns (UNCHANGED)
+        # ====================================================================
+        data = data.copy()
+        data['Date'] = pd.to_datetime(data['Date'])
+
+        if frequency == 'Monthly':
+            dates = data.groupby([data['Date'].dt.year, data['Date'].dt.month])['Date'].max().values
+        elif frequency == 'Quarterly':
+            dates = data.groupby([data['Date'].dt.year, data['Date'].dt.quarter])['Date'].max().values
+        else:  # Yearly
+            dates = data.groupby(data['Date'].dt.year)['Date'].max().values
+            
+        dates = pd.to_datetime(dates)
+        start_dt = pd.Timestamp(year=start_year, month=1, day=1)
+        end_dt = pd.Timestamp(year=end_year, month=12, day=31)
+        
+        dates = dates[(dates >= start_dt) & (dates <= end_dt)]
+        dates = sorted(dates.unique())
+        
+        if len(dates) < 2:
+            raise ValueError("Not enough overlapping dates to run a backtest. Please widen your date bounds.")
+            
+        time_labels = [d.strftime('%Y-%m-%d') for d in dates]
+        years = time_labels
+        portfolio_returns = []  
+        portfolio_values = [aum]  
+        benchmark_returns = []
+
+        # --- 1. Rebalancing Loop ---
+        for i in range(len(dates) - 1):
+            current_date = dates[i]
+            next_date = dates[i+1]
+            
+            market = MarketObject(data[data['Date'] == current_date], current_date)
+            next_market = MarketObject(data[data['Date'] == next_date], next_date)
+            
+            yearly_portfolio = []
+
+            for factor in factors:
+                factor_which = which
+                if factor_directions:
+                    col_name = getattr(factor, 'column_name', str(factor))
+                    factor_which = factor_directions.get(col_name, which)
+
+                factor_portfolio = calculate_holdings(
+                    factor=factor,
+                    aum=aum / len(factors),
+                    market=market,
+                    restrict_fossil_fuels=restrict_fossil_fuels,
+                    top_pct=top_pct,
+                    which=factor_which,
+                    use_market_cap_weight=use_market_cap_weight
+                )
+                yearly_portfolio.append(factor_portfolio)
+
+            # Calculate period growth for the invested portion
+            _, total_start_value, total_end_value = calculate_growth(yearly_portfolio, market, next_market, verbosity)
+
+            # Retain cash that was not allocated to any valid stocks
+            uninvested_cash = aum - total_start_value
+            new_aum = total_end_value + uninvested_cash
+            
+            actual_growth = (new_aum / aum) - 1 if aum > 0 else 0
+
+            # POC benchmark return (Market-Cap Weighted Universe)
+            try:
+                entry_prices = market.stocks['Ending Price']
+                entry_prices = entry_prices[~entry_prices.index.duplicated(keep='first')]
+                
+                mcaps = market.stocks.get('Market Capitalization', None)
+                if mcaps is not None:
+                    mcaps = mcaps[~mcaps.index.duplicated(keep='first')]
+                
+                exit_prices = next_market.stocks['Ending Price']
+                exit_prices = exit_prices[~exit_prices.index.duplicated(keep='first')]
+                
+                exit_prices = exit_prices.reindex(entry_prices.index)
+                returns = (exit_prices / entry_prices) - 1
+                returns = returns.fillna(0.0)
+                valid_returns = returns[entry_prices > 0]
+                
+                if mcaps is not None:
+                    valid_mcaps = mcaps.reindex(valid_returns.index).fillna(0.0)
+                    total_mcap = valid_mcaps.sum()
+                    if total_mcap > 0:
+                        bench_ret = (valid_returns * valid_mcaps).sum() / total_mcap
+                    else:
+                        bench_ret = valid_returns.mean()
+                else:
+                    bench_ret = valid_returns.mean() if not valid_returns.empty else 0.0
+            except Exception as e:
+                if verbosity >= 2:
+                    print(f"Benchmark eval exception: {e}")
+                bench_ret = 0.0
+                
+            benchmark_returns.append(bench_ret)
+
+            if verbosity >= 2:
+                print(f"{current_date.date()} to {next_date.date()}: Growth: {actual_growth:.2%}, Start: ${aum:.2f}, End: ${new_aum:.2f} (Uninvested: ${uninvested_cash:.2f}) | Bench: {bench_ret:.2%}")
+
+            aum = new_aum  
+            portfolio_returns.append(actual_growth)
+            portfolio_values.append(aum)
+
+        # --- 2. Data Alignment (Benchmarks & Risk-Free) ---
+        rf_list = get_benchmark_list(4, start_year, end_year)
+        if len(rf_list) > len(portfolio_returns):
+            rf_list = rf_list[:len(portfolio_returns)]
+        elif len(rf_list) < len(portfolio_returns):
+            rf_list = rf_list + [rf_list[-1] if rf_list else 0] * (len(portfolio_returns) - len(rf_list))
+
+        bench_list = benchmark_returns
+
+        portfolio_returns_np = np.array(portfolio_returns)
+        rf_rates_np = np.array(rf_list) / 100 
+        benchmark_returns_np = np.array(bench_list)
     
 # --- 3. Excess Return Calculations ---
     excess_portfolio_returns = portfolio_returns_np - rf_rates_np
@@ -327,8 +458,7 @@ def calculate_information_ratio(portfolio_returns, benchmark_returns, verbosity=
     # Ensure inputs are numpy arrays for mathematical operations
     verbosity = 0 if verbosity is None else verbosity
     portfolio_returns = np.array(portfolio_returns)
-    #benchmark_returns = np.array(benchmark_returns)
-    benchmark_returns = np.array(benchmark_returns) / 100
+    benchmark_returns = np.array(benchmark_returns)
 
     # Calculate active returns
     active_returns = portfolio_returns - benchmark_returns
