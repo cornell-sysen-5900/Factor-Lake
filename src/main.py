@@ -3,7 +3,7 @@ from .calculate_holdings import rebalance_portfolio
 from .user_input import get_factors
 from .verbosity_options import get_verbosity_level
 from .fossil_fuel_restriction import get_fossil_fuel_restriction
-from .supabase_input import get_supabase_preference, get_data_loading_verbosity
+from .supabase_input import get_data_loading_verbosity
 from .sector_selection import get_sector_selection
 from Visualizations.portfolio_growth_plot import plot_portfolio_growth
 import pandas as pd
@@ -12,9 +12,6 @@ import matplotlib.pyplot as plt
 def main():
     ### Ask about fossil fuel restriction first ###
     restrict_fossil_fuels = get_fossil_fuel_restriction()  # Prompt user (Yes/No)
-
-    ### Ask about data source ###
-    use_supabase = get_supabase_preference()
     
     # Ask about data loading verbosity
     show_loading = get_data_loading_verbosity()
@@ -25,7 +22,6 @@ def main():
     # Load market data
     rdata = load_data(
         restrict_fossil_fuels=restrict_fossil_fuels, 
-        use_supabase=use_supabase,
         show_loading_progress=show_loading,
         sectors=selected_sectors
     )
@@ -67,7 +63,7 @@ def main():
     # ...existing code...
     results = rebalance_portfolio(
         rdata, list(factor_objects),
-        start_year=2002, end_year=2023,
+        start_year=2008, end_year=2023,
         initial_aum=1,
         verbosity=verbosity_level,
         restrict_fossil_fuels=restrict_fossil_fuels
