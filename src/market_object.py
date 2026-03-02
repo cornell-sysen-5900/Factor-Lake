@@ -4,7 +4,7 @@ from .supabase_client import load_supabase_data
 import os
 
 ### CREATING FUNCTION TO LOAD DATA ### Tables: FR2000 Annual Quant Data Full Precision Test
-def load_data(restrict_fossil_fuels=False, use_supabase=None, table_name='Full Precision Test', show_loading_progress=True, data_path=None, excel_sheet='Data', sectors=None):
+def load_data(restrict_fossil_fuels=False, use_supabase=True, table_name='Full Precision Test', show_loading_progress=True, data_path=None, excel_sheet='Data', sectors=None):
     """
     Load market data from either Supabase or Excel file (fallback).
     
@@ -17,23 +17,6 @@ def load_data(restrict_fossil_fuels=False, use_supabase=None, table_name='Full P
     Returns:
         pandas.DataFrame: Market data
     """
-    
-    # Auto-detect local daily CSV file; prefer it over Supabase when available
-    local_csv_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'russell2000_cleaned.csv')
-    if use_supabase is None:
-        if data_path is not None:
-            use_supabase = False
-        elif os.path.exists(local_csv_path):
-            data_path = local_csv_path
-            use_supabase = False
-            if show_loading_progress:
-                print(f"Loading data from local CSV: {os.path.abspath(local_csv_path)}")
-        else:
-            use_supabase = True
-    elif use_supabase is False and data_path is None:
-        # Explicit use_supabase=False but no path — auto-fill with local CSV if available
-        if os.path.exists(local_csv_path):
-            data_path = local_csv_path
     
     if use_supabase:
         try:
@@ -164,73 +147,57 @@ def load_data(restrict_fossil_fuels=False, use_supabase=None, table_name='Full P
             # Standardize to the same column names we expect from Supabase
             rdata = _standardize_column_names(rdata)
             
-            # --- CRSP daily CSV preprocessing ---
-            # Parse Date column
-            if 'Date' not in rdata.columns and 'date' in rdata.columns:
-                rdata['Date'] = rdata['date']
-            if 'Date' in rdata.columns:
-                rdata['Date'] = pd.to_datetime(rdata['Date'], format='mixed', errors='coerce')
-                rdata = rdata.dropna(subset=['Date'])
-            
-            # Derive Year from Date if not already present
-            if 'Year' not in rdata.columns and 'Date' in rdata.columns:
-                rdata['Year'] = rdata['Date'].dt.year
-            
-            # Filter out pre-2008 rows for performance (keep 2007+ for lookback data)
-            if 'Year' in rdata.columns:
-                before_count = len(rdata)
-                rdata = rdata[rdata['Year'] >= 2008]
-                filtered_count = before_count - len(rdata)
-                if filtered_count > 0 and show_loading_progress:
-                    print(f"Filtered out {filtered_count} rows from before 2008.")
-            
-            # Filter out rows with missing essential data
-            essential_missing = 0
-            for col in ['Ending Price', 'Ticker', 'Date']:
-                if col in rdata.columns:
-                    before_len = len(rdata)
-                    rdata = rdata.dropna(subset=[col])
-                    essential_missing += before_len - len(rdata)
-            if essential_missing > 0 and show_loading_progress:
-                print(f"Filtered out {essential_missing} rows with missing essential data (price, ticker, or date)")
-            
-            # Remove duplicates and incomplete rows
-            before_dup = len(rdata)
-            rdata = rdata.drop_duplicates()
-            dup_removed = before_dup - len(rdata)
-            if show_loading_progress:
-                print(f"Removed {dup_removed} duplicates and {essential_missing} incomplete rows.")
-            
-            # Compute custom momentum factors from daily prices
-            momentum_factors = {
-                '1-Mo Momentum %': 21,    # ~21 trading days ≈ 1 month
-                '6-Mo Momentum %': 126,   # ~126 trading days ≈ 6 months
-                '12-Mo Momentum %': 252,  # ~252 trading days ≈ 12 months
-            }
-            needs_momentum = any(
-                col not in rdata.columns for col in momentum_factors
-            )
-            if needs_momentum and 'Ending Price' in rdata.columns and 'Ticker' in rdata.columns:
-                if show_loading_progress:
-                    print("Calculating custom factor momentum...")
-                # Sort by Ticker and Date for proper pct_change calculation
-                rdata = rdata.sort_values(['Ticker', 'Date']).reset_index(drop=True)
-                for col_name, lookback_days in momentum_factors.items():
-                    if col_name not in rdata.columns:
-                        rdata[col_name] = rdata.groupby('Ticker')['Ending Price'].pct_change(lookback_days, fill_method=None) * 100
-
             # New return logic: 0 if null next year return
-            if 'Next_Year_Return' in rdata.columns:
-                rdata['Next_Year_Return'] = rdata['Next_Year_Return'].fillna(0)
+            rdata['Next_Year_Return'] = rdata['Next_Year_Return'].fillna(0)
 
-            if show_loading_progress:
-                print(f"Successfully loaded {len(rdata)} records")
-                if 'Year' in rdata.columns:
-                    try:
-                        year_counts = rdata['Year'].value_counts().sort_index()
-                        print("Rows per Year:", ", ".join([f"{int(y)}: {int(c)}" for y, c in year_counts.items()]))
-                    except Exception:
-                        pass
+            # Apply sector restriction logic (post-standardization)
+            if restrict_fossil_fuels:
+                industry_col = 'FactSet Industry'
+                if industry_col in rdata.columns:
+                    before = rdata.copy()
+                    rdata[industry_col] = rdata[industry_col].astype(str).str.lower()
+                    fossil_keywords = ['oil', 'gas', 'coal', 'energy', 'fossil']
+                    mask = rdata[industry_col].apply(lambda x: not any(kw in x for kw in fossil_keywords))
+                    rdata = rdata[mask]
+                    # Report removals (tickers)
+                    if 'Ticker' in before.columns and 'Ticker' in rdata.columns:
+                        removed = sorted(set(before['Ticker']) - set(rdata['Ticker']))
+                        if removed:
+                            print(f"Fossil filter removed {len(removed)} tickers (Excel/CSV): {', '.join(removed[:25])}{' ...' if len(removed) > 25 else ''}")
+                        else:
+                            print("Fossil filter removed 0 tickers (Excel/CSV)")
+                else:
+                    print("Warning: 'FactSet Industry' column not found. Fossil fuel filtering skipped.")
+
+            # If sectors are provided, apply client-side filter
+            if sectors:
+                rdata = _apply_sector_filter(rdata, sectors, context_label="File")
+
+            # Remove duplicate rows and rows with missing essential data (prices/tickers/dates)
+            try:
+                before_total = len(rdata)
+                # Drop exact duplicate rows
+                rdata = rdata.drop_duplicates()
+                dup_removed = before_total - len(rdata)
+
+                # Filter out rows missing essential data
+                rdata_before_filter = rdata.copy()
+                rdata = _filter_essential_data(rdata)
+                nulls_removed = len(rdata_before_filter) - len(rdata)
+
+                if dup_removed > 0 or nulls_removed > 0:
+                    print(f"File load: removed {dup_removed} duplicate rows and {nulls_removed} rows with missing essential data (out of {before_total} rows).")
+            except Exception:
+                pass
+
+            print(f"Successfully loaded {len(rdata)} records from file")
+            # Quick sanity check: distribution by Year after standardization
+            if 'Year' in rdata.columns:
+                try:
+                    year_counts = rdata['Year'].value_counts().sort_index()
+                    print("Rows per Year (File):", ", ".join([f"{int(y)}: {int(c)}" for y, c in year_counts.items()]))
+                except Exception:
+                    pass
             return rdata
 
         except Exception as e:
@@ -291,9 +258,7 @@ def _standardize_column_names(df):
     
     # Ensure required columns exist (with fallback logic)
     if 'Ticker' not in df.columns:
-        if 'ticker' in df.columns:
-            df['Ticker'] = df['ticker']
-        elif 'Ticker-Region' in df.columns:
+        if 'Ticker-Region' in df.columns:
             df['Ticker'] = df['Ticker-Region'].str.split('-').str[0].str.strip()
         elif 'ticker_region' in df.columns:
             df['Ticker'] = df['ticker_region'].str.split('-').str[0].str.strip()
@@ -307,17 +272,6 @@ def _standardize_column_names(df):
     # Ensure Ticker-Region exists if we have ticker_region in lowercase
     if 'Ticker-Region' not in df.columns and 'ticker_region' in df.columns:
         df['Ticker-Region'] = df['ticker_region']
-    
-    # Map raw CRSP price to Ending Price if not present
-    if 'Ending Price' not in df.columns and 'prc' in df.columns:
-        if 'cfacpr' in df.columns:
-            df['Ending Price'] = df['prc'].abs() / df['cfacpr']
-        else:
-            df['Ending Price'] = df['prc'].abs()  # CRSP sets negative prices for bid/ask averages
-    
-    # Derive Market Capitalization if raw CRSP shares data is available
-    if 'Market Capitalization' not in df.columns and 'prc' in df.columns and 'shrout' in df.columns:
-        df['Market Capitalization'] = df['prc'].abs() * df['shrout']
     
     return df
 
@@ -416,14 +370,14 @@ class MarketObject():
 
         # Define relevant columns
         available_factors = [
-            'ROE using 9/30 Data', 'ROA using 9/30 Data', '12-Mo Momentum %', '6-Mo Momentum %', '1-Mo Momentum %',
+            'ROE using 9/30 Data', 'ROA using 9/30 Data', '12-Mo Momentum %', '1-Mo Momentum %',
             'Price to Book Using 9/30 Data', 'Next FY Earns/P', '1-Yr Price Vol %', 'Accruals/Assets',
             'ROA %', '1-Yr Asset Growth %', '1-Yr CapEX Growth %', 'Book/Price',
             "Next_Year_Return", "Next-Year's Active Return %"
         ]
         # Keep Ticker-Region so we can index uniquely when present
         # Include Market Capitalization for cap-weighted portfolios
-        keep_cols = ['Ticker-Region', 'Ticker', 'Ending Price', 'Year', 'Date', 'FactSet Industry', 'Market Capitalization'] + available_factors
+        keep_cols = ['Ticker-Region', 'Ticker', 'Ending Price', 'Year', '6-Mo Momentum %', 'FactSet Industry', 'Market Capitalization'] + available_factors
 
         # Filter and clean data
         data = data[[col for col in keep_cols if col in data.columns]].copy()

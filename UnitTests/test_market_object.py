@@ -69,8 +69,7 @@ class TestColumnStandardization:
             '6-Mo_Momentum': [0.10, 0.15],
             'ROE_using_9-30_Data': [0.20, 0.25],
             '1-Yr_Price_Vol': [0.30, 0.35],
-            'Next_FY_Earns-P': [0.05, 0.08],
-            'Date': ['2022-01-01', '2022-01-01']
+            'Next_FY_Earns-P': [0.05, 0.08]
         })
         
         standardized = _standardize_column_names(test_data)
