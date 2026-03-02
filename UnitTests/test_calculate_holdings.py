@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 from src.calculate_holdings import (
     calculate_holdings, calculate_growth, rebalance_portfolio,
-    calculate_information_ratio
+    get_benchmark_return, calculate_information_ratio
 )
 from src.factor_function import Momentum6m, ROE, ROA
 from src.market_object import MarketObject, load_data
@@ -139,10 +139,8 @@ class TestCalculateGrowth:
         """Create current market"""
         data = pd.DataFrame({
             'Ticker-Region': ['AAPL-US', 'MSFT-US'],
-            'Ticker': ['AAPL', 'MSFT'],
             'Ending Price': [100.0, 200.0],
-            'Year': [2021, 2021],
-            'Date': ['2021-12-31', '2021-12-31']
+            'Year': [2021, 2021]
         })
         return MarketObject(data, 2021)
     
@@ -151,25 +149,19 @@ class TestCalculateGrowth:
         """Create next year market"""
         data = pd.DataFrame({
             'Ticker-Region': ['AAPL-US', 'MSFT-US'],
-            'Ticker': ['AAPL', 'MSFT'],
             'Ending Price': [150.0, 250.0],
-            'Year': [2022, 2022],
-            'Date': ['2022-12-31', '2022-12-31']
+            'Year': [2022, 2022]
         })
         return MarketObject(data, 2022)
     
     def test_calculate_growth_positive(self, portfolio_list, current_market, next_market):
         """Test calculating positive growth"""
-        # Next_Year_Return in current_market needed
-        current_market.stocks['Next_Year_Return'] = [50.0, 25.0] # 50% for AAPL, 25% for MSFT
-        
         growth, start_value, end_value = calculate_growth(
-            portfolio_list, current_market, next_market, verbosity=0
+            portfolio_list, next_market, current_market, verbosity=0
         )
         
         # Start: 10*100 + 5*200 = 2000
-        # Expected end value? 
-        # AAPL: 1000 * 1.50 = 1500; MSFT: 1000 * 1.25 = 1250 => 2750
+        # End: 10*150 + 5*250 = 2750
         # Growth: (2750-2000)/2000 = 0.375
         
         assert start_value == 2000.0
@@ -181,16 +173,12 @@ class TestCalculateGrowth:
         # Market with declining prices
         declining_market = MarketObject(pd.DataFrame({
             'Ticker-Region': ['AAPL-US', 'MSFT-US'],
-            'Ticker': ['AAPL', 'MSFT'],
             'Ending Price': [80.0, 150.0],
-            'Year': [2022, 2022],
-            'Date': ['2022-12-31', '2022-12-31']
+            'Year': [2022, 2022]
         }), 2022)
         
-        declining_market.stocks['Next_Year_Return'] = [-20.0, -25.0]
-
         growth, start_value, end_value = calculate_growth(
-            portfolio_list, current_market, declining_market, verbosity=0
+            portfolio_list, declining_market, current_market, verbosity=0
         )
         
         assert growth < 0  # Negative growth
@@ -201,21 +189,17 @@ class TestCalculateGrowth:
         # Next market missing MSFT
         partial_market = MarketObject(pd.DataFrame({
             'Ticker-Region': ['AAPL-US'],
-            'Ticker': ['AAPL'],
             'Ending Price': [150.0],
-            'Year': [2022],
-            'Date': ['2022-12-31']
+            'Year': [2022]
         }), 2022)
         
-        partial_market.stocks['Next_Year_Return'] = [50.0]
-
         growth, start_value, end_value = calculate_growth(
-            portfolio_list, partial_market, partial_market, verbosity=0
+            portfolio_list, partial_market, current_market, verbosity=0
         )
         
         # Should use entry price for MSFT
         assert end_value > 0
-        assert start_value == 1500.0
+        assert start_value == 2000.0
 
 
 class TestRebalancePortfolio:
@@ -234,8 +218,7 @@ class TestRebalancePortfolio:
                     '6-Mo Momentum %': np.random.uniform(0.05, 0.30),
                     'ROE using 9/30 Data': np.random.uniform(0.10, 0.40),
                     'ROA using 9/30 Data': np.random.uniform(0.05, 0.25),
-                    'Year': year,
-                    'Date': pd.Timestamp(year, 12, 31)
+                    'Year': year
                 })
         
         return pd.DataFrame(data)
@@ -254,7 +237,7 @@ class TestRebalancePortfolio:
         assert 'final_value' in results
         assert 'yearly_returns' in results
         assert 'benchmark_returns' in results
-        assert results['final_value'] >= 0
+        assert results['final_value'] > 0
     
     def test_rebalance_portfolio_multiple_factors(self, sample_data):
         """Test rebalancing with multiple factors"""
@@ -267,7 +250,7 @@ class TestRebalancePortfolio:
             verbosity=0
         )
         
-        assert results['final_value'] >= 0
+        assert results['final_value'] > 0
         assert len(results['yearly_returns']) == 2  # 2 years of returns
     
     def test_rebalance_portfolio_returns_structure(self, sample_data):
@@ -304,7 +287,21 @@ class TestRebalancePortfolio:
         assert len(results['portfolio_values']) == 3
 
 
-
+class TestBenchmarkReturn:
+    """Test benchmark return function"""
+    
+    def test_get_benchmark_return_known_years(self):
+        """Test getting benchmark returns for known years"""
+        # Test a few known years
+        assert get_benchmark_return(2002) == 34.62
+        assert get_benchmark_return(2010) == -4.73
+        assert get_benchmark_return(2020) == 46.21
+    
+    def test_get_benchmark_return_unknown_year(self):
+        """Test getting benchmark return for unknown year"""
+        # Should return 0 for unknown years
+        assert get_benchmark_return(1999) == 0
+        assert get_benchmark_return(2050) == 0
 
 
 class TestInformationRatio:
@@ -342,7 +339,7 @@ class TestInformationRatio:
     def test_calculate_information_ratio_with_numpy_arrays(self):
         """Test IR calculation with numpy arrays"""
         portfolio_returns = np.array([0.10, 0.12, 0.15])
-        benchmark_returns = np.array([8.0, 9.0, 10.0])
+        benchmark_returns = np.array([0.08, 0.09, 0.10])
         
         ir = calculate_information_ratio(portfolio_returns, benchmark_returns, verbosity=0)
         
@@ -356,7 +353,7 @@ class TestCalculateHoldingsIntegration:
     @pytest.fixture
     def real_data(self):
         """Load real data"""
-        return load_data()
+        return load_data(use_supabase=True)
     
     @pytest.mark.skip(reason="Requires Supabase credentials")
     def test_calculate_holdings_with_real_data(self, real_data):
