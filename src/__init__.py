@@ -15,7 +15,6 @@ from . import factor_utils        # noqa: F401
 from . import fossil_fuel_restriction  # noqa: F401
 from . import portfolio           # noqa: F401
 from . import sector_selection    # noqa: F401
-from . import supabase_client     # noqa: F401
-from . import supabase_input      # noqa: F401
+
 from . import user_input          # noqa: F401
 from . import verbosity_options   # noqa: F401
