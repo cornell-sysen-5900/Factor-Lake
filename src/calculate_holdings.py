@@ -227,35 +227,59 @@ def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, benchm
     # Fetched from benchmarks.py to ensure data integrity across the range
     rf_list = get_benchmark_list(4, start_year, end_year)
     bench_list = get_benchmark_list(benchmark_index, start_year + 1, end_year + 1)
+    growth_bench_list = get_benchmark_list(2, start_year + 1, end_year + 1)
+    value_bench_list = get_benchmark_list(3, start_year + 1, end_year + 1)
 
     # Convert to NumPy for performance math
     portfolio_returns_np = np.array(portfolio_returns)
     rf_rates_np = np.array(rf_list)
     benchmark_returns_np = np.array(bench_list) / 100 
+    growth_returns_np = np.array(growth_bench_list) / 100
+    value_returns_np = np.array(value_bench_list) / 100
+
+    # Full-sample volatility of RAW returns
+    vol_raw_portfolio = np.std(portfolio_returns_np, ddof=1)
+    vol_raw_benchmark = np.std(benchmark_returns_np, ddof=1)
+    vol_raw_growth = np.std(growth_returns_np, ddof=1)
+    vol_raw_value = np.std(value_returns_np, ddof=1)
     
 # --- 3. Excess Return Calculations ---
     excess_portfolio_returns = portfolio_returns_np - rf_rates_np
     excess_benchmark_returns = benchmark_returns_np - rf_rates_np
+    excess_growth_returns = growth_returns_np - rf_rates_np
+    excess_value_returns = value_returns_np - rf_rates_np
     
     # --- 4. Sharpe Ratio ---
     # Volatility of the EXCESS returns (Institutional Standard)
     vol_excess_p = np.std(excess_portfolio_returns, ddof=1)
     vol_excess_b = np.std(excess_benchmark_returns, ddof=1)
+    vol_excess_growth = np.std(excess_growth_returns, ddof=1)
+    vol_excess_value = np.std(excess_value_returns, ddof=1)
 
     # Formula: Mean(Yearly Excess Returns) / Volatility(Yearly Excess Returns)
     sharpe_portfolio = np.mean(excess_portfolio_returns) / vol_excess_p if vol_excess_p > 0 else 0
     sharpe_benchmark = np.mean(excess_benchmark_returns) / vol_excess_b if vol_excess_b > 0 else 0
+    sharpe_growth = np.mean(excess_growth_returns) / vol_excess_growth if vol_excess_growth > 0 else 0
+    sharpe_value = np.mean(excess_value_returns) / vol_excess_value if vol_excess_value > 0 else 0
     
     # --- 5. Portfolio Beta ---
     portfolio_beta = None
+    portfolio_beta_growth = None
+    portfolio_beta_value = None
     if len(portfolio_returns_np) >= 3:
         # CAPM Beta using excess returns
         coeffs = np.polyfit(excess_benchmark_returns, excess_portfolio_returns, 1)
         portfolio_beta = float(coeffs[0])
+        growth_coeffs = np.polyfit(excess_growth_returns, excess_portfolio_returns, 1)
+        portfolio_beta_growth = float(growth_coeffs[0])
+        value_coeffs = np.polyfit(excess_value_returns, excess_portfolio_returns, 1)
+        portfolio_beta_value = float(value_coeffs[0])
 
     # --- 6. Additional Risk Metrics ---
     # Information Ratio
     information_ratio = calculate_information_ratio(portfolio_returns, bench_list, verbosity)
+    information_ratio_growth = calculate_information_ratio(portfolio_returns, growth_bench_list, verbosity)
+    information_ratio_value = calculate_information_ratio(portfolio_returns, value_bench_list, verbosity)
     
     # Portfolio Max Drawdown
     cumulative_values = np.array(portfolio_values)
@@ -264,54 +288,120 @@ def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, benchm
     
     # Benchmark Max Drawdown
     benchmark_cumulative = [initial_aum]
+    growth_cumulative = [initial_aum]
+    value_cumulative = [initial_aum]
     for r in benchmark_returns_np:
         benchmark_cumulative.append(benchmark_cumulative[-1] * (1 + r))
+    for r in growth_returns_np:
+        growth_cumulative.append(growth_cumulative[-1] * (1 + r))
+    for r in value_returns_np:
+        value_cumulative.append(value_cumulative[-1] * (1 + r))
     
     benchmark_cumulative_np = np.array(benchmark_cumulative)
     benchmark_peak = np.maximum.accumulate(benchmark_cumulative_np)
     max_drawdown_benchmark = np.min((benchmark_cumulative_np - benchmark_peak) / benchmark_peak)
 
+    growth_cumulative_np = np.array(growth_cumulative)
+    growth_peak = np.maximum.accumulate(growth_cumulative_np)
+    max_drawdown_growth = np.min((growth_cumulative_np - growth_peak) / growth_peak)
+
+    value_cumulative_np = np.array(value_cumulative)
+    value_peak = np.maximum.accumulate(value_cumulative_np)
+    max_drawdown_value = np.min((value_cumulative_np - value_peak) / value_peak)
+
     # Yearly Win Rate
     wins = 0
     yearly_comparisons = []
-    for i, (p_ret, b_ret) in enumerate(zip(portfolio_returns_np, benchmark_returns_np)):
+    for i, (p_ret, b_ret, g_ret, v_ret) in enumerate(zip(portfolio_returns_np, benchmark_returns_np, growth_returns_np, value_returns_np)):
         win = p_ret > b_ret
         if win: wins += 1
         yearly_comparisons.append({
             'year': years[i+1],
             'portfolio_return': p_ret * 100,
             'benchmark_return': b_ret * 100,
-            'win': win
+            'win': win,
+            'growth_return': g_ret * 100,
+            'growth_win': p_ret > g_ret,
+            'value_return': v_ret * 100,
+            'value_win': p_ret > v_ret
         })
     win_rate = wins / len(portfolio_returns_np) if len(portfolio_returns_np) > 0 else 0
+
+    wins_growth = 0
+    wins_value = 0
+    for p_ret, g_ret, v_ret in zip(portfolio_returns_np, growth_returns_np, value_returns_np):
+        if p_ret > g_ret:
+            wins_growth += 1
+        if p_ret > v_ret:
+            wins_value += 1
+    win_rate_growth = wins_growth / len(portfolio_returns_np) if len(portfolio_returns_np) > 0 else 0
+    win_rate_value = wins_value / len(portfolio_returns_np) if len(portfolio_returns_np) > 0 else 0
 
     # --- 7. Summary Output ---
     if verbosity >= 1:
         print(f"\n==== Performance Metrics ({start_year}-{end_year}) ====")
         print(f"Final AUM: ${aum:.2f}")
+        print(f"Volatility (Raw Returns, Portfolio): {vol_raw_portfolio:.4%}")
+        print(f"Volatility (Raw Returns, Benchmark): {vol_raw_benchmark:.4%}")
+        print(f"Volatility (Raw Returns, Growth Index): {vol_raw_growth:.4%}")
+        print(f"Volatility (Raw Returns, Value Index): {vol_raw_value:.4%}")
+        print(f"Volatility (Excess Returns, Portfolio): {vol_excess_p:.4%}")
+        print(f"Volatility (Excess Returns, Benchmark): {vol_excess_b:.4%}")
+        print(f"Volatility (Excess Returns, Growth Index): {vol_excess_growth:.4%}")
+        print(f"Volatility (Excess Returns, Value Index): {vol_excess_value:.4%}")
         print(f"Sharpe Ratio (Portfolio): {sharpe_portfolio:.4f}")
         print(f"Sharpe Ratio (Benchmark): {sharpe_benchmark:.4f}")
+        print(f"Sharpe Ratio (Growth Index): {sharpe_growth:.4f}")
+        print(f"Sharpe Ratio (Value Index): {sharpe_value:.4f}")
         if portfolio_beta is not None:
             print(f"Portfolio Beta: {portfolio_beta:.4f}")
+        if portfolio_beta_growth is not None:
+            print(f"Beta (Portfolio vs Growth Index): {portfolio_beta_growth:.4f}")
+        if portfolio_beta_value is not None:
+            print(f"Beta (Portfolio vs Value Index): {portfolio_beta_value:.4f}")
         print(f"Max Drawdown (Portfolio): {max_drawdown_portfolio:.2%}")
         print(f"Max Drawdown (Benchmark): {max_drawdown_benchmark:.2%}")
+        print(f"Max Drawdown (Growth Index): {max_drawdown_growth:.2%}")
+        print(f"Max Drawdown (Value Index): {max_drawdown_value:.2%}")
         print(f"Win Rate: {win_rate:.2%}")
+        print(f"Win Rate (vs Growth Index): {win_rate_growth:.2%}")
+        print(f"Win Rate (vs Value Index): {win_rate_value:.2%}")
 
     return {
         'final_value': aum,
         'yearly_returns': portfolio_returns,
         'benchmark_returns': bench_list,
+        'growth_benchmark_returns': growth_bench_list,
+        'value_benchmark_returns': value_bench_list,
         'years': years,
         'portfolio_values': portfolio_values,
         'portfolio_beta': portfolio_beta,
+        'portfolio_beta_growth': portfolio_beta_growth,
+        'portfolio_beta_value': portfolio_beta_value,
         'max_drawdown_portfolio': max_drawdown_portfolio,
         'max_drawdown_benchmark': max_drawdown_benchmark,
+        'max_drawdown_growth': max_drawdown_growth,
+        'max_drawdown_value': max_drawdown_value,
         'sharpe_portfolio': sharpe_portfolio,
         'sharpe_benchmark': sharpe_benchmark,
+        'sharpe_growth': sharpe_growth,
+        'sharpe_value': sharpe_value,
+        'vol_raw_portfolio': vol_raw_portfolio,
+        'vol_raw_benchmark': vol_raw_benchmark,
+        'vol_raw_growth': vol_raw_growth,
+        'vol_raw_value': vol_raw_value,
+        'vol_excess_portfolio': vol_excess_p,
+        'vol_excess_benchmark': vol_excess_b,
+        'vol_excess_growth': vol_excess_growth,
+        'vol_excess_value': vol_excess_value,
         'win_rate': win_rate,
+        'win_rate_growth': win_rate_growth,
+        'win_rate_value': win_rate_value,
         'risk_free_rate_source': risk_free_rate_source,
         'yearly_comparisons': yearly_comparisons,
-        'information_ratio': information_ratio
+        'information_ratio': information_ratio,
+        'information_ratio_growth': information_ratio_growth,
+        'information_ratio_value': information_ratio_value
     }
 def calculate_information_ratio(portfolio_returns, benchmark_returns, verbosity=0):
     """

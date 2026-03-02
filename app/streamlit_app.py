@@ -769,6 +769,8 @@ def main():
                                 percent=cohort_pct,
                                 show_bottom=show_bottom_cohort,
                                 benchmark_returns=results.get('benchmark_returns'),
+                                growth_returns=results.get('growth_benchmark_returns'),
+                                value_returns=results.get('value_benchmark_returns'),
                                 benchmark_label='Russell 2000',
                                 initial_investment=st.session_state.initial_aum,
                                 baseline_portfolio_values=results.get('portfolio_values'),
@@ -805,7 +807,13 @@ def main():
             
             if 'benchmark_returns' in results and results['benchmark_returns']:
                 # Benchmark returns are already in percentage format (like 34.62)
-                perf_data['Benchmark Return'] = ['-'] + [f"{r:.2f}%" for r in results['benchmark_returns']]
+                perf_data['Benchmark Returns'] = ['-'] + [f"{r:.2f}%" for r in results['benchmark_returns']]
+
+            if 'growth_benchmark_returns' in results and results['growth_benchmark_returns']:
+                perf_data['Growth Returns'] = ['-'] + [f"{r:.2f}%" for r in results['growth_benchmark_returns']]
+
+            if 'value_benchmark_returns' in results and results['value_benchmark_returns']:
+                perf_data['Value Returns'] = ['-'] + [f"{r:.2f}%" for r in results['value_benchmark_returns']]
             
             perf_df = pd.DataFrame(perf_data)
             st.dataframe(perf_df, use_container_width=True, hide_index=True)
@@ -830,44 +838,145 @@ def main():
                              f"{results['max_drawdown_benchmark']*100:.2f}%",
                              delta=None,
                              help="Largest peak-to-trough decline in Russell 2000")
-                
+
                 with col3:
+                    if 'max_drawdown_growth' in results:
+                        st.metric("Max Drawdown (Growth Index)", 
+                                 f"{results['max_drawdown_growth']*100:.2f}%",
+                                 delta=None,
+                                 help="Largest peak-to-trough decline in Russell 2000 Growth")
+
+                with col4:
+                    if 'max_drawdown_value' in results:
+                        st.metric("Max Drawdown (Value Index)", 
+                                 f"{results['max_drawdown_value']*100:.2f}%",
+                                 delta=None,
+                                 help="Largest peak-to-trough decline in Russell 2000 Value")
+                
+                col1, col2, col3, col4 = st.columns(4)
+
+                with col1:
                     sharpe_delta = results['sharpe_portfolio'] - results['sharpe_benchmark']
                     st.metric("Sharpe Ratio (Portfolio)", 
                              f"{results['sharpe_portfolio']:.4f}",
                              delta=f"{sharpe_delta:+.4f} vs benchmark",
                              help="Risk-adjusted return (return per unit of volatility)")
                 
-                with col4:
+                with col2:
                     st.metric("Sharpe Ratio (Benchmark)", 
                              f"{results['sharpe_benchmark']:.4f}",
                              delta=None,
                              help="Risk-adjusted return for Russell 2000")
+
+                with col3:
+                    if 'sharpe_growth' in results:
+                        st.metric("Sharpe Ratio (Growth Index)", 
+                                 f"{results['sharpe_growth']:.4f}",
+                                 delta=None,
+                                 help="Risk-adjusted return for Russell 2000 Growth")
+
+                with col4:
+                    if 'sharpe_value' in results:
+                        st.metric("Sharpe Ratio (Value Index)", 
+                                 f"{results['sharpe_value']:.4f}",
+                                 delta=None,
+                                 help="Risk-adjusted return for Russell 2000 Value")
+
+                col1, col2, col3, col4 = st.columns(4)
+
+                with col1:
+                    if 'vol_raw_portfolio' in results:
+                        st.metric("Volatility (Raw Returns, Portfolio)",
+                                 f"{results['vol_raw_portfolio']*100:.2f}%",
+                                 delta=None,
+                                 help="Sample standard deviation of full-sample portfolio returns")
+
+                with col2:
+                    if 'vol_raw_benchmark' in results:
+                        st.metric("Volatility (Raw Returns, Benchmark)",
+                                 f"{results['vol_raw_benchmark']*100:.2f}%",
+                                 delta=None,
+                                 help="Sample standard deviation of full-sample Russell 2000 returns")
+
+                with col3:
+                    if 'vol_raw_growth' in results:
+                        st.metric("Volatility (Raw Returns, Growth Index)",
+                                 f"{results['vol_raw_growth']*100:.2f}%",
+                                 delta=None,
+                                 help="Sample standard deviation of full-sample Russell 2000 Growth returns")
+
+                with col4:
+                    if 'vol_raw_value' in results:
+                        st.metric("Volatility (Raw Returns, Value Index)",
+                                 f"{results['vol_raw_value']*100:.2f}%",
+                                 delta=None,
+                                 help="Sample standard deviation of full-sample Russell 2000 Value returns")
+
+                col1, col2, col3, col4 = st.columns(4)
+
+                with col1:
+                    if 'vol_excess_portfolio' in results:
+                        st.metric("Volatility (Excess Returns, Portfolio)",
+                                 f"{results['vol_excess_portfolio']*100:.2f}%",
+                                 delta=None,
+                                 help="Sample standard deviation of portfolio excess returns")
+
+                with col2:
+                    if 'vol_excess_benchmark' in results:
+                        st.metric("Volatility (Excess Returns, Benchmark)",
+                                 f"{results['vol_excess_benchmark']*100:.2f}%",
+                                 delta=None,
+                                 help="Sample standard deviation of Russell 2000 excess returns")
+
+                with col3:
+                    if 'vol_excess_growth' in results:
+                        st.metric("Volatility (Excess Returns, Growth Index)",
+                                 f"{results['vol_excess_growth']*100:.2f}%",
+                                 delta=None,
+                                 help="Sample standard deviation of Russell 2000 Growth excess returns")
+
+                with col4:
+                    if 'vol_excess_value' in results:
+                        st.metric("Volatility (Excess Returns, Value Index)",
+                                 f"{results['vol_excess_value']*100:.2f}%",
+                                 delta=None,
+                                 help="Sample standard deviation of Russell 2000 Value excess returns")
                 
                 # Win rate and information ratio
                 col1, col2, col3, col4 = st.columns(4)
                 
                 with col1:
-                    st.metric("Yearly Win Rate", 
-                             f"{results['win_rate']*100:.2f}%",
-                             delta=None,
-                             help="Percentage of years portfolio outperformed benchmark")
-                
-                with col2:
-                    if 'information_ratio' in results and results['information_ratio'] is not None:
-                        st.metric("Information Ratio", 
-                                 f"{results['information_ratio']:.4f}",
-                                 delta=None,
-                                 help="Active return per unit of active risk")
-                
-                with col3:
                     if results.get('portfolio_beta') is not None:
                         st.metric(
-                            "Portfolio Beta",
+                            "Portfolio Beta vs Russell 2000",
                             f"{results['portfolio_beta']:.3f}",
                             help=(
                                 "Sensitivity of portfolio returns to the Russell 2000. "
                                 "Beta = 1 moves with the market. "
+                                "> 1 is more volatile. < 1 is more defensive."
+                            )
+                        )
+
+                with col2:
+                    if results.get('portfolio_beta_growth') is not None:
+                        st.metric(
+                            "Beta (Portfolio vs Growth Index)",
+                            f"{results['portfolio_beta_growth']:.3f}",
+                            help=(
+                                "Sensitivity of portfolio returns to the Russell 2000 Growth index. "
+                                "Beta = 1 moves with the index. "
+                                "> 1 is more volatile. < 1 is more defensive."
+                            )
+                        )
+
+                with col3:
+                    if results.get('portfolio_beta_value') is not None:
+                        st.metric(
+                            "Beta (Portfolio vs Value Index)",
+                            f"{results['portfolio_beta_value']:.3f}",
+                            help=(
+                                "Sensitivity of portfolio returns to the Russell 2000 Value index. "
+                                "Beta = 1 moves with the index. "
                                 "> 1 is more volatile. < 1 is more defensive."
                             )
                         )
@@ -877,17 +986,68 @@ def main():
                              results.get('risk_free_rate_source', 'N/A'),
                              delta=None,
                              help="Data source for risk-free rate calculations")
+
+                col1, col2, col3, col4 = st.columns(4)
+
+                with col1:
+                    st.metric("Yearly Win Rate (Portfolio vs Russell 2000)", 
+                             f"{results['win_rate']*100:.2f}%",
+                             delta=None,
+                             help="Percentage of years portfolio outperformed benchmark")
+                
+                with col2:
+                    if 'win_rate_growth' in results:
+                        st.metric("Yearly Win Rate (Portfolio vs Growth Index)",
+                                 f"{results['win_rate_growth']*100:.2f}%",
+                                 delta=None,
+                                 help="Percentage of years portfolio outperformed Russell 2000 Growth")
+
+                with col3:
+                    if 'win_rate_value' in results:
+                        st.metric("Yearly Win Rate (Portfolio vs Value Index)",
+                                 f"{results['win_rate_value']*100:.2f}%",
+                                 delta=None,
+                                 help="Percentage of years portfolio outperformed Russell 2000 Value")
+
+                with col4:
+                    if 'information_ratio' in results and results['information_ratio'] is not None:
+                        st.metric("Information Ratio", 
+                                 f"{results['information_ratio']:.4f}",
+                                 delta=None,
+                                 help="Active return per unit of active risk")
+
+                col1, col2, col3, col4 = st.columns(4)
+
+                with col1:
+                    if 'information_ratio_growth' in results and results['information_ratio_growth'] is not None:
+                        st.metric("Information Ratio (Portfolio vs Growth Index)",
+                                 f"{results['information_ratio_growth']:.4f}",
+                                 delta=None,
+                                 help="Active return per unit of active risk versus Russell 2000 Growth")
+
+                with col2:
+                    if 'information_ratio_value' in results and results['information_ratio_value'] is not None:
+                        st.metric("Information Ratio (Portfolio vs Value Index)",
+                                 f"{results['information_ratio_value']:.4f}",
+                                 delta=None,
+                                 help="Active return per unit of active risk versus Russell 2000 Value")
+                        
+                st.divider()    
                 
                 # Yearly win/loss comparison table
                 if 'yearly_comparisons' in results:
-                    st.subheader("Yearly Win/Loss vs Benchmark")
+                    st.subheader("Yearly Win/Loss vs Benchmarks")
                     
                     comparison_data = {
                         'Year': [comp['year'] for comp in results['yearly_comparisons']],
                         'Portfolio Return': [f"{comp['portfolio_return']:.2f}%" for comp in results['yearly_comparisons']],
                         'Benchmark Return': [f"{comp['benchmark_return']:.2f}%" for comp in results['yearly_comparisons']],
                         # Use a green check for wins and a red cross for losses instead of Yes/No
-                        'Outperformed': ['✅' if comp['win'] else '❌' for comp in results['yearly_comparisons']]
+                        'Outperformed Benchmark': ['✅' if comp['win'] else '❌' for comp in results['yearly_comparisons']],
+                        'Growth Index Return': [f"{comp['growth_return']:.2f}%" for comp in results['yearly_comparisons']],
+                        'Outperformed vs Growth': ['✅' if comp['growth_win'] else '❌' for comp in results['yearly_comparisons']],
+                        'Value Index Return': [f"{comp['value_return']:.2f}%" for comp in results['yearly_comparisons']],
+                        'Outperformed vs Value': ['✅' if comp['value_win'] else '❌' for comp in results['yearly_comparisons']]
                     }
                     
                     comparison_df = pd.DataFrame(comparison_data)
