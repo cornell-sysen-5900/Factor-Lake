@@ -7,7 +7,7 @@ from .factors_doc import FACTOR_DOCS
 from .factor_utils import normalize_series
 from .benchmarks import get_benchmark_list
 
-def calculate_holdings(factor, aum, market, restrict_fossil_fuels=False, top_pct=10, which='top', use_market_cap_weight=False):
+def calculate_holdings(factor, aum, market, restrict_fossil_fuels=False, top_pct=10, which='top', use_market_cap_weight=False, enforce_liquidity=False, liquidity_volume_col='vol', liquidity_participation_rate=1.0):
     # Apply sector restrictions if enabled
     if restrict_fossil_fuels:
         industry_col = 'FactSet Industry'
@@ -69,6 +69,26 @@ def calculate_holdings(factor, aum, market, restrict_fossil_fuels=False, top_pct
     # Calculate number of shares for each selected security
     portfolio_new = Portfolio(name=f"Portfolio_{market.t}")
     
+    def _cap_shares_by_liquidity(ticker, requested_shares):
+        if not enforce_liquidity:
+            return requested_shares
+        if liquidity_volume_col not in market.stocks.columns:
+            return requested_shares
+        try:
+            daily_volume = market.stocks.loc[ticker, liquidity_volume_col]
+            if isinstance(daily_volume, (pd.Series, np.ndarray)):
+                if hasattr(daily_volume, 'dropna') and not daily_volume.dropna().empty:
+                    daily_volume = daily_volume.dropna().iloc[0]
+                else:
+                    daily_volume = daily_volume.iloc[0] if hasattr(daily_volume, 'iloc') and len(daily_volume) > 0 else None
+            daily_volume = pd.to_numeric(daily_volume, errors='coerce')
+            if pd.isna(daily_volume) or daily_volume <= 0:
+                return 0.0
+            max_trade_shares = float(daily_volume) * max(0.0, min(float(liquidity_participation_rate), 1.0))
+            return max(0.0, min(float(requested_shares), max_trade_shares))
+        except Exception:
+            return requested_shares
+
     if use_market_cap_weight:
         # Market capitalization-based weighting (similar to Russell 2000)
         # Collect market cap and price for each selected ticker, then allocate
@@ -101,14 +121,18 @@ def calculate_holdings(factor, aum, market, restrict_fossil_fuels=False, top_pct
                 price = prices.get(ticker)
                 if price is not None and price > 0 and dollar_investment > 0:
                     shares = dollar_investment / price
-                    portfolio_new.add_investment(ticker, shares)
+                    shares = _cap_shares_by_liquidity(ticker, shares)
+                    if shares > 0:
+                         portfolio_new.add_investment(ticker, shares)
             # If for some reason no shares were added (e.g., rounding), fallback to equal among priced tickers
             if not portfolio_new.investments and prices:
                 valid_tickers = list(prices.keys())
                 equal_investment = aum / len(valid_tickers)
                 for t in valid_tickers:
                     shares = equal_investment / prices[t]
-                    portfolio_new.add_investment(t, shares)
+                    shares = _cap_shares_by_liquidity(t, shares)
+                    if shares > 0:
+                        portfolio_new.add_investment(t, shares)
         else:
             # Fallback to equal weighting among tickers that have valid prices
             valid_tickers = [t for t, _ in selected if market.get_price(t) is not None and market.get_price(t) > 0]
@@ -120,7 +144,9 @@ def calculate_holdings(factor, aum, market, restrict_fossil_fuels=False, top_pct
                     price = market.get_price(ticker)
                     if price is not None and price > 0:
                         shares = equal_investment / price
-                        portfolio_new.add_investment(ticker, shares)
+                        shares = _cap_shares_by_liquidity(ticker, shares)
+                        if shares > 0:
+                            portfolio_new.add_investment(ticker, shares)
     else:
         # Equal dollar weighting (allocate only to tickers with valid entry prices)
         valid_tickers = [t for t, _ in selected if market.get_price(t) is not None and market.get_price(t) > 0]
@@ -133,7 +159,9 @@ def calculate_holdings(factor, aum, market, restrict_fossil_fuels=False, top_pct
                 price = market.get_price(ticker)
                 if price is not None and price > 0:
                     shares = equal_investment / price
-                    portfolio_new.add_investment(ticker, shares)
+                    shares = _cap_shares_by_liquidity(ticker, shares)
+                    if shares > 0:
+                        portfolio_new.add_investment(ticker, shares)
 
     return portfolio_new
 
@@ -183,7 +211,25 @@ def calculate_growth(portfolio, current_market, next_market=None, verbosity=0):
     
     return growth, total_investment_value, total_end_value
 
-def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, benchmark_index=1, verbosity=0, restrict_fossil_fuels=False, top_pct=10, which='top', use_market_cap_weight=False, factor_directions=None, frequency='Yearly', data_mode='poc'):
+def rebalance_portfolio(
+    data,
+    factors,
+    start_year,
+    end_year,
+    initial_aum,
+    benchmark_index=1,
+    verbosity=0,
+    restrict_fossil_fuels=False,
+    top_pct=10,
+    which='top',
+    use_market_cap_weight=False,
+    factor_directions=None,
+    frequency='Yearly',
+    data_mode='poc',
+    enforce_liquidity=False,
+    liquidity_volume_col='vol',
+    liquidity_participation_rate=1.0
+):
     """
     Executes a multi-year backtest. 
     Calculates Sharpe and Beta using year-specific excess returns.
@@ -222,7 +268,10 @@ def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, benchm
                     restrict_fossil_fuels=restrict_fossil_fuels,
                     top_pct=top_pct,
                     which=factor_which,
-                    use_market_cap_weight=use_market_cap_weight
+                    use_market_cap_weight=use_market_cap_weight,
+                    enforce_liquidity=enforce_liquidity,
+                    liquidity_volume_col=liquidity_volume_col,
+                    liquidity_participation_rate=liquidity_participation_rate
                 )
                 yearly_portfolio.append(factor_portfolio)
 
@@ -298,7 +347,10 @@ def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, benchm
                     restrict_fossil_fuels=restrict_fossil_fuels,
                     top_pct=top_pct,
                     which=factor_which,
-                    use_market_cap_weight=use_market_cap_weight
+                    use_market_cap_weight=use_market_cap_weight,
+                    enforce_liquidity=enforce_liquidity,
+                    liquidity_volume_col=liquidity_volume_col,
+                    liquidity_participation_rate=liquidity_participation_rate
                 )
                 yearly_portfolio.append(factor_portfolio)
 

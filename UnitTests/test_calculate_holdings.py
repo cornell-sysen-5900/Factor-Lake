@@ -98,6 +98,50 @@ class TestCalculateHoldings:
         # Should only include stocks with valid values
         selected_tickers = [inv['ticker'] for inv in portfolio.investments]
         assert 'MSFT' not in selected_tickers
+
+    def test_calculate_holdings_liquidity_cap_enabled(self):
+        """When liquidity cap is enabled, shares cannot exceed `vol`."""
+        data = pd.DataFrame({
+            'Ticker-Region': ['AAA-US', 'BBB-US', 'CCC-US'],
+            'Ticker': ['AAA', 'BBB', 'CCC'],
+            'Ending Price': [100.0, 100.0, 100.0],
+            '6-Mo Momentum %': [0.30, 0.20, 0.10],  # AAA selected (top decile)
+            'vol': [20, 1000, 1000],
+            'Year': [2022, 2022, 2022]
+        })
+        market = MarketObject(data, 2022)
+        factor = Momentum6m()
+
+        portfolio = calculate_holdings(
+            factor, 10000.0, market,
+            enforce_liquidity=True
+        )
+
+        assert len(portfolio.investments) == 1
+        assert portfolio.investments[0]['ticker'] == 'AAA'
+        assert portfolio.investments[0]['number_of_shares'] == pytest.approx(20.0)
+
+    def test_calculate_holdings_liquidity_cap_disabled(self):
+        """When liquidity cap is disabled, allocation is unconstrained by `vol`."""
+        data = pd.DataFrame({
+            'Ticker-Region': ['AAA-US', 'BBB-US', 'CCC-US'],
+            'Ticker': ['AAA', 'BBB', 'CCC'],
+            'Ending Price': [100.0, 100.0, 100.0],
+            '6-Mo Momentum %': [0.30, 0.20, 0.10],  # AAA selected (top decile)
+            'vol': [20, 1000, 1000],
+            'Year': [2022, 2022, 2022]
+        })
+        market = MarketObject(data, 2022)
+        factor = Momentum6m()
+
+        portfolio = calculate_holdings(
+            factor, 10000.0, market,
+            enforce_liquidity=False
+        )
+
+        assert len(portfolio.investments) == 1
+        assert portfolio.investments[0]['ticker'] == 'AAA'
+        assert portfolio.investments[0]['number_of_shares'] == pytest.approx(100.0)
     
     @pytest.mark.skip(reason="Fossil fuel filtering needs fixing in calculate_holdings")
     def test_calculate_holdings_fossil_fuel_restriction(self):

@@ -305,6 +305,18 @@ def main():
             st.info("📊 Market Cap Weighting: Stocks will be weighted by their market capitalization, similar to the Russell 2000 index. This reduces turnover costs and aligns with market performance.")
         
         st.write("---")
+        st.subheader("Liquidity Controls")
+        if is_legacy:
+            enforce_liquidity = False
+            st.info("💧 Liquidity trade caps are only available in **POC (Daily CRSP)** mode.")
+        else:
+            enforce_liquidity = st.checkbox(
+                "Cap trades by daily liquidity (`vol`)",
+                value=False,
+                help="When enabled, each trade is capped by that stock's available daily volume from the `vol` column."
+            )
+
+        st.write("---")
         # Sector Selection
         st.subheader("Sector Selection")
         sector_filter_enabled = st.checkbox("Enable Sector Filter", value=False)
@@ -501,6 +513,10 @@ def main():
                             rdata['Market Capitalization'] = rdata['Market_Capitalization']
                             cols_to_keep.append('Market Capitalization')
 
+                        # Keep liquidity column for optional trade-size capping in POC mode
+                        if 'vol' in rdata.columns:
+                            cols_to_keep.append('vol')
+
                         for factor in FACTOR_MAP.keys():
                             if factor in rdata.columns:
                                 cols_to_keep.append(factor)
@@ -556,7 +572,8 @@ def main():
                                     use_market_cap_weight=use_market_cap_weight,
                                     factor_directions=factor_directions,
                                     frequency=rebalance_frequency,
-                                    data_mode=st.session_state.get('data_mode', 'poc')
+                                    data_mode=st.session_state.get('data_mode', 'poc'),
+                                    enforce_liquidity=enforce_liquidity
                                 )
                                 
                                 st.session_state.results = results
@@ -566,6 +583,7 @@ def main():
                                 st.session_state.initial_aum = initial_aum
                                 st.session_state.use_cap_weight = use_market_cap_weight
                                 st.session_state.rebalance_frequency = rebalance_frequency
+                                st.session_state.enforce_liquidity = enforce_liquidity
                                 
                                 st.success("Analysis complete! Check the Results tab.")
                             
@@ -708,7 +726,8 @@ def main():
                                 factor_directions=top_dirs,
                                 use_market_cap_weight=st.session_state.use_cap_weight,
                                 frequency=st.session_state.rebalance_frequency,
-                                data_mode=cohort_data_mode
+                                data_mode=cohort_data_mode,
+                                enforce_liquidity=st.session_state.get('enforce_liquidity', False)
                             )
 
                             # 4. Calculate Bottom Cohort (Absolute Bottom Tier)
@@ -727,7 +746,8 @@ def main():
                                     factor_directions=bot_dirs,
                                     use_market_cap_weight=st.session_state.use_cap_weight,
                                     frequency=st.session_state.rebalance_frequency,
-                                    data_mode=cohort_data_mode
+                                    data_mode=cohort_data_mode,
+                                    enforce_liquidity=st.session_state.get('enforce_liquidity', False)
                                 )
 
                             # 5. Helper to extract metric data

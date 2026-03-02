@@ -423,14 +423,14 @@ class MarketObject():
         ]
         # Keep Ticker-Region so we can index uniquely when present
         # Include Market Capitalization for cap-weighted portfolios
-        keep_cols = ['Ticker-Region', 'Ticker', 'Ending Price', 'Year', 'Date', 'FactSet Industry', 'Market Capitalization'] + available_factors
+        keep_cols = ['Ticker-Region', 'Ticker', 'Ending Price', 'Year', 'Date', 'FactSet Industry', 'Market Capitalization', 'vol'] + available_factors
 
         # Filter and clean data
         data = data[[col for col in keep_cols if col in data.columns]].copy()
         data.replace({'--': None, 'N/A': None, '#N/A': None, '': None}, inplace=True)
         
         # Convert numeric columns to proper numeric types
-        numeric_columns = ['Ending Price', 'Market Capitalization'] + [col for col in available_factors if col in data.columns]
+        numeric_columns = ['Ending Price', 'Market Capitalization', 'vol'] + [col for col in available_factors if col in data.columns]
         for col in numeric_columns:
             if col in data.columns:
                 data[col] = pd.to_numeric(data[col], errors='coerce')
