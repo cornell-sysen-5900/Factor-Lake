@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from supabase import create_client, Client
 
-def load_supabase_data(table_name='Full Precision Test', show_progress=True, sectors=None):
+def load_supabase_data(table_name='Full Precision Test', show_progress=True, sectors=None, start_year=None, end_year=None, data_frequency='Yearly'):
     """
     Loads data from a Supabase table and returns it as a pandas DataFrame.
     Credentials are read from environment variables or Colab userdata.
@@ -11,6 +11,7 @@ def load_supabase_data(table_name='Full Precision Test', show_progress=True, sec
     Args:
         table_name (str): Name of the Supabase table to load
         show_progress (bool): Whether to print loading progress messages
+        data_frequency (str): 'Yearly', 'Monthly', or 'Daily'
     """
     supabase_url = os.environ.get('SUPABASE_URL')
     supabase_key = os.environ.get('SUPABASE_KEY')
@@ -34,40 +35,162 @@ def load_supabase_data(table_name='Full Precision Test', show_progress=True, sec
     if show_progress:
         print(f"Loading data from Supabase table '{table_name}'...")
     
-    while True:
-        # Build base query
-        base_query = supabase.table(table_name).select('*')
-        # Apply server-side sector filter if provided. Uses the exact DB column name.
-        # Column is renamed later to "Scott's Sector (5)" by the loader.
-        if sectors:
-            try:
-                base_query = base_query.in_('Scotts_Sector_5', sectors)
-            except Exception:
-                # If server-side filter isn't supported, we'll filter client-side later
-                pass
+    # Build base query
+    base_query = supabase.table(table_name).select('*')
+    if sectors:
+        try:
+            base_query = base_query.in_('Scotts_Sector_5', sectors)
+        except Exception:
+            pass
 
-        # Fetch a page of data
-        response = base_query.range(offset, offset + page_size - 1).execute()
+    sy = int(start_year) if start_year is not None else 1995
+    ey = int(end_year) if end_year is not None else 2030
+
+    import concurrent.futures
+    import time as _time
+
+    def _paginate_query(query, label="", max_retries=4, page_size=1000):
+        """Paginate a single query with retries. Returns all rows."""
+        rows = []
+        offset = 0
+        while True:
+            result = None
+            for attempt in range(max_retries):
+                try:
+                    res = query.range(offset, offset + page_size - 1).execute()
+                    result = res.data if hasattr(res, 'data') else res
+                    break
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        _time.sleep(0.5 * (attempt + 1))
+                    else:
+                        print(f"  WARN: Page {offset} failed for {label}: {e}")
+                        result = []
+            
+            if not result or len(result) == 0:
+                break
+            rows.extend(result)
+            if len(result) < page_size:
+                break
+            offset += page_size
+        return rows
+
+    if table_name in ['daily_prices', 'monthly_prices'] and data_frequency in ['Monthly', 'Daily']:
+        # Ultra-fast parallel loading: fetch each MONTH independently
+        # Each month has ~2000 rows (only 2 API pages), so queries are tiny and fast
+        needed_cols = "permno,date,prc,ret,mkt_cap,mom_1m,mom_6m,mom_12m,vol_gk_1m,vol_gk_3m,vol_gk_6m,vol_gk_12m,vol_close_1m,vol_close_3m,vol_close_6m,vol_close_12m"
         
-        batch = response.data if hasattr(response, 'data') else response
+        month_keys = []
+        for y in range(sy, ey + 1):
+            for m in range(1, 13):
+                month_keys.append((y, m))
         
-        if not batch:
-            break
-        
-        all_rows.extend(batch)
         if show_progress:
-            print(f"Loaded {len(all_rows)} records so far...")
+            print(f"Loading {len(month_keys)} months of {data_frequency.lower()} data in parallel...")
         
-        # If we got fewer records than page_size, we're done
-        if len(batch) < page_size:
-            break
+        def fetch_month(ym):
+            year, month = ym
+            last_day = 28 if month == 2 else 30 if month in (4, 6, 9, 11) else 31
+            q = supabase.table(table_name).select(needed_cols)
+            q = q.gte('date', f"{year}-{month:02d}-01").lte('date', f"{year}-{month:02d}-{last_day}")
+            return ym, _paginate_query(q, label=f"{year}-{month:02d}")
         
-        offset += page_size
+        all_rows = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
+            futures = {executor.submit(fetch_month, ym): ym for ym in month_keys}
+            results = {}
+            for future in concurrent.futures.as_completed(futures):
+                ym, rows = future.result()
+                results[ym] = rows
+        
+        for ym in sorted(results.keys()):
+            all_rows.extend(results[ym])
+        
+        if show_progress:
+            print(f"Loaded {len(all_rows)} total records.")
+    
+    elif table_name in ['daily_prices', 'monthly_prices']:
+        # Yearly mode: December-only for annual backtest
+        if show_progress:
+            print(f"Limiting {table_name} fetch to December dates...")
+        or_conditions = []
+        for y in range(sy, ey + 1):
+            or_conditions.append(f"and(date.gte.{y}-12-01,date.lte.{y}-12-31)")
+        or_str = ",".join(or_conditions)
+        base_query = base_query.or_(or_str)
+        all_rows = _paginate_query(base_query, label=table_name)
+    
+    else:
+        if start_year is not None:
+            if table_name in ['index_monthly', 'index_daily']:
+                base_query = base_query.gte('date', f"{start_year}-01-01")
+            elif table_name == 'Full Precision Test' or table_name == 'Yearly Data':
+                base_query = base_query.gte('Date', f"{start_year}-01-01")
+        if end_year is not None:
+            if table_name in ['index_monthly', 'index_daily']:
+                base_query = base_query.lte('date', f"{end_year}-12-31")
+            elif table_name == 'Full Precision Test' or table_name == 'Yearly Data':
+                base_query = base_query.lte('Date', f"{end_year}-12-31")
+        all_rows = _paginate_query(base_query, label=table_name)
     
     if show_progress:
         print(f"Total records loaded: {len(all_rows)}")
     
     return pd.DataFrame(all_rows)
+
+
+def load_constituents_from_supabase(start_year=None, end_year=None, show_progress=True):
+    """
+    Load Russell 2000 constituent membership data from the Supabase
+    iwm_constituents table.  Returns a DataFrame with columns:
+        permno, index_effective, index_through, ticker, sector, is_fossil_fuel
+    Only returns rows whose membership window overlaps [start_year, end_year].
+    """
+    supabase_url = os.environ.get('SUPABASE_URL')
+    supabase_key = os.environ.get('SUPABASE_KEY')
+    if not supabase_url or not supabase_key:
+        try:
+            from google.colab import userdata
+            supabase_url = userdata.get('SUPABASE_URL')
+            supabase_key = userdata.get('SUPABASE_KEY')
+        except Exception:
+            pass
+    if not supabase_url or not supabase_key:
+        raise RuntimeError('Supabase credentials not set.')
+
+    supabase = create_client(supabase_url, supabase_key)
+
+    if show_progress:
+        print("Loading constituent data from Supabase (iwm_constituents)...")
+
+    # Build query – filter to rows that overlap the requested date window
+    query = supabase.table('iwm_constituents').select('*')
+    if start_year is not None:
+        # constituent must not have left before our start
+        query = query.gte('index_through', f"{int(start_year)}-01-01")
+    if end_year is not None:
+        # constituent must have joined before our end
+        query = query.lte('index_effective', f"{int(end_year)}-12-31")
+
+    # Paginate (table is small – ~5 634 rows – but be safe)
+    page_size = 1000
+    offset = 0
+    all_rows = []
+    while True:
+        res = query.range(offset, offset + page_size - 1).execute()
+        batch = res.data if hasattr(res, 'data') else res
+        if not batch:
+            break
+        all_rows.extend(batch)
+        if len(batch) < page_size:
+            break
+        offset += page_size
+
+    df = pd.DataFrame(all_rows)
+    if show_progress:
+        print(f"Loaded {len(df)} constituent records from Supabase.")
+    return df
+
     
     def load_market_data(self, 
                         table_name: str = 'market_data',
