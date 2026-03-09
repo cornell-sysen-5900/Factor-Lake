@@ -7,7 +7,7 @@ from .factors_doc import FACTOR_DOCS
 from .factor_utils import normalize_series
 from .benchmarks import get_benchmark_list
 
-def calculate_holdings(factor, aum, market, restrict_fossil_fuels=False, top_pct=10, which='top', use_market_cap_weight=False, enforce_liquidity=False, liquidity_volume_col='vol', liquidity_participation_rate=1.0):
+def calculate_holdings(factor, aum, market, restrict_fossil_fuels=False, top_pct=10, which='top', use_market_cap_weight=False, enforce_liquidity=False, liquidity_volume_col='vol'):
     # Apply sector restrictions if enabled
     if restrict_fossil_fuels:
         industry_col = 'FactSet Industry'
@@ -84,7 +84,7 @@ def calculate_holdings(factor, aum, market, restrict_fossil_fuels=False, top_pct
             daily_volume = pd.to_numeric(daily_volume, errors='coerce')
             if pd.isna(daily_volume) or daily_volume <= 0:
                 return 0.0
-            max_trade_shares = float(daily_volume) * max(0.0, min(float(liquidity_participation_rate), 1.0))
+            max_trade_shares = float(daily_volume)
             return max(0.0, min(float(requested_shares), max_trade_shares))
         except Exception:
             return requested_shares
@@ -227,8 +227,7 @@ def rebalance_portfolio(
     frequency='Yearly',
     data_mode='poc',
     enforce_liquidity=False,
-    liquidity_volume_col='vol',
-    liquidity_participation_rate=1.0
+    liquidity_volume_col='vol'
 ):
     """
     Executes a multi-year backtest. 
@@ -270,8 +269,7 @@ def rebalance_portfolio(
                     which=factor_which,
                     use_market_cap_weight=use_market_cap_weight,
                     enforce_liquidity=enforce_liquidity,
-                    liquidity_volume_col=liquidity_volume_col,
-                    liquidity_participation_rate=liquidity_participation_rate
+                    liquidity_volume_col=liquidity_volume_col
                 )
                 yearly_portfolio.append(factor_portfolio)
 
@@ -349,8 +347,7 @@ def rebalance_portfolio(
                     which=factor_which,
                     use_market_cap_weight=use_market_cap_weight,
                     enforce_liquidity=enforce_liquidity,
-                    liquidity_volume_col=liquidity_volume_col,
-                    liquidity_participation_rate=liquidity_participation_rate
+                    liquidity_volume_col=liquidity_volume_col
                 )
                 yearly_portfolio.append(factor_portfolio)
 
