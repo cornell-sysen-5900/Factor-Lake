@@ -240,6 +240,18 @@ SECTOR_OPTIONS = [
     'Healthcare'
 ]
 
+@st.cache_data(show_spinner="Loading market data...", ttl=3600)
+def cached_load_data(restrict_ff, data_freq, sectors, start, end):
+    return load_data(
+        restrict_fossil_fuels=restrict_ff,
+        use_supabase=True,
+        data_frequency=data_freq,
+        show_loading_progress=True,
+        sectors=sectors,
+        start_year=start,
+        end_year=end
+    )
+
 def main():
     # Check password first
     if not check_password():
@@ -488,23 +500,13 @@ def main():
                 st.session_state.data_loaded = False
                 st.session_state.rdata = None
                 st.session_state.results = None
+                # Clear the Streamlit cache to ensure fresh data is loaded
+                st.cache_data.clear()
                 if True:
                     try:
                         sectors_to_use = selected_sectors if sector_filter_enabled else None
-
-                        @st.cache_data(show_spinner="Loading daily market data...", ttl=3600)
-                        def cached_load_data(_restrict_ff, _data_freq, _sectors, _start, _end):
-                            return load_data(
-                                restrict_fossil_fuels=_restrict_ff,
-                                use_supabase=True,
-                                data_frequency=_data_freq,
-                                show_loading_progress=True,
-                                sectors=_sectors,
-                                start_year=_start,
-                                end_year=_end
-                            )
-                        
                         sectors_key = tuple(sorted(sectors_to_use)) if sectors_to_use else None
+                        
                         rdata = cached_load_data(
                             restrict_fossil_fuels,
                             data_frequency,

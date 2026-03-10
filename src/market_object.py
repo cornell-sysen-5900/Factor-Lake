@@ -1,10 +1,9 @@
 import pandas as pd
 import numpy as np
-from .supabase_client import load_supabase_data
+from .supabase_client import load_supabase_data, load_constituents_from_supabase
 import os
 
-### CREATING FUNCTION TO LOAD DATA ### Tables: FR2000 Annual Quant Data Full Precision Test
-def load_data(restrict_fossil_fuels=False, use_supabase=True, table_name='Full Precision Test', show_loading_progress=True, data_path=None, excel_sheet='Data', sectors=None):
+def load_data(restrict_fossil_fuels=False, use_supabase=True, table_name='Full Precision Test', show_loading_progress=True, data_path=None, excel_sheet='Data', sectors=None, data_frequency='Yearly', start_year=None, end_year=None):
     """
     Load market data from either Supabase or Excel file (fallback).
     
@@ -21,12 +20,17 @@ def load_data(restrict_fossil_fuels=False, use_supabase=True, table_name='Full P
     if use_supabase:
         try:
             # Resolve which Supabase table to use (param > env var > sensible default)
-            effective_table = table_name or os.environ.get('SUPABASE_TABLE') or 'Full Precision Test'
+            if data_frequency == 'Daily':
+                effective_table = 'daily_prices'
+            elif data_frequency == 'Monthly':
+                effective_table = 'monthly_prices'
+            else:
+                effective_table = table_name or os.environ.get('SUPABASE_TABLE') or 'Full Precision Test'
 
             # Load data from Supabase
             if show_loading_progress:
                 print(f"Using Supabase table: '{effective_table}'")
-            rdata = load_supabase_data(effective_table, show_progress=show_loading_progress, sectors=sectors)
+            rdata = load_supabase_data(effective_table, show_progress=show_loading_progress, sectors=sectors, start_year=start_year, end_year=end_year, data_frequency=data_frequency)
             
             if rdata.empty:
                 print("Warning: No data loaded from Supabase. Check your table and connection.")
@@ -37,6 +41,18 @@ def load_data(restrict_fossil_fuels=False, use_supabase=True, table_name='Full P
             
             # New return logic: 0 if null next year return
             rdata['Next_Year_Return'] = rdata['Next_Year_Return'].fillna(0)
+
+            # Add Period column for sub-annual rebalancing
+            if data_frequency in ['Monthly', 'Daily'] and 'Date' in rdata.columns:
+                if data_frequency == 'Daily':
+                    # Each trading day is its own rebalancing period
+                    rdata['Period'] = pd.to_datetime(rdata['Date']).dt.strftime('%Y-%m-%d')
+                else:
+                    rdata['Period'] = pd.to_datetime(rdata['Date']).dt.to_period('M').astype(str)
+
+            # Filter to Russell 2000 constituents using Supabase
+            if data_frequency in ['Monthly', 'Daily']:
+                rdata = _apply_constituent_filter_supabase(rdata, start_year=start_year, end_year=end_year)
 
             # Apply sector restriction logic (post-standardization)
             if restrict_fossil_fuels:
@@ -239,6 +255,16 @@ def _standardize_column_names(df):
         'Book-Price': 'Book/Price',
         'Next-Years_Return': "Next_Year_Return",
         'Next-Years_Active_Return': "Next-Year's Active Return %",
+        
+        # New Point-in-Time Daily/Monthly columns
+        'permno': 'Ticker',
+        'date': 'Date',
+        'prc': 'Ending Price',
+        'mkt_cap': 'Market Capitalization',
+        'ret': 'Next_Year_Return', # Daily/Monthly use ret as the forward period return
+        'mom_1m': '1-Mo Momentum %',
+        'mom_6m': '6-Mo Momentum %',
+        'mom_12m': '12-Mo Momentum %',
 
         # Financial data columns
         'NI_Millions': 'NI, $Millions',
@@ -273,6 +299,21 @@ def _standardize_column_names(df):
     if 'Ticker-Region' not in df.columns and 'ticker_region' in df.columns:
         df['Ticker-Region'] = df['ticker_region']
     
+    # If Ticker-Region is still missing but we have Ticker (like from permno), generate it
+    if 'Ticker-Region' not in df.columns and 'Ticker' in df.columns:
+        df['Ticker'] = df['Ticker'].astype(str)
+        df['Ticker-Region'] = df['Ticker'] + '-US'
+    
+    # Convert decimal returns (e.g. 0.12) to percentage returns (e.g. 12.0)
+    # The legacy engine's calculate_growth divides Next_Year_Return by 100,
+    # so it expects percentage format. Supabase ret is in decimal format.
+    if 'Next_Year_Return' in df.columns:
+        nyr = pd.to_numeric(df['Next_Year_Return'], errors='coerce')
+        # If the max absolute value is < 20.0, it's almost certainly decimal format
+        # (A 2000% return in decimal is 20.0, whereas in percentage it would be 2000.0)
+        if nyr.dropna().abs().max() < 20.0:
+            df['Next_Year_Return'] = nyr * 100
+    
     return df
 
 
@@ -300,6 +341,57 @@ def _apply_sector_filter(df: pd.DataFrame, sectors, context_label: str = "") -> 
     removed = before - len(filtered)
     print(f"Sector filter kept {len(filtered)} rows and removed {removed} ({context_label}).")
     return filtered
+
+def _apply_constituent_filter_supabase(df, start_year=None, end_year=None):
+    """
+    Filter a DataFrame to only include Russell 2000 constituents
+    using the Supabase iwm_constituents table.
+    
+    The iwm_constituents table has columns:
+        permno, index_effective, index_through, ticker, sector, is_fossil_fuel
+    A stock is a valid constituent if its [index_effective, index_through] window
+    overlaps with the row's date.
+    """
+    try:
+        constituents = load_constituents_from_supabase(
+            start_year=start_year, end_year=end_year, show_progress=True
+        )
+        if constituents.empty:
+            print("Warning: No constituents loaded from Supabase. Skipping filter.")
+            return df
+        
+        # Build a set of valid permnos with their date ranges
+        constituents['index_effective'] = pd.to_datetime(constituents['index_effective'])
+        constituents['index_through'] = pd.to_datetime(constituents['index_through'])
+        
+        # For each row in df, check if its permno was a constituent on that date
+        df_temp = df.copy()
+        df_temp['_permno_int'] = pd.to_numeric(df_temp['Ticker'], errors='coerce').astype('Int64')
+        df_temp['_date'] = pd.to_datetime(df_temp['Date'])
+        
+        # Merge on permno, then filter by date range
+        constituents['_permno_int'] = constituents['permno'].astype('Int64')
+        merged = pd.merge(
+            df_temp, 
+            constituents[['_permno_int', 'index_effective', 'index_through']],
+            on='_permno_int', 
+            how='inner'
+        )
+        
+        # Keep rows where the data date falls within the constituent membership window
+        mask = (merged['_date'] >= merged['index_effective']) & (merged['_date'] <= merged['index_through'])
+        filtered = merged[mask].copy()
+        
+        # Drop helper columns and deduplicate (a permno may match multiple constituent windows)
+        filtered = filtered.drop(columns=['_permno_int', '_date', 'index_effective', 'index_through'])
+        filtered = filtered.drop_duplicates()
+        
+        removed = len(df) - len(filtered)
+        print(f"Supabase constituent filter kept {len(filtered)} rows and removed {removed}.")
+        return filtered
+    except Exception as e:
+        print(f"Warning: Could not apply Supabase constituent filter: {e}")
+        return df
 
 def _filter_essential_data(df):
     """
@@ -377,7 +469,8 @@ class MarketObject():
         ]
         # Keep Ticker-Region so we can index uniquely when present
         # Include Market Capitalization for cap-weighted portfolios
-        keep_cols = ['Ticker-Region', 'Ticker', 'Ending Price', 'Year', '6-Mo Momentum %', 'FactSet Industry', 'Market Capitalization'] + available_factors
+        volatility_metrics = ["vol_gk_1m", "vol_gk_3m", "vol_gk_6m", "vol_gk_12m", "vol_close_1m", "vol_close_3m", "vol_close_6m", "vol_close_12m"]
+        keep_cols = ['Ticker-Region', 'Ticker', 'Ending Price', 'Year', '6-Mo Momentum %', 'FactSet Industry', 'Market Capitalization'] + available_factors + volatility_metrics
 
         # Filter and clean data
         data = data[[col for col in keep_cols if col in data.columns]].copy()
@@ -393,6 +486,8 @@ class MarketObject():
         index_col = 'Ticker' if 'Ticker' in data.columns else ('Ticker-Region' if 'Ticker-Region' in data.columns else None)
         if index_col:
             try:
+                # Drop duplicate tickers, keeping the last occurrence (most recent)
+                data = data.drop_duplicates(subset=[index_col], keep='last')
                 data.set_index(index_col, inplace=True)
             except Exception:
                 pass

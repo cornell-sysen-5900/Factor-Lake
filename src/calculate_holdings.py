@@ -623,11 +623,11 @@ def calculate_information_ratio(portfolio_returns, benchmark_returns, verbosity=
     mean_active_return = np.mean(active_returns)
     
     # Calculate tracking error (denominator)
-    tracking_error = np.std(active_returns, ddof=1)  # Use sample std deviation
+    tracking_error = np.std(active_returns, ddof=1) if len(active_returns) > 1 else 0  # Use sample std deviation
 
     # Prevent division by zero
     if tracking_error == 0:
-        return None  # Or return float('nan') to indicate undefined IR
+        return 0.0  # Or return float('nan') to indicate undefined IR
     
     # Compute Information Ratio
     information_ratio = mean_active_return / tracking_error
@@ -867,10 +867,10 @@ def _rebalance_portfolio_yearly(data, factors, start_year, end_year, initial_aum
     value_returns_np = np.array(value_bench_list) / 100
 
     # Full-sample volatility of RAW returns
-    vol_raw_portfolio = np.std(portfolio_returns_np, ddof=1)
-    vol_raw_benchmark = np.std(benchmark_returns_np, ddof=1)
-    vol_raw_growth = np.std(growth_returns_np, ddof=1)
-    vol_raw_value = np.std(value_returns_np, ddof=1)
+    vol_raw_portfolio = np.std(portfolio_returns_np, ddof=1) if len(portfolio_returns_np) > 1 else 0
+    vol_raw_benchmark = np.std(benchmark_returns_np, ddof=1) if len(benchmark_returns_np) > 1 else 0
+    vol_raw_growth = np.std(growth_returns_np, ddof=1) if len(growth_returns_np) > 1 else 0
+    vol_raw_value = np.std(value_returns_np, ddof=1) if len(value_returns_np) > 1 else 0
     
 # --- 3. Excess Return Calculations ---
     excess_portfolio_returns = portfolio_returns_np - rf_rates_np
@@ -880,10 +880,10 @@ def _rebalance_portfolio_yearly(data, factors, start_year, end_year, initial_aum
     
     # --- 4. Sharpe Ratio ---
     # Volatility of the EXCESS returns (Institutional Standard)
-    vol_excess_p = np.std(excess_portfolio_returns, ddof=1)
-    vol_excess_b = np.std(excess_benchmark_returns, ddof=1)
-    vol_excess_growth = np.std(excess_growth_returns, ddof=1)
-    vol_excess_value = np.std(excess_value_returns, ddof=1)
+    vol_excess_p = np.std(excess_portfolio_returns, ddof=1) if len(excess_portfolio_returns) > 1 else 0
+    vol_excess_b = np.std(excess_benchmark_returns, ddof=1) if len(excess_benchmark_returns) > 1 else 0
+    vol_excess_growth = np.std(excess_growth_returns, ddof=1) if len(excess_growth_returns) > 1 else 0
+    vol_excess_value = np.std(excess_value_returns, ddof=1) if len(excess_value_returns) > 1 else 0
 
     # Formula: Mean(Yearly Excess Returns) / Volatility(Yearly Excess Returns)
     sharpe_portfolio = np.mean(excess_portfolio_returns) / vol_excess_p if vol_excess_p > 0 else 0
@@ -1030,5 +1030,6 @@ def _rebalance_portfolio_yearly(data, factors, start_year, end_year, initial_aum
         'yearly_comparisons': yearly_comparisons,
         'information_ratio': information_ratio,
         'information_ratio_growth': information_ratio_growth,
-        'information_ratio_value': information_ratio_value
+        'information_ratio_value': information_ratio_value,
+        'data_frequency': 'Yearly'
     }
