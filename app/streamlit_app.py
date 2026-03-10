@@ -240,6 +240,18 @@ SECTOR_OPTIONS = [
     'Healthcare'
 ]
 
+@st.cache_data(show_spinner="Loading market data...", ttl=3600)
+def cached_load_data(restrict_ff, data_freq, sectors, start, end):
+    return load_data(
+        restrict_fossil_fuels=restrict_ff,
+        use_supabase=True,
+        data_frequency=data_freq,
+        show_loading_progress=True,
+        sectors=sectors,
+        start_year=start,
+        end_year=end
+    )
+
 def main():
     # Check password first
     if not check_password():
@@ -263,8 +275,29 @@ def main():
         st.subheader("Data Source")
         st.caption("Data source: Supabase (cloud)")
         use_supabase = True
-        excel_file = None
-        uploaded_file = None
+        
+        # Data is loaded at daily granularity by default for accuracy
+        # Yearly (legacy) option preserved for backward compatibility with 2002-2023 data
+        data_frequency = st.radio(
+            "Data Frequency:",
+            options=["Daily", "Yearly (Legacy)"],
+            index=0,
+            help="Daily uses point-in-time daily prices for accurate compounding. Yearly (Legacy) uses the original annual factor data (2002-2023)."
+        )
+        # Map display label back to internal value
+        if data_frequency == "Yearly (Legacy)":
+            data_frequency = "Yearly"
+
+        # Rebalance frequency options depend on data frequency
+        if data_frequency == "Daily":
+            rebalance_frequency = st.radio(
+                "Rebalance Frequency:",
+                options=["Daily", "Monthly", "Quarterly", "Yearly"],
+                index=1,  # Default Monthly
+                help="How often to reconstruct the portfolio. Between rebalances, existing holdings compound daily returns."
+            )
+        else:
+            rebalance_frequency = "Yearly"
 
         st.write("---")
         # Fossil Fuel Restriction
@@ -277,16 +310,29 @@ def main():
         st.write("---")
         # Portfolio Weighting Method
         st.subheader("Portfolio Weighting")
+        weighting_options = ["Equal Weight", "Market Cap Weight", "Volatility Weighted"]
+
         weighting_method = st.radio(
             "Select weighting method:",
-            options=["Equal Weight", "Market Cap Weight"],
+            options=weighting_options,
             index=0,
-            help="Equal Weight: Each stock gets equal dollar investment. Market Cap Weight: Weight by market capitalization (similar to Russell 2000)"
+            help="Equal: Each stock gets equal dollar investment. Market Cap: Weight by market capitalization. Volatility: Weight inversely by volatility to hit a target (only available for Monthly and Daily data)."
         )
         use_market_cap_weight = (weighting_method == "Market Cap Weight")
         
         if use_market_cap_weight:
-            st.info("📊 Market Cap Weighting: Stocks will be weighted by their market capitalization, similar to the Russell 2000 index. This reduces turnover costs and aligns with market performance.")
+            st.info("📊 Market Cap Weighting: Stocks will be weighted by their market capitalization, similar to the Russell 2000 index.")
+            
+        target_volatility = None
+        volatility_metric = None
+        if weighting_method == "Volatility Weighted":
+            st.info("📉 Inverse-Volatility Weighting (Risk Parity): Stocks are weighted inversely proportional to their volatility. Lower-vol stocks get larger allocations.")
+            volatility_metric = st.selectbox(
+                "Volatility Metric",
+                options=["vol_gk_1m", "vol_gk_3m", "vol_gk_6m", "vol_gk_12m", "vol_close_1m", "vol_close_3m", "vol_close_6m", "vol_close_12m"],
+                index=0,
+                help="Which metric to use to measure stock volatility (GK = Garman-Klass, Close = standard closing returns)."
+            )
         
         st.write("---")
         # Sector Selection
@@ -342,7 +388,7 @@ def main():
             "Initial AUM ($)",
             min_value=0.0,
             max_value=1000000000.0,
-            value=1000.0,
+            value=1000000.0,
             step=100.0,
             format="%.0f",
             help="Starting portfolio value in dollars"
@@ -450,63 +496,81 @@ def main():
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             if st.button("Load Data", use_container_width=True, type="primary"):
-                # Prevemt re-loading if data is already loaded
-                if not st.session_state.data_loaded:
-                    with st.spinner("Loading market data..."):
-                        try:
-                            sectors_to_use = selected_sectors if sector_filter_enabled else None
+                # Reset session state so each click does a fresh load
+                st.session_state.data_loaded = False
+                st.session_state.rdata = None
+                st.session_state.results = None
+                # Clear the Streamlit cache to ensure fresh data is loaded
+                st.cache_data.clear()
+                if True:
+                    try:
+                        sectors_to_use = selected_sectors if sector_filter_enabled else None
+                        sectors_key = tuple(sorted(sectors_to_use)) if sectors_to_use else None
+                        
+                        rdata = cached_load_data(
+                            restrict_fossil_fuels,
+                            data_frequency,
+                            sectors_key,
+                            int(start_year),
+                            int(end_year)
+                        )
 
-                            rdata = load_data(
-                                restrict_fossil_fuels=restrict_fossil_fuels,
-                                use_supabase=True,
-                                data_path=None,
-                                show_loading_progress=show_loading,
-                                sectors=sectors_to_use
-                            )
+                        if rdata is None or rdata.empty:
+                            st.error(f"No {data_frequency} data found in the database between {start_year} and {end_year}. Please expand your Analysis Period.")
+                            st.stop()
 
-                            # Data preprocessing
+                        # Data preprocessing
+                        if 'Ticker' not in rdata.columns and 'Ticker-Region' in rdata.columns:
                             rdata['Ticker'] = rdata['Ticker-Region'].dropna().apply(
-                                lambda x: x.split('-')[0].strip()
+                                lambda x: str(x).split('-')[0].strip()
                             )
-                            rdata['Year'] = pd.to_datetime(rdata['Date']).dt.year
+                        if 'Year' not in rdata.columns:
+                            if 'Date' in rdata.columns:
+                                rdata['Year'] = pd.to_datetime(rdata['Date']).dt.year
+                            elif 'date' in rdata.columns:
+                                rdata['Year'] = pd.to_datetime(rdata['date']).dt.year
 
-                            # If the user selected an analysis period, filter the loaded data to that range
-                            try:
-                                rdata = rdata[(rdata['Year'] >= int(start_year)) & (rdata['Year'] <= int(end_year))]
-                            except Exception:
-                                # If filtering fails, keep full dataset but warn the user
-                                st.warning('Unable to filter loaded data by selected years; using full dataset instead.')
+                        # If the user selected an analysis period, filter the loaded data to that range
+                        try:
+                            rdata = rdata[(rdata['Year'] >= int(start_year)) & (rdata['Year'] <= int(end_year))]
+                        except Exception:
+                            st.warning('Unable to filter loaded data by selected years; using full dataset instead.')
 
-                            # Keep only relevant columns (include Market Capitalization for cap-weighted portfolios)
-                            cols_to_keep = ['Ticker', 'Year', 'Next_Year_Return']
-                            if 'Ending Price' in rdata.columns:
-                                cols_to_keep.append('Ending Price')
-                            elif 'Ending_Price' in rdata.columns:
-                                rdata['Ending Price'] = rdata['Ending_Price']
-                                cols_to_keep.append('Ending Price')
+                        # Keep only relevant columns
+                        cols_to_keep = ['Ticker', 'Year', 'Next_Year_Return']
+                        
+                        if 'Period' in rdata.columns:
+                            cols_to_keep.append('Period')
+                        
+                        if 'Ending Price' in rdata.columns:
+                            cols_to_keep.append('Ending Price')
+                        elif 'Ending_Price' in rdata.columns:
+                            rdata['Ending Price'] = rdata['Ending_Price']
+                            cols_to_keep.append('Ending Price')
+                        
+                        if 'Market Capitalization' in rdata.columns:
+                            cols_to_keep.append('Market Capitalization')
+                        elif 'Market_Capitalization' in rdata.columns:
+                            rdata['Market Capitalization'] = rdata['Market_Capitalization']
+                            cols_to_keep.append('Market Capitalization')
+
+                        if weighting_method == "Volatility Weighted" and volatility_metric in rdata.columns:
+                            cols_to_keep.append(volatility_metric)
                             
-                            # Add Market Capitalization if available (needed for cap-weighted portfolios)
-                            if 'Market Capitalization' in rdata.columns:
-                                cols_to_keep.append('Market Capitalization')
-                            elif 'Market_Capitalization' in rdata.columns:
-                                rdata['Market Capitalization'] = rdata['Market_Capitalization']
-                                cols_to_keep.append('Market Capitalization')
+                        for factor in FACTOR_MAP.keys():
+                            if factor in rdata.columns:
+                                cols_to_keep.append(factor)
 
-                            for factor in FACTOR_MAP.keys():
-                                if factor in rdata.columns:
-                                    cols_to_keep.append(factor)
+                        rdata = rdata[cols_to_keep]
 
-                            rdata = rdata[cols_to_keep]
+                        st.session_state.rdata = rdata
+                        st.session_state.data_loaded = True
 
-                            st.session_state.rdata = rdata
-                            st.session_state.data_loaded = True
+                        st.success(f"Data loaded successfully! {len(rdata)} records from {rdata['Year'].min()} to {rdata['Year'].max()}")
 
-
-                            st.success(f"Data loaded successfully! {len(rdata)} records from {rdata['Year'].min()} to {rdata['Year'].max()}")
-
-                        except Exception as e:
-                            st.error(f"Error loading data: {str(e)}")
-                            st.exception(e)
+                    except Exception as e:
+                        st.error(f"Error loading data: {str(e)}")
+                        st.exception(e)
                 
                 
         # Show data preview
@@ -544,7 +608,12 @@ def main():
                                     verbosity=verbosity_level,
                                     restrict_fossil_fuels=restrict_fossil_fuels,
                                     use_market_cap_weight=use_market_cap_weight,
-                                    factor_directions=factor_directions
+                                    factor_directions=factor_directions,
+                                    weighting_method=weighting_method,
+                                    target_volatility=target_volatility,
+                                    volatility_metric=volatility_metric,
+                                    data_frequency=data_frequency,
+                                    rebalance_frequency=rebalance_frequency
                                 )
                                 
                                 st.session_state.results = results
@@ -553,6 +622,11 @@ def main():
                                 st.session_state.restrict_ff = restrict_fossil_fuels
                                 st.session_state.initial_aum = initial_aum
                                 st.session_state.use_cap_weight = use_market_cap_weight
+                                st.session_state.weighting_method = weighting_method
+                                st.session_state.target_volatility = target_volatility
+                                st.session_state.volatility_metric = volatility_metric
+                                st.session_state.data_frequency = data_frequency
+                                st.session_state.rebalance_frequency = rebalance_frequency
                                 
                                 st.success("Analysis complete! Check the Results tab.")
                             
@@ -576,7 +650,11 @@ def main():
                 ]
                 st.caption(f"**Factors:** {', '.join(factor_captions)}")
             with col2:
-                weighting_label = "Market Cap Weighted" if st.session_state.get('use_cap_weight', False) else "Equal Weighted"
+                weighting_label = st.session_state.get('weighting_method', 'Equal Weight')
+                if weighting_label == "Volatility Weighted":
+                    tgt = st.session_state.get('target_volatility', 15.0)
+                    met = st.session_state.get('volatility_metric', '')
+                    weighting_label += f" ({tgt}% target using {met})"
                 st.caption(f"**Weighting:** {weighting_label}")
             
             st.divider()
@@ -595,8 +673,16 @@ def main():
                 st.metric("Total Return", f"{total_return:.2f}%")
             
             with col3:
-                years = len(results['years'])
-                cagr = (((final_value / st.session_state.initial_aum) ** (1/years)) - 1) * 100
+                n_periods = len(results['years'])
+                data_freq = st.session_state.get('data_frequency', 'Yearly')
+                if data_freq == 'Monthly':
+                    n_years = n_periods / 12.0
+                elif data_freq == 'Daily':
+                    n_years = n_periods / 252.0
+                else:
+                    n_years = float(n_periods)
+                n_years = max(n_years, 1.0 / 252.0)  # prevent division by zero
+                cagr = (((final_value / st.session_state.initial_aum) ** (1 / n_years)) - 1) * 100
                 st.metric("CAGR", f"{cagr:.2f}%")
             
             with col4:
@@ -618,47 +704,103 @@ def main():
             years = results['years']
             portfolio_values = results['portfolio_values']
             initial_aum = st.session_state.initial_aum
+            is_sub_annual = results.get('data_frequency', 'Yearly') in ['Monthly', 'Daily']
             
-            ax.plot(years, portfolio_values, marker='o', linewidth=2, markersize=6, label='Portfolio', color='#1f77b4')
+            if is_sub_annual:
+                # Use sequential integer x-axis, map to period labels
+                x_vals = list(range(len(years)))
+                ax.plot(x_vals, portfolio_values, marker='o', linewidth=2, markersize=3, label='Portfolio', color='#1f77b4')
+                # Show every Nth label to avoid overlap
+                n_labels = min(12, len(years))
+                step = max(1, len(years) // n_labels)
+                tick_positions = list(range(0, len(years), step))
+                ax.set_xticks(tick_positions)
+                ax.set_xticklabels([str(years[i]) for i in tick_positions], rotation=45, ha='right', fontsize=8)
+                ax.set_xlabel('Period', fontsize=12)
+            else:
+                ax.plot(years, portfolio_values, marker='o', linewidth=2, markersize=6, label='Portfolio', color='#1f77b4')
+                ax.set_xlabel('Year', fontsize=12)
             
-            # 1. Existing Russell 2000 Benchmark
+            # Benchmark overlays
             if 'benchmark_returns' in results and results['benchmark_returns']:
                 benchmark_values = [initial_aum]
                 for ret in results['benchmark_returns']:
                     benchmark_values.append(benchmark_values[-1] * (1 + ret / 100))
-                ax.plot(years, benchmark_values, marker='s', linewidth=2, markersize=4, 
-                       label='Russell 2000', linestyle='--', alpha=0.7, color='#ff7f0e')
+                
+                if is_sub_annual:
+                    # Map yearly benchmark values to x-positions
+                    year_end_positions = []
+                    for yr_idx in range(len(benchmark_values)):
+                        if yr_idx == 0:
+                            # Initial value maps to the very first period
+                            year_end_positions.append(0)
+                        else:
+                            # Value at end of year N maps to December of that year
+                            yr = start_year + (yr_idx - 1)
+                            dec_label = f"{yr}-12"
+                            if dec_label in years:
+                                year_end_positions.append(years.index(dec_label))
+                            else:
+                                yr_periods = [i for i, p in enumerate(years) if str(p).startswith(str(yr))]
+                                if yr_periods:
+                                    year_end_positions.append(yr_periods[-1])
+                                else:
+                                    year_end_positions.append(None)
+                    # Filter out Nones and plot
+                    valid = [(pos, val) for pos, val in zip(year_end_positions, benchmark_values) if pos is not None]
+                    if valid:
+                        bx, bv = zip(*valid)
+                        ax.plot(list(bx), list(bv), marker='s', linewidth=2, markersize=5,
+                               label='Russell 2000', linestyle='--', alpha=0.7, color='#ff7f0e')
+                else:
+                    ax.plot(years, benchmark_values, marker='s', linewidth=2, markersize=4, 
+                           label='Russell 2000', linestyle='--', alpha=0.7, color='#ff7f0e')
 
-            # === ADDED: VALUE AND GROWTH OVERLAYS ===
             try:
                 from src.benchmarks import get_benchmark_list
-                
-                # Fetch returns (Index 3: Value, Index 2: Growth)
-                val_rets = get_benchmark_list(3, years[0] + 1, years[-1] + 2)
-                gro_rets = get_benchmark_list(2, years[0] + 1, years[-1] + 2)
+                val_rets = get_benchmark_list(3, start_year + 1, (start_year + len(results.get('benchmark_returns', []))) + 1)
+                gro_rets = get_benchmark_list(2, start_year + 1, (start_year + len(results.get('benchmark_returns', []))) + 1)
 
                 indices_to_plot = [
                     ('Value Index', val_rets, 'g', '^'),
                     ('Growth Index', gro_rets, 'orange', 'D')
                 ]
 
-                for label, rets, color, marker in indices_to_plot:
+                for label, rets, color, mkr in indices_to_plot:
                     if rets:
                         vals = [initial_aum]
                         for r in rets:
                             vals.append(vals[-1] * (1 + float(r) / 100))
-                        
-                        # Align lengths: Ensure we only plot the intersection of years and values
-                        common_len = min(len(years), len(vals))
-                        ax.plot(years[:common_len], vals[:common_len], 
-                               marker=marker, linestyle=':', linewidth=1.5, 
-                               alpha=0.6, label=label, color=color)
+                        if is_sub_annual:
+                            # Same approach: map to year-end x-positions
+                            idx_positions = []
+                            for yr_idx in range(len(vals)):
+                                if yr_idx == 0:
+                                    idx_positions.append(0)
+                                else:
+                                    yr = start_year + (yr_idx - 1)
+                                    dec_label = f"{yr}-12"
+                                    if dec_label in years:
+                                        idx_positions.append(years.index(dec_label))
+                                    else:
+                                        yr_periods = [i for i, p in enumerate(years) if str(p).startswith(str(yr))]
+                                        if yr_periods:
+                                            idx_positions.append(yr_periods[-1])
+                                        else:
+                                            idx_positions.append(None)
+                            valid = [(pos, val) for pos, val in zip(idx_positions, vals) if pos is not None]
+                            if valid:
+                                ix, iv = zip(*valid)
+                                ax.plot(list(ix), list(iv), marker=mkr, linestyle=':', linewidth=1.5,
+                                       alpha=0.6, label=label, color=color)
+                        else:
+                            common_len = min(len(years), len(vals))
+                            ax.plot(years[:common_len], vals[:common_len], 
+                                   marker=mkr, linestyle=':', linewidth=1.5, 
+                                   alpha=0.6, label=label, color=color)
             except Exception as e:
                 st.error(f"Error loading extra benchmarks: {e}")
-            # ========================================
-            # ========================================
             
-            ax.set_xlabel('Year', fontsize=12)
             ax.set_ylabel('Portfolio Value ($)', fontsize=12)
             ax.set_title(f'Portfolio Growth: {", ".join(st.session_state.selected_factors)}', fontsize=14, fontweight='bold')
             ax.legend(loc='best')
@@ -716,7 +858,9 @@ def main():
                                 top_pct=cohort_pct,
                                 which='top',
                                 factor_directions=original_dirs,
-                                use_market_cap_weight=st.session_state.use_cap_weight
+                                weighting_method=st.session_state.get('weighting_method', 'Equal Weight'),
+                                target_volatility=st.session_state.get('target_volatility'),
+                                volatility_metric=st.session_state.get('volatility_metric')
                             )
 
                             # 4. Calculate Bottom Cohort (Inverse)
@@ -733,7 +877,9 @@ def main():
                                     top_pct=cohort_pct,
                                     which='bottom',
                                     factor_directions=flipped_dirs,
-                                    use_market_cap_weight=st.session_state.use_cap_weight
+                                    weighting_method=st.session_state.get('weighting_method', 'Equal Weight'),
+                                    target_volatility=st.session_state.get('target_volatility'),
+                                    volatility_metric=st.session_state.get('volatility_metric')
                                 )
 
                             # 5. Helper to extract metric data
@@ -789,11 +935,13 @@ def main():
             
             st.divider()
             
-            # Year-by-year performance table
-            st.subheader("Year-by-Year Performance")
+            # Period-by-period performance table
+            is_sub_annual_table = results.get('data_frequency', 'Yearly') in ['Monthly', 'Daily']
+            period_label = 'Period' if is_sub_annual_table else 'Year'
+            st.subheader(f"{period_label}-by-{period_label} Performance")
             
             perf_data = {
-                'Year': results['years'],
+                period_label: [str(y) for y in results['years']],
                 'Portfolio Value': [f"${v:,.2f}" for v in results['portfolio_values']],
             }
             
@@ -801,19 +949,24 @@ def main():
             if len(results['portfolio_values']) > 1:
                 yoy_returns = ['-']
                 for i in range(1, len(results['portfolio_values'])):
-                    ret = ((results['portfolio_values'][i] / results['portfolio_values'][i-1]) - 1) * 100
-                    yoy_returns.append(f"{ret:.2f}%")
+                    prev = results['portfolio_values'][i-1]
+                    if prev != 0:
+                        ret = ((results['portfolio_values'][i] / prev) - 1) * 100
+                        yoy_returns.append(f"{ret:.2f}%")
+                    else:
+                        yoy_returns.append("N/A")
                 perf_data['YoY Return'] = yoy_returns
             
-            if 'benchmark_returns' in results and results['benchmark_returns']:
-                # Benchmark returns are already in percentage format (like 34.62)
-                perf_data['Benchmark Returns'] = ['-'] + [f"{r:.2f}%" for r in results['benchmark_returns']]
+            if not is_sub_annual_table:
+                if 'benchmark_returns' in results and results['benchmark_returns']:
+                    # Benchmark returns are already in percentage format (like 34.62)
+                    perf_data['Benchmark Returns'] = ['-'] + [f"{r:.2f}%" for r in results['benchmark_returns']]
 
-            if 'growth_benchmark_returns' in results and results['growth_benchmark_returns']:
-                perf_data['Growth Returns'] = ['-'] + [f"{r:.2f}%" for r in results['growth_benchmark_returns']]
+                if 'growth_benchmark_returns' in results and results['growth_benchmark_returns']:
+                    perf_data['Growth Returns'] = ['-'] + [f"{r:.2f}%" for r in results['growth_benchmark_returns']]
 
-            if 'value_benchmark_returns' in results and results['value_benchmark_returns']:
-                perf_data['Value Returns'] = ['-'] + [f"{r:.2f}%" for r in results['value_benchmark_returns']]
+                if 'value_benchmark_returns' in results and results['value_benchmark_returns']:
+                    perf_data['Value Returns'] = ['-'] + [f"{r:.2f}%" for r in results['value_benchmark_returns']]
             
             perf_df = pd.DataFrame(perf_data)
             st.dataframe(perf_df, use_container_width=True, hide_index=True)

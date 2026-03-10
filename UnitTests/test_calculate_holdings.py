@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 from src.calculate_holdings import (
     calculate_holdings, calculate_growth, rebalance_portfolio,
-    get_benchmark_return, calculate_information_ratio
+    calculate_information_ratio
 )
 from src.factor_function import Momentum6m, ROE, ROA
 from src.market_object import MarketObject, load_data
@@ -140,6 +140,7 @@ class TestCalculateGrowth:
         data = pd.DataFrame({
             'Ticker-Region': ['AAPL-US', 'MSFT-US'],
             'Ending Price': [100.0, 200.0],
+            'Next_Year_Return': [50.0, 25.0], # 50% for AAPL, 25% for MSFT
             'Year': [2021, 2021]
         })
         return MarketObject(data, 2021)
@@ -150,14 +151,15 @@ class TestCalculateGrowth:
         data = pd.DataFrame({
             'Ticker-Region': ['AAPL-US', 'MSFT-US'],
             'Ending Price': [150.0, 250.0],
+            'Next_Year_Return': [0.0, 0.0],
             'Year': [2022, 2022]
         })
         return MarketObject(data, 2022)
     
-    def test_calculate_growth_positive(self, portfolio_list, current_market, next_market):
+    def test_calculate_growth_positive(self, portfolio_list, current_market):
         """Test calculating positive growth"""
         growth, start_value, end_value = calculate_growth(
-            portfolio_list, next_market, current_market, verbosity=0
+            portfolio_list, current_market, verbosity=0
         )
         
         # Start: 10*100 + 5*200 = 2000
@@ -174,11 +176,12 @@ class TestCalculateGrowth:
         declining_market = MarketObject(pd.DataFrame({
             'Ticker-Region': ['AAPL-US', 'MSFT-US'],
             'Ending Price': [80.0, 150.0],
+            'Next_Year_Return': [-20.0, -25.0],
             'Year': [2022, 2022]
         }), 2022)
         
         growth, start_value, end_value = calculate_growth(
-            portfolio_list, declining_market, current_market, verbosity=0
+            portfolio_list, declining_market, verbosity=0
         )
         
         assert growth < 0  # Negative growth
@@ -190,16 +193,20 @@ class TestCalculateGrowth:
         partial_market = MarketObject(pd.DataFrame({
             'Ticker-Region': ['AAPL-US'],
             'Ending Price': [150.0],
+            'Next_Year_Return': [50.0],
             'Year': [2022]
         }), 2022)
         
         growth, start_value, end_value = calculate_growth(
-            portfolio_list, partial_market, current_market, verbosity=0
+            portfolio_list, partial_market, verbosity=0
         )
         
-        # Should use entry price for MSFT
+        # MSFT (150.0 value, 5 shares) + AAPL (150.0 value, 10 shares) = 2250 total.
+        # But wait, original AAPL entry price is 150.
+        # If MSFT is missing, Calculate_growth uses current_market.get_price(ticker) which now returns None or 0.
         assert end_value > 0
-        assert start_value == 2000.0
+        # Start value should reflect the investments that were actually priced
+        assert start_value == 1500.0
 
 
 class TestRebalancePortfolio:
@@ -215,6 +222,7 @@ class TestRebalancePortfolio:
                 data.append({
                     'Ticker-Region': f'{ticker}-US',
                     'Ending Price': np.random.uniform(100, 500),
+                    'Next_Year_Return': np.random.uniform(-20, 30),
                     '6-Mo Momentum %': np.random.uniform(0.05, 0.30),
                     'ROE using 9/30 Data': np.random.uniform(0.10, 0.40),
                     'ROA using 9/30 Data': np.random.uniform(0.05, 0.25),
@@ -230,7 +238,7 @@ class TestRebalancePortfolio:
         results = rebalance_portfolio(
             sample_data, factors,
             start_year=2020, end_year=2022,
-            initial_aum=1.0,
+            initial_aum=100.0,
             verbosity=0
         )
         
@@ -246,7 +254,7 @@ class TestRebalancePortfolio:
         results = rebalance_portfolio(
             sample_data, factors,
             start_year=2020, end_year=2022,
-            initial_aum=1.0,
+            initial_aum=100.0,
             verbosity=0
         )
         
@@ -287,23 +295,6 @@ class TestRebalancePortfolio:
         assert len(results['portfolio_values']) == 3
 
 
-class TestBenchmarkReturn:
-    """Test benchmark return function"""
-    
-    def test_get_benchmark_return_known_years(self):
-        """Test getting benchmark returns for known years"""
-        # Test a few known years
-        assert get_benchmark_return(2002) == 34.62
-        assert get_benchmark_return(2010) == -4.73
-        assert get_benchmark_return(2020) == 46.21
-    
-    def test_get_benchmark_return_unknown_year(self):
-        """Test getting benchmark return for unknown year"""
-        # Should return 0 for unknown years
-        assert get_benchmark_return(1999) == 0
-        assert get_benchmark_return(2050) == 0
-
-
 class TestInformationRatio:
     """Test information ratio calculation"""
     
@@ -320,7 +311,7 @@ class TestInformationRatio:
     def test_calculate_information_ratio_negative(self):
         """Test calculating negative information ratio"""
         portfolio_returns = [0.05, 0.06, 0.07, 0.04, 0.08]
-        benchmark_returns = [0.08, 0.09, 0.10, 0.07, 0.11]
+        benchmark_returns = [8.0, 9.0, 10.0, 7.0, 11.0] # Benchmark is divided by 100 in info ratio calculation
         
         ir = calculate_information_ratio(portfolio_returns, benchmark_returns, verbosity=0)
         
@@ -330,7 +321,7 @@ class TestInformationRatio:
     def test_calculate_information_ratio_zero_tracking_error(self):
         """Test IR calculation with zero tracking error"""
         portfolio_returns = [0.10, 0.10, 0.10]
-        benchmark_returns = [0.10, 0.10, 0.10]
+        benchmark_returns = [10.0, 10.0, 10.0]
         
         ir = calculate_information_ratio(portfolio_returns, benchmark_returns, verbosity=0)
         
@@ -339,7 +330,7 @@ class TestInformationRatio:
     def test_calculate_information_ratio_with_numpy_arrays(self):
         """Test IR calculation with numpy arrays"""
         portfolio_returns = np.array([0.10, 0.12, 0.15])
-        benchmark_returns = np.array([0.08, 0.09, 0.10])
+        benchmark_returns = np.array([8.0, 9.0, 10.0])
         
         ir = calculate_information_ratio(portfolio_returns, benchmark_returns, verbosity=0)
         
