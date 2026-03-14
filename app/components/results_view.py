@@ -67,24 +67,40 @@ def _render_summary_metrics(results: Dict[str, Any], user_settings: Dict[str, An
     m4.metric("Alpha vs Benchmark", f"{alpha:.2f}%")
 
 
-def _render_growth_chart(results: Dict[str, Any], user_settings: Dict[str, Any]) -> None:
+from Visualizations.portfolio_growth_plot import plot_portfolio_growth
+
+def _render_growth_chart(results: dict, user_settings: dict) -> None:
     """
-    Constructs a comparative time-series visualization of wealth accumulation.
-    """
-    st.subheader("Growth of $10,000 Investment")
+    Orchestrates the growth visualization within the Streamlit Results tab.
     
-    fig, ax = plt.subplots(figsize=(10, 5))
+    This UI-level function extracts the necessary time-series data from the 
+    application's session state and passes it to the specialized visualization 
+    module. It acts as a bridge between the data store and the plotting engine.
+
+    Args:
+        results (dict): The dictionary containing 'years', 'portfolio_values', 
+                        and 'benchmark_values' keys.
+        user_settings (dict): Configuration dictionary used for chart labeling.
+
+    Returns:
+        None: Renders the plot directly to the active Streamlit column.
+    """
+    st.subheader("Growth of Portfolio")
+    
+    # Extract data from the results dictionary
     years = results.get('years', [])
     port_vals = results.get('portfolio_values', [])
     bench_vals = results.get('benchmark_values', [])
 
-    ax.plot(years, port_vals, label='Strategy', linewidth=2, color='#1f77b4')
-    ax.plot(years, bench_vals, label='Russell 2000', linestyle='--', color='#7f7f7f')
+    # Validation gate to prevent empty chart rendering
+    if not years or not port_vals:
+        st.error("Visualization Error: The backtest engine returned empty datasets.")
+        return
+
+    # Call the externalized plotting utility
+    fig = plot_portfolio_growth(years, port_vals, bench_vals)
     
-    ax.set_ylabel("Portfolio Value ($)")
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    
+    # Display the figure in the Streamlit UI
     st.pyplot(fig)
 
 
