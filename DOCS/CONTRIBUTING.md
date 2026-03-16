@@ -7,7 +7,7 @@ The Quebec team follows the standard git workflow to manage this repository. Beg
 1. Clone Repository
 
 ```
-git clone https://github.com/mbh226/Factor-Lake.git
+git clone https://github.com/cornell-sysen-5900/Factor-Lake.git
 ```
 
 2. Move to repository directory 
