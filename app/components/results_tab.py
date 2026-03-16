@@ -36,28 +36,62 @@ def render_results_tab(results: Dict[str, Any], user_settings: Dict[str, Any]) -
     st.divider()
 
     # 3. Main Growth Plot
+    st.subheader("Ranked Stocks (Best to Worst)")
+    _render_ranked_stocks_table(results)
+    st.divider()
+
+    # 4. Main Growth Plot
     st.subheader("Portfolio Growth Over Time")
     _render_growth_plot(results, user_settings)
     st.divider()
 
-    # 4. Year-by-Year Performance
+    # 5. Year-by-Year Performance
     st.subheader("Year-by-Year Performance")
     _render_year_by_year_table(results)
     st.divider()
 
-    # 5. Top vs Bottom Cohort Analysis
+    # 6. Top vs Bottom Cohort Analysis
     _render_cohort_analysis_section(results, user_settings)
     st.divider()
 
-    # 6. Advanced Backtest Statistics
+    # 7. Advanced Backtest Statistics
     st.header("Advanced Backtest Statistics")
     _render_advanced_stats_grid(results)
     st.divider()
 
-    # 7. Yearly Win/Loss Summary
+    # 8. Yearly Win/Loss Summary
     st.header("Yearly Win/Loss Summary")
     _render_win_loss_ledger(results)
     st.divider()
+
+
+def _render_ranked_stocks_table(res: Dict[str, Any]) -> None:
+    """
+    Displays the selected top cohort ranked by composite multi-factor score.
+    """
+    ranked_rows = res.get('ranked_stocks', [])
+    ranking_year = res.get('ranking_year')
+
+    if ranking_year is not None:
+        st.caption(f"Ranking year: {int(ranking_year)}")
+
+    if not ranked_rows:
+        st.info("No ranked stocks are available for the selected factors and date range.")
+        return
+
+    ranked_df = pd.DataFrame(ranked_rows)
+
+    if 'Composite Score' in ranked_df.columns:
+        ranked_df['Composite Score'] = pd.to_numeric(
+            ranked_df['Composite Score'], errors='coerce'
+        ).round(4)
+
+    if 'Next-Year Return %' in ranked_df.columns:
+        ranked_df['Next-Year Return %'] = pd.to_numeric(
+            ranked_df['Next-Year Return %'], errors='coerce'
+        ).round(2)
+
+    st.dataframe(ranked_df, use_container_width=True, hide_index=True)
 
 def _render_year_by_year_table(res: Dict[str, Any]) -> None:
     """

@@ -17,6 +17,69 @@ from .portfolio import Portfolio
 from .portfolio_filters import filter_universe
 from .performance_metrics import compute_comprehensive_metrics
 
+
+def build_ranked_stocks_table(
+    data: pd.DataFrame,
+    factors: List[str],
+    factor_directions: Dict[str, str],
+    target_year: int,
+    top_pct: float = 10.0
+) -> pd.DataFrame:
+    """
+    Builds a best-to-worst ranked stock table for a single rebalance year.
+
+    The ranking is a composite score formed by averaging each selected factor's
+    normalized signal after applying its selected direction (top or bottom).
+    """
+    if data.empty or not factors:
+        return pd.DataFrame()
+
+    year_slice = data[data['Year'] == target_year]
+    if year_slice.empty:
+        return pd.DataFrame()
+
+    if 'Ticker' not in year_slice.columns:
+        return pd.DataFrame()
+
+    df_year = year_slice.set_index('Ticker')
+
+    score_components: List[pd.Series] = []
+    for factor_col in factors:
+        if factor_col not in df_year.columns:
+            continue
+        higher_is_better = factor_directions.get(factor_col, 'top') == 'top'
+        norm_scores = normalize_series(df_year[factor_col], higher_is_better=higher_is_better)
+        score_components.append(norm_scores.rename(f"score_{factor_col}"))
+
+    if not score_components:
+        return pd.DataFrame()
+
+    scores_df = pd.concat(score_components, axis=1)
+    composite_scores = scores_df.mean(axis=1, skipna=True).dropna().sort_values(ascending=False)
+    if composite_scores.empty:
+        return pd.DataFrame()
+
+    n_select = max(1, math.floor(len(composite_scores) * (top_pct / 100.0)))
+    selected_scores = composite_scores.head(n_select)
+
+    ranked_df = pd.DataFrame({
+        'Ticker': selected_scores.index,
+        'Composite Score': selected_scores.values,
+        'Rank': np.arange(1, len(selected_scores) + 1)
+    })
+
+    if 'Next-Years_Return' in df_year.columns:
+        ranked_df['Next-Year Return %'] = pd.to_numeric(
+            df_year.reindex(selected_scores.index)['Next-Years_Return'], errors='coerce'
+        ).values
+
+    if 'Scotts_Sector_5' in df_year.columns:
+        ranked_df['Sector'] = df_year.reindex(selected_scores.index)['Scotts_Sector_5'].values
+
+    return ranked_df[['Rank', 'Ticker', 'Composite Score'] + [
+        c for c in ['Next-Year Return %', 'Sector'] if c in ranked_df.columns
+    ]]
+
 def calculate_holdings(df_year: pd.DataFrame, factor_col: str, aum: float, 
                        higher_is_better: bool = True, top_pct: float = 10.0, 
                        use_market_cap_weight: bool = False) -> Portfolio:
