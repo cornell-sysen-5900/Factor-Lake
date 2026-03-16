@@ -10,7 +10,7 @@ Factor-Lake lets you compose multi-factor stock selection models, run historical
 
 | Section | Description |
 |---|---|
-| [API Reference](reference/) | Auto-generated docs for every function and class in the codebase |
+| [API Reference](reference/SUMMARY.md) | Auto-generated docs for every function and class in the codebase |
 | [Deployment](DEPLOYMENT.md) | How to deploy the Streamlit app |
 | [Supabase Setup](SUPABASE_SETUP.md) | Database configuration and schema |
 | [Contributing](CONTRIBUTING.md) | Development workflow and standards |
@@ -28,5 +28,5 @@ Factor-Lake lets you compose multi-factor stock selection models, run historical
 
 ---
 
-> The **API Reference** section is generated automatically from source code at every build.
+> The **API Reference** section is generated automatically from source code at every `mkdocs build` / `mkdocs serve` run.
 > No manual updates are necessary when functions are added, changed, or removed.

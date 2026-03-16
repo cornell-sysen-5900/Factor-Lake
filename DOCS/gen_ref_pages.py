@@ -49,7 +49,10 @@ for package in SOURCE_PACKAGES:
         doc_path = Path("reference") / module_rel.with_suffix(".md")
 
         # Register with literate-nav using the module path tuple as the key.
-        nav[module_rel.parts] = doc_path.as_posix()
+        # IMPORTANT: SUMMARY.md lives at reference/SUMMARY.md, so links inside
+        # it must be relative to reference/ — i.e. just "src/backtest_engine.md",
+        # NOT "reference/src/backtest_engine.md" (which would double the prefix).
+        nav[module_rel.parts] = module_rel.with_suffix(".md").as_posix()
 
         # Write the virtual page — just a heading and the mkdocstrings directive.
         with mkdocs_gen_files.open(doc_path, "w") as fh:

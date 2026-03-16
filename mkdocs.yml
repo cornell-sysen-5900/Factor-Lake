@@ -56,4 +56,5 @@ nav:
     - Supabase Setup: SUPABASE_SETUP.md
     - Streamlit Styling: STREAMLIT_STYLING_GUIDE.md
     - Security Scanning: Bandit & Safety.md
+    - Reorganization Summary: REORGANIZATION_SUMMARY.md
   - API Reference: reference/           # Navigated by the auto-generated SUMMARY.md
