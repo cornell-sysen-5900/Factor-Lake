@@ -5,6 +5,15 @@ PURPOSE: Main application entry point orchestrating UI components and analysis l
 VERSION: 3.3.0
 """
 
+import sys
+from pathlib import Path
+
+# Ensure top-level packages (e.g., `src`, `Visualizations`) are importable
+# before component modules are imported by Streamlit runtime.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 import streamlit as st
 import streamlit_utils as utils
 import streamlit_css as css
