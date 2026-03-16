@@ -1,0 +1,33 @@
+name: Deploy MkDocs to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write   # needed to push to gh-pages branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install documentation dependencies
+        run: |
+          pip install \
+            mkdocs>=1.5.0 \
+            mkdocs-material \
+            mkdocstrings[python] \
+            mkdocs-gen-files \
+            mkdocs-literate-nav \
+            mkdocs-section-index \
+            black
+
+      - name: Deploy to GitHub Pages
+        run: mkdocs gh-deploy --force
