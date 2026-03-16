@@ -1,6 +1,6 @@
 """
 PROJECT: Factor-Lake Portfolio Analysis
-MODULE: app/styles/css.py
+MODULE: app/streamlit_css.py
 PURPOSE: Global CSS injection to customize the Streamlit UI, branding, and responsiveness.
 VERSION: 1.1.0
 """

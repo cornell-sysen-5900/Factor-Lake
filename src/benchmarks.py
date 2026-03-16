@@ -1,4 +1,14 @@
-# Annual Returns (%) from the "Annual" sheet (3Q/Sept 30 ending)
+"""
+PROJECT: Factor-Lake Portfolio Analysis
+MODULE: src/benchmarks.py
+PURPOSE: Reference data for annual index returns and risk-free rates.
+VERSION: 2.1.0
+"""
+
+from typing import List, Dict
+
+# Annual Returns (%) for benchmarks; Decimal for RISK_FREE_RATES.
+# Data is captured for 12-month periods ending September 30 (Q3).
 benchmarks = {
     "Russell 2000": {
         2002: -9.30, 2003: 36.50, 2004: 18.76, 2005: 17.95, 2006: 9.92,
@@ -22,7 +32,7 @@ benchmarks = {
         2022: -17.69, 2023: 7.84, 2024: 25.89
     },
     
-    # FRED OCT 1 4 Week Treasury Bill Rate (Risk-Free Rate)
+    # FRED 4-Week Treasury Bill Secondary Market Rate (Annualized)
     "RISK_FREE_RATES": {
         2002: 0.0156, 2003: 0.0102, 2004: 0.0182, 2005: 0.0349, 2006: 0.0473,
         2007: 0.0462, 2008: 0.0148, 2009: 0.0014, 2010: 0.0014, 2011: 0.0010,
@@ -32,26 +42,30 @@ benchmarks = {
     }
 }
 
-def get_benchmark_list(index, start_year, end_year):
+def get_benchmark_list(index: int, start_year: int, end_year: int) -> List[float]:
     """
-    Returns a list of annual returns for a specific index or risk-free rate 
-    over a defined year range, ensuring alignment with backtest steps.
+    Retrieves time-series data for benchmarks or risk-free rates.
+
+    Args:
+        index (int): 1: Russell 2000, 2: R2000 Growth, 3: R2000 Value, 4: Risk-Free.
+        start_year (int): Initial year (inclusive).
+        end_year (int): Terminal year (exclusive).
+
+    Returns:
+        List[float]: Annual returns. Indices 1-3 are in %, Index 4 is decimal.
     """
-    # Mapping index integers to the data dictionaries
     benchmark_lookup = {
-        1: benchmarks["Russell 2000"],
-        2: benchmarks["Russell 2000 Growth"],
-        3: benchmarks["Russell 2000 Value"],
-        4: benchmarks["RISK_FREE_RATES"]
+        1: "Russell 2000",
+        2: "Russell 2000 Growth",
+        3: "Russell 2000 Value",
+        4: "RISK_FREE_RATES"
     }
     
-    # Retrieve the specific dictionary
-    data_dict = benchmark_lookup.get(index)
-    
-    if data_dict is None:
-        available = list(benchmark_lookup.keys())
-        raise ValueError(f"Index {index} not found. Available: {available}")
+    name = benchmark_lookup.get(index)
+    if name is None:
+        raise ValueError(f"Invalid benchmark index: {index}. Choose from 1, 2, 3, or 4.")
 
-    # Construct the list for the range [start_year, end_year)
-    # Using .get(yr, 0.0) ensures the list length matches the year range
+    data_dict = benchmarks[name]
+    
+    # Year-range selection with safe defaulting
     return [data_dict.get(yr, 0.0) for yr in range(start_year, end_year)]

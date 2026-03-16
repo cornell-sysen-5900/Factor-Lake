@@ -1,292 +1,111 @@
+"""
+PROJECT: Factor-Lake Portfolio Analysis
+MODULE: src/supabase_client.py
+PURPOSE: Silent, high-performance data ingestion with schema-aligned standardization.
+VERSION: 2.2.0
+"""
+
 import os
+import logging
 import pandas as pd
+import numpy as np
 from supabase import create_client, Client
 
-def load_supabase_data(table_name='Full Precision Test', show_progress=True, sectors=None):
+# 1. Silence external library verbosity (silences the httpx GET logs)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("supabase").setLevel(logging.WARNING)
+
+# Institutional logging for the application
+logger = logging.getLogger(__name__)
+
+class SupabaseManager:
     """
-    Loads data from a Supabase table and returns it as a pandas DataFrame.
-    Credentials are read from environment variables or Colab userdata.
-    Uses pagination to load all records.
-    
-    Args:
-        table_name (str): Name of the Supabase table to load
-        show_progress (bool): Whether to print loading progress messages
+    Manages bulk ingestion and standardization of market data from Supabase.
     """
-    supabase_url = os.environ.get('SUPABASE_URL')
-    supabase_key = os.environ.get('SUPABASE_KEY')
-    if not supabase_url or not supabase_key:
-        try:
-            from google.colab import userdata
-            supabase_url = userdata.get('SUPABASE_URL')
-            supabase_key = userdata.get('SUPABASE_KEY')
-        except Exception:
-            pass
-    if not supabase_url or not supabase_key:
-        raise RuntimeError('Supabase credentials not set. Please set SUPABASE_URL and SUPABASE_KEY.')
-    
-    supabase = create_client(supabase_url, supabase_key)
-    
-    # Paginate through all records
-    page_size = 1000
-    offset = 0
-    all_rows = []
-    
-    if show_progress:
-        print(f"Loading data from Supabase table '{table_name}'...")
-    
-    while True:
-        # Build base query
-        base_query = supabase.table(table_name).select('*')
-        # Apply server-side sector filter if provided. Uses the exact DB column name.
-        # Column is renamed later to "Scott's Sector (5)" by the loader.
-        if sectors:
-            try:
-                base_query = base_query.in_('Scotts_Sector_5', sectors)
-            except Exception:
-                # If server-side filter isn't supported, we'll filter client-side later
-                pass
 
-        # Fetch a page of data
-        response = base_query.range(offset, offset + page_size - 1).execute()
+    def __init__(self):
+        """Initializes the connection using validated environment variables."""
+        url = os.environ.get('SUPABASE_URL')
+        key = os.environ.get('SUPABASE_KEY')
+
+        if not url or not key:
+            raise RuntimeError("Cloud configuration missing: SUPABASE_URL or SUPABASE_KEY not found.")
         
-        batch = response.data if hasattr(response, 'data') else response
-        
-        if not batch:
-            break
-        
-        all_rows.extend(batch)
-        if show_progress:
-            print(f"Loaded {len(all_rows)} records so far...")
-        
-        # If we got fewer records than page_size, we're done
-        if len(batch) < page_size:
-            break
-        
-        offset += page_size
-    
-    if show_progress:
-        print(f"Total records loaded: {len(all_rows)}")
-    
-    return pd.DataFrame(all_rows)
-    
-    def load_market_data(self, 
-                        table_name: str = 'market_data',
-                        year_filter: Optional[int] = None,
-                        restrict_fossil_fuels: bool = False) -> pd.DataFrame:
+        self.client: Client = create_client(url, key)
+
+    def fetch_all_data(self, table_name: str = 'Full Precision Test') -> pd.DataFrame:
         """
-        Load market data from Supabase table.
-        
-        Args:
-            table_name: Name of the table containing market data
-            year_filter: Optional year to filter data (if None, loads all years)
-            restrict_fossil_fuels: Whether to exclude fossil fuel companies
-            
-        Returns:
-            DataFrame with market data
+        Ingests the entire target table using iterative range-based pagination.
         """
-        try:
-            # Fetch all rows with pagination to avoid default page limits
-            page_size = 1000
-            offset = 0
-            rows = []
+        page_size = 1000
+        offset = 0
+        all_rows = []
 
-            # If a year filter is provided, filter by Date range on the server if possible
-            # Note: Column name uses exact case as in the DB schema ("Date")
-            base_query = self.client.table(table_name).select("*")
-            if year_filter:
-                start_date = f"{year_filter}-01-01"
-                end_date = f"{year_filter}-12-31"
-                base_query = base_query.gte('Date', start_date).lte('Date', end_date)
+        # Cleaner, single-line initiation log
+        logger.info(f"Syncing with Cloud Database: '{table_name}'...")
 
-            # Use ID ordering for deterministic pagination if available
-            # If "ID" column doesn't exist, pagination will still work without ordering
-            try:
-                base_query = base_query.order('ID', desc=False)
-            except Exception:
-                pass
+        while True:
+            response = self.client.table(table_name).select('*').range(offset, offset + page_size - 1).execute()
+            batch = response.data if hasattr(response, 'data') else []
 
-            while True:
-                try:
-                    response = base_query.range(offset, offset + page_size - 1).execute()
-                except Exception as e:
-                    logger.error(f"Error during Supabase pagination (offset={offset}): {e}")
-                    raise
-
-                batch = response.data or []
-                if not batch:
-                    break
-                rows.extend(batch)
-                if len(batch) < page_size:
-                    break
-                offset += page_size
-
-            if not rows:
-                logger.warning(f"No data found in table '{table_name}' with the given filters")
-                return pd.DataFrame()
-
-            # Convert to DataFrame
-            df = pd.DataFrame(rows)
-            
-            # Apply fossil fuel restrictions if needed
-            if restrict_fossil_fuels:
-                df = self._apply_fossil_fuel_filter(df)
-            
-            # Clean and standardize column names
-            df = self._clean_dataframe(df)
-            
-            # Filter out rows with missing essential data
-            df = self._filter_incomplete_data(df)
-            
-            logger.info(f"Loaded {len(df)} records from Supabase after filtering")
-            return df
-            
-        except Exception as e:
-            logger.error(f"Error loading data from Supabase: {e}")
-            raise
-    
-    def _apply_fossil_fuel_filter(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Apply fossil fuel industry filter to dataframe."""
-        import re
-        possible_cols = ['FactSet_Industry', 'factset_industry', 'FactSet Industry']
-        industry_col = None
-        for col in possible_cols:
-            if col in df.columns:
-                industry_col = col
+            if not batch:
                 break
-        if industry_col is None:
-            logger.warning(f"Column 'FactSet_Industry' not found. Fossil fuel filtering skipped.")
+            
+            all_rows.extend(batch)
+            
+            if len(batch) < page_size:
+                break
+            
+            offset += page_size
+            # Only log every 10k records to keep the console clean
+            if offset % 10000 == 0:
+                logger.info(f"Transfer Progress: {offset:,} records...")
+
+        df = pd.DataFrame(all_rows)
+        
+        if df.empty:
+            logger.warning("Supabase ingestion returned an empty dataset.")
             return df
-        # Excluded industries (normalized)
-        excluded_industries = [
-            "integratedoil",
-            "oilfieldservicesequipment",
-            "oilgasproduction",
-            "coal",
-            "oilrefiningmarketing"
-        ]
-        # Normalize function: lowercase and remove non-alphanumeric
-        def normalize(s):
-            return re.sub(r'[^a-z0-9]', '', str(s).lower())
-        # Apply normalization to both data and excluded list
-        industry_norm = df[industry_col].apply(normalize)
-        excluded_norm = set(excluded_industries)
-        mask = ~industry_norm.isin(excluded_norm)
-        filtered_df = df[mask].copy()
-        removed_count = len(df) - len(filtered_df)
-        logger.info(f"Filtered out {removed_count} fossil fuel companies from {len(df)} total records")
-        return filtered_df
-    
-    def _clean_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Clean and standardize DataFrame format."""
-        # Strip whitespace from column names
+
+        return self._standardize_dataframe(df)
+
+    def _standardize_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Enforces structural consistency based on actual Supabase SQL schema.
+        """
+        # 1. Hygiene
         df.columns = df.columns.str.strip()
-        
-        # Remove duplicate columns
         df = df.loc[:, ~df.columns.duplicated(keep='first')]
-        
-        # Replace common null representations
-        df.replace({'--': None, '': None, 'N/A': None, '#N/A': None, 'NULL': None, 'null': None}, inplace=True)
-        
-        # Ensure ticker column exists
-        if 'ticker' not in df.columns and 'ticker_region' in df.columns:
-            df['ticker'] = df['ticker_region'].str.split('-').str[0].str.strip()
-        
-        # Ensure year column exists
-        if 'year' not in df.columns and 'date' in df.columns:
-            df['year'] = pd.to_datetime(df['date']).dt.year
-        
-        return df
-    
-    def _filter_incomplete_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Filter out rows with missing essential data after querying.
-        Removes rows where critical columns like price data are missing.
-        """
-        initial_count = len(df)
-        
-        # Define essential columns that must have valid data
-        essential_columns = []
-        
-        # Check for price columns (try multiple possible names)
-        price_columns = ['Ending Price', 'ending_price', 'Price']
-        for col in price_columns:
-            if col in df.columns:
-                essential_columns.append(col)
-                break
-        
-        # Check for ticker columns
-        ticker_columns = ['Ticker', 'ticker', 'Ticker-Region', 'ticker_region']
-        for col in ticker_columns:
-            if col in df.columns:
-                essential_columns.append(col)
-                break
-        
-        # Check for date/year columns
-        date_columns = ['Date', 'date', 'Year', 'year']
-        for col in date_columns:
-            if col in df.columns:
-                essential_columns.append(col)
-                break
-        
-        if not essential_columns:
-            logger.warning("No essential columns found for filtering")
-            return df
-        
-        # Filter out rows where essential columns are null or invalid
-        for col in essential_columns:
-            if col in df.columns:
-                # Remove rows where the column is null, empty, or contains invalid values
-                if df[col].dtype in ['float64', 'int64']:
-                    # For numeric columns, remove null, inf, or zero values (for price)
-                    if 'price' in col.lower() or 'Price' in col:
-                        df = df[df[col].notna() & (df[col] > 0) & (df[col] != float('inf'))]
-                    else:
-                        df = df[df[col].notna() & (df[col] != float('inf'))]
-                else:
-                    # For text columns, remove null or empty strings
-                    df = df[df[col].notna() & (df[col] != '') & (df[col] != '--')]
-        
-        filtered_count = len(df)
-        removed_count = initial_count - filtered_count
-        
-        if removed_count > 0:
-            logger.info(f"Filtered out {removed_count} rows with missing essential data")
-            logger.info(f"Remaining records: {filtered_count}")
-        
-        return df
-    
-    def get_available_years(self, table_name: str = 'market_data') -> list:
-        """Get list of available years in the database."""
-        try:
-            response = self.client.table(table_name).select("year").execute()
-            years = sorted(set(row['year'] for row in response.data if row['year']))
-            logger.info(f"Available years: {years}")
-            return years
-        except Exception as e:
-            logger.error(f"Error getting available years: {e}")
-            return []
-    
-    def get_available_factors(self, table_name: str = 'market_data') -> list:
-        """Get list of available factor columns in the database."""
-        try:
-            # Get first row to examine columns
-            response = self.client.table(table_name).select("*").limit(1).execute()
-            
-            if not response.data:
-                return []
-            
-            # Filter for factor-related columns (adjust as needed based on your schema)
-            all_columns = list(response.data[0].keys())
-            factor_columns = [col for col in all_columns 
-                            if any(keyword in col.lower() for keyword in 
-                                 ['momentum', 'roe', 'roa', 'price', 'book', 'earns', 'vol', 
-                                  'accrual', 'growth', 'return'])]
-            
-            logger.info(f"Available factors: {factor_columns}")
-            return factor_columns
-            
-        except Exception as e:
-            logger.error(f"Error getting available factors: {e}")
-            return []
 
+        # 2. Ticker Normalization
+        if 'Ticker-Region' in df.columns:
+            df['Ticker'] = df['Ticker-Region'].str.split('-').str[0].str.strip().str.upper()
 
+        # 3. Temporal Standardization
+        if 'Date' in df.columns:
+            df['Year'] = pd.to_datetime(df['Date']).dt.year
+
+        # 4. Global Null Handling
+        df = df.replace(['--', 'N/A', '#N/A', 'NULL', 'null', 'nan', ''], np.nan)
+
+        # 5. Strict Numeric Casting (Aligned with SQL Schema Output)
+        numeric_targets = [
+            'Ending_Price', 'Next-Years_Return', 'Market_Capitalization', 
+            'Russell_2000_Port_Weight', 'ROE_using_9-30_Data', 'ROA_using_9-30_Data'
+        ]
+        
+        for col in df.columns:
+            if col in numeric_targets:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+
+        # 6. Schema Validation: Match actual SQL column names
+        # Replaces 'Ending Price' with 'Ending_Price', etc.
+        required = ['Ticker', 'Year', 'Ending_Price', 'Next-Years_Return']
+        missing = [r for r in required if r not in df.columns]
+        
+        if missing:
+            logger.error(f"SCHEMA MISMATCH: Missing critical SQL columns: {missing}")
+        else:
+            logger.info(f"Ingestion successful. {len(df):,} records normalized.")
+            
+        return df

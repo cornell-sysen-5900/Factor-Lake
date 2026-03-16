@@ -1,8 +1,8 @@
 """
 PROJECT: Factor-Lake Portfolio Analysis
-MODULE: app/utils/streamlit_utils.py
+MODULE: app/streamlit_utils.py
 PURPOSE: Utility functions for session management, authentication, and data orchestration.
-VERSION: 1.1.0
+VERSION: 2.2.0
 """
 
 import os
@@ -10,29 +10,18 @@ import sys
 import hmac
 import streamlit as st
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 def initialize_environment() -> None:
     """
-    Configures the Python path and loads environment variables.
-    
-    This function ensures that the 'src' directory is added to sys.path 
-    for module resolution and loads a local .env file if the application 
-    is running in a local development environment.
-    
-    Input:
-        None
-    Output:
-        None: Modifies sys.path and os.environ in-place.
+    Configures the application runtime environment by establishing necessary system paths.
     """
     current_dir = Path(__file__).resolve().parent
-    project_root = current_dir.parent
+    project_root = current_dir.parent.parent 
     
-    # Ensure src is importable
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
 
-    # Load local .env if not running on Streamlit Cloud
     if not os.environ.get("STREAMLIT_RUNTIME_ENV"):
         env_path = project_root / '.env'
         if env_path.exists():
@@ -43,20 +32,14 @@ def initialize_environment() -> None:
                         key, value = line.split('=', 1)
                         os.environ.setdefault(key, value.strip("'\""))
 
-
 def check_password(secrets_map: Dict[str, Any]) -> bool:
     """
-    Renders a password input field and verifies credentials via HMAC comparison.
-    
-    Input:
-        secrets_map (Dict[str, Any]): A dictionary containing the 'password' key.
-    Output:
-        bool: True if the session is authenticated, False otherwise.
+    Implements a secure gatekeeper mechanism using HMAC-based credential verification.
     """
     configured_password = secrets_map.get("password") or os.environ.get("ADMIN_PASSWORD")
 
     if not configured_password:
-        st.error("Authentication secret is missing. Please check your configuration.")
+        st.error("Authentication secret is missing. Please check system configuration.")
         return False
 
     if st.session_state.get("password_correct"):
@@ -70,31 +53,20 @@ def check_password(secrets_map: Dict[str, Any]) -> bool:
         else:
             st.session_state["password_correct"] = False
 
-    st.text_input(
-        "Administrator Password", 
-        type="password", 
-        on_change=validate_input, 
-        key="pwd_entry"
-    )
+    st.text_input("Administrator Password", type="password", on_change=validate_input, key="pwd_entry")
     
     if st.session_state.get("password_correct") == False:
         st.error("Invalid credentials. Access denied.")
     
-    st.caption("Contact the system administrator if you require access.")
     return False
-
 
 def initialize_session_state() -> None:
     """
-    Ensures all necessary keys exist in st.session_state with default values.
-    
-    Input:
-        None
-    Output:
-        None: Modifies st.session_state in-place.
+    Initializes the global state container with default values for tracking application data.
     """
     default_state: Dict[str, Any] = {
         'data_loaded': False,
+        'raw_data': None,
         'rdata': None,
         'results': None,
         'selected_factors': [],
@@ -105,107 +77,93 @@ def initialize_session_state() -> None:
         if key not in st.session_state:
             st.session_state[key] = default_value
 
-
 def load_and_process_data(user_settings: Dict[str, Any]) -> None:
     """
-    Orchestrates data acquisition from Supabase and performs initial cleaning.
-    
-    Input:
-        user_settings (Dict[str, Any]): Parameters including 'start_year', 'end_year', 
-                                        and 'selected_sectors'.
-    Output:
-        None: Updates st.session_state.rdata and sets data_loaded to True.
+    Orchestrates the retrieval and refinement of market data from the cloud backend.
     """
-    from src.market_object import load_data
+    from src.supabase_client import SupabaseManager
     import pandas as pd
-    import streamlit_config as config
 
-    with st.spinner("Loading market data..."):
-        try:
-            sectors_to_use = user_settings['selected_sectors'] if user_settings['sector_filter_enabled'] else None
+    try:
+        # Step 1: Fetch raw universe if not already cached
+        if st.session_state.raw_data is None:
+            manager = SupabaseManager()
+            st.session_state.raw_data = manager.fetch_all_data()
 
-            rdata = load_data(
-                restrict_fossil_fuels=user_settings['restrict_fossil_fuels'],
-                use_supabase=True,
-                data_path=None,
-                show_loading_progress=user_settings['show_loading'],
-                sectors=sectors_to_use
-            )
+        df = st.session_state.raw_data.copy()
 
-            # Standardize formats
-            rdata['Ticker'] = rdata['Ticker-Region'].dropna().apply(lambda x: x.split('-')[0].strip())
-            rdata['Year'] = pd.to_datetime(rdata['Date']).dt.year
+        # Step 2: Apply Sector Filters
+        if user_settings.get('selected_sectors'):
+            df = df[df['Scotts_Sector_5'].isin(user_settings['selected_sectors'])]
 
-            start_yr, end_yr = int(user_settings['start_year']), int(user_settings['end_year'])
-            rdata = rdata[(rdata['Year'] >= start_yr) & (rdata['Year'] <= end_yr)]
-
-            # Map column variations
-            cols_to_keep = ['Ticker', 'Year', 'Next_Year_Return']
-            col_mappings = {
-                'Ending Price': ['Ending Price', 'Ending_Price'],
-                'Market Capitalization': ['Market Capitalization', 'Market_Capitalization']
-            }
+        # Step 3: ESG Exclusionary Screening (Fossil Fuels)
+        if user_settings.get('restrict_fossil_fuels'):
+            excluded = {"integratedoil", "oilfieldservicesequipment", "oilgasproduction", "coal", "oilrefiningmarketing"}
+            # Schema-safe column lookup
+            industry_col = 'FactSet_Industry' if 'FactSet_Industry' in df.columns else 'FactSet Industry'
             
-            for target, options in col_mappings.items():
-                for opt in options:
-                    if opt in rdata.columns:
-                        rdata[target] = rdata[opt]
-                        cols_to_keep.append(target)
-                        break
+            if industry_col in df.columns:
+                # Optimized cleaning for string matching
+                clean_ind = df[industry_col].str.lower().str.replace(r'[^a-z0-9]', '', regex=True)
+                df = df[~clean_ind.isin(excluded)]
 
-            for factor_label in config.FACTOR_MAP.keys():
-                if factor_label in rdata.columns:
-                    cols_to_keep.append(factor_label)
+        # Step 4: Temporal Constraints
+        start_yr, end_yr = int(user_settings['start_year']), int(user_settings['end_year'])
+        df = df[(df['Year'] >= start_yr) & (df['Year'] <= end_yr)]
 
-            st.session_state.rdata = rdata[list(set(cols_to_keep))]
-            st.session_state.data_loaded = True
-            st.success(f"Data loaded successfully! {len(rdata)} records found.")
+        st.session_state.rdata = df
+        st.session_state.data_loaded = True
+        st.success(f"Universe Refined: {len(df):,} records ready for analysis.")
 
-        except Exception as e:
-            st.error(f"Error loading data: {str(e)}")
-
+    except Exception as e:
+        st.error(f"Data Orchestration Error: {str(e)}")
 
 def run_backtest_logic(user_settings: Dict[str, Any], 
-                       factor_names: List[str], 
-                       factor_dirs: Dict[str, str]) -> None:
+                        factor_names: List[str], 
+                        factor_dirs: Dict[str, str]) -> None:
     """
-    Executes the portfolio rebalancing engine and stores the backtest results.
-    
-    Input:
-        user_settings (Dict[str, Any]): UI parameters (AUM, Weighting, etc.).
-        factor_names (List[str]): List of active factor labels.
-        factor_dirs (Dict[str, str]): Mapping of factors to 'top' or 'bottom' tilt.
-    Output:
-        None: Updates st.session_state.results with the calculation output.
+    Triggers the core rebalancing engine to calculate historical portfolio performance.
     """
     from src.calculate_holdings import rebalance_portfolio
-    import streamlit_config as config
+    from app.streamlit_config import FACTOR_METADATA
 
     if not factor_names:
-        st.warning("Please select at least one factor before running the analysis.")
+        st.warning("Strategy Configuration: Please select at least one factor.")
         return
 
-    with st.spinner("Running portfolio backtest..."):
-        try:
-            factor_objects = [config.FACTOR_MAP[name]() for name in factor_names]
-            
-            results = rebalance_portfolio(
-                st.session_state.rdata,
-                factor_objects,
-                start_year=int(user_settings['start_year']),
-                end_year=int(user_settings['end_year']),
-                initial_aum=user_settings['initial_aum'],
-                verbosity=user_settings['verbosity_level'],
-                restrict_fossil_fuels=user_settings['restrict_fossil_fuels'],
-                use_market_cap_weight=user_settings['use_market_cap_weight'],
-                factor_directions=factor_dirs
-            )
-            
-            st.session_state.results = results
-            st.session_state.selected_factors = factor_names
-            st.session_state.factor_directions = factor_dirs
-            st.success("Analysis complete! Check the Results tab.")
-            
-        except Exception as e:
-            st.error(f"Error running analysis: {str(e)}")
-            st.exception(e)
+    try:
+        # Map UI labels to internal SQL column names
+        # e.g., '6-Mo Momentum %' -> '6-Mo_Momentum'
+        internal_factor_cols = []
+        internal_directions = {}
+
+        for f_label in factor_names:
+            if f_label in FACTOR_METADATA:
+                sql_col = FACTOR_METADATA[f_label]['column']
+                internal_factor_cols.append(sql_col)
+                # Ensure the direction toggle is mapped to the SQL column name
+                internal_directions[sql_col] = factor_dirs.get(f_label, 'top')
+            else:
+                st.error(f"Metadata Missing: No SQL mapping found for factor '{f_label}'.")
+                return
+
+        # Execute Backtest
+        results = rebalance_portfolio(
+            st.session_state.rdata,
+            internal_factor_cols,
+            factor_directions=internal_directions,
+            start_year=int(user_settings['start_year']),
+            end_year=int(user_settings['end_year']),
+            initial_aum=user_settings['initial_aum'],
+            benchmark_index=user_settings.get('benchmark_index', 1),
+            top_pct=user_settings.get('top_pct', 10.0),
+            use_market_cap_weight=user_settings.get('use_market_cap_weight', False)
+        )
+        
+        st.session_state.results = results
+        st.session_state.selected_factors = factor_names
+        st.session_state.factor_directions = factor_dirs
+        
+    except Exception as e:
+        st.error(f"Backtest Execution Error: {str(e)}")
+        st.exception(e)

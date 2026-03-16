@@ -1,141 +1,128 @@
 """
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/components/results_view.py
-PURPOSE: Visualization component for backtest metrics, charts, and cohort analysis.
-VERSION: 1.1.0
+PURPOSE: Visualization component for backtest metrics, charts, and risk attribution.
+VERSION: 2.0.0
 """
 
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-from typing import Dict, Any
+import numpy as np
+from typing import Dict, Any, List
+from Visualizations.portfolio_growth_plot import plot_portfolio_growth
 
 def render_results_tab(results: Dict[str, Any], user_settings: Dict[str, Any]) -> None:
     """
-    Acts as the primary entry point for the Performance Results interface.
+    Primary entry point for the Performance Results interface.
     
-    This function orchestrates the layout of the entire results tab, coordinating 
-    metadata display, KPI metrics, time-series growth visualizations, and 
-    interactive cohort analysis. It ensures that all UI elements are synchronized 
-    with the current backtest session data.
-    
-    Input:
-        results (Dict[str, Any]): The comprehensive output dictionary from the 
-                                 backtest engine containing returns and risk metrics.
-        user_settings (Dict[str, Any]): Global configuration parameters used to 
-                                        standardize labels and calculations.
-    Output:
-        None: Renders multiple UI components directly to the Streamlit application.
+    Orchestrates the layout of the results tab, coordinating KPI metrics, 
+    time-series growth visualizations, and institutional risk analytics.
     """
     if not results:
-        st.warning("No backtest results found. Please run the analysis first.")
+        st.warning("No backtest results found. Please execute the analysis in the Analysis tab.")
         return
 
-    # 1. Summary Metrics Row
+    # 1. High-Level Performance KPIs
     _render_summary_metrics(results, user_settings)
     
     st.divider()
 
-    # 2. Growth Visualization and Performance Tables
+    # 2. Time-Series Growth and Risk Analytics
     col_chart, col_stats = st.columns([2, 1])
     
     with col_chart:
         _render_growth_chart(results, user_settings)
         
     with col_stats:
-        _render_performance_tables(results)
+        _render_risk_analytics(results)
 
     st.divider()
 
-    # 3. Interactive Cohort/Decile Analysis
-    _render_cohort_analysis(results, user_settings)
-
+    # 3. Yearly Comparison and Data Export
+    _render_performance_tables(results)
 
 def _render_summary_metrics(results: Dict[str, Any], user_settings: Dict[str, Any]) -> None:
     """
-    Calculates and displays high-level portfolio performance indicators.
+    Renders absolute and relative performance metrics.
     """
-    final_val = results.get('portfolio_values', [0])[-1]
-    total_ret = ((final_val / user_settings['initial_aum']) - 1) * 100
-    cagr = results.get('cagr', 0) * 100
-    alpha = results.get('alpha', 0) * 100
+    initial_aum = user_settings.get('initial_aum', 1000000)
+    final_val = results.get('final_value', 0)
+    total_ret = ((final_val / initial_aum) - 1) * 100
+    
+    # Calculate CAGR based on the year range
+    years_count = len(results.get('years', [])) - 1
+    cagr = (((final_val / initial_aum) ** (1 / years_count)) - 1) * 100 if years_count > 0 else 0
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Final Portfolio Value", f"${final_val:,.2f}")
-    m2.metric("Total Return", f"{total_ret:.2f}%")
-    m3.metric("CAGR", f"{cagr:.2f}%")
-    m4.metric("Alpha vs Benchmark", f"{alpha:.2f}%")
+    m1.metric("Ending Capital", f"${final_val:,.2f}")
+    m2.metric("Cumulative Return", f"{total_ret:.2f}%")
+    m3.metric("Annualized (CAGR)", f"{cagr:.2f}%")
+    m4.metric("Win Rate vs Bench", f"{results.get('win_rate', 0)*100:.1f}%")
 
-
-from Visualizations.portfolio_growth_plot import plot_portfolio_growth
-
-def _render_growth_chart(results: dict, user_settings: dict) -> None:
+def _render_growth_chart(results: Dict[str, Any], user_settings: Dict[str, Any]) -> None:
     """
-    Orchestrates the growth visualization within the Streamlit Results tab.
-    
-    This UI-level function extracts the necessary time-series data from the 
-    application's session state and passes it to the specialized visualization 
-    module. It acts as a bridge between the data store and the plotting engine.
-
-    Args:
-        results (dict): The dictionary containing 'years', 'portfolio_values', 
-                        and 'benchmark_values' keys.
-        user_settings (dict): Configuration dictionary used for chart labeling.
-
-    Returns:
-        None: Renders the plot directly to the active Streamlit column.
+    Visualizes the growth of $1 (or initial AUM) over the investment horizon.
     """
-    st.subheader("Growth of Portfolio")
+    st.subheader("Cumulative Growth Comparison")
     
-    # Extract data from the results dictionary
     years = results.get('years', [])
     port_vals = results.get('portfolio_values', [])
-    bench_vals = results.get('benchmark_values', [])
+    
+    # Reconstruct benchmark values for visualization if not explicitly provided
+    # Standardizing to the same starting AUM
+    bench_rets = results.get('benchmark_returns', [])
+    bench_vals = [user_settings['initial_aum']]
+    for r in bench_rets:
+        bench_vals.append(bench_vals[-1] * (1 + (r / 100)))
 
-    # Validation gate to prevent empty chart rendering
     if not years or not port_vals:
-        st.error("Visualization Error: The backtest engine returned empty datasets.")
+        st.error("Data Integrity Error: Dataset is insufficient for time-series plotting.")
         return
 
-    # Call the externalized plotting utility
     fig = plot_portfolio_growth(years, port_vals, bench_vals)
-    
-    # Display the figure in the Streamlit UI
     st.pyplot(fig)
 
-
-def _render_performance_tables(results: Dict[str, Any]) -> None:
+def _render_risk_analytics(results: Dict[str, Any]) -> None:
     """
-    Tabulates granular backtest data and advanced risk-adjusted return statistics.
+    Displays institutional risk-adjusted return statistics.
     """
-    st.subheader("Risk Analytics")
+    st.subheader("Risk-Adjusted Metrics")
     
+    # Portfolio vs Benchmark Comparison
     stats = {
-        "Sharpe Ratio": f"{results.get('sharpe', 0):.2f}",
-        "Max Drawdown": f"{results.get('max_drawdown', 0)*100:.2f}%",
-        "Beta": f"{results.get('beta', 0):.2f}",
-        "Volatility": f"{results.get('volatility', 0)*100:.2f}%"
+        "Sharpe Ratio (Port)": f"{results.get('sharpe_portfolio', 0):.2f}",
+        "Sharpe Ratio (Bench)": f"{results.get('sharpe_benchmark', 0):.2f}",
+        "Information Ratio": f"{results.get('information_ratio', 0):.2f}",
+        "Portfolio Beta": f"{results.get('portfolio_beta', 0):.2f}",
+        "Max Drawdown (Port)": f"{results.get('max_drawdown_portfolio', 0)*100:.2f}%",
+        "Max Drawdown (Bench)": f"{results.get('max_drawdown_benchmark', 0)*100:.2f}%"
     }
     
     for label, val in stats.items():
         st.write(f"**{label}:** {val}")
 
-    # CSV Download
-    df_returns = pd.DataFrame({
-        'Year': results.get('years', []),
-        'Return': results.get('yearly_returns', [])
-    })
-    csv = df_returns.to_csv(index=False).encode('utf-8')
-    st.download_button("Download Yearly Returns", data=csv, file_name="returns.csv", mime="text/csv")
-
-
-def _render_cohort_analysis(results: Dict[str, Any], user_settings: Dict[str, Any]) -> None:
+def _render_performance_tables(results: Dict[str, Any]) -> None:
     """
-    Facilitates interactive performance exploration through decile-based analysis.
+    Tabulates yearly performance and provides data export capabilities.
     """
-    st.subheader("Factor Cohort Analysis")
-    st.write("Compare the performance of the Top decile vs. Bottom decile for the selected strategy.")
+    st.subheader("Yearly Performance Audit")
     
-    # Implementation of cohort specific plotting/logic
-    # (Placeholder for the specific logic block we moved from main)
-    st.info("Cohort analysis visualization is calculated based on current factor tilts.")
+    comparisons = results.get('yearly_comparisons', [])
+    if comparisons:
+        df_comp = pd.DataFrame(comparisons)
+        
+        # Format for display
+        df_display = df_comp.copy()
+        df_display['portfolio_return'] = df_display['portfolio_return'].map("{:.2f}%".format)
+        df_display['benchmark_return'] = df_display['benchmark_return'].map("{:.2f}%".format)
+        
+        st.table(df_display)
+
+        # Export Logic
+        csv = df_comp.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="Download Full Audit Trail (CSV)",
+            data=csv,
+            file_name="factor_backtest_results.csv",
+            mime="text/csv"
+        )

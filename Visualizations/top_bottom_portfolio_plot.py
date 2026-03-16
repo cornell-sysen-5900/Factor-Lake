@@ -1,92 +1,101 @@
-import streamlit as st
+"""
+PROJECT: Factor-Lake Portfolio Analysis
+MODULE: visualizations/top_bottom_portfolio_plot.py
+PURPOSE: Visualization utility for analyzing factor premiums via cohort spreads.
+VERSION: 2.0.0
+"""
+
 import matplotlib.pyplot as plt
-from matplotlib.ticker import FuncFormatter
-import pandas as pd
+import matplotlib.ticker as mticker
+from typing import List, Optional, Dict, Any
 
-def plot_top_bottom_percent(rdata,
-                            factors,
-                            years,
-                            percent=10,
-                            show_bottom=True,
-                            benchmark_returns=None,
-                            benchmark_label='Russell 2000',
-                            initial_investment=1000000.0,
-                            baseline_portfolio_values=None,
-                            precomputed_top=None,
-                            precomputed_bot=None):
+def plot_top_bottom_percent(
+    years: List[int],
+    percent: float = 10.0,
+    show_bottom: bool = True,
+    benchmark_returns: Optional[List[float]] = None,
+    benchmark_label: str = 'Russell 2000',
+    initial_investment: float = 1000000.0,
+    baseline_portfolio_values: Optional[List[float]] = None,
+    precomputed_top: Optional[Dict[str, Any]] = None,
+    precomputed_bot: Optional[Dict[str, Any]] = None
+) -> plt.Figure:
     """
-    Plots the growth of $1 invested for top/bottom cohorts using precomputed 
-    results passed from the main application.
+    Constructs a wealth-index chart comparing the performance of top and bottom cohorts.
+
+    This visualization allows researchers to observe the effectiveness of a factor 
+    by displaying the performance gap (spread) between the 'Top' decile and 
+    the 'Bottom' decile. It includes a baseline for the current user-defined 
+    portfolio and the selected market benchmark.
+
+    Args:
+        years (List[int]): Timeline for the x-axis.
+        percent (float): The percentage of the universe represented in each cohort.
+        show_bottom (bool): If True, the bottom cohort is rendered for spread analysis.
+        benchmark_returns (List[float]): Annual percentage returns for the benchmark.
+        benchmark_label (str): Label for the benchmark index.
+        initial_investment (float): The starting dollar amount for all series.
+        baseline_portfolio_values (List[float]): The values of the active strategy.
+        precomputed_top (Dict): Results dictionary for the top cohort.
+        precomputed_bot (Dict): Results dictionary for the bottom cohort.
+
+    Returns:
+        plt.Figure: A formatted Matplotlib figure.
     """
+    fig, ax = plt.subplots(figsize=(12, 6), dpi=100)
 
-    # 1. Extract values from precomputed results or default to initial investment
-    top_values = [initial_investment]
-    if precomputed_top and 'portfolio_values' in precomputed_top:
-        top_values = precomputed_top['portfolio_values']
-
-    bottom_values = None
-    if show_bottom:
-        bottom_values = [initial_investment]
-        if precomputed_bot and 'portfolio_values' in precomputed_bot:
-            bottom_values = precomputed_bot['portfolio_values']
-
-    # 2. Setup Benchmark Values
-    benchmark_values = None
+    # 1. Setup Benchmark Trajectory
+    # Converts annual returns into a cumulative wealth index starting at initial_investment
     if benchmark_returns is not None:
-        br = list(benchmark_returns)
-        benchmark_values = [initial_investment]
-        for i in range(len(years) - 1):
-            if i < len(br):
-                # Convert percentage (e.g., 10.5) to decimal (0.105)
-                ret_decimal = float(br[i]) / 100.0
-                next_val = benchmark_values[-1] * (1 + ret_decimal)
-                benchmark_values.append(next_val)
-            else:
-                benchmark_values.append(benchmark_values[-1])
+        bench_vals = [initial_investment]
+        for ret in benchmark_returns:
+            # ret is assumed to be in percentage (e.g., 8.5 for 8.5%)
+            bench_vals.append(bench_vals[-1] * (1 + (float(ret) / 100.0)))
+        
+        if len(bench_vals) == len(years):
+            ax.plot(years, bench_vals, label=benchmark_label, color='#d62728', 
+                    linestyle='--', linewidth=1.5, alpha=0.8)
 
-    # 3. Initialize Plot
-    plt.figure(figsize=(11, 5))
-    ax = plt.gca()
+    # 2. Plot Cohort Series
+    # Render Bottom Cohort first (lower visual priority than Top)
+    if show_bottom and precomputed_bot:
+        bot_vals = precomputed_bot.get('portfolio_values', [initial_investment])
+        if len(bot_vals) == len(years):
+            ax.plot(years, bot_vals, label=f'Bottom {percent}%', color='#9467bd', 
+                    marker='v', markersize=4, linewidth=1.8, alpha=0.7)
 
-    # Plot Top Cohort
-    plt.plot(years, top_values, marker='o', linestyle='-', color='g', 
-             label=f'Top {percent}%', linewidth=1.6, markersize=6)
+    # Render Top Cohort
+    if precomputed_top:
+        top_vals = precomputed_top.get('portfolio_values', [initial_investment])
+        if len(top_vals) == len(years):
+            ax.plot(years, top_vals, label=f'Top {percent}%', color='#2ca02c', 
+                    marker='^', markersize=5, linewidth=2.0)
 
-    # Plot Bottom Cohort
-    if show_bottom and bottom_values is not None:
-        plt.plot(years, bottom_values, marker='o', linestyle='-', color='m', 
-                 label=f'Bottom {percent}%', linewidth=1.6, markersize=6)
+    # 3. Plot Current Strategy Baseline
+    if baseline_portfolio_values:
+        common_len = min(len(years), len(baseline_portfolio_values))
+        ax.plot(years[:common_len], baseline_portfolio_values[:common_len], 
+                label='Active Strategy', color='#003366', linewidth=2.5, marker='o', markersize=4)
 
-    # Plot Benchmark
-    if benchmark_values is not None and len(benchmark_values) == len(years):
-        plt.plot(years, benchmark_values, marker='s', linestyle='--', color='r', 
-                 label=benchmark_label, linewidth=1.2)
+    # 4. Institutional Formatting
+    ax.set_title(f"Cohort Spread Analysis: Top vs. Bottom {percent}%", 
+                 fontsize=14, fontweight='bold', pad=20)
+    ax.set_ylabel("Account Value (USD)", fontsize=11)
+    ax.set_xlabel("Year", fontsize=11)
 
-    # Plot Main Portfolio Baseline (blue line)
-    if baseline_portfolio_values is not None:
-        bp = list(baseline_portfolio_values)
-        common_len = min(len(years), len(bp))
-        plt.plot(years[:common_len], bp[:common_len], marker='o', linestyle='-', 
-                 color='b', label='Current Portfolio', linewidth=1.6, markersize=6)
-
-    # 4. Formatting
-    try:
-        factor_names = ", ".join([getattr(f, 'column_name', str(f)) for f in factors])
-    except Exception:
-        factor_names = "Selected Factors"
-
-    plt.title(f"Cohort Analysis: Top vs Bottom {percent}% ({factor_names})")
-    plt.xlabel('Year')
-    plt.ylabel('Portfolio Value ($)')
-    plt.grid(True, linestyle='--', linewidth=0.5, alpha=0.7)
+    # Currency Formatting for Y-axis
+    ax.yaxis.set_major_formatter(mticker.StrMethodFormatter('${x:,.0f}'))
     
-    plt.xticks(years)
-    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'${x:,.0f}'))
+    # Visual Hygiene
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.grid(True, linestyle='--', alpha=0.4)
+    ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
     
     # Reference line for starting capital
-    plt.axhline(initial_investment, color='black', linestyle=':', linewidth=1.0, alpha=0.5)
+    ax.axhline(initial_investment, color='#000000', linestyle=':', linewidth=1.2, alpha=0.4)
 
-    plt.legend(loc='upper left')
-    plt.tight_layout()
+    ax.legend(loc='upper left', frameon=True, facecolor='white')
     
-    return plt.gcf()
+    plt.tight_layout()
+    return fig

@@ -5,7 +5,7 @@ Tests factor classes and their data retrieval
 import pytest
 import pandas as pd
 import numpy as np
-from src.factor_function import (
+from src.factor_registry import (
     Factors, Momentum6m, Momentum12m, Momentum1m,
     ROE, ROA, P2B, NextFYrEarns, OneYrPriceVol,
     AccrualsAssets, ROAPercentage, OneYrAssetGrowth,

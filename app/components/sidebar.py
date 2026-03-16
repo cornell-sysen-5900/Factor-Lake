@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/components/sidebar.py
 PURPOSE: Configuration interface for global backtest parameters and ESG filters.
-VERSION: 1.1.0
+VERSION: 2.0.0
 """
 
 import streamlit as st
@@ -10,18 +10,20 @@ from typing import Dict, Any, List
 
 def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
     """
-    Renders the configuration sidebar and aggregates all user input parameters.
-    
-    This interface manages global settings including data source metadata, 
-    ESG exclusionary filters, portfolio weighting methodologies, and 
-    chronological constraints for the backtesting engine.
+    Constructs the application sidebar to capture and validate user configuration settings.
 
-    Input:
+    This function builds the interactive control panel that governs the behavior of 
+    the backtesting engine. It facilitates the selection of ESG constraints, portfolio 
+    weighting schemes, and temporal ranges, consolidating these inputs into a 
+    standardized dictionary for downstream data orchestration.
+
+    Args:
         sector_options (List[str]): A list of unique sector classifications 
-                                    extracted from the configuration.
-    Output:
-        Dict[str, Any]: A validated dictionary containing all user-defined 
-                        configurations for the current session.
+            available for filtering within the current dataset.
+
+    Returns:
+        Dict[str, Any]: A collection of validated user inputs required to 
+            initialize the portfolio analysis.
     """
     with st.sidebar:
         st.header("Configuration")
@@ -79,7 +81,7 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
             start_year = st.number_input(
                 "Start Year",
                 min_value=2002,
-                max_value=2024,
+                max_value=2026,
                 value=2002,
                 step=1,
                 format="%d",
@@ -89,14 +91,13 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
             end_year = st.number_input(
                 "End Year",
                 min_value=2002,
-                max_value=2024,
+                max_value=2026,
                 value=2024,
                 step=1,
                 format="%d",
                 key="end_year_input"
             )
 
-        # Validation logic to ensure chronological integrity
         if start_year > end_year:
             st.warning('Start Year precedes End Year. Adjusting range...')
             end_year = start_year
@@ -113,20 +114,7 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
             step=100000.0,
             format="%.0f"
         )
-        
-        st.divider()
 
-        # 7. Engine Verbosity
-        st.subheader("Output Detail")
-        verbosity_level = st.select_slider(
-            "Verbosity Level",
-            options=[0, 1, 2, 3],
-            value=1,
-            format_func=lambda x: ["Silent", "Basic", "Detailed", "Debug"][x]
-        )
-        show_loading = st.checkbox("Show data loading progress", value=True)
-
-    # Compile the validated settings into a unified configuration object
     return {
         "restrict_fossil_fuels": restrict_fossil_fuels,
         "use_market_cap_weight": use_market_cap_weight,
@@ -134,7 +122,5 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
         "sector_filter_enabled": sector_filter_enabled,
         "start_year": start_year,
         "end_year": end_year,
-        "initial_aum": initial_aum,
-        "verbosity_level": verbosity_level,
-        "show_loading": show_loading
+        "initial_aum": initial_aum
     }

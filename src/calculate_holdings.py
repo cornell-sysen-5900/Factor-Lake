@@ -1,350 +1,202 @@
-from scipy import stats
-from .market_object import MarketObject
-from .portfolio import Portfolio
+"""
+PROJECT: Factor-Lake Portfolio Analysis
+MODULE: src/calculate_holdings.py
+PURPOSE: Core backtesting engine for factor-based portfolio construction and risk attribution.
+VERSION: 2.2.0
+"""
+
 import numpy as np
 import pandas as pd
-from .factors_doc import FACTOR_DOCS
+import math
+import logging
+from typing import Dict, List, Any, Optional
 from .factor_utils import normalize_series
 from .benchmarks import get_benchmark_list
+from .portfolio import Portfolio
 
-def calculate_holdings(factor, aum, market, restrict_fossil_fuels=False, top_pct=10, which='top', use_market_cap_weight=False):
-    # Apply sector restrictions if enabled
-    if restrict_fossil_fuels:
-        industry_col = 'FactSet Industry'
-        if industry_col in market.stocks.columns:
-            fossil_keywords = ['oil', 'gas', 'coal', 'energy', 'fossil']
-            series = market.stocks[industry_col].astype(str).str.lower()
-            mask = series.apply(
-                lambda x: not any(kw in x for kw in fossil_keywords) if pd.notna(x) else True)
-            # Report which tickers are being removed in this step
-            try:
-                removed_tickers = list(market.stocks.loc[~mask].index)
-                if removed_tickers:
-                    print(f"Fossil filter (holdings) removed {len(removed_tickers)} tickers: {', '.join(removed_tickers[:25])}{' ...' if len(removed_tickers) > 25 else ''}")
-            except Exception:
-                pass
-            market.stocks = market.stocks[mask].copy()
+logger = logging.getLogger(__name__)
 
-    # Get eligible stocks for factor calculation
-    # Prefer vectorized series from market.stocks when available so we can normalize
-    factor_col = getattr(factor, 'column_name', str(factor))
-    factor_values = {}
-
-    if factor_col in market.stocks.columns:
-        raw_series = pd.to_numeric(market.stocks[factor_col], errors='coerce')
-        # Determine direction from FACTOR_DOCS if available
-        meta = FACTOR_DOCS.get(factor_col, {})
-        higher_is_better = meta.get('higher_is_better', True)
-        # Normalize series (winsorize + zscore) and invert if needed so higher == better
-        normed = normalize_series(raw_series, higher_is_better=higher_is_better)
-        factor_values = normed.dropna().to_dict()
-    else:
-        # Fallback to original per-ticker get() when column not present
-        factor_values = {
-            ticker: factor.get(ticker, market)
-            for ticker in market.stocks.index
-            if isinstance(factor.get(ticker, market), (int, float))
-        }
-    
-    # ...existing code...
-    
-    if len(factor_values) == 0:
-        # Return empty portfolio instead of crashing
-        return Portfolio(name=f"Portfolio_{market.t}")
-    
-    sorted_securities = sorted(factor_values.items(), key=lambda x: x[1], reverse=True)
-
-    # Select the top or bottom `top_pct`% of securities (default 10%)
-    import math
-    n_select = max(1, math.floor(len(sorted_securities) * (top_pct / 100.0))) if sorted_securities else 0
-    if n_select == 0:
-        selected = []
-    else:
-        if which == 'top':
-            selected = sorted_securities[:n_select]
-        else:
-            # bottom: take the weakest n_select securities
-            selected = sorted_securities[-n_select:]
-
-    # Calculate number of shares for each selected security
-    portfolio_new = Portfolio(name=f"Portfolio_{market.t}")
-    
-    if use_market_cap_weight:
-        # Market capitalization-based weighting (similar to Russell 2000)
-        # Collect market cap and price for each selected ticker, then allocate
-        market_caps = {}
-        prices = {}
-        for ticker, _ in selected:
-            # Try to get market cap from the data
-            if 'Market Capitalization' in market.stocks.columns:
-                try:
-                    market_cap = market.stocks.loc[ticker, 'Market Capitalization']
-                    if isinstance(market_cap, (pd.Series, np.ndarray)):
-                        market_cap = market_cap.iloc[0] if len(market_cap) > 0 else None
-                    if pd.notna(market_cap) and market_cap > 0:
-                        market_caps[ticker] = float(market_cap)
-                except (KeyError, IndexError):
-                    pass
-            # also capture entry price availability
-            price = market.get_price(ticker)
-            if price is not None and price > 0:
-                prices[ticker] = price
-
-        # If we have market caps and at least one valid price, use them for weighting
-        valid_caps = {t: c for t, c in market_caps.items() if t in prices}
-        if valid_caps:
-            total_market_cap = sum(valid_caps.values())
-            for ticker, cap in valid_caps.items():
-                # Weight by market cap: (ticker_market_cap / total_market_cap) * AUM
-                weight = cap / total_market_cap if total_market_cap > 0 else 0
-                dollar_investment = weight * aum
-                price = prices.get(ticker)
-                if price is not None and price > 0 and dollar_investment > 0:
-                    shares = dollar_investment / price
-                    portfolio_new.add_investment(ticker, shares)
-            # If for some reason no shares were added (e.g., rounding), fallback to equal among priced tickers
-            if not portfolio_new.investments and prices:
-                valid_tickers = list(prices.keys())
-                equal_investment = aum / len(valid_tickers)
-                for t in valid_tickers:
-                    shares = equal_investment / prices[t]
-                    portfolio_new.add_investment(t, shares)
-        else:
-            # Fallback to equal weighting among tickers that have valid prices
-            valid_tickers = [t for t, _ in selected if market.get_price(t) is not None and market.get_price(t) > 0]
-            if not valid_tickers:
-                print(f"Warning: No valid priced tickers for year {market.t}; returning empty portfolio.")
-            else:
-                equal_investment = aum / len(valid_tickers)
-                for ticker in valid_tickers:
-                    price = market.get_price(ticker)
-                    if price is not None and price > 0:
-                        shares = equal_investment / price
-                        portfolio_new.add_investment(ticker, shares)
-    else:
-        # Equal dollar weighting (allocate only to tickers with valid entry prices)
-        valid_tickers = [t for t, _ in selected if market.get_price(t) is not None and market.get_price(t) > 0]
-        if not valid_tickers and selected:
-            # nothing priced; warn and return empty portfolio
-            print(f"Warning: No valid priced tickers for equal-weighting in year {market.t}; returning empty portfolio.")
-        else:
-            equal_investment = aum / len(valid_tickers) if valid_tickers else 0
-            for ticker in valid_tickers:
-                price = market.get_price(ticker)
-                if price is not None and price > 0:
-                    shares = equal_investment / price
-                    portfolio_new.add_investment(ticker, shares)
-
-    return portfolio_new
-
-def calculate_growth(portfolio, current_market, verbosity=0):
+def calculate_holdings(
+    df_year: pd.DataFrame,
+    factor_col: str,
+    aum: float,
+    higher_is_better: bool = True,
+    top_pct: float = 10.0,
+    use_market_cap_weight: bool = False
+) -> Portfolio:
     """
-    Calculates portfolio growth using the forward-looking 'Next_Year_Return' column.
-    """
-    total_weighted_rtn = 0
-    total_investment_value = 0
-
-    for factor_portfolio in portfolio:
-        for inv in factor_portfolio.investments:
-            ticker = inv["ticker"]
-            
-            # Retrieve the pre-calculated total return from the current market object
-            try:
-                # Dividing by 100 because the data is in percentage format (e.g., 20.0 for 20%)
-                stock_rtn = current_market.stocks.loc[ticker, "Next_Year_Return"] / 100
-                
-                # Weight the return by the dollar value of the position at the start of the year
-                entry_price = current_market.get_price(ticker)
-                if entry_price:
-                    position_value = inv["number_of_shares"] * entry_price
-                    total_weighted_rtn += stock_rtn * position_value
-                    total_investment_value += position_value
-                    
-            except KeyError:
-                if verbosity >= 2:
-                    print(f"Warning: {ticker} return data missing, treating as 0%.")
-                continue
-
-    # Calculate aggregate growth for the year
-    growth = total_weighted_rtn / total_investment_value if total_investment_value > 0 else 0
+    Constructs a cross-sectional portfolio for a specific time period.
     
-    # Calculate end value to maintain compatibility with the rebalancing loop
-    total_end_value = total_investment_value * (1 + growth)
-    
-    return growth, total_investment_value, total_end_value
-
-def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, benchmark_index=1, verbosity=0, restrict_fossil_fuels=False, top_pct=10, which='top', use_market_cap_weight=False, factor_directions=None):
+    Now utilizes the user-toggled polarity to ensure that if 'bottom' is selected,
+    the 'higher_is_better' logic in the normalization utility is inverted.
     """
-    Executes a multi-year backtest. 
-    Calculates Sharpe and Beta using year-specific excess returns.
+    # Normalize factor values across the cross-section
+    # The utility handles the actual inversion logic based on higher_is_better
+    scores = normalize_series(df_year[factor_col], higher_is_better=higher_is_better)
+    
+    # We sort descending because normalize_series ensures 'higher' is always 'better' 
+    # after accounting for the direction toggle.
+    valid_scores = scores.dropna().sort_values(ascending=False)
+    
+    if valid_scores.empty:
+        return Portfolio(name=f"Empty_{factor_col}")
 
-    Args:
-        factor_directions: optional dict mapping factor column_name -> 'top'/'bottom'.
-            When provided, overrides the global ``which`` on a per-factor basis.
+    # Determine selection size
+    n_select = max(1, math.floor(len(valid_scores) * (top_pct / 100.0)))
+    selected_tickers = valid_scores.head(n_select).index.tolist()
+    holdings_data = df_year.loc[selected_tickers]
+    
+    portfolio = Portfolio(name=f"Portfolio_{factor_col}")
+
+    # Weighting Strategy
+    if use_market_cap_weight and 'Market_Capitalization' in holdings_data.columns:
+        caps = pd.to_numeric(holdings_data['Market_Capitalization'], errors='coerce').fillna(0)
+        weights = caps / caps.sum() if caps.sum() > 0 else pd.Series(1.0/len(caps), index=caps.index)
+    else:
+        weights = pd.Series(1.0 / len(selected_tickers), index=selected_tickers)
+
+    # Translate dollar allocations into shares using SQL 'Ending_Price'
+    for ticker in selected_tickers:
+        price = holdings_data.loc[ticker, 'Ending_Price']
+        if price > 0:
+            shares = (weights[ticker] * aum) / price
+            portfolio.add_investment(ticker, shares)
+
+    return portfolio
+
+def rebalance_portfolio(
+    data: pd.DataFrame,
+    factors: List[str],
+    factor_directions: Dict[str, str],
+    start_year: int,
+    end_year: int,
+    initial_aum: float,
+    benchmark_index: int = 1,
+    top_pct: float = 10.0,
+    use_market_cap_weight: bool = False
+) -> Dict[str, Any]:
+    """
+    Executes a multi-year backtest simulation with integrated risk analytics.
     """
     aum = initial_aum
-    years = [start_year]
-    portfolio_returns = []  
-    portfolio_values = [aum]  
+    portfolio_values = [aum]
+    portfolio_returns = []
     
-    verbosity = 0 if verbosity is None else verbosity
-    risk_free_rate_source = "FRED 4 Week T-Bill (Oct 1)"
-
-    # --- 1. Annual Rebalancing Loop ---
+    # Ensure Ticker is the index for faster lookups in the loop
+    if data.index.name != 'Ticker':
+        data = data.copy()
+    
+    # 1. Annual Simulation Loop
     for year in range(start_year, end_year):
-        market = MarketObject(data.loc[data['Year'] == year], year)
-        yearly_portfolio = []
+        df_year = data[data['Year'] == year].set_index('Ticker')
+        if df_year.empty:
+            continue
+            
+        factor_aum = aum / len(factors)
+        yearly_components = []
 
-        for factor in factors:
-            factor_which = which
-            if factor_directions:
-                col_name = getattr(factor, 'column_name', str(factor))
-                factor_which = factor_directions.get(col_name, which)
-
-            factor_portfolio = calculate_holdings(
-                factor=factor,
-                aum=aum / len(factors),
-                market=market,
-                restrict_fossil_fuels=restrict_fossil_fuels,
+        for f_col in factors:
+            # Direction is pulled from UI toggle dictionary
+            direction = factor_directions.get(f_col, 'top')
+            
+            p = calculate_holdings(
+                df_year, f_col, factor_aum, 
+                higher_is_better=(direction == 'top'),
                 top_pct=top_pct,
-                which=factor_which,
                 use_market_cap_weight=use_market_cap_weight
             )
-            yearly_portfolio.append(factor_portfolio)
+            yearly_components.append(p)
 
-        # Calculate annual growth
-        growth, total_start_value, total_end_value = calculate_growth(yearly_portfolio, market, verbosity)
-
-        if verbosity >= 2:
-            print(f"Year {year} to {year + 1}: Growth: {growth:.2%}, Start: ${total_start_value:.2f}, End: ${total_end_value:.2f}")
-
-        aum = total_end_value  
-        portfolio_returns.append(growth)
+        # realized forward returns (using SQL column: Next-Years_Return)
+        year_ret = _calculate_annual_return(yearly_components, df_year)
+        portfolio_returns.append(year_ret)
+        aum *= (1 + year_ret)
         portfolio_values.append(aum)
-        years.append(year + 1)
 
-    # --- 2. Data Alignment (Benchmarks & Risk-Free) ---
-    # Fetched from benchmarks.py to ensure data integrity across the range
-    rf_list = get_benchmark_list(4, start_year, end_year)
-    bench_list = get_benchmark_list(benchmark_index, start_year + 1, end_year + 1)
+    # 2. Benchmark & Risk-Free Alignment
+    rf_rates = np.array(get_benchmark_list(4, start_year, end_year))
+    bench_returns = np.array(get_benchmark_list(benchmark_index, start_year + 1, end_year + 1)) / 100.0
+    
+    # Ensure returns lists match in length for stats
+    min_len = min(len(portfolio_returns), len(bench_returns))
+    
+    return _compute_comprehensive_metrics(
+        np.array(portfolio_returns[:min_len]), 
+        bench_returns[:min_len], 
+        rf_rates[:min_len], 
+        portfolio_values[:min_len + 1], 
+        start_year, 
+        start_year + min_len
+    )
 
-    # Convert to NumPy for performance math
-    portfolio_returns_np = np.array(portfolio_returns)
-    rf_rates_np = np.array(rf_list)
-    benchmark_returns_np = np.array(bench_list) / 100 
-    
-# --- 3. Excess Return Calculations ---
-    excess_portfolio_returns = portfolio_returns_np - rf_rates_np
-    excess_benchmark_returns = benchmark_returns_np - rf_rates_np
-    
-    # --- 4. Sharpe Ratio ---
-    # Volatility of the EXCESS returns (Institutional Standard)
-    vol_excess_p = np.std(excess_portfolio_returns, ddof=1)
-    vol_excess_b = np.std(excess_benchmark_returns, ddof=1)
+def _calculate_annual_return(portfolios: List[Portfolio], df_year: pd.DataFrame) -> float:
+    """Calculates realized return based on SQL column 'Next-Years_Return'."""
+    total_val = 0.0
+    total_profit = 0.0
+    for p in portfolios:
+        for inv in p.investments:
+            t = inv['ticker']
+            if t in df_year.index:
+                price = df_year.loc[t, 'Ending_Price']
+                # Accessing the exact SQL column name
+                ret_val = df_year.loc[t, 'Next-Years_Return']
+                ret = (ret_val / 100.0) if not pd.isna(ret_val) else 0.0
+                
+                pos_val = inv['number_of_shares'] * price
+                total_val += pos_val
+                total_profit += pos_val * ret
+                
+    return total_profit / total_val if total_val > 0 else 0.0
 
-    # Formula: Mean(Yearly Excess Returns) / Volatility(Yearly Excess Returns)
-    sharpe_portfolio = np.mean(excess_portfolio_returns) / vol_excess_p if vol_excess_p > 0 else 0
-    sharpe_benchmark = np.mean(excess_benchmark_returns) / vol_excess_b if vol_excess_b > 0 else 0
+def _compute_comprehensive_metrics(p_ret: np.ndarray, b_ret: np.ndarray, rf: np.ndarray, 
+                                   p_vals: List[float], start: int, end: int) -> Dict[str, Any]:
+    """Computes Sharpe, IR, Beta, and MDD with sample standard deviation."""
+    excess_p = p_ret - rf
+    excess_b = b_ret - rf
+    active_ret = p_ret - b_ret
     
-    # --- 5. Portfolio Beta ---
-    portfolio_beta = None
-    if len(portfolio_returns_np) >= 3:
-        # CAPM Beta using excess returns
-        coeffs = np.polyfit(excess_benchmark_returns, excess_portfolio_returns, 1)
-        portfolio_beta = float(coeffs[0])
+    # Risk Ratios (ddof=1 for sample volatility)
+    sharpe_p = np.mean(excess_p) / np.std(excess_p, ddof=1) if np.std(excess_p) > 0 else 0
+    sharpe_b = np.mean(excess_b) / np.std(excess_b, ddof=1) if np.std(excess_b) > 0 else 0
+    info_ratio = np.mean(active_ret) / np.std(active_ret, ddof=1) if np.std(active_ret) > 0 else 0
+    
+    # Regression for Beta
+    beta = np.polyfit(excess_b, excess_p, 1)[0] if len(p_ret) > 1 else 1.0
 
-    # --- 6. Additional Risk Metrics ---
-    # Information Ratio
-    information_ratio = calculate_information_ratio(portfolio_returns, bench_list, verbosity)
-    
-    # Portfolio Max Drawdown
-    cumulative_values = np.array(portfolio_values)
-    running_peak = np.maximum.accumulate(cumulative_values)
-    max_drawdown_portfolio = np.min((cumulative_values - running_peak) / running_peak)
-    
-    # Benchmark Max Drawdown
-    benchmark_cumulative = [initial_aum]
-    for r in benchmark_returns_np:
-        benchmark_cumulative.append(benchmark_cumulative[-1] * (1 + r))
-    
-    benchmark_cumulative_np = np.array(benchmark_cumulative)
-    benchmark_peak = np.maximum.accumulate(benchmark_cumulative_np)
-    max_drawdown_benchmark = np.min((benchmark_cumulative_np - benchmark_peak) / benchmark_peak)
+    # Drawdown Calculation
+    def get_mdd(values):
+        values = np.array(values)
+        peak = np.maximum.accumulate(values)
+        dd = (values - peak) / peak
+        return np.min(dd) if len(dd) > 0 else 0
 
-    # Yearly Win Rate
-    wins = 0
+    # Benchmark wealth reconstruction
+    b_vals = [p_vals[0]]
+    for r in b_ret: 
+        b_vals.append(b_vals[-1] * (1 + r))
+
+    # Yearly Comparison metadata for UI tables
     yearly_comparisons = []
-    for i, (p_ret, b_ret) in enumerate(zip(portfolio_returns_np, benchmark_returns_np)):
-        win = p_ret > b_ret
-        if win: wins += 1
+    for i in range(len(p_ret)):
         yearly_comparisons.append({
-            'year': years[i+1],
-            'portfolio_return': p_ret * 100,
-            'benchmark_return': b_ret * 100,
-            'win': win
+            'year': start + i,
+            'portfolio_return': p_ret[i] * 100,
+            'benchmark_return': b_ret[i] * 100,
+            'win': p_ret[i] > b_ret[i]
         })
-    win_rate = wins / len(portfolio_returns_np) if len(portfolio_returns_np) > 0 else 0
-
-    # --- 7. Summary Output ---
-    if verbosity >= 1:
-        print(f"\n==== Performance Metrics ({start_year}-{end_year}) ====")
-        print(f"Final AUM: ${aum:.2f}")
-        print(f"Sharpe Ratio (Portfolio): {sharpe_portfolio:.4f}")
-        print(f"Sharpe Ratio (Benchmark): {sharpe_benchmark:.4f}")
-        if portfolio_beta is not None:
-            print(f"Portfolio Beta: {portfolio_beta:.4f}")
-        print(f"Max Drawdown (Portfolio): {max_drawdown_portfolio:.2%}")
-        print(f"Max Drawdown (Benchmark): {max_drawdown_benchmark:.2%}")
-        print(f"Win Rate: {win_rate:.2%}")
 
     return {
-        'final_value': aum,
-        'yearly_returns': portfolio_returns,
-        'benchmark_returns': bench_list,
-        'years': years,
-        'portfolio_values': portfolio_values,
-        'portfolio_beta': portfolio_beta,
-        'max_drawdown_portfolio': max_drawdown_portfolio,
-        'max_drawdown_benchmark': max_drawdown_benchmark,
-        'sharpe_portfolio': sharpe_portfolio,
-        'sharpe_benchmark': sharpe_benchmark,
-        'win_rate': win_rate,
-        'risk_free_rate_source': risk_free_rate_source,
-        'yearly_comparisons': yearly_comparisons,
-        'information_ratio': information_ratio
+        'final_value': p_vals[-1],
+        'portfolio_values': p_vals,
+        'yearly_returns': (p_ret * 100).tolist(),
+        'benchmark_returns': (b_ret * 100).tolist(),
+        'years': list(range(start, end + 1)),
+        'sharpe_portfolio': sharpe_p,
+        'sharpe_benchmark': sharpe_b,
+        'information_ratio': info_ratio,
+        'portfolio_beta': beta,
+        'max_drawdown_portfolio': get_mdd(p_vals),
+        'max_drawdown_benchmark': get_mdd(b_vals),
+        'win_rate': np.mean(p_ret > b_ret) if len(p_ret) > 0 else 0,
+        'yearly_comparisons': yearly_comparisons
     }
-def calculate_information_ratio(portfolio_returns, benchmark_returns, verbosity=0):
-    """
-    Calculates the Information Ratio (IR) for a given set of portfolio returns and benchmark returns.
-    
-    Parameters:
-        portfolio_returns (list or np.array): List of portfolio returns over time.
-        benchmark_returns (list or np.array): List of benchmark returns over time.
-    
-    Returns:
-        float: The Information Ratio value.
-    """
-    # Ensure inputs are numpy arrays for mathematical operations
-    verbosity = 0 if verbosity is None else verbosity
-    portfolio_returns = np.array(portfolio_returns)
-    #benchmark_returns = np.array(benchmark_returns)
-    benchmark_returns = np.array(benchmark_returns) / 100
-
-    # Calculate active returns
-    active_returns = portfolio_returns - benchmark_returns
-    
-    # Calculate the mean active return (numerator)
-    mean_active_return = np.mean(active_returns)
-    
-    # Calculate tracking error (denominator)
-    tracking_error = np.std(active_returns, ddof=1)  # Use sample std deviation
-
-    # Prevent division by zero
-    if tracking_error == 0:
-        return None  # Or return float('nan') to indicate undefined IR
-    
-    # Compute Information Ratio
-    information_ratio = mean_active_return / tracking_error
-    if verbosity >=1:
-        print(f"Information Ratio: {information_ratio:.4f}")
-    return information_ratio

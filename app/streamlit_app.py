@@ -1,14 +1,14 @@
 """
 PROJECT: Factor-Lake Portfolio Analysis
-MODULE: app.py
+MODULE: app/streamlit_app.py
 PURPOSE: Main application entry point and tab orchestration.
-VERSION: 1.1.0
+VERSION: 2.2.0
 """
 
 import streamlit as st
-import streamlit_utils as utils
-import streamlit_css as css
-import streamlit_config as config
+import app.streamlit_utils as utils
+import app.streamlit_css as css
+import app.streamlit_config as config
 
 # Component Imports
 import components.sidebar as sidebar
@@ -18,85 +18,92 @@ from components.about import render_about_tab
 
 # --- INITIALIZATION ---
 
-# Mandatory: Must be the first Streamlit command executed
+# Mandatory configuration for the Streamlit environment
 st.set_page_config(
     page_title="Factor-Lake Portfolio Analysis",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Initialize system paths, environment variables, and session state persistence
+# Initialize system paths, session state, and environment variables
+# This ensures Supabase keys are loaded before any buttons are pressed
 utils.initialize_environment()
 utils.initialize_session_state()
 
-# Inject custom professional styling
+# Inject professional CSS styling
 css.inject_styles()
 
-# Global Constants
+# Global configuration constants
 SECTOR_OPTIONS = config.SECTOR_OPTIONS
 
 def main():
     """
     Primary execution loop for the Factor-Lake application.
-    
-    This function manages the high-level application lifecycle, including 
-    security authentication, global configuration via the sidebar, and 
-    the modular rendering of the Analysis, Results, and About tabs.
-    
-    Output:
-        None: Manages the Streamlit frontend state and visual output.
     """
     
-    # 1. Authentication Gate
+    # 1. Security Authentication Gate
     if not utils.check_password(st.secrets):
         st.stop()
         
-    # 2. Page Header
+    # 2. Application Header
     st.markdown('<div class="main-header">Factor-Lake Portfolio Analysis</div>', unsafe_allow_html=True)
     
     st.markdown("""
-    Welcome to the Factor-Lake Portfolio Analysis tool. This platform provides an interactive 
-    environment for quantitative factor backtesting. Use the interface below to:
-    - Define strategy parameters and factor tilts.
-    - Apply ESG exclusionary filters and sector-specific constraints.
-    - Analyze historical performance relative to the Russell 2000 benchmark.
+    This platform provides a high-performance environment for quantitative factor 
+    backtesting. Configure your strategy parameters below to analyze historical 
+    performance relative to Russell 2000 benchmarks.
     """)
     
-    # 3. Sidebar Configuration
+    # 3. Sidebar Configuration (Universe & Constraints)
+    # Returns a dictionary of settings: sectors, fossil fuel toggle, dates, AUM, etc.
     user_settings = sidebar.render_sidebar(SECTOR_OPTIONS)
 
-    # 4. Tabbed Interface Navigation
-    tab1, tab2, tab3 = st.tabs(["Analysis", "Results", "About"])
+    # 4. Modular Tabbed Navigation
+    tab_analysis, tab_results, tab_about = st.tabs(["Analysis", "Results", "About"])
 
-    with tab1:
-        # Render Factor Selection UI
+    with tab_analysis:
+        # 4.1. Factor Selection and Tilt Definition
+        # Returns: (List of factor labels, Dict of labels to 'top'/'bottom')
         selected_factor_names, factor_directions = render_factor_selection()
         
         if selected_factor_names:
             st.success(f"Active Factor Selection: {len(selected_factor_names)} factor(s)")
         else:
-            st.warning("Strategy Configuration: Please select at least one factor to proceed.")
+            st.warning("Configuration Required: Select at least one factor to proceed.")
 
         st.divider()
 
-        # Data Acquisition Block
-        if st.button("Load Market Data", type="primary"):
-            utils.load_and_process_data(user_settings)
+        # 4.2. Data Acquisition Loop
+        # Uses the streamlined loader to fetch standardized data from Supabase
+        # Modified to ensure user settings are passed correctly for sector filtering
+        if st.button("Load Market Data", type="primary", use_container_width=True):
+            with st.spinner("Executing vectorized data ingestion from Cloud..."):
+                utils.load_and_process_data(user_settings)
 
-        # Backtest Execution Block
-        if st.session_state.data_loaded:
-            if st.button("Run Portfolio Analysis", type="primary"):
-                utils.run_backtest_logic(user_settings, selected_factor_names, factor_directions)
+        # 4.3. Backtest Execution Loop
+        # Only enabled once 'data_loaded' is True in session state
+        if st.session_state.get('data_loaded', False):
+            if st.button("Run Portfolio Analysis", type="primary", use_container_width=True):
+                with st.spinner("Calculating annual rebalancing and risk metrics..."):
+                    utils.run_backtest_logic(
+                        user_settings, 
+                        selected_factor_names, 
+                        factor_directions
+                    )
+                    
+                    if st.session_state.get('results'):
+                        st.balloons() # Optional: Visual cue for successful backtest
+                        st.success("Analysis complete. Review performance in the Results tab.")
     
-    with tab2:
-        # Performance Visualization and Statistical Analysis
+    with tab_results:
+        # 4.4. Performance and Risk Attribution
         if st.session_state.get('results') is not None:
             render_results_tab(st.session_state.results, user_settings)
         else:
-            st.info("Performance data is currently unavailable. Please execute an analysis in the 'Analysis' tab.")
+            st.info("No active results. Execute an analysis in the 'Analysis' tab to view metrics.")
     
-    with tab3:
-        # Investment Thesis and Methodology Documentation
+    with tab_about:
+        # 4.5. Methodology and Documentation
         render_about_tab()
 
 if __name__ == "__main__":

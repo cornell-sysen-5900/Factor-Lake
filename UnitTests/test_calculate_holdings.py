@@ -9,7 +9,7 @@ from src.calculate_holdings import (
     calculate_holdings, calculate_growth, rebalance_portfolio,
     get_benchmark_return, calculate_information_ratio
 )
-from src.factor_function import Momentum6m, ROE, ROA
+from src.factor_registry import Momentum6m, ROE, ROA
 from src.market_object import MarketObject, load_data
 
 
