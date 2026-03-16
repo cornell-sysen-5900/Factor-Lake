@@ -1,0 +1,59 @@
+site_name: Factor-Lake
+site_description: API Reference and Guides for the Factor-Lake Portfolio Analysis System
+docs_dir: DOCS
+site_dir: site
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: indigo
+      accent: light-blue
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+    - scheme: default
+      primary: indigo
+      accent: light-blue
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - content.code.copy
+
+plugins:
+  - search
+  - gen-files:
+      scripts:
+        - DOCS/gen_ref_pages.py          # Runs at every build — auto-discovers all modules
+  - literate-nav:
+      nav_file: SUMMARY.md              # Written by gen_ref_pages.py at build time
+  - section-index
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]                    # Project root; finds src/, app/, Visualizations/
+          options:
+            docstring_style: google
+            show_root_heading: true
+            show_source: true
+            show_signature_annotations: true
+            show_if_no_docstring: true  # Works even when no docstring is written
+            members_order: source
+            separate_signature: true
+            merge_init_into_class: true
+
+nav:
+  - Home: index.md
+  - Guides:
+    - Contributing: CONTRIBUTING.md
+    - Deployment: DEPLOYMENT.md
+    - Supabase Setup: SUPABASE_SETUP.md
+    - Streamlit Styling: STREAMLIT_STYLING_GUIDE.md
+    - Security Scanning: Bandit & Safety.md
+  - API Reference: reference/           # Navigated by the auto-generated SUMMARY.md
