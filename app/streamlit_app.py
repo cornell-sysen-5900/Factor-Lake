@@ -12,7 +12,7 @@ import streamlit_config as config
 
 import components.sidebar as sidebar
 from components.factor_selection import render_factor_selection
-from app.components.results_tab import render_results_tab
+from components.results_tab import render_results_tab
 from components.about import render_about_tab
 
 # Global Page Configuration
