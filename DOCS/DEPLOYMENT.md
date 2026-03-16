@@ -85,7 +85,7 @@ Hi [Student Name],
 The Factor-Lake Portfolio Analysis tool is now available online!
 
 🔗 URL: https://cornell-factor-lake.streamlit.app
-🔒 Password: Cornell2024!
+🔒 Password: test3
 
 No installation required - just:
 1. Click the link above
