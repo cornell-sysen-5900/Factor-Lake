@@ -1,0 +1,2310 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="API Reference and Guides for the Factor-Lake Portfolio Analysis System">
+      
+      
+      
+      
+        <link rel="prev" href="../SUPABASE_SETUP/">
+      
+      
+        <link rel="next" href="../Bandit%20%26%20Safety/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>Streamlit Styling - Factor-Lake</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#streamlit-customization-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Factor-Lake" class="md-header__button md-logo" aria-label="Factor-Lake" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Factor-Lake
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Streamlit Styling
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../CONTRIBUTING/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/src/backtest_engine/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Factor-Lake" class="md-nav__button md-logo" aria-label="Factor-Lake" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Factor-Lake
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DEPLOYMENT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SUPABASE_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supabase Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streamlit Styling
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streamlit Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#levels-of-customization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Levels of Customization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Levels of Customization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-theme-configuration-streamlitconfigtoml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Theme Configuration (.streamlit/config.toml)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-custom-css-in-your-python-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Custom CSS (In your Python code)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-html-components-custom-elements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. HTML Components (Custom elements)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-layout-customization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Layout Customization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-page-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Page Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-custom-fonts-google-fonts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Custom Fonts (Google Fonts)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-advanced-custom-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Advanced: Custom Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-third-party-styling-libraries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Third-Party Styling Libraries
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pre-made-color-schemes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎨 Pre-made Color Schemes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🎨 Pre-made Color Schemes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#professional-blue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Professional Blue
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dark-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dark Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mint-fresh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mint Fresh
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sunset-orange" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sunset Orange
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#purple-gradient" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Purple Gradient
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#css-selector-cheat-sheet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📝 CSS Selector Cheat Sheet
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start-apply-to-your-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🚀 Quick Start: Apply to Your App
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pro-tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        💡 Pro Tips
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔗 Resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Bandit%20%26%20Safety/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security Scanning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../REORGANIZATION_SUMMARY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reorganization Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    src
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    src
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/backtest_engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    backtest_engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    benchmarks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/factor_registry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factor_registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/factor_utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factor_utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/factors_doc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factors_doc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/performance_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    performance_metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/portfolio/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    portfolio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/portfolio_filters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    portfolio_filters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/supabase_client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    supabase_client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    app
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    app
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_1" id="__nav_3_2_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    components
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    components
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/about/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    about
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/factor_selection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factor_selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/results_tab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    results_tab
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/sidebar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidebar
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/streamlit_app/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_app
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/streamlit_config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/streamlit_css/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_css
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/streamlit_utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visualizations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Visualizations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/Visualizations/portfolio_growth_plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    portfolio_growth_plot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/Visualizations/top_bottom_portfolio_plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    top_bottom_portfolio_plot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#levels-of-customization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Levels of Customization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Levels of Customization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-theme-configuration-streamlitconfigtoml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Theme Configuration (.streamlit/config.toml)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-custom-css-in-your-python-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Custom CSS (In your Python code)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-html-components-custom-elements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. HTML Components (Custom elements)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-layout-customization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Layout Customization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-page-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Page Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-custom-fonts-google-fonts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Custom Fonts (Google Fonts)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-advanced-custom-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Advanced: Custom Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-third-party-styling-libraries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Third-Party Styling Libraries
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pre-made-color-schemes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎨 Pre-made Color Schemes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🎨 Pre-made Color Schemes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#professional-blue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Professional Blue
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dark-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dark Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mint-fresh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mint Fresh
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sunset-orange" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sunset Orange
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#purple-gradient" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Purple Gradient
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#css-selector-cheat-sheet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📝 CSS Selector Cheat Sheet
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start-apply-to-your-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🚀 Quick Start: Apply to Your App
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pro-tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        💡 Pro Tips
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔗 Resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="streamlit-customization-guide">🎨 Streamlit Customization Guide</h1>
+<h2 id="levels-of-customization">Levels of Customization</h2>
+<h3 id="1-theme-configuration-streamlitconfigtoml">1. <strong>Theme Configuration</strong> (.streamlit/config.toml)</h3>
+<pre><code class="language-toml">[theme]
+primaryColor = &quot;#FF4B4B&quot;        # Accent color (buttons, links)
+backgroundColor = &quot;#FFFFFF&quot;      # Main background
+secondaryBackgroundColor = &quot;#F0F2F6&quot;  # Sidebar, widgets
+textColor = &quot;#262730&quot;           # Text color
+font = &quot;sans serif&quot;             # Font family
+
+# Additional color options you can use:
+# - Blue theme: primaryColor = &quot;#1f77b4&quot;
+# - Green theme: primaryColor = &quot;#2ca02c&quot;
+# - Purple theme: primaryColor = &quot;#9467bd&quot;
+# - Orange theme: primaryColor = &quot;#ff7f0e&quot;
+
+# Dark mode:
+base = &quot;dark&quot;  # or &quot;light&quot;
+</code></pre>
+<h3 id="2-custom-css-in-your-python-code">2. <strong>Custom CSS</strong> (In your Python code)</h3>
+<p>You can style almost everything with CSS:</p>
+<pre><code class="language-python">st.markdown(&quot;&quot;&quot;
+&lt;style&gt;
+    /* Change button styles */
+    .stButton&gt;button {
+        background-color: #4CAF50;
+        color: white;
+        border-radius: 12px;
+        padding: 15px 32px;
+        font-size: 16px;
+    }
+
+    /* Change sidebar */
+    [data-testid=&quot;stSidebar&quot;] {
+        background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+    }
+
+    /* Change headers */
+    h1 {
+        color: #1f77b4;
+        font-family: 'Georgia', serif;
+    }
+
+    /* Style dataframes */
+    .dataframe {
+        border: 2px solid #1f77b4 !important;
+    }
+
+    /* Change metric values */
+    [data-testid=&quot;stMetricValue&quot;] {
+        color: #28a745;
+        font-size: 3rem;
+    }
+
+    /* Animate elements */
+    .stButton&gt;button:hover {
+        transform: scale(1.05);
+        transition: 0.3s;
+    }
+
+    /* Add background image */
+    .main {
+        background-image: url('your-image-url.jpg');
+        background-size: cover;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+        width: 10px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 5px;
+    }
+&lt;/style&gt;
+&quot;&quot;&quot;, unsafe_allow_html=True)
+</code></pre>
+<h3 id="3-html-components-custom-elements">3. <strong>HTML Components</strong> (Custom elements)</h3>
+<pre><code class="language-python"># Custom cards
+st.markdown(&quot;&quot;&quot;
+&lt;div style=&quot;
+    padding: 20px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+&quot;&gt;
+    &lt;h2&gt;Custom Card&lt;/h2&gt;
+    &lt;p&gt;Your content here&lt;/p&gt;
+&lt;/div&gt;
+&quot;&quot;&quot;, unsafe_allow_html=True)
+
+# Custom badges
+st.markdown(&quot;&quot;&quot;
+&lt;span style=&quot;
+    background-color: #28a745;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+&quot;&gt;NEW&lt;/span&gt;
+&quot;&quot;&quot;, unsafe_allow_html=True)
+
+# Progress bar with custom styling
+st.markdown(&quot;&quot;&quot;
+&lt;div style=&quot;
+    width: 100%;
+    background-color: #ddd;
+    border-radius: 10px;
+&quot;&gt;
+    &lt;div style=&quot;
+        width: 70%;
+        background-color: #4CAF50;
+        height: 30px;
+        border-radius: 10px;
+        text-align: center;
+        line-height: 30px;
+        color: white;
+    &quot;&gt;70%&lt;/div&gt;
+&lt;/div&gt;
+&quot;&quot;&quot;, unsafe_allow_html=True)
+</code></pre>
+<h3 id="4-layout-customization">4. <strong>Layout Customization</strong></h3>
+<pre><code class="language-python"># Wide mode
+st.set_page_config(layout=&quot;wide&quot;)
+
+# Custom columns with different widths
+col1, col2, col3 = st.columns([3, 1, 1])
+
+# Containers
+with st.container():
+    st.write(&quot;Grouped content&quot;)
+
+# Expanders
+with st.expander(&quot;Click to expand&quot;):
+    st.write(&quot;Hidden content&quot;)
+
+# Tabs
+tab1, tab2, tab3 = st.tabs([&quot;📊 Tab 1&quot;, &quot;📈 Tab 2&quot;, &quot;💰 Tab 3&quot;])
+</code></pre>
+<h3 id="5-page-configuration">5. <strong>Page Configuration</strong></h3>
+<pre><code class="language-python">st.set_page_config(
+    page_title=&quot;Your App Name&quot;,
+    page_icon=&quot;🚀&quot;,  # emoji or image path
+    layout=&quot;wide&quot;,  # or &quot;centered&quot;
+    initial_sidebar_state=&quot;expanded&quot;,  # or &quot;collapsed&quot;
+    menu_items={
+        'Get Help': 'https://your-help-url.com',
+        'Report a bug': &quot;https://your-bug-report-url.com&quot;,
+        'About': &quot;# Your App\nVersion 1.0&quot;
+    }
+)
+</code></pre>
+<h3 id="6-custom-fonts-google-fonts">6. <strong>Custom Fonts</strong> (Google Fonts)</h3>
+<pre><code class="language-python">st.markdown(&quot;&quot;&quot;
+&lt;link href=&quot;https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&amp;display=swap&quot; rel=&quot;stylesheet&quot;&gt;
+&lt;style&gt;
+    html, body, [class*=&quot;css&quot;] {
+        font-family: 'Poppins', sans-serif;
+    }
+
+    h1 {
+        font-family: 'Poppins', sans-serif;
+        font-weight: 700;
+    }
+&lt;/style&gt;
+&quot;&quot;&quot;, unsafe_allow_html=True)
+</code></pre>
+<h3 id="7-advanced-custom-components">7. <strong>Advanced: Custom Components</strong></h3>
+<p>You can create fully custom JavaScript components:</p>
+<pre><code class="language-bash"># Install component creator
+pip install streamlit-component-lib
+
+# Create custom component
+streamlit-component-lib create my_component
+</code></pre>
+<h3 id="8-third-party-styling-libraries">8. <strong>Third-Party Styling Libraries</strong></h3>
+<pre><code class="language-python"># streamlit-extras
+pip install streamlit-extras
+from streamlit_extras.colored_header import colored_header
+colored_header(
+    label=&quot;My Header&quot;,
+    description=&quot;Description&quot;,
+    color_name=&quot;blue-70&quot;
+)
+
+# streamlit-card
+pip install streamlit-card
+from streamlit_card import card
+
+# streamlit-aggrid (beautiful tables)
+pip install streamlit-aggrid
+</code></pre>
+<h2 id="pre-made-color-schemes">🎨 Pre-made Color Schemes</h2>
+<h3 id="professional-blue">Professional Blue</h3>
+<pre><code class="language-python">primaryColor = &quot;#1f77b4&quot;
+backgroundColor = &quot;#FFFFFF&quot;
+secondaryBackgroundColor = &quot;#F0F2F6&quot;
+textColor = &quot;#262730&quot;
+</code></pre>
+<h3 id="dark-mode">Dark Mode</h3>
+<pre><code class="language-python">base = &quot;dark&quot;
+primaryColor = &quot;#FF4B4B&quot;
+backgroundColor = &quot;#0E1117&quot;
+secondaryBackgroundColor = &quot;#262730&quot;
+textColor = &quot;#FAFAFA&quot;
+</code></pre>
+<h3 id="mint-fresh">Mint Fresh</h3>
+<pre><code class="language-python">primaryColor = &quot;#00D4AA&quot;
+backgroundColor = &quot;#F0FFF4&quot;
+secondaryBackgroundColor = &quot;#C6F6D5&quot;
+textColor = &quot;#1A202C&quot;
+</code></pre>
+<h3 id="sunset-orange">Sunset Orange</h3>
+<pre><code class="language-python">primaryColor = &quot;#FF6B35&quot;
+backgroundColor = &quot;#FFF8F3&quot;
+secondaryBackgroundColor = &quot;#FFE5D9&quot;
+textColor = &quot;#2D3748&quot;
+</code></pre>
+<h3 id="purple-gradient">Purple Gradient</h3>
+<pre><code class="language-python">primaryColor = &quot;#9D4EDD&quot;
+backgroundColor = &quot;#FFFFFF&quot;
+secondaryBackgroundColor = &quot;#F3E5F5&quot;
+textColor = &quot;#240046&quot;
+</code></pre>
+<h2 id="css-selector-cheat-sheet">📝 CSS Selector Cheat Sheet</h2>
+<pre><code class="language-css">/* Main app container */
+.main { }
+
+/* Sidebar */
+[data-testid=&quot;stSidebar&quot;] { }
+
+/* Buttons */
+.stButton&gt;button { }
+
+/* Text input */
+.stTextInput&gt;div&gt;div&gt;input { }
+
+/* Selectbox */
+.stSelectbox { }
+
+/* Checkbox */
+.stCheckbox { }
+
+/* Radio buttons */
+.stRadio { }
+
+/* Slider */
+.stSlider { }
+
+/* Dataframe */
+.dataframe { }
+
+/* Metric */
+[data-testid=&quot;stMetricValue&quot;] { }
+[data-testid=&quot;stMetricDelta&quot;] { }
+
+/* Tabs */
+.stTabs [data-baseweb=&quot;tab-list&quot;] { }
+.stTabs [data-baseweb=&quot;tab&quot;] { }
+
+/* Headers */
+h1, h2, h3 { }
+
+/* Markdown */
+.stMarkdown { }
+
+/* Code blocks */
+.stCodeBlock { }
+
+/* Alerts */
+.stAlert { }
+.stSuccess { }
+.stError { }
+.stWarning { }
+.stInfo { }
+</code></pre>
+<h2 id="quick-start-apply-to-your-app">🚀 Quick Start: Apply to Your App</h2>
+<ol>
+<li><strong>Edit <code>.streamlit/config.toml</code></strong> - Change theme colors</li>
+<li><strong>Edit CSS in <code>streamlit_app.py</code></strong> - Already enhanced!</li>
+<li><strong>Run and reload</strong> - Streamlit auto-updates on save</li>
+</ol>
+<h2 id="pro-tips">💡 Pro Tips</h2>
+<ol>
+<li><strong>Use browser DevTools</strong> (F12) to inspect elements and find selectors</li>
+<li><strong>Test responsiveness</strong> with different screen sizes</li>
+<li><strong>Keep it accessible</strong> - maintain good contrast ratios</li>
+<li><strong>Use CSS variables</strong> for consistent theming</li>
+<li><strong>Gradients</strong> make things look modern:
+   <code>css
+   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);</code></li>
+</ol>
+<h2 id="resources">🔗 Resources</h2>
+<ul>
+<li><a href="https://streamlit.io/generative_ai">Streamlit Theme Editor</a></li>
+<li><a href="https://www.w3schools.com/css/">CSS Reference</a></li>
+<li><a href="https://coolors.co/">Color Palette Generator</a></li>
+<li><a href="https://cssgradient.io/">Gradient Generator</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
