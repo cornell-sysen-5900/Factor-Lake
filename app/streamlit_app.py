@@ -6,9 +6,9 @@ VERSION: 3.3.0
 """
 
 import streamlit as st
-import app.streamlit_utils as utils
-import app.streamlit_css as css
-import app.streamlit_config as config
+import streamlit_utils as utils
+import streamlit_css as css
+import streamlit_config as config
 
 import components.sidebar as sidebar
 from components.factor_selection import render_factor_selection
