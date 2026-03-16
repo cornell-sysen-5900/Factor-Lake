@@ -56,28 +56,46 @@ def render_results_tab(results: Dict[str, Any], user_settings: Dict[str, Any]) -
     _render_export_utility(results)
 
 def _render_header_captions(settings):
-    # Check both potential keys for compatibility
-    selected_factors = st.session_state.get('selected_factor_names') or st.session_state.get('selected_factors', [])
+    # Same consolidated lookup used in cohort section
+    selected_factors = (
+        st.session_state.get('selected_factor_names') or 
+        st.session_state.get('selected_factors') or 
+        []
+    )
     saved_dirs = st.session_state.get('factor_directions', {})
     
     factors_str = ", ".join([f"{f} ({saved_dirs.get(f, 'top')})" for f in selected_factors])
     weighting_str = "Market Cap Weighted" if settings.get('use_market_cap_weight') else "Equal Weighted"
     
-    st.caption(f"**Factors:** {factors_str}")
+    # If it's still empty, it means the keys aren't being set during selection
+    if not selected_factors:
+        st.caption("**Factors:** No factors selected in Parameters.")
+    else:
+        st.caption(f"**Factors:** {factors_str}")
+        
     st.caption(f"**Weighting:** {weighting_str}")
-
+    
 def _render_summary_metrics(res, settings):
     col1, col2, col3, col4 = st.columns(4)
     initial_aum = settings.get('initial_aum', 1000000.0)
-    final_value = res.get('final_value', initial_aum)
     
-    # Original logic: CAGR uses count of yearly returns
+    # Use portfolio_values directly for consistency
+    port_vals = res.get('portfolio_values', [initial_aum])
+    final_value = port_vals[-1]
+    
+    # CAGR Logic
     n_years = len(res.get('yearly_returns', []))
     cagr = (((final_value / initial_aum) ** (1 / n_years)) - 1) if n_years > 0 else 0
     
+    # Correct Outperformance logic using wealth indices
     bench_rets = res.get('benchmark_returns', [])
-    benchmark_final = initial_aum * np.prod([1 + (r / 100.0) for r in bench_rets])
-    cum_outperformance = ((final_value / benchmark_final) - 1)
+    # Reconstruct benchmark wealth index to ensure apples-to-apples comparison
+    bench_wealth = [initial_aum]
+    for r in bench_rets:
+        bench_wealth.append(bench_wealth[-1] * (1 + (r / 100.0)))
+    
+    benchmark_final = bench_wealth[-1]
+    cum_outperformance = ((final_value / benchmark_final) - 1) if benchmark_final != 0 else 0
     
     col1.metric("Final Portfolio Value", f"${final_value:,.2f}")
     col2.metric("Total Return", f"{((final_value/initial_aum)-1):.2%}")
@@ -99,33 +117,59 @@ def _render_year_by_year_table(res):
 
 def _render_cohort_analysis_section(results, user_settings):
     st.subheader("Top vs Bottom Cohort Analysis")
+    st.write("This visualization compares the performance of the **top N%** and **bottom N%** of stocks against the benchmark.")
+    
     with st.expander("Run Cohort Comparison", expanded=False):
-        col1, col2 = st.columns(2)
-        with col1:
-            cohort_pct = st.slider("Cohort Percentage", 1, 50, 10)
+        col_slider, _ = st.columns([2, 2])
+        with col_slider:
+            cohort_pct = st.slider("Select Cohort Percentage", 1, 100, 10, key="cohort_slider_input")
         
-        if st.button("Generate Comparison", type="primary"):
-            factors = st.session_state.get('selected_factor_names') or st.session_state.get('selected_factors', [])
-            res_top, res_bot = backtest_engine.run_cohort_comparison(
-                data=st.session_state.rdata,
-                selected_factors=factors,
-                factor_directions=st.session_state.get('factor_directions', {}),
-                cohort_pct=cohort_pct,
-                user_settings=user_settings
-            )
+        if st.button("Generate Comparison", type="primary", key="btn_generate_cohort"):
+            # FIX: Define the 'factors' variable here before passing it to the engine
+            factors = st.session_state.get('selected_factor_names', [])
+            f_dirs = st.session_state.get('factor_directions', {})
 
-            fig = plot_top_bottom_percent(
-                years=results['years'],
-                percent=cohort_pct,
-                show_bottom=True,
-                benchmark_returns=results.get('benchmark_returns'),
-                initial_investment=user_settings['initial_aum'],
-                baseline_portfolio_values=results['portfolio_values'],
-                precomputed_top=res_top,
-                precomputed_bot=res_bot
-            )
-            st.pyplot(fig)
+            if not factors:
+                st.error("No factors found. Please run the Portfolio Analysis first.")
+                return
 
+            with st.spinner("Calculating cohorts..."):
+                # Now 'factors' exists and contains the internal column names
+                res_top, res_bot = backtest_engine.run_cohort_comparison(
+                    data=st.session_state.rdata,
+                    selected_factors=factors, 
+                    factor_directions=f_dirs,
+                    cohort_pct=cohort_pct,
+                    user_settings=user_settings
+                )
+
+                # --- Metrics Rendering ---
+                m1, m2, m3, m4 = st.columns(4)
+                
+                # Extract values for metrics
+                top_final = res_top.get('portfolio_values', [0])[-1]
+                top_cagr = res_top.get('cagr', 0)
+                bot_final = res_bot.get('portfolio_values', [0])[-1]
+                bot_cagr = res_bot.get('cagr', 0)
+
+                m1.metric(f"Top {cohort_pct}% Value", f"${top_final:,.2f}")
+                m2.metric(f"Top {cohort_pct}% CAGR", f"{top_cagr:.2%}")
+                m3.metric(f"Bottom {cohort_pct}% Value", f"${bot_final:,.2f}")
+                m4.metric(f"Bottom {cohort_pct}% CAGR", f"{bot_cagr:.2%}")
+
+                # --- Plotting ---
+                fig = plot_top_bottom_percent(
+                    years=results['years'],
+                    percent=cohort_pct,
+                    show_bottom=True,
+                    benchmark_returns=results.get('benchmark_returns'),
+                    initial_investment=user_settings.get('initial_aum', 1000000.0),
+                    baseline_portfolio_values=results['portfolio_values'],
+                    precomputed_top=res_top,
+                    precomputed_bot=res_bot
+                )
+                st.pyplot(fig)
+                
 def _render_advanced_stats_grid(res):
     # Row 1: Drawdowns
     c1, c2, c3, c4 = st.columns(4)
@@ -194,21 +238,23 @@ def _render_win_loss_ledger(res):
         st.dataframe(df, use_container_width=True, hide_index=True)
 
 def _render_growth_plot(res, settings):
+    # Use the persistent session state keys
+    factors = st.session_state.get('selected_factor_names', [])
+    
     initial = settings.get('initial_aum', 1000000.0)
     def build_wealth(rets):
         if not rets: return None
         v = [initial]
         for r in rets: v.append(v[-1] * (1 + (r/100.0)))
         return v
-    
-    factors = st.session_state.get('selected_factor_names') or st.session_state.get('selected_factors', [])
+        
     fig = plot_portfolio_growth(
         years=res.get('years', []),
         port_vals=res.get('portfolio_values', []),
         bench_vals=build_wealth(res.get('benchmark_returns')),
         val_vals=build_wealth(res.get('value_benchmark_returns')),
         gro_vals=build_wealth(res.get('growth_benchmark_returns')),
-        factor_names=factors
+        factor_names=factors # This will now be populated
     )
     st.pyplot(fig)
 

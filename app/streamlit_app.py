@@ -35,8 +35,10 @@ def main():
     tab_analysis, tab_results, tab_about = st.tabs(["Analysis", "Results", "About"])
 
     with tab_analysis:
-        # Render selection without the redundant success banner
+        # Capture selections and store them in session_state immediately
         selected_factor_names, factor_directions = render_factor_selection()
+        st.session_state['selected_factor_names'] = selected_factor_names
+        st.session_state['factor_directions'] = factor_directions
         st.divider()
 
         if st.button("Load Market Data", type="primary", use_container_width=True):
@@ -53,7 +55,6 @@ def main():
                     )
                 
                 if st.session_state.get('results') is not None:
-                    # Professional success notification without balloons
                     st.success("Analysis complete. Review performance in the Results tab.")
                     st.markdown("""
                         <script>
@@ -63,6 +64,7 @@ def main():
 
     with tab_results:
         if st.session_state.get('results') is not None:
+            # The component now has access to stored factors via session_state
             render_results_tab(st.session_state.results, user_settings)
         else:
             st.info("No active results. Execute an analysis in the 'Analysis' tab.")

@@ -103,9 +103,21 @@ def run_backtest_logic(user_settings: Dict[str, Any],
     from app.streamlit_config import FACTOR_METADATA
 
     try:
+        # 1. Translate user-friendly names to internal data columns
         internal_factor_cols = [FACTOR_METADATA[f]['column'] for f in factor_names if f in FACTOR_METADATA]
-        internal_directions = {FACTOR_METADATA[f]['column']: factor_dirs.get(f, 'top') for f in factor_names if f in FACTOR_METADATA}
+        
+        # 2. Map the directions (top/bottom) to those internal columns
+        internal_directions = {
+            FACTOR_METADATA[f]['column']: factor_dirs.get(f, 'top') 
+            for f in factor_names if f in FACTOR_METADATA
+        }
 
+        # 3. CRITICAL: Persist these internal mappings so Results Tab / Cohorts can find them
+        # This prevents the "Factor missing from data" error
+        st.session_state['selected_factor_names'] = internal_factor_cols
+        st.session_state['factor_directions'] = internal_directions
+
+        # 4. Execute Main Backtest
         results = rebalance_portfolio(
             st.session_state.rdata,
             internal_factor_cols,
@@ -117,6 +129,8 @@ def run_backtest_logic(user_settings: Dict[str, Any],
             top_pct=user_settings.get('top_pct', 10.0),
             use_market_cap_weight=user_settings.get('use_market_cap_weight', False)
         )
+        
         st.session_state.results = results
+        
     except Exception as e:
         st.error(f"Backtest Execution Error: {str(e)}")
