@@ -8,11 +8,11 @@ VERSION: 3.6.1
 import streamlit as st
 import pandas as pd
 import numpy as np
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 
 from Visualizations.portfolio_growth_plot import plot_portfolio_growth
 from Visualizations.top_bottom_portfolio_plot import plot_top_bottom_percent
-from src import backtest_engine 
+import src.backtest_engine as backtest_engine
 
 def render_results_tab(results: Dict[str, Any], user_settings: Dict[str, Any]) -> None:
     """
@@ -244,6 +244,8 @@ def _render_cohort_analysis_section(results: Dict[str, Any], user_settings: Dict
         
         if st.button("Generate Comparison", type="primary"):
             factors = st.session_state.get('selected_factor_names') or st.session_state.get('selected_factors', [])
+            
+            # This now returns lists because of the engine fix above
             res_top, res_bot = backtest_engine.run_cohort_comparison(
                 data=st.session_state.rdata,
                 selected_factors=factors,
@@ -251,6 +253,28 @@ def _render_cohort_analysis_section(results: Dict[str, Any], user_settings: Dict
                 cohort_pct=cohort_pct,
                 user_settings=user_settings
             )
+
+            # --- THE 4 STATS BLOCK ---
+            st.write("### Cohort Performance Summary")
+            init_aum = user_settings['initial_aum']
+            num_years = len(results['years'])
+            
+            # Using [-1] is safe now because res_top is a list again
+            stats_df = pd.DataFrame({
+                "Metric": ["Total Return (%)", "Final Value ($)", "CAGR (%)"],
+                "Top Cohort": [
+                    f"{((res_top[-1] / init_aum) - 1) * 100:.2f}%",
+                    f"${res_top[-1]:,.0f}",
+                    f"{(((res_top[-1] / init_aum) ** (1 / num_years)) - 1) * 100:.2f}%"
+                ],
+                "Bottom Cohort": [
+                    f"{((res_bot[-1] / init_aum) - 1) * 100:.2f}%",
+                    f"${res_bot[-1]:,.0f}",
+                    f"{(((res_bot[-1] / init_aum) ** (1 / num_years)) - 1) * 100:.2f}%"
+                ]
+            })
+            st.table(stats_df)
+            # -------------------------
 
             fig = plot_top_bottom_percent(
                 years=results['years'],

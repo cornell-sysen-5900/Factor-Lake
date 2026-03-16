@@ -14,6 +14,7 @@ from typing import Dict, List, Any, Tuple, Optional  # Added Tuple and Optional
 from .factor_utils import normalize_series
 from .benchmarks import get_benchmark_list
 from .portfolio import Portfolio
+from src.factor_registry import get_factor_column
 from .portfolio_filters import filter_universe
 from .performance_metrics import compute_comprehensive_metrics
 
@@ -79,34 +80,76 @@ def build_ranked_stocks_table(
     return ranked_df[['Rank', 'Ticker', 'Composite Score'] + [
         c for c in ['Next-Year Return %', 'Sector'] if c in ranked_df.columns
     ]]
+    
+def calculate_holdings(
+    df_year: pd.DataFrame, 
+    factor_key: str, 
+    aum: float, 
+    higher_is_better: bool = True, 
+    top_pct: float = 10.0, 
+    use_market_cap_weight: bool = False
+) -> Portfolio:
+    """
+    Constructs a cross-sectional portfolio for a specific period.
+    
+    This function handles the mapping from internal factor keys to database 
+    column names and performs the stock selection and weight allocation.
+    """
+    
+    # 1. Resolve internal key to database column name
+    factor_col = get_factor_column(factor_key)
+    
+    # 2. Safety Check & Emergency Path Cleaning
+    # If the registry mapping fails, we attempt to resolve common formatting mismatches
+    if factor_col not in df_year.columns:
+        # Convert "6-Mo Momentum %" -> "6-Mo_Momentum"
+        cleaned_fallback = factor_key.replace(" ", "_").replace("%", "").strip("_")
+        if cleaned_fallback in df_year.columns:
+            factor_col = cleaned_fallback
+        else:
+            raise KeyError(
+                f"Factor column '{factor_col}' not found in data. "
+                f"Available columns: {df_year.columns.tolist()}"
+            )
 
-def calculate_holdings(df_year: pd.DataFrame, factor_col: str, aum: float, 
-                       higher_is_better: bool = True, top_pct: float = 10.0, 
-                       use_market_cap_weight: bool = False) -> Portfolio:
-    """Constructs a cross-sectional portfolio for a specific period."""
+    # 3. Score Normalization
+    # higher_is_better=True ranks high values at the top (Long)
+    # higher_is_better=False ranks low values at the top (Short/Bottom)
     scores = normalize_series(df_year[factor_col], higher_is_better=higher_is_better)
     valid_scores = scores.dropna().sort_values(ascending=False)
     
     if valid_scores.empty:
-        return Portfolio(name=f"Empty_{factor_col}")
+        return Portfolio(name=f"Empty_{factor_key}")
 
+    # 4. Determine Selection Size
     n_select = max(1, math.floor(len(valid_scores) * (top_pct / 100.0)))
     selected_tickers = valid_scores.head(n_select).index.tolist()
     holdings_data = df_year.loc[selected_tickers]
     
-    portfolio = Portfolio(name=f"Portfolio_{factor_col}")
+    portfolio = Portfolio(name=f"Portfolio_{factor_key}")
 
+    # 5. Calculate Weights (Market Cap vs. Equal Weight)
     if use_market_cap_weight and 'Market_Capitalization' in holdings_data.columns:
         caps = pd.to_numeric(holdings_data['Market_Capitalization'], errors='coerce').fillna(0)
-        weights = caps / caps.sum() if caps.sum() > 0 else pd.Series(1.0/len(caps), index=caps.index)
+        if caps.sum() > 0:
+            weights = caps / caps.sum()
+        else:
+            weights = pd.Series(1.0 / len(selected_tickers), index=selected_tickers)
     else:
         weights = pd.Series(1.0 / len(selected_tickers), index=selected_tickers)
 
+    # 6. Allocate Positions
+    # We verify required columns exist to prevent runtime errors during the loop
+    has_price = 'Ending_Price' in holdings_data.columns
+    
     for ticker in selected_tickers:
-        price = holdings_data.loc[ticker, 'Ending_Price']
-        if price > 0:
-            shares = (weights[ticker] * aum) / price
-            portfolio.add_investment(ticker, shares)
+        if has_price:
+            price = holdings_data.loc[ticker, 'Ending_Price']
+            # Only add investment if price is valid and positive
+            if pd.notnull(price) and price > 0:
+                shares = (weights[ticker] * aum) / price
+                portfolio.add_investment(ticker, shares)
+                
     return portfolio
 
 def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_directions: Dict[str, str], 
@@ -207,4 +250,7 @@ def run_cohort_comparison(data: pd.DataFrame,
         use_market_cap_weight=user_settings['use_market_cap_weight']
     )
 
-    return res_top, res_bot
+    top_list = res_top['portfolio_values'] if isinstance(res_top, dict) else res_top
+    bot_list = res_bot['portfolio_values'] if isinstance(res_bot, dict) else res_bot
+
+    return top_list, bot_list
