@@ -2,12 +2,12 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: Visualizations/top_bottom_portfolio_plot.py
 PURPOSE: Institutional-grade cohort spread analysis visualization.
-VERSION: 2.1.0
+VERSION: 2.1.1
 """
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 
 def plot_top_bottom_percent(
     years: List[int],
@@ -17,8 +17,8 @@ def plot_top_bottom_percent(
     benchmark_label: str = 'Russell 2000',
     initial_investment: float = 1000000.0,
     baseline_portfolio_values: Optional[List[float]] = None,
-    precomputed_top: Optional[Dict[str, Any]] = None,
-    precomputed_bot: Optional[Dict[str, Any]] = None
+    precomputed_top: Optional[Union[Dict[str, Any], List[float]]] = None,
+    precomputed_bot: Optional[Union[Dict[str, Any], List[float]]] = None
 ) -> plt.Figure:
     """
     Constructs a wealth-index chart comparing performance of top and bottom cohorts.
@@ -41,15 +41,25 @@ def plot_top_bottom_percent(
                     linestyle='--', linewidth=1.5, alpha=0.7)
 
     # 2. Bottom Cohort (Lower Visual Weight)
-    if show_bottom and precomputed_bot:
-        bot_vals = precomputed_bot.get('portfolio_values', [initial_investment])
+    if show_bottom and precomputed_bot is not None:
+        # Resolve either dictionary-style or list-style input
+        if isinstance(precomputed_bot, dict):
+            bot_vals = precomputed_bot.get('portfolio_values', [initial_investment])
+        else:
+            bot_vals = precomputed_bot
+            
         if len(bot_vals) >= len(years):
             ax.plot(years, bot_vals[:len(years)], label=f'Bottom {percent}%', color='#9467bd', 
                     marker='v', markersize=4, linewidth=1.5, alpha=0.6)
 
     # 3. Top Cohort (High Contrast)
-    if precomputed_top:
-        top_vals = precomputed_top.get('portfolio_values', [initial_investment])
+    if precomputed_top is not None:
+        # Resolve either dictionary-style or list-style input
+        if isinstance(precomputed_top, dict):
+            top_vals = precomputed_top.get('portfolio_values', [initial_investment])
+        else:
+            top_vals = precomputed_top
+
         if len(top_vals) >= len(years):
             ax.plot(years, top_vals[:len(years)], label=f'Top {percent}%', color='#2ca02c', 
                     marker='^', markersize=5, linewidth=2.0, zorder=4)
@@ -63,7 +73,7 @@ def plot_top_bottom_percent(
 
     # Institutional Chart Formatting
     ax.set_title(f"Factor Efficacy: Top vs. Bottom {percent}% Cohort Spread", 
-                 fontsize=14, fontweight='bold', pad=20)
+                  fontsize=14, fontweight='bold', pad=20)
     ax.set_ylabel("Account Value (USD)", fontsize=11)
     ax.set_xlabel("Year", fontsize=11)
 

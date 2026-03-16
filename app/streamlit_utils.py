@@ -127,7 +127,7 @@ def run_backtest_logic(user_settings: Dict[str, Any],
     Translates UI-friendly labels to internal database columns, 
     persists directional tilts, and updates the session results.
     """
-    from src.backtest_engine import rebalance_portfolio
+    from src.backtest_engine import rebalance_portfolio, build_ranked_stocks_table
     from app.streamlit_config import FACTOR_METADATA
 
     try:
@@ -155,6 +155,18 @@ def run_backtest_logic(user_settings: Dict[str, Any],
             top_pct=user_settings.get('top_pct', 10.0),
             use_market_cap_weight=user_settings.get('use_market_cap_weight', False)
         )
+
+        # Build a ranked list for the most recent rebalance year used by the backtest loop.
+        ranking_year = int(user_settings['end_year']) - 1
+        ranked_stocks_df = build_ranked_stocks_table(
+            data=st.session_state.rdata,
+            factors=internal_factor_cols,
+            factor_directions=internal_directions,
+            target_year=ranking_year,
+            top_pct=float(user_settings.get('top_pct', 10.0))
+        )
+        results['ranking_year'] = ranking_year
+        results['ranked_stocks'] = ranked_stocks_df.to_dict('records')
         
         st.session_state.results = results
         
