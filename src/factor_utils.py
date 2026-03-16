@@ -19,56 +19,51 @@ def normalize_series(
     """
     Transforms a raw factor distribution into a standardized, comparable signal.
 
-    This utility processes a cross-section of financial data by addressing 
-    extreme outliers through winsorization and adjusting the directional 
-    polarity of the signal. The resulting output is typically a Z-score, 
-    calculated as:
-    
+    This utility processes a cross-section of financial data by mitigating the 
+    influence of outliers and adjusting the directional polarity of the signal. 
+    Standardization is achieved via Z-score normalization:
+
     $$Z = \frac{x - \mu}{\sigma}$$
 
     Args:
-        s (pd.Series): The raw numerical factor values.
-        higher_is_better (bool): If True, larger values represent a stronger signal.
-        method (str): The inversion strategy ('negate' or 'reciprocal').
-        winsorize_pct (Optional[float]): The tail fraction to cap at both ends.
-        zscore (bool): If True, center the distribution around zero with unit variance.
+        s: The raw numerical factor values.
+        higher_is_better: If True, larger values represent a stronger signal.
+        method: The inversion strategy ('negate' or 'reciprocal').
+        winsorize_pct: The tail fraction to cap at both ends (e.g., 0.01 for 1%).
+        zscore: If True, centers the distribution at zero with unit variance.
 
     Returns:
         pd.Series: A standardized series of factor scores.
     """
-    # Ensure numerical consistency
-    s = pd.to_numeric(s, errors='coerce').copy()
+    # Numerical validation and initial cleanup
+    s = pd.to_numeric(s, errors='coerce').replace([np.inf, -np.inf], np.nan).copy()
     
-    # Validation gate for empty or all-NaN series
     if s.dropna().empty:
         return s
 
     # 1. Outlier Mitigation (Winsorization)
-    # Mitigates the influence of extreme values on the mean and standard deviation
     if winsorize_pct and winsorize_pct > 0:
         lower_limit = s.quantile(winsorize_pct)
         upper_limit = s.quantile(1 - winsorize_pct)
         s = s.clip(lower=lower_limit, upper=upper_limit)
 
-    # 2. Directional Alignment
-    # Inverts the signal if a lower value is quantitatively superior
+    # 2. Directional Alignment (Polarity)
     if not higher_is_better:
         if method == 'reciprocal':
-            # Guard against division by zero
-            s = s.replace(0, np.nan)
-            s = 1.0 / s
+            # Replace zero with NaN to prevent infinite values
+            s = (1.0 / s.replace(0, np.nan))
         else:
             s = -s
 
     # 3. Statistical Standardization
     if zscore:
         mu = s.mean()
-        sigma = s.std(ddof=1) # Use sample standard deviation
+        sigma = s.std(ddof=1)
         
-        # Guard against zero-variance to prevent division by zero
+        # Guard against zero-variance to prevent division by zero errors
         if sigma > 1e-12:
             s = (s - mu) / sigma
         else:
-            s = s - mu
+            s = s - mu  # Center the data if scaling is mathematically impossible
 
     return s

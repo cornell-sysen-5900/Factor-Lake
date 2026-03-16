@@ -7,8 +7,10 @@ VERSION: 2.1.0
 
 from typing import List, Dict
 
-# Annual Returns (%) for benchmarks; Decimal for RISK_FREE_RATES.
-# Data is captured for 12-month periods ending September 30 (Q3).
+# Annual Returns for benchmarks are represented as percentages (e.g., 8.50).
+# Risk-Free Rates are represented as decimals (e.g., 0.015).
+# All data reflects the 12-month period ending September 30 to align with fiscal reporting.
+
 benchmarks = {
     "Russell 2000": {
         2002: -9.30, 2003: 36.50, 2004: 18.76, 2005: 17.95, 2006: 9.92,
@@ -32,7 +34,7 @@ benchmarks = {
         2022: -17.69, 2023: 7.84, 2024: 25.89
     },
     
-    # FRED 4-Week Treasury Bill Secondary Market Rate (Annualized)
+    # FRED 4-Week Treasury Bill Secondary Market Rate (Annualized Decimal)
     "RISK_FREE_RATES": {
         2002: 0.0156, 2003: 0.0102, 2004: 0.0182, 2005: 0.0349, 2006: 0.0473,
         2007: 0.0462, 2008: 0.0148, 2009: 0.0014, 2010: 0.0014, 2011: 0.0010,
@@ -44,28 +46,28 @@ benchmarks = {
 
 def get_benchmark_list(index: int, start_year: int, end_year: int) -> List[float]:
     """
-    Retrieves time-series data for benchmarks or risk-free rates.
+    Retrieves time-series data for specified market benchmarks or risk-free rates.
 
     Args:
-        index (int): 1: Russell 2000, 2: R2000 Growth, 3: R2000 Value, 4: Risk-Free.
-        start_year (int): Initial year (inclusive).
-        end_year (int): Terminal year (exclusive).
+        index: Selection index (1: R2000, 2: R2000 Growth, 3: R2000 Value, 4: Risk-Free).
+        start_year: The first year in the requested range (inclusive).
+        end_year: The final year in the requested range (exclusive).
 
     Returns:
-        List[float]: Annual returns. Indices 1-3 are in %, Index 4 is decimal.
+        List[float]: A list of annual values for the requested timeframe.
     """
-    benchmark_lookup = {
+    benchmark_mapping = {
         1: "Russell 2000",
         2: "Russell 2000 Growth",
         3: "Russell 2000 Value",
         4: "RISK_FREE_RATES"
     }
     
-    name = benchmark_lookup.get(index)
-    if name is None:
-        raise ValueError(f"Invalid benchmark index: {index}. Choose from 1, 2, 3, or 4.")
+    name = benchmark_mapping.get(index)
+    if not name:
+        raise ValueError(f"Benchmark index {index} is not recognized. Expected 1-4.")
 
-    data_dict = benchmarks[name]
+    data_source = benchmarks[name]
     
-    # Year-range selection with safe defaulting
-    return [data_dict.get(yr, 0.0) for yr in range(start_year, end_year)]
+    # Range selection: Uses 0.0 as a fallback for missing historical data
+    return [data_source.get(year, 0.0) for year in range(start_year, end_year)]

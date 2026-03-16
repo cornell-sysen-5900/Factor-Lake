@@ -21,28 +21,35 @@ def plot_portfolio_growth(
     """
     Constructs a time-series line chart comparing strategy growth against multiple benchmarks.
     
+    This utility provides a high-fidelity visualization of cumulative wealth, 
+    supporting overlays for market, value, and growth indices.
+
     Args:
-        years (List[int]): X-axis timeline.
-        port_vals (List[float]): Cumulative portfolio values for the strategy.
-        bench_vals (Optional[List[float]]): Cumulative values for the Russell 2000.
-        val_vals (Optional[List[float]]): Cumulative values for the Russell 2000 Value Index.
-        gro_vals (Optional[List[float]]): Cumulative values for the Russell 2000 Growth Index.
-        factor_names (Optional[List[str]]): List of active factors for the dynamic title.
+        years: A list of integers representing the timeline years.
+        port_vals: Cumulative dollar values for the strategy portfolio.
+        bench_vals: Optional cumulative values for the Russell 2000 index.
+        val_vals: Optional cumulative values for the Russell 2000 Value Index.
+        gro_vals: Optional cumulative values for the Russell 2000 Growth Index.
+        factor_names: A list of active factor labels to be included in the chart title.
+
+    Returns:
+        plt.Figure: The generated Matplotlib figure object.
     """
     fig, ax = plt.subplots(figsize=(12, 6))
     
-    # 1. Base Portfolio
+    # 1. Primary Portfolio Strategy
     ax.plot(
         years, 
         port_vals, 
         label='Portfolio', 
-        linewidth=2, 
+        linewidth=2.5, 
         color='#1f77b4',
         marker='o', 
-        markersize=6
+        markersize=6,
+        zorder=5
     )
     
-    # 2. Main Russell 2000 Benchmark
+    # 2. Market Benchmark (Russell 2000)
     if bench_vals and len(years) == len(bench_vals):
         ax.plot(
             years, 
@@ -53,10 +60,10 @@ def plot_portfolio_growth(
             color='#ff7f0e',
             marker='s',
             markersize=4,
-            alpha=0.7
+            alpha=0.8
         )
         
-    # 3. Value Index Overlay (Green Triangles)
+    # 3. Style Benchmark: Value Index
     if val_vals and len(years) == len(val_vals):
         ax.plot(
             years, 
@@ -64,12 +71,13 @@ def plot_portfolio_growth(
             label='Value Index', 
             linewidth=1.5, 
             linestyle=':', 
-            color='g',
+            color='#2ca02c',
             marker='^',
+            markersize=4,
             alpha=0.6
         )
 
-    # 4. Growth Index Overlay (Orange Diamonds)
+    # 4. Style Benchmark: Growth Index
     if gro_vals and len(years) == len(gro_vals):
         ax.plot(
             years, 
@@ -77,30 +85,32 @@ def plot_portfolio_growth(
             label='Growth Index', 
             linewidth=1.5, 
             linestyle=':', 
-            color='orange',
+            color='#d62728',
             marker='D',
+            markersize=4,
             alpha=0.6
         )
     
-    # Dynamic Title
+    # Title and Label Configuration
     if factor_names:
-        title_str = f'Portfolio Growth: {", ".join(factor_names)}'
+        clean_names = [name.replace('_', ' ').title() for name in factor_names]
+        title_str = f'Cumulative Wealth: {", ".join(clean_names)}'
     else:
-        title_str = 'Portfolio Growth Over Time'
+        title_str = 'Portfolio Growth Comparison'
         
-    ax.set_title(title_str, fontsize=14, fontweight='bold')
-    ax.set_ylabel("Portfolio Value ($)", fontsize=12)
+    ax.set_title(title_str, fontsize=14, fontweight='bold', pad=15)
+    ax.set_ylabel("Portfolio Value (USD)", fontsize=12)
     ax.set_xlabel("Year", fontsize=12)
     
-    # Legend and Grid
-    ax.legend(loc='best')
-    ax.grid(True, alpha=0.3)
+    # Grid and Legend Aesthetics
+    ax.legend(loc='upper left', frameon=True, shadow=True)
+    ax.grid(True, linestyle='--', alpha=0.5)
     
-    # Currency Formatter
+    # Financial Axis Formatting
     formatter = FuncFormatter(lambda x, p: f'${x:,.0f}')
     ax.yaxis.set_major_formatter(formatter)
     
-    # Ensure X-axis only displays integer years
+    # Ensure X-axis utilizes integer year ticks
     ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
     
     plt.tight_layout()

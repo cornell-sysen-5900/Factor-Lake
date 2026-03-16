@@ -7,11 +7,10 @@ VERSION: 1.1.0
 
 import streamlit as st
 
-# Define styles as a constant to avoid re-creating the string on every rerun.
-# This approach optimizes memory usage during high-frequency session refreshes.
+# Global CSS definitions for a unified professional interface.
 CSS_STYLE = """
 <style>
-    /* Main header styling with professional typography and drop shadow */
+    /* Typography and header styling */
     .main-header {
         font-size: 2.5rem;
         font-weight: bold;
@@ -21,13 +20,13 @@ CSS_STYLE = """
         text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
     }
     
-    /* Styled alert boxes for consistency across success/error messages */
+    /* Global component styling */
     .stAlert {
         margin-top: 1rem;
         border-radius: 10px;
     }
     
-    /* Interactive button states with subtle hover elevation */
+    /* Interactive element transitions */
     .stButton>button {
         border-radius: 8px;
         font-weight: 600;
@@ -39,7 +38,7 @@ CSS_STYLE = """
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
     
-    /* Sidebar configuration panel: Grey background with Cyan accent border */
+    /* Navigation panel aesthetic (Grey with Cyan border) */
     [data-testid="stSidebar"] {
         background-color: #DEDFE0;
         border-right: 4px solid #3BD2E3;
@@ -50,13 +49,13 @@ CSS_STYLE = """
         color: #1f77b4;
     }
     
-    /* Standardized metric value formatting for financial KPIs */
+    /* Financial KPI display formatting */
     [data-testid="stMetricValue"] {
         font-size: 2rem;
         font-weight: bold;
     }
     
-    /* Custom container styling for detailed cards and information blocks */
+    /* Information container cards */
     .custom-card {
         padding: 20px;
         border-radius: 10px;
@@ -66,11 +65,11 @@ CSS_STYLE = """
         color: #31333F;
     }
     
-    /* Clean UI: Hiding Streamlit's default branding and footer elements */
+    /* Branding: Hiding standard application headers and footers */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* Responsive breakpoints for mobile and tablet compatibility */
+    /* Responsive breakpoints */
     @media (max-width: 768px) {
         .main-header {
             font-size: 1.8rem;
@@ -81,13 +80,9 @@ CSS_STYLE = """
 
 def inject_styles() -> None:
     """
-    Renders custom CSS definitions into the Streamlit application's frontend.
+    Renders custom CSS definitions into the application's frontend.
     
-    This function utilizes unsafe_allow_html to inject a raw <style> block, 
-    allowing for deep customization of the DOM elements that Streamlit 
-    does not expose through its standard API.
-    
-    Output:
-        None: Renders the CSS payload directly to the user's browser.
+    This function injects raw CSS to customize UI elements and ensure 
+    a consistent visual experience across different screen sizes.
     """
     st.markdown(CSS_STYLE, unsafe_allow_html=True)

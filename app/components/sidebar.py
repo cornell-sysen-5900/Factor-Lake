@@ -12,61 +12,61 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
     """
     Constructs the application sidebar to capture user configuration settings.
     
-    Returns a standardized dictionary of inputs for the data orchestration 
-    and backtesting engines.
+    This interface manages global constraints, including date ranges, initial 
+    capitalization, sector exposures, and weighting methodologies.
+    
+    Returns:
+        Dict[str, Any]: Standardized dictionary of user-defined parameters.
     """
     with st.sidebar:
         st.header("Configuration")
         
-        # Data Source
+        # Data Source Information
         st.subheader("Data Source")
-        st.caption("Data source: Supabase (cloud)")
-        use_supabase = True
-        excel_file = None
-        uploaded_file = None
+        st.caption("Primary Source: Supabase (Cloud Relational Database)")
 
         st.divider()
         
-        # Fossil Fuel Restriction
+        # ESG & Ethical Filtering
         st.subheader("ESG Filters")
         restrict_fossil_fuels = st.checkbox(
             "Restrict Fossil Fuel Companies",
             value=False,
-            help="Exclude oil, gas, coal, and fossil energy companies"
+            help="Exclude companies involved in oil, gas, coal, and fossil energy production."
         )
         
         st.divider()
         
-        # Portfolio Weighting Method
+        # Allocation Methodology
         st.subheader("Portfolio Weighting")
         weighting_method = st.radio(
             "Select weighting method:",
             options=["Equal Weight", "Market Cap Weight"],
             index=0,
-            help="Equal Weight: Each stock gets equal dollar investment. Market Cap Weight: Weight by market capitalization (similar to Russell 2000)"
+            help="Equal Weight: Uniform dollar distribution. Market Cap Weight: Proportional to market capitalization."
         )
         use_market_cap_weight = (weighting_method == "Market Cap Weight")
         
         if use_market_cap_weight:
-            st.info("Market Cap Weighting: Stocks will be weighted by their market capitalization, similar to the Russell 2000 index. This reduces turnover costs and aligns with market performance.")
+            st.info("Portfolio will be weighted by market capitalization, aligning with the Russell 2000 methodology.")
         
         st.divider()
         
-        # Sector Selection
+        # Sector Exposure Configuration
         st.subheader("Sector Selection")
         sector_filter_enabled = st.checkbox("Enable Sector Filter", value=False)
         selected_sectors = []
         if sector_filter_enabled:
             selected_sectors = st.multiselect(
-                "Select sectors to include:",
+                "Include following sectors:",
                 options=sector_options,
                 default=sector_options,
-                help="Choose which sectors to include in the analysis"
+                help="Only tickers within these selected sectors will be eligible for portfolio inclusion."
             )
             
         st.divider()
         
-        # Date Range
+        # Analysis Temporal Range
         st.subheader("Analysis Period")
         col1, col2 = st.columns(2)
         with col1:
@@ -77,8 +77,7 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
                 value=2002,
                 step=1,
                 format="%d",
-                key="start_year_input",
-                help="Select the first year for analysis (2002-2023)"
+                key="start_year_input"
             )
         with col2:
             end_year = st.number_input(
@@ -88,22 +87,17 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
                 value=2024,
                 step=1,
                 format="%d",
-                key="end_year_input",
-                help="Select the last year for analysis (2002-2023)"
+                key="end_year_input"
             )
 
-        # Ensure start_year <= end_year; auto-correct end year if needed
-        try:
-            if int(st.session_state.get('start_year_input', 2002)) > int(st.session_state.get('end_year_input', 2023)):
-                st.warning('Start Year was greater than End Year — adjusting End Year to match Start Year')
-                st.session_state['end_year_input'] = int(st.session_state['start_year_input'])
-                end_year = start_year
-        except Exception:
-            pass
+        # Logic to ensure chronological consistency
+        if start_year > end_year:
+            st.warning('Start Year exceeded End Year. Synchronizing dates...')
+            end_year = start_year
             
         st.divider()
         
-        # Initial Investment
+        # Capitalization
         st.subheader("Initial Investment")
         initial_aum = st.number_input(
             "Initial AUM ($)",
@@ -112,7 +106,7 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
             value=1000.0,
             step=100.0,
             format="%.0f",
-            help="Starting portfolio value in dollars"
+            help="The starting dollar value of the portfolio at the beginning of the backtest."
         )
 
     return {

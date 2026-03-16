@@ -5,70 +5,74 @@ PURPOSE: Documentation for available factors including economic theses and imple
 VERSION: 1.1.0
 """
 
-# Each entry maps the display column name used across the codebase to a dict with:
-#  - thesis: one- or two-sentence economic thesis
-#  - implementation: the exact column name used in the market data
+# The FACTOR_DOCS registry provides the conceptual framework for each quantitative signal.
+# Each entry maps the display name to its economic justification and database implementation.
 FACTOR_DOCS = {
     'ROE using 9/30 Data': {
-        'thesis': 'Firms with higher return on equity generate more profit from shareholder capital, indicating efficient capital allocation and stronger profitability prospects.',
+        'thesis': 'Firms with higher return on equity generate superior profit from shareholder capital, indicating efficient management and robust profitability prospects.',
         'implementation': 'ROE using 9/30 Data',
     },
     'ROA using 9/30 Data': {
-        'thesis': 'Return on assets measures how efficiently a company uses its assets to generate earnings; higher ROA typically signals better operational efficiency.',
+        'thesis': 'Return on assets measures the efficiency with which a company utilizes its asset base to generate earnings; higher values signal operational excellence.',
         'implementation': 'ROA using 9/30 Data',
     },
     '12-Mo Momentum %': {
-        'thesis': 'Stocks that have performed well over the past 12 months tend to continue to outperform in the near-term due to persistent investor behavior and trend continuation.',
+        'thesis': 'Empirical evidence suggests that securities with high relative strength over the past 12 months tend to persist in their outperformance due to trend continuation.',
         'implementation': '12-Mo Momentum %',
     },
     '6-Mo Momentum %': {
-        'thesis': 'Stocks with strong 6-month performance often continue upward in the short-term; this captures intermediate-term momentum.',
+        'thesis': 'Captures intermediate-term price trends; securities with strong 6-month returns often benefit from continued investor interest in the short term.',
         'implementation': '6-Mo Momentum %',
     },
     '1-Mo Momentum %': {
-        'thesis': 'One-month momentum captures very short-term trend continuation; higher recent returns indicate near-term strength.',
+        'thesis': 'Reflects short-term price velocity; high recent returns serve as a proxy for immediate market sentiment and trend strength.',
         'implementation': '1-Mo Momentum %',
     },
     'Price to Book Using 9/30 Data': {
-        'thesis': "A lower price-to-book (P/B) implies the stock is cheaper relative to its book value; economically we expect higher book-to-price (inverse of P/B) to indicate value.",
+        'thesis': 'A low price-to-book ratio identifies stocks trading at a discount relative to their accounting net worth, a core pillar of the value premium.',
         'implementation': 'Price to Book Using 9/30 Data',
     },
     'Next FY Earns/P': {
-        'thesis': 'Earnings yield (next fiscal year earnings / price) indicates how cheaply the market prices future earnings; higher values suggest more attractive valuation.',
+        'thesis': 'The forward earnings yield represents the expected return on investment based on projected earnings, identifying valuation discounts on future cash flows.',
         'implementation': 'Next FY Earns/P',
     },
     '1-Yr Price Vol %': {
-        'thesis': 'Higher trailing 1-year price volatility may indicate higher risk or mispricing; depending on strategy, lower volatility is often targeted for defensive stability.',
+        'thesis': 'Price volatility serves as a proxy for risk; low-volatility strategies target stability, while high-volatility targets capture higher-beta market exposure.',
         'implementation': '1-Yr Price Vol %',
     },
     'Accruals/Assets': {
-        'thesis': 'High accruals relative to assets can indicate lower earnings quality; analyzing the non-cash component of earnings helps identify potential future performance mean-reversion.',
+        'thesis': 'High accruals relative to assets may signal aggressive accounting or lower earnings quality, suggesting a potential mean-reversion in future performance.',
         'implementation': 'Accruals/Assets',
     },
     'ROA %': {
-        'thesis': 'Return on assets (percentage) measures profitability relative to asset base; higher ROA suggests better operating performance.',
+        'thesis': 'A standardized measure of profitability relative to the total asset base, reflecting the core operating efficiency of the business entity.',
         'implementation': 'ROA %',
     },
     '1-Yr Asset Growth %': {
-        'thesis': 'Higher asset growth can signal expansion and investment opportunities, though excessively high growth can occasionally indicate overextension.',
+        'thesis': 'Securities with moderate asset growth often signal expansion; however, excessive growth can precede diminishing returns on invested capital.',
         'implementation': '1-Yr Asset Growth %',
     },
     '1-Yr CapEX Growth %': {
-        'thesis': 'Rising capital expenditures can indicate investment in future growth; interpretation depends on context, but higher CapEx growth is often treated as a growth signal.',
+        'thesis': 'Investment in capital expenditures reflects management confidence in future growth and long-term infrastructure development.',
         'implementation': '1-Yr CapEX Growth %',
     },
     'Book/Price': {
-        'thesis': 'Book-to-price is the inverse of price-to-book and aligns directly with the value thesis: higher book/price means cheaper relative to book value.',
+        'thesis': 'The direct inverse of price-to-book; higher values identify securities with the most significant valuation margin relative to book equity.',
         'implementation': 'Book/Price',
     },
 }
 
-def print_factors_doc():
+def print_factors_doc() -> None:
     """
-    Prints a concise list of factors with their corresponding economic thesis.
+    Outputs a structured list of factors and their economic theses to the console.
     
-    This function iterates through the FACTOR_DOCS registry to provide a human-readable 
-    summary of the available financial metrics and the investment logic behind them.
+    This function serves as a CLI-based documentation tool for developers 
+    and analysts to verify the qualitative logic behind quantitative signals.
     """
+    header = f"{'#':<3} | {'Factor Name':<35} | {'Economic Thesis'}"
+    print(header)
+    print("-" * len(header) * 2)
+    
     for i, (name, meta) in enumerate(FACTOR_DOCS.items(), start=1):
-        print(f"{i}. {name}\n   Thesis: {meta['thesis']}\n")
+        # Using structured printing for a professional, spreadsheet-like appearance
+        print(f"{i:<3} | {name:<35} | {meta['thesis']}")

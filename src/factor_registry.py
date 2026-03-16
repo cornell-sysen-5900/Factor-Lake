@@ -1,13 +1,13 @@
 """
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: src/factor_registry.py
-PURPOSE: Centralized registry of factor column names and metadata.
+PURPOSE: Centralized registry mapping internal factor keys to database column names.
 VERSION: 2.0.0
 """
 
-# A simple mapping of internal keys to database column names.
-# This eliminates the need for individual classes while maintaining 
-# a single source of truth for the engine.
+# The FACTOR_REGISTRY serves as the single source of truth for factor naming.
+# It maps shorthand internal identifiers to the exact string literals 
+# required for Supabase SQL queries.
 
 FACTOR_REGISTRY = {
     'momentum_12m': '12-Mo Momentum %',
@@ -27,6 +27,13 @@ FACTOR_REGISTRY = {
 
 def get_factor_column(factor_key: str) -> str:
     """
-    Retrieves the actual database column name for a given factor identifier.
+    Retrieves the standardized database column name for a given factor identifier.
+
+    Args:
+        factor_key: The shorthand internal identifier (e.g., 'roe').
+
+    Returns:
+        str: The corresponding database column name. If the key is not found, 
+             the original factor_key is returned as a fallback.
     """
     return FACTOR_REGISTRY.get(factor_key, factor_key)

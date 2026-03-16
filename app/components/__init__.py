@@ -1,8 +1,12 @@
-"""Factor-Lake UI Components package initialization.
-
-This module exposes the component submodules. 
-Note: Imports are kept as module-level to preserve existing absolute import paths.
 """
+PROJECT: Factor-Lake Portfolio Analysis
+MODULE: app/components/__init__.py
+PURPOSE: Package initialization for Streamlit UI component submodules.
+VERSION: 2.1.0
+"""
+
+# The following modules are exposed as sub-packages within the components namespace.
+# Direct submodule imports are preserved to maintain compatibility with existing logic.
 
 from . import about             # noqa: F401
 from . import factor_selection  # noqa: F401

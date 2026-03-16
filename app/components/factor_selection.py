@@ -12,9 +12,13 @@ def render_factor_selection() -> Tuple[List[str], Dict[str, str]]:
     """
     Renders the interactive interface for configuring equity factor exposures.
 
-    This component replicates the original UI layout, allowing users to select 
-    specific financial metrics and define their directional impact on the ranking 
-    model via toggle switches.
+    This component allows users to select specific financial metrics and define 
+    their directional impact (top-down or bottom-up ranking) on the model 
+    via toggle switches.
+
+    Returns:
+        Tuple[List[str], Dict[str, str]]: A list of selected factor names and 
+            a dictionary mapping those names to their ranking direction ('top' or 'bottom').
     """
     st.header("Factor Selection")
     st.write("Select one or more factors for your portfolio strategy:")
@@ -35,7 +39,7 @@ def render_factor_selection() -> Tuple[List[str], Dict[str, str]]:
                         "Low to High", 
                         key=f"{key}_dir", 
                         value=False,
-                        help="OFF = High to Low (positive factor tilt), ON = Low to High (negative factor tilt)"
+                        help="OFF = High to Low (Positive Tilt), ON = Low to High (Negative Tilt)"
                     )
                 else:
                     is_bottom = False
@@ -45,7 +49,6 @@ def render_factor_selection() -> Tuple[List[str], Dict[str, str]]:
         
         return selections, directions
 
-    # Layout: Two columns of factor categories to match original design
     col1, col2 = st.columns(2)
     
     with col1:
@@ -80,17 +83,15 @@ def render_factor_selection() -> Tuple[List[str], Dict[str, str]]:
             ('1-Yr Price Vol %', 'vol')
         ])
 
-    # Aggregating data from all rendered categories
+    # Aggregating all rendered categories
     all_factors = {**f1, **f2, **f3, **f4, **f5}
     all_dirs = {**d1, **d2, **d3, **d4, **d5}
     
-    # Isolate active selections for the backtesting engine
     selected_names = [name for name, selected in all_factors.items() if selected]
     selected_dirs = {name: all_dirs[name] for name in selected_names}
 
     st.write("---")
     
-    # Restore exact success/warning message formatting from the original UI
     if selected_names:
         factor_labels = [
             f"{name} ({'High to Low' if selected_dirs[name] == 'top' else 'Low to High'})"

@@ -1,13 +1,13 @@
 """
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/streamlit_config.py
-PURPOSE: Configuration mapping UI labels to Supabase SQL column names.
+PURPOSE: Centralized registry mapping UI labels to backend database column names.
 VERSION: 2.2.0
 """
 
 from typing import Dict, List, Any
 
-# Standardized sector classifications based on Scotts_Sector_5
+# Standardized sector classifications for universe filtering
 SECTOR_OPTIONS: List[str] = [
     'Consumer',
     'Technology',
@@ -21,8 +21,12 @@ SECTOR_OPTIONS: List[str] = [
 
 """
 FACTOR_METADATA:
-This registry maps the Streamlit UI selection strings to the exact 
-SQL column names found in the Supabase 'Full Precision Test' table.
+A configuration registry that maps Streamlit UI strings to specific 
+SQL column names in the Supabase 'Full Precision Test' table. 
+
+Each entry defines:
+- column: The exact database field name.
+- higher_is_better: The default directional rank for the factor tilt.
 """
 FACTOR_METADATA: Dict[str, Dict[str, Any]] = {
     'ROE using 9/30 Data': {
@@ -79,4 +83,5 @@ FACTOR_METADATA: Dict[str, Dict[str, Any]] = {
     }
 }
 
+# Derived list of available factors for UI rendering
 FACTOR_OPTIONS: List[str] = list(FACTOR_METADATA.keys())
