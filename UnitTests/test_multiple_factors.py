@@ -1,6 +1,6 @@
 from src.factor_registry import Momentum6m, ROE, ROA
 from src.market_object import load_data
-from src.calculate_holdings import rebalance_portfolio
+from src.backtest_engine import rebalance_portfolio
 import unittest
 import pandas as pd
 import pytest

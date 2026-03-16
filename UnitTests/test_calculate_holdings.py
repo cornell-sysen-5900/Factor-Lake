@@ -5,7 +5,7 @@ Tests portfolio construction, rebalancing, and performance calculations
 import pytest
 import pandas as pd
 import numpy as np
-from src.calculate_holdings import (
+from src.backtest_engine import (
     calculate_holdings, calculate_growth, rebalance_portfolio,
     get_benchmark_return, calculate_information_ratio
 )

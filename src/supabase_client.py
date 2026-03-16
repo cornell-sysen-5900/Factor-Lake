@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: src/supabase_client.py
 PURPOSE: Silent, high-performance data ingestion with schema-aligned standardization.
-VERSION: 2.2.0
+VERSION: 2.4.0
 """
 
 import os
@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 from supabase import create_client, Client
 
-# 1. Silence external library verbosity (silences the httpx GET logs)
+# Silence external library verbosity (mutes the httpx GET logs)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("supabase").setLevel(logging.WARNING)
 
@@ -36,13 +36,11 @@ class SupabaseManager:
     def fetch_all_data(self, table_name: str = 'Full Precision Test') -> pd.DataFrame:
         """
         Ingests the entire target table using iterative range-based pagination.
+        Executes silently to prevent terminal clutter.
         """
         page_size = 1000
         offset = 0
         all_rows = []
-
-        # Cleaner, single-line initiation log
-        logger.info(f"Syncing with Cloud Database: '{table_name}'...")
 
         while True:
             response = self.client.table(table_name).select('*').range(offset, offset + page_size - 1).execute()
@@ -57,9 +55,6 @@ class SupabaseManager:
                 break
             
             offset += page_size
-            # Only log every 10k records to keep the console clean
-            if offset % 10000 == 0:
-                logger.info(f"Transfer Progress: {offset:,} records...")
 
         df = pd.DataFrame(all_rows)
         
@@ -99,13 +94,10 @@ class SupabaseManager:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
 
         # 6. Schema Validation: Match actual SQL column names
-        # Replaces 'Ending Price' with 'Ending_Price', etc.
         required = ['Ticker', 'Year', 'Ending_Price', 'Next-Years_Return']
         missing = [r for r in required if r not in df.columns]
         
         if missing:
             logger.error(f"SCHEMA MISMATCH: Missing critical SQL columns: {missing}")
-        else:
-            logger.info(f"Ingestion successful. {len(df):,} records normalized.")
             
         return df

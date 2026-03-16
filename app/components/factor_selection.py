@@ -2,38 +2,26 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/components/factor_selection.py
 PURPOSE: UI component for multi-factor selection and signal direction (tilt) configuration.
-VERSION: 2.0.0
+VERSION: 2.3.0
 """
 
 import streamlit as st
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple
 
 def render_factor_selection() -> Tuple[List[str], Dict[str, str]]:
     """
-    Renders an interactive interface for configuring equity factor exposures and signal tilts.
+    Renders the interactive interface for configuring equity factor exposures.
 
-    This component allows users to construct a multi-factor strategy by selecting 
-    specific financial metrics and defining their directional impact on the 
-    ranking model. By toggling between 'High to Low' and 'Low to High' orientations, 
-    the interface provides the necessary flexibility to implement diverse investment 
-    styles, such as Value, Momentum, or Quality.
-
-    Returns:
-        Tuple[List[str], Dict[str, str]]: 
-            - A list of display names for all factors currently selected by the user.
-            - A dictionary mapping those names to their intended signal direction ('top' or 'bottom').
+    This component replicates the original UI layout, allowing users to select 
+    specific financial metrics and define their directional impact on the ranking 
+    model via toggle switches.
     """
     st.header("Factor Selection")
-    st.write("Select one or more factors to define your portfolio strategy:")
+    st.write("Select one or more factors for your portfolio strategy:")
 
     def factor_category(factors_config: List[Tuple[str, str]]):
         """
-        Internal utility to generate a vertical alignment of factor checkboxes and direction toggles.
-
-        This helper manages the state of individual factor selections within a 
-        categorical group. It utilizes a columnar sub-layout to present the factor 
-        label alongside a toggle switch that defines whether the engine should 
-        prioritize the highest or lowest numerical values for that specific metric.
+        Manages the state of individual factor selections within a categorical group.
         """
         selections = {}
         directions = {}
@@ -47,16 +35,17 @@ def render_factor_selection() -> Tuple[List[str], Dict[str, str]]:
                         "Low to High", 
                         key=f"{key}_dir", 
                         value=False,
-                        help="OFF = High to Low (positive tilt), ON = Low to High (negative tilt)"
+                        help="OFF = High to Low (positive factor tilt), ON = Low to High (negative factor tilt)"
                     )
                 else:
                     is_bottom = False
             
             selections[name] = checked
             directions[name] = 'bottom' if is_bottom else 'top'
+        
         return selections, directions
 
-    # Layout: Two columns of factor categories to optimize screen real estate
+    # Layout: Two columns of factor categories to match original design
     col1, col2 = st.columns(2)
     
     with col1:
@@ -86,7 +75,6 @@ def render_factor_selection() -> Tuple[List[str], Dict[str, str]]:
             ('Next FY Earns/P', 'fey')
         ])
         st.subheader("Quality Factors")
-        st.subheader("") # Aesthetic spacing to align with left column
         f5, d5 = factor_category([
             ('Accruals/Assets', 'accruals'), 
             ('1-Yr Price Vol %', 'vol')
@@ -99,5 +87,19 @@ def render_factor_selection() -> Tuple[List[str], Dict[str, str]]:
     # Isolate active selections for the backtesting engine
     selected_names = [name for name, selected in all_factors.items() if selected]
     selected_dirs = {name: all_dirs[name] for name in selected_names}
+
+    st.write("---")
+    
+    # Restore exact success/warning message formatting from the original UI
+    if selected_names:
+        factor_labels = [
+            f"{name} ({'High to Low' if selected_dirs[name] == 'top' else 'Low to High'})"
+            for name in selected_names
+        ]
+        st.success(f"Selected {len(selected_names)} factor(s): {', '.join(factor_labels)}")
+    else:
+        st.warning("Please select at least one factor to run the analysis")
+        
+    st.write("---")
 
     return selected_names, selected_dirs
