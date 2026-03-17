@@ -9,9 +9,11 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Any
 
-def compute_comprehensive_metrics(p_ret: np.ndarray, b_ret: np.ndarray, g_ret: np.ndarray, 
-                                 v_ret: np.ndarray, rf: np.ndarray, 
-                                 p_vals: List[float], start: int, end: int) -> Dict[str, Any]:
+def compute_comprehensive_metrics(p_ret: np.ndarray, b_ret: np.ndarray, g_ret: np.ndarray,
+                                 v_ret: np.ndarray, rf: np.ndarray,
+                                 p_vals: List[float], start: int, end: int,
+                                 delisting_strategy: str = 'zero_return',
+                                 total_delisted_positions: int = 0) -> Dict[str, Any]:
     """Calculates risk/return metrics across all benchmarks."""
     
     # Excess Returns
@@ -89,5 +91,7 @@ def compute_comprehensive_metrics(p_ret: np.ndarray, b_ret: np.ndarray, g_ret: n
         'information_ratio': get_ir(p_ret, b_ret),
         'information_ratio_growth': get_ir(p_ret, g_ret),
         'information_ratio_value': get_ir(p_ret, v_ret),
-        'risk_free_rate_source': "FRED 4 Week T-Bill (Oct 1)"
+        'risk_free_rate_source': "FRED 4 Week T-Bill (Oct 1)",
+        'delisting_strategy': delisting_strategy,
+        'total_delisted_positions': total_delisted_positions
     }
