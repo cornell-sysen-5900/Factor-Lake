@@ -137,50 +137,125 @@ def calculate_holdings(factor, aum, market, restrict_fossil_fuels=False, top_pct
 
     return portfolio_new
 
-def calculate_growth(portfolio, current_market, verbosity=0):
+def calculate_growth(portfolio, current_market, verbosity=0,
+                     delisting_strategy='zero_return', risk_free_rate=0.0):
     """
     Calculates portfolio growth using the forward-looking 'Next_Year_Return' column.
+
+    Args:
+        portfolio: list of Portfolio objects (one per factor).
+        current_market: MarketObject for the current year.
+        verbosity: 0=silent, 1=basic, 2+=detailed.
+        delisting_strategy: how to handle positions whose stock was delisted
+            during the holding period (identified by the ``_delisted`` flag):
+            - 'zero_return' (default): treat as 0% return (legacy behaviour).
+            - 'hold_cash': earn the risk-free rate on the delisted position.
+            - 'reinvest': redistribute the delisted position's weight
+              pro-rata across the surviving (non-delisted) positions.
+        risk_free_rate: annual risk-free rate as a decimal (e.g. 0.02 for 2%).
+            Only used when delisting_strategy='hold_cash'.
+
+    Returns:
+        (growth, total_start_value, total_end_value, delisted_count)
     """
-    total_weighted_rtn = 0
-    total_investment_value = 0
+    has_delisted_col = '_delisted' in current_market.stocks.columns
+
+    # First pass: classify each position as live or delisted and capture its
+    # dollar value and return.
+    live_positions = []   # (ticker, position_value, stock_rtn)
+    delisted_positions = []  # (ticker, position_value)
 
     for factor_portfolio in portfolio:
         for inv in factor_portfolio.investments:
             ticker = inv["ticker"]
-            
-            # Retrieve the pre-calculated total return from the current market object
+
+            entry_price = current_market.get_price(ticker)
+            if not entry_price:
+                continue
+
+            position_value = inv["number_of_shares"] * entry_price
+
+            # Check delisted flag
+            is_delisted = False
+            if has_delisted_col:
+                try:
+                    flag = current_market.stocks.loc[ticker, "_delisted"]
+                    if isinstance(flag, (pd.Series, np.ndarray)):
+                        flag = flag.iloc[0] if len(flag) > 0 else False
+                    is_delisted = bool(flag)
+                except (KeyError, IndexError):
+                    pass
+
+            if is_delisted:
+                delisted_positions.append((ticker, position_value))
+                if verbosity >= 2:
+                    print(f"  {ticker} delisted (${position_value:.2f}), strategy={delisting_strategy}")
+                continue
+
+            # Live position — get return
             try:
-                # Dividing by 100 because the data is in percentage format (e.g., 20.0 for 20%)
                 stock_rtn = current_market.stocks.loc[ticker, "Next_Year_Return"] / 100
-                
-                # Weight the return by the dollar value of the position at the start of the year
-                entry_price = current_market.get_price(ticker)
-                if entry_price:
-                    position_value = inv["number_of_shares"] * entry_price
-                    total_weighted_rtn += stock_rtn * position_value
-                    total_investment_value += position_value
-                    
             except KeyError:
                 if verbosity >= 2:
                     print(f"Warning: {ticker} return data missing, treating as 0%.")
-                continue
+                stock_rtn = 0.0
+
+            live_positions.append((ticker, position_value, stock_rtn))
+
+    # Totals
+    live_value = sum(pv for _, pv, _ in live_positions)
+    delisted_value = sum(pv for _, pv in delisted_positions)
+    total_investment_value = live_value + delisted_value
+    delisted_count = len(delisted_positions)
+
+    if total_investment_value == 0:
+        return 0, 0, 0, 0
+
+    # Weighted return from live positions
+    live_weighted_rtn = sum(rtn * pv for _, pv, rtn in live_positions)
+
+    # Apply delisting strategy to the delisted capital
+    if delisting_strategy == 'hold_cash':
+        # Delisted capital earns the risk-free rate
+        delisted_weighted_rtn = risk_free_rate * delisted_value
+
+    elif delisting_strategy == 'reinvest':
+        # Redistribute delisted capital pro-rata across live positions.
+        # Each live position gets an additional weight proportional to its
+        # share of live_value, and that extra capital earns the same return
+        # as the live position.
+        if live_value > 0:
+            delisted_weighted_rtn = sum(
+                (pv / live_value) * delisted_value * rtn
+                for _, pv, rtn in live_positions
+            )
+        else:
+            # All positions delisted and no live positions — fall back to 0
+            delisted_weighted_rtn = 0.0
+
+    else:  # 'zero_return' (default / legacy)
+        delisted_weighted_rtn = 0.0
+
+    total_weighted_rtn = live_weighted_rtn + delisted_weighted_rtn
 
     # Calculate aggregate growth for the year
-    growth = total_weighted_rtn / total_investment_value if total_investment_value > 0 else 0
-    
-    # Calculate end value to maintain compatibility with the rebalancing loop
+    growth = total_weighted_rtn / total_investment_value
     total_end_value = total_investment_value * (1 + growth)
-    
-    return growth, total_investment_value, total_end_value
 
-def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, benchmark_index=1, verbosity=0, restrict_fossil_fuels=False, top_pct=10, which='top', use_market_cap_weight=False, factor_directions=None):
+    return growth, total_investment_value, total_end_value, delisted_count
+
+def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, benchmark_index=1, verbosity=0, restrict_fossil_fuels=False, top_pct=10, which='top', use_market_cap_weight=False, factor_directions=None, delisting_strategy='zero_return'):
     """
-    Executes a multi-year backtest. 
+    Executes a multi-year backtest.
     Calculates Sharpe and Beta using year-specific excess returns.
 
     Args:
         factor_directions: optional dict mapping factor column_name -> 'top'/'bottom'.
             When provided, overrides the global ``which`` on a per-factor basis.
+        delisting_strategy: how to treat positions in stocks that were delisted
+            during the holding period.  One of 'zero_return' (default/legacy),
+            'hold_cash' (earn risk-free rate), or 'reinvest' (redistribute to
+            remaining positions pro-rata).
     """
     aum = initial_aum
     years = [start_year]
@@ -189,6 +264,15 @@ def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, benchm
     
     verbosity = 0 if verbosity is None else verbosity
     risk_free_rate_source = "FRED 4 Week T-Bill (Oct 1)"
+
+    # Pre-fetch risk-free rates for the full range (used by hold_cash strategy)
+    rf_by_year = {}
+    if delisting_strategy == 'hold_cash':
+        rf_full = get_benchmark_list(4, start_year, end_year)
+        for i, yr in enumerate(range(start_year, end_year)):
+            rf_by_year[yr] = rf_full[i] if i < len(rf_full) else 0.0
+
+    total_delisted = 0
 
     # --- 1. Annual Rebalancing Loop ---
     for year in range(start_year, end_year):
@@ -213,10 +297,16 @@ def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, benchm
             yearly_portfolio.append(factor_portfolio)
 
         # Calculate annual growth
-        growth, total_start_value, total_end_value = calculate_growth(yearly_portfolio, market, verbosity)
+        growth, total_start_value, total_end_value, delisted_count = calculate_growth(
+            yearly_portfolio, market, verbosity,
+            delisting_strategy=delisting_strategy,
+            risk_free_rate=rf_by_year.get(year, 0.0)
+        )
+        total_delisted += delisted_count
 
         if verbosity >= 2:
-            print(f"Year {year} to {year + 1}: Growth: {growth:.2%}, Start: ${total_start_value:.2f}, End: ${total_end_value:.2f}")
+            delist_msg = f", Delisted: {delisted_count}" if delisted_count else ""
+            print(f"Year {year} to {year + 1}: Growth: {growth:.2%}, Start: ${total_start_value:.2f}, End: ${total_end_value:.2f}{delist_msg}")
 
         aum = total_end_value  
         portfolio_returns.append(growth)
@@ -401,7 +491,9 @@ def rebalance_portfolio(data, factors, start_year, end_year, initial_aum, benchm
         'yearly_comparisons': yearly_comparisons,
         'information_ratio': information_ratio,
         'information_ratio_growth': information_ratio_growth,
-        'information_ratio_value': information_ratio_value
+        'information_ratio_value': information_ratio_value,
+        'delisting_strategy': delisting_strategy,
+        'total_delisted_positions': total_delisted
     }
 def calculate_information_ratio(portfolio_returns, benchmark_returns, verbosity=0):
     """

@@ -35,6 +35,12 @@ def load_data(restrict_fossil_fuels=False, use_supabase=True, table_name='Full P
             # Standardize column names to match existing code expectations
             rdata = _standardize_column_names(rdata)
             
+            # Mark delisted stocks (NaN return) before filling with 0
+            if 'Next_Year_Return' in rdata.columns:
+                rdata['_delisted'] = rdata['Next_Year_Return'].isna()
+            else:
+                rdata['_delisted'] = False
+
             # New return logic: 0 if null next year return
             rdata['Next_Year_Return'] = rdata['Next_Year_Return'].fillna(0)
 
@@ -146,7 +152,13 @@ def load_data(restrict_fossil_fuels=False, use_supabase=True, table_name='Full P
 
             # Standardize to the same column names we expect from Supabase
             rdata = _standardize_column_names(rdata)
-            
+
+            # Mark delisted stocks (NaN return) before filling with 0
+            if 'Next_Year_Return' in rdata.columns:
+                rdata['_delisted'] = rdata['Next_Year_Return'].isna()
+            else:
+                rdata['_delisted'] = False
+
             # New return logic: 0 if null next year return
             rdata['Next_Year_Return'] = rdata['Next_Year_Return'].fillna(0)
 
@@ -377,7 +389,7 @@ class MarketObject():
         ]
         # Keep Ticker-Region so we can index uniquely when present
         # Include Market Capitalization for cap-weighted portfolios
-        keep_cols = ['Ticker-Region', 'Ticker', 'Ending Price', 'Year', '6-Mo Momentum %', 'FactSet Industry', 'Market Capitalization'] + available_factors
+        keep_cols = ['Ticker-Region', 'Ticker', 'Ending Price', 'Year', '6-Mo Momentum %', 'FactSet Industry', 'Market Capitalization', '_delisted'] + available_factors
 
         # Filter and clean data
         data = data[[col for col in keep_cols if col in data.columns]].copy()
