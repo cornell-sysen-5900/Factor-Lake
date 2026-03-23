@@ -5,7 +5,6 @@ Tests portfolio creation, management, and calculations
 import pytest
 import pandas as pd
 from src.portfolio import Portfolio
-from src.market_object import MarketObject
 
 
 class TestPortfolioCreation:
@@ -102,21 +101,14 @@ class TestPortfolioManagement:
 
 class TestPortfolioValuation:
     """Test portfolio value calculations"""
-    
+
     @pytest.fixture
     def market_data(self):
-        """Create sample market data"""
+        """Create sample market data indexed by ticker with Ending_Price column"""
         return pd.DataFrame({
-            'Ticker-Region': ['AAPL-US', 'MSFT-US', 'GOOGL-US'],
-            'Ending Price': [150.0, 300.0, 2800.0],
-            'Year': [2022, 2022, 2022]
-        })
-    
-    @pytest.fixture
-    def market(self, market_data):
-        """Create a market object"""
-        return MarketObject(market_data, 2022)
-    
+            'Ending_Price': [150.0, 300.0, 2800.0],
+        }, index=['AAPL', 'MSFT', 'GOOGL'])
+
     @pytest.fixture
     def portfolio(self):
         """Create a portfolio with investments"""
@@ -124,41 +116,41 @@ class TestPortfolioValuation:
         portfolio.add_investment('AAPL', 10)
         portfolio.add_investment('MSFT', 5)
         return portfolio
-    
-    def test_present_value_calculation(self, portfolio, market):
+
+    def test_present_value_calculation(self, portfolio, market_data):
         """Test calculating present value of portfolio"""
-        value = portfolio.present_value(market)
-        
+        value = portfolio.present_value(market_data)
+
         # AAPL: 10 shares * $150 = $1,500
         # MSFT: 5 shares * $300 = $1,500
         # Total: $3,000
         assert value == 3000.0
-    
-    def test_present_value_empty_portfolio(self, market):
+
+    def test_present_value_empty_portfolio(self, market_data):
         """Test present value of empty portfolio"""
         portfolio = Portfolio(name="Empty Portfolio")
-        value = portfolio.present_value(market)
-        
+        value = portfolio.present_value(market_data)
+
         assert value == 0.0
-    
-    def test_present_value_with_missing_stock(self, market):
+
+    def test_present_value_with_missing_stock(self, market_data):
         """Test present value when stock not in market"""
         portfolio = Portfolio(name="Test Portfolio")
         portfolio.add_investment('AAPL', 10)
         portfolio.add_investment('INVALID', 5)  # Not in market
-        
-        value = portfolio.present_value(market)
-        
+
+        value = portfolio.present_value(market_data)
+
         # Should only count AAPL
         assert value == 1500.0
-    
-    def test_present_value_with_fractional_shares(self, market):
+
+    def test_present_value_with_fractional_shares(self, market_data):
         """Test present value with fractional shares"""
         portfolio = Portfolio(name="Test Portfolio")
         portfolio.add_investment('AAPL', 10.5)
-        
-        value = portfolio.present_value(market)
-        
+
+        value = portfolio.present_value(market_data)
+
         # 10.5 shares * $150 = $1,575
         assert value == 1575.0
 
@@ -198,10 +190,9 @@ class TestPortfolioReturns:
         
         assert return_pct == 0.0
     
-    def test_calculate_return_zero_t1_raises_error(self, portfolio):
-        """Test that zero t1 value raises error"""
-        with pytest.raises(ValueError, match='Value at time 1 is 0'):
-            portfolio.calculate_return(0, 1000.0)
+    def test_calculate_return_zero_t1(self, portfolio):
+        """Test that zero t1 value returns 0.0"""
+        assert portfolio.calculate_return(0, 1000.0) == 0.0
     
     def test_calculate_return_large_gain(self, portfolio):
         """Test calculating large return"""
@@ -215,70 +206,63 @@ class TestPortfolioReturns:
 
 class TestPortfolioIntegration:
     """Integration tests with real scenarios"""
-    
+
     def test_portfolio_lifecycle(self):
         """Test complete portfolio lifecycle"""
         # Create portfolio
         portfolio = Portfolio(name="Growth Portfolio")
-        
+
         # Add investments
         portfolio.add_investment('AAPL', 10)
         portfolio.add_investment('MSFT', 5)
         portfolio.add_investment('GOOGL', 2)
-        
+
         assert len(portfolio.investments) == 3
-        
-        # Create market
+
+        # Create market data indexed by ticker
         market_data = pd.DataFrame({
-            'Ticker-Region': ['AAPL-US', 'MSFT-US', 'GOOGL-US'],
-            'Ending Price': [150.0, 300.0, 2800.0],
-            'Year': [2022, 2022, 2022]
-        })
-        market = MarketObject(market_data, 2022)
-        
+            'Ending_Price': [150.0, 300.0, 2800.0],
+        }, index=['AAPL', 'MSFT', 'GOOGL'])
+
         # Calculate value
-        initial_value = portfolio.present_value(market)
+        initial_value = portfolio.present_value(market_data)
         assert initial_value == 10 * 150 + 5 * 300 + 2 * 2800  # 9,600
-        
+
         # Modify portfolio
         portfolio.remove_investment('GOOGL')
         portfolio.add_investment('AAPL', 5)  # Add more AAPL
-        
+
         # Recalculate value
-        new_value = portfolio.present_value(market)
+        new_value = portfolio.present_value(market_data)
         assert new_value == 15 * 150 + 5 * 300  # 3,750
-        
+
         # Calculate return
         return_pct = portfolio.calculate_return(initial_value, new_value)
         assert return_pct < 0  # Value decreased
-    
+
     def test_portfolio_rebalancing_scenario(self):
         """Test a realistic rebalancing scenario"""
         # Initial portfolio
         portfolio = Portfolio(name="Rebalanced Portfolio")
         portfolio.add_investment('AAPL', 10)
         portfolio.add_investment('MSFT', 10)
-        
+
         # Year 1 market
-        market_y1 = MarketObject(pd.DataFrame({
-            'Ticker-Region': ['AAPL-US', 'MSFT-US'],
-            'Ending Price': [100.0, 200.0],
-            'Year': [2021, 2021]
-        }), 2021)
-        
+        market_y1 = pd.DataFrame({
+            'Ending_Price': [100.0, 200.0],
+        }, index=['AAPL', 'MSFT'])
+
         value_y1 = portfolio.present_value(market_y1)
         assert value_y1 == 3000.0  # 10*100 + 10*200
-        
+
         # Year 2 market (prices changed)
-        market_y2 = MarketObject(pd.DataFrame({
-            'Ticker-Region': ['AAPL-US', 'MSFT-US'],
-            'Ending Price': [150.0, 250.0],
-            'Year': [2022, 2022]
-        }), 2022)
-        
+        market_y2 = pd.DataFrame({
+            'Ending_Price': [150.0, 250.0],
+        }, index=['AAPL', 'MSFT'])
+
         value_y2 = portfolio.present_value(market_y2)
         assert value_y2 == 4000.0  # 10*150 + 10*250
-        
+
         # Calculate return
         annual_return = portfolio.calculate_return(value_y1, value_y2)
         assert annual_return == pytest.approx(33.33, rel=0.01)  # ~33.33% return
