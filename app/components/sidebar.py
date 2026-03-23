@@ -49,7 +49,27 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
         
         if use_market_cap_weight:
             st.info("Portfolio will be weighted by market capitalization, aligning with the Russell 2000 methodology.")
-        
+
+        st.divider()
+
+        # Delisting Strategy
+        st.subheader("Delisting Strategy")
+        delisting_strategy = st.radio(
+            "Handle delisted positions:",
+            options=["zero_return", "hold_cash", "reinvest"],
+            format_func=lambda x: {
+                "zero_return": "Zero Return (default)",
+                "hold_cash": "Hold Cash (earn risk-free rate)",
+                "reinvest": "Reinvest (redistribute pro-rata)"
+            }[x],
+            index=0,
+            help=(
+                "Zero Return: delisted stocks earn 0% (legacy). "
+                "Hold Cash: delisted capital earns the risk-free rate. "
+                "Reinvest: delisted capital is redistributed pro-rata across surviving positions."
+            )
+        )
+
         st.divider()
         
         # Sector Exposure Configuration
@@ -112,6 +132,7 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
     return {
         "restrict_fossil_fuels": restrict_fossil_fuels,
         "use_market_cap_weight": use_market_cap_weight,
+        "delisting_strategy": delisting_strategy,
         "selected_sectors": selected_sectors if sector_filter_enabled else None,
         "sector_filter_enabled": sector_filter_enabled,
         "start_year": start_year,
