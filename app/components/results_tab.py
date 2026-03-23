@@ -33,6 +33,9 @@ def render_results_tab(results: Dict[str, Any], user_settings: Dict[str, Any]) -
     # 2. Performance Summary
     st.subheader("Performance Summary")
     _render_summary_metrics(results, user_settings)
+    total_delisted = results.get('total_delisted_positions', 0)
+    if total_delisted > 0:
+        st.caption(f"**Delisted positions encountered:** {total_delisted}")
     st.divider()
 
     # 3. Main Growth Plot
@@ -208,9 +211,18 @@ def _render_header_captions(settings: Dict[str, Any]) -> None:
     saved_dirs = st.session_state.get('factor_directions', {})
     factors_str = ", ".join([f"{f} ({saved_dirs.get(f, 'top')})" for f in selected_factors])
     weighting_str = "Market Cap Weighted" if settings.get('use_market_cap_weight') else "Equal Weighted"
-    
+    delisting_labels = {
+        "zero_return": "Zero Return",
+        "hold_cash": "Hold Cash (risk-free rate)",
+        "reinvest": "Reinvest (pro-rata)"
+    }
+    delisting_str = delisting_labels.get(
+        settings.get('delisting_strategy', 'zero_return'), 'Zero Return'
+    )
+
     st.caption(f"**Factors:** {factors_str}")
     st.caption(f"**Weighting:** {weighting_str}")
+    st.caption(f"**Delisting Strategy:** {delisting_str}")
 
 def _render_summary_metrics(res: Dict[str, Any], settings: Dict[str, Any]) -> None:
     """

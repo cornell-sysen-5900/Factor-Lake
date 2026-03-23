@@ -153,7 +153,8 @@ def run_backtest_logic(user_settings: Dict[str, Any],
             initial_aum=user_settings['initial_aum'],
             benchmark_index=user_settings.get('benchmark_index', 1),
             top_pct=user_settings.get('top_pct', 10.0),
-            use_market_cap_weight=user_settings.get('use_market_cap_weight', False)
+            use_market_cap_weight=user_settings.get('use_market_cap_weight', False),
+            delisting_strategy=user_settings.get('delisting_strategy', 'zero_return')
         )
 
         # Build a ranked list for the most recent rebalance year used by the backtest loop.
