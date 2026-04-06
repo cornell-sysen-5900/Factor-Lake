@@ -1,115 +1,159 @@
 import pandas as pd
 import numpy as np
-import time
+import cvxpy as cp
+import matplotlib.pyplot as plt
+import random
+from pathlib import Path
+
+# --- SETTINGS & CONFIG ---
+TARGET_VOL = 0.08
+BURN_IN = 252
+MAX_LEVERAGE = 3.0
+START_YEAR = 2010
+END_YEAR = 2024
+# Options: 'D' (Daily), 'W' (Weekly), 'M' (Monthly), 'Q' (Quarterly)
+REBALANCE_FREQ = 'D' 
+CHART_FILE = "vol_target_report.png"
+
+def load_data(file_name="r2000_price_crsp.csv"):
+    path = Path(__file__).resolve().parent / file_name
+    df = pd.read_csv(path, usecols=['date', 'PERMNO', 'RET'], low_memory=False)
+    df.columns = [col.lower() for col in df.columns]
+    df['date'] = pd.to_datetime(df['date'])
+    df['ret'] = pd.to_numeric(df['ret'], errors='coerce')
+    return df.dropna().sort_values('date')
+
+def solve_weights(cov_matrix, target_vol, max_leverage):
+    """Uses CVXPY to find optimal weights for 100 stocks."""
+    n = cov_matrix.shape[0]
+    w = cp.Variable(n)
+    
+    # Portfolio Variance (Annualized)
+    # We use 252 * w.T @ Cov @ w
+    portfolio_variance = cp.quad_form(w, cov_matrix) * 252
+    
+    # Objective: Minimize variance (or just find a feasible point hitting the target)
+    prob = cp.Problem(cp.Minimize(portfolio_variance), [
+        portfolio_variance <= target_vol**2,
+        cp.sum(w) <= max_leverage,
+        w >= 0
+    ])
+    
+    try:
+        prob.solve(solver=cp.ECOS)
+        if w.value is None:
+            return np.ones(n) / n * (target_vol / 0.20) # Fallback
+        return w.value
+    except:
+        return np.ones(n) / n * 0.5 # Safe fallback
+
+
+def build_yearly_metrics(results):
+    yearly = results.groupby(results.index.year).agg(['mean', 'std'])
+    yearly_ann_return = yearly['mean'] * 252
+    yearly_vol = yearly['std'] * np.sqrt(252)
+    metrics = pd.DataFrame({
+        'ann_return': yearly_ann_return,
+        'yearly_vol': yearly_vol,
+    })
+    metrics.index.name = 'year'
+    return metrics
+
+
+def plot_final_report(metrics, target_vol, file_name=CHART_FILE):
+    years = metrics.index.astype(int)
+
+    plt.figure(figsize=(11, 6))
+    plt.plot(years, metrics['ann_return'] * 100, marker='o', linewidth=2, label='Ann. Return (%)')
+    plt.plot(years, metrics['yearly_vol'] * 100, marker='s', linewidth=2, label='Yearly Vol (%)')
+    plt.axhline(target_vol * 100, color='black', linestyle='--', linewidth=2, label=f'Target Vol ({target_vol*100:.1f}%)')
+
+    plt.title('Volatility Targeting Report by Year')
+    plt.xlabel('Year')
+    plt.ylabel('Percent')
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+
+    chart_path = Path(__file__).resolve().parent / file_name
+    plt.savefig(chart_path, dpi=150)
+    print(f"Saved chart: {chart_path}")
+    plt.close()
 
 def main():
-    print("Loading data from Factor-Lake/data/russell2000_cleaned.csv...")
-    try:
-        # permno is unique per asset, whereas tickers can be reused
-        df = pd.read_csv("Factor-Lake/data/russell2000_cleaned.csv", usecols=['date', 'permno', 'ret'], low_memory=False)
-    except FileNotFoundError:
-        print("Data file not found. Ensure you are running this from the workspace root.")
+    df = load_data()
+    all_rets, all_dates = [], []
+
+    for year in range(START_YEAR, END_YEAR + 1):
+        year_mask = df['date'].dt.year == year
+        if not year_mask.any(): continue
+        
+        first_day = pd.to_datetime(df[year_mask]['date'].min())
+        available = df[df['date'] == first_day]['permno'].unique()
+        selected_permnos = random.sample(list(available), 100) if len(available) >= 100 else list(available)
+
+        # Matrix setup
+        lookback = first_day - pd.Timedelta(days=450)
+        subset = df[(df['permno'].isin(selected_permnos)) & (df['date'] >= lookback) & (df['date'].dt.year <= year)]
+        matrix = subset.pivot(index='date', columns='permno', values='ret').fillna(0)
+        
+        current_year_days = matrix.index[matrix.index.year == year]
+        
+        # Tracking weights for rebalancing frequency
+        current_weights = None
+        
+        print(f"--- Processing {year} (Freq: {REBALANCE_FREQ}) ---")
+        
+        for i, d in enumerate(current_year_days):
+            t_idx = matrix.index.get_loc(d)
+            if t_idx < BURN_IN: continue
+
+            # REBALANCE LOGIC:
+            # Check if it's the first day of the period (Month/Week/Quarter)
+            is_rebalance_day = False
+            if REBALANCE_FREQ == 'D':
+                is_rebalance_day = True
+            elif REBALANCE_FREQ == 'W' and d.weekday() == 0: # Monday
+                is_rebalance_day = True
+            elif REBALANCE_FREQ == 'M' and d.is_month_start:
+                is_rebalance_day = True
+            elif REBALANCE_FREQ == 'Q' and d.is_quarter_start:
+                is_rebalance_day = True
+            elif current_weights is None: # Initial setup
+                is_rebalance_day = True
+
+            if is_rebalance_day:
+                window = matrix.iloc[t_idx - BURN_IN : t_idx].values
+                cov_matrix = np.cov(window, rowvar=False)
+                # Add a small value to diagonal for solver stability (Regularization)
+                cov_matrix += np.eye(len(selected_permnos)) * 1e-6 
+                current_weights = solve_weights(cov_matrix, TARGET_VOL, MAX_LEVERAGE)
+
+            # Daily Performance
+            daily_asset_rets = matrix.iloc[t_idx].values
+            port_ret = np.dot(current_weights, daily_asset_rets)
+            all_rets.append(port_ret)
+            all_dates.append(d)
+
+    # FINAL REPORT
+    results = pd.Series(all_rets, index=all_dates)
+    if results.empty:
+        print("No portfolio returns were generated. Check data/timeframe settings.")
         return
-        
-    df['date'] = pd.to_datetime(df['date'])
-    
-    # Coerce returns to numeric (CRSP uses 'C' or 'B' sometimes for missing/bad data)
-    df['ret'] = pd.to_numeric(df['ret'], errors='coerce')
-    df = df.dropna(subset=['ret'])
-    
-    print("Selecting 100 assets with the longest history...")
-    counts = df['permno'].value_counts()
-    top_100_permnos = counts.head(100).index
-    
-    df = df[df['permno'].isin(top_100_permnos)]
-    df = df.drop_duplicates(subset=['date', 'permno'])
-    
-    print("Pivoting data to create a returns matrix...")
-    # Reshape long-form data into a 2D matrix (dates x assets) and sort chronologically
-    ret_matrix = df.pivot(index='date', columns='permno', values='ret').sort_index()
-    
-    # Replace missing returns with 0 so matrix math (covariance, dot products) doesn't break
-    ret_matrix = ret_matrix.fillna(0)
-    
-    TARGET_VOLS = [0.10, 0.15, 0.20, 0.25]
-    BURN_IN = 100
-    
-    if len(ret_matrix) <= BURN_IN:
-        print("Not enough data to support the burn-in period!")
-        return
 
-    n_assets = len(ret_matrix.columns)
-    dates = ret_matrix.index
-    
-    # Store daily tracking items for each target
-    results = {tv: {'returns': [], 'k': [], 'est_vol': []} for tv in TARGET_VOLS}
-    
-    print(f"Beginning Volatility Targeting over {len(dates) - BURN_IN} days...")
-    start_time = time.time()
-    
-    for t in range(BURN_IN, len(dates)):
-        cov_window = ret_matrix.iloc[t-BURN_IN:t]
-        cov_matrix = cov_window.cov().values
-        w_baseline = np.ones(n_assets) / n_assets
-        
-        var = w_baseline.T @ cov_matrix @ w_baseline
-        est_vol = np.sqrt(var) * np.sqrt(252)
-        daily_ret = ret_matrix.iloc[t].values
-        
-        for tv in TARGET_VOLS:
-            if est_vol == 0:
-                k = 1.0 
-            else:
-                k = tv / est_vol
-                
-            w_target = w_baseline * k
-            portfolio_return = np.dot(w_target, daily_ret)
-            
-            results[tv]['returns'].append(portfolio_return)
-            results[tv]['k'].append(k)
-            results[tv]['est_vol'].append(est_vol)
-            
-        if t % 500 == 0:
-            print(f"Processed {t}/{len(dates)} days...")
+    ann_vol = results.std() * np.sqrt(252)
+    ann_ret = results.mean() * 252
+    yearly_metrics = build_yearly_metrics(results)
 
-    print(f"Finished processing in {time.time() - start_time:.2f} seconds.")
+    print("\n" + "="*45)
+    print(f"OPTIMIZED RESULTS (Freq: {REBALANCE_FREQ})")
+    print(f"Realized Vol: {ann_vol*100:.2f}% | Target: {TARGET_VOL*100:.2f}%")
+    print(f"Ann. Return:  {ann_ret*100:.2f}%")
+    print(f"Sharpe Ratio: {ann_ret / ann_vol:.2f}")
+    print("="*45)
 
-    out_df = pd.DataFrame({'date': dates[BURN_IN:]})
-    
-    print("\n--- Strategy Performance Summary ---")
-    print(f"Universe Size:           {n_assets} equal-weighted stocks")
-    print("-" * 50)
-    
-    for tv in TARGET_VOLS:
-        strat_returns = pd.Series(results[tv]['returns'])
-        k_series = pd.Series(results[tv]['k'])
-        
-        realized_vol = strat_returns.std() * np.sqrt(252)
-        ann_ret = strat_returns.mean() * 252
-        avg_k = k_series.mean()
-        
-        # Add to the output dataframe
-        out_df[f'strat_ret_{int(tv*100)}'] = strat_returns
-        out_df[f'scale_k_{int(tv*100)}'] = k_series
-        out_df[f'est_vol_annual'] = results[tv]['est_vol'] # identical across TVs but stored once
-        
-        print(f"Target Annual Vol:       {tv*100:.2f}%")
-        print(f"Realized Annual Vol:     {realized_vol*100:.2f}%")
-        print(f"Annualized Return:       {ann_ret*100:.2f}%")
-        print(f"Average Leverage (k):    {avg_k:.2f}x")
-        print(f"  --- Yearly Volatility Breakdown ---")
-        
-        strat_ts = pd.Series(strat_returns.values, index=out_df['date'])
-        yearly_vol = strat_ts.groupby(strat_ts.index.year).std() * np.sqrt(252)
-        for year, vol in yearly_vol.items():
-            print(f"    {year}: {vol*100:.2f}%")
-            
-        print("-" * 50)
-    
-    out_csv = "vol_target_results.csv"
-    out_df.to_csv(out_csv, index=False)
-    print(f"\nDetails saved to {out_csv}")
+
+    plot_final_report(yearly_metrics, TARGET_VOL)
 
 if __name__ == "__main__":
     main()
-
