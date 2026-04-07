@@ -1,11 +1,14 @@
-from src.factor_registry import Momentum6m, ROE, ROA
-from src.market_object import load_data
+from src.supabase_client import SupabaseManager
 from src.backtest_engine import rebalance_portfolio
 import unittest
-import pandas as pd
 import pytest
 import os
+import streamlit as st
 
+# TODO(supabase): Once Supabase creds are restored, run this with:
+#   SUPABASE_URL=... SUPABASE_KEY=... pytest -m integration UnitTests/test_multiple_factors.py
+# Expected regression values ($5.29, 429.07%) were calibrated against the old OOP
+# code path with 3 factors. Re-calibrate if normalize_series shifts results.
 @pytest.mark.integration
 @pytest.mark.slow
 @pytest.mark.skipif(
@@ -14,26 +17,33 @@ import os
 )
 class TestFactorLakePortfolio(unittest.TestCase):
     def setUp(self):
-        self.data = load_data(use_supabase=True)
-        
-        # Ensure 'Year' column exists for consistency
-        if 'Year' not in self.data.columns:
-            self.data['Year'] = pd.to_datetime(self.data['Date']).dt.year
-        
+        if not hasattr(st, 'session_state'):
+            st.session_state = {}
+        st.session_state.setdefault('exclude_fossil_fuels', False)
+        st.session_state.setdefault('selected_sectors', [])
+
+        manager = SupabaseManager()
+        self.data = manager.fetch_all_data()
+
         self.start_year = 2002
         self.end_year = 2023
         self.initial_aum = 1
-        self.expected_final_value = 5.29 #supabase data sig digitss
+        self.expected_final_value = 5.29  # supabase data sig digits
         self.expected_growth = 429.07
-        self.factors = [Momentum6m(), ROE(), ROA()]
-        self.restrict_fossil_fuels = False  # Allow flexibility for testing both scenarios
+        self.factors = ['6-Mo_Momentum', 'ROE_using_9-30_Data', 'ROA_using_9-30_Data']
+        self.factor_directions = {
+            '6-Mo_Momentum': 'top',
+            'ROE_using_9-30_Data': 'top',
+            'ROA_using_9-30_Data': 'top',
+        }
 
     def test_portfolio_growth(self):
         portfolio_result = rebalance_portfolio(
-            self.data, self.factors, self.start_year, self.end_year, self.initial_aum, restrict_fossil_fuels=self.restrict_fossil_fuels
+            self.data, self.factors, self.factor_directions,
+            self.start_year, self.end_year, self.initial_aum
         )
-        
-        final_aum = portfolio_result["final_value"]  # Adjusted to access correct structure
+
+        final_aum = portfolio_result["final_value"]
 
         self.assertAlmostEqual(
             final_aum,

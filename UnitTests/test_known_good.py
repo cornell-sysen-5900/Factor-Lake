@@ -1,11 +1,15 @@
-from src.factor_registry import Momentum6m
-from src.market_object import load_data
+from src.supabase_client import SupabaseManager
 from src.backtest_engine import rebalance_portfolio
 import unittest
-import pandas as pd
 import pytest
 import os
+import streamlit as st
 
+# TODO(supabase): Once Supabase creds are restored, run this with:
+#   SUPABASE_URL=... SUPABASE_KEY=... pytest -m integration UnitTests/test_known_good.py
+# Expected regression values ($4.42, 341.94%) were calibrated against the old OOP
+# code path. If the new normalize_series path shifts results beyond delta=0.01,
+# re-calibrate expected_final_value and expected_growth against a verified run.
 @pytest.mark.integration
 @pytest.mark.slow
 @pytest.mark.skipif(
@@ -14,21 +18,28 @@ import os
 )
 class TestFactorLakePortfolio(unittest.TestCase):
     def setUp(self):
-        self.data = load_data(use_supabase=True)
-        
-        # Ensure 'Year' column exists for consistency
-        if 'Year' not in self.data.columns:
-            self.data['Year'] = pd.to_datetime(self.data['Date']).dt.year
-        
+        # Initialize minimal streamlit session state for filter_universe
+        if not hasattr(st, 'session_state'):
+            st.session_state = {}
+        st.session_state.setdefault('exclude_fossil_fuels', False)
+        st.session_state.setdefault('selected_sectors', [])
+
+        manager = SupabaseManager()
+        self.data = manager.fetch_all_data()
+
         self.start_year = 2002
         self.end_year = 2023
         self.initial_aum = 1
-        self.expected_final_value = 4.42 #error in supabase data sig digits
+        self.expected_final_value = 4.42  # error in supabase data sig digits
         self.expected_growth = 341.94
-        self.factors = [Momentum6m()]
+        self.factors = ['6-Mo_Momentum']
+        self.factor_directions = {'6-Mo_Momentum': 'top'}
 
     def test_portfolio_growth(self):
-        portfolio_result = rebalance_portfolio(self.data, self.factors, self.start_year, self.end_year, self.initial_aum)
+        portfolio_result = rebalance_portfolio(
+            self.data, self.factors, self.factor_directions,
+            self.start_year, self.end_year, self.initial_aum
+        )
         final_aum = portfolio_result["final_value"]
 
         self.assertAlmostEqual(
@@ -43,7 +54,7 @@ class TestFactorLakePortfolio(unittest.TestCase):
             overall_growth,
             self.expected_growth,
             delta=0.1,
-            msg=f'Expected overall growth: {self.expected_growth}%, but got {overall_growth}%'  # Fixed the closing quote
+            msg=f'Expected overall growth: {self.expected_growth}%, but got {overall_growth}%'
         )
 
 if __name__ == '__main__':
