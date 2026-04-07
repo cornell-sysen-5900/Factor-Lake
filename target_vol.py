@@ -5,10 +5,12 @@ import matplotlib.pyplot as plt
 import random
 from pathlib import Path
 
+random.seed(42)
+
 # --- SETTINGS & CONFIG ---
-TARGET_VOL = 0.08
-BURN_IN = 252
-MAX_LEVERAGE = 3.0
+TARGET_VOL = 0.1
+BURN_IN = 60
+MAX_LEVERAGE = 5
 START_YEAR = 2010
 END_YEAR = 2024
 # Options: 'D' (Daily), 'W' (Weekly), 'M' (Monthly), 'Q' (Quarterly)
@@ -24,29 +26,26 @@ def load_data(file_name="r2000_price_crsp.csv"):
     return df.dropna().sort_values('date')
 
 def solve_weights(cov_matrix, target_vol, max_leverage):
-    """Uses CVXPY to find optimal weights for 100 stocks."""
     n = cov_matrix.shape[0]
     w = cp.Variable(n)
-    
-    # Portfolio Variance (Annualized)
-    # We use 252 * w.T @ Cov @ w
     portfolio_variance = cp.quad_form(w, cov_matrix) * 252
     
-    # Objective: Minimize variance (or just find a feasible point hitting the target)
-    prob = cp.Problem(cp.Minimize(portfolio_variance), [
-        portfolio_variance <= target_vol**2,
+    # CONSTRAINT: Force the variance to be EXACTLY the target squared
+    prob = cp.Problem(cp.Minimize(cp.sum(w)), [
+        portfolio_variance == target_vol**2, 
         cp.sum(w) <= max_leverage,
         w >= 0
     ])
     
     try:
+        # Using ECOS or OSQP; ensure the problem is feasible
         prob.solve(solver=cp.ECOS)
         if w.value is None:
-            return np.ones(n) / n * (target_vol / 0.20) # Fallback
+            # If 15% is impossible with 6x leverage, fallback to max leverage equal-weight
+            return np.ones(n) / n * max_leverage 
         return w.value
     except:
-        return np.ones(n) / n * 0.5 # Safe fallback
-
+        return np.ones(n) / n * (target_vol / 0.20)
 
 def build_yearly_metrics(results):
     yearly = results.groupby(results.index.year).agg(['mean', 'std'])
