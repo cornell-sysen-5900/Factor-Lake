@@ -75,7 +75,7 @@ class SupabaseManager:
         # Merge delisting dates from last_price_mapping for time-adjusted strategies
         lpm = self.fetch_last_price_mapping()
         if not lpm.empty:
-            df = df.merge(lpm[['Ticker-Region', 'Delist_Date']], on='Ticker-Region', how='left')
+            df = df.merge(lpm[['Ticker-Region', 'Delist_Date', 'Delist_Price']], on='Ticker-Region', how='left')
 
         return df
 

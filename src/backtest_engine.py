@@ -238,10 +238,12 @@ def _calculate_annual_return(portfolios: List[Portfolio], df_year: pd.DataFrame,
 
     holding_end = datetime.date(rebalance_year + 1, 12, 31)
     has_delist_date = 'Delist_Date' in df_year.columns
+    has_delist_price = 'Delist_Price' in df_year.columns
 
     live_positions = []       # (position_value, return)
-    delisted_value = 0.0
-    delisted_fractions = []   # time-fraction remaining after delist
+    delisted_pre_profit = 0.0 # profit earned before delisting
+    delisted_post_capital = [] # (capital_at_delist, fraction) for post-delist strategies
+    delisted_value = 0.0      # total position value at formation
     delisted_count = 0
 
     for p in portfolios:
@@ -256,7 +258,16 @@ def _calculate_annual_return(portfolios: List[Portfolio], df_year: pd.DataFrame,
             ret_val = df_year.loc[t, 'Next-Years_Return']
 
             if pd.isna(ret_val):
-                # Compute fraction of holding year remaining after delist
+                # Pre-delist return: actual price change from formation to delisting
+                partial_return = 0.0
+                if has_delist_price:
+                    dp = df_year.loc[t, 'Delist_Price']
+                    if pd.notna(dp) and dp >= 0:
+                        partial_return = (dp / price) - 1.0
+                delisted_pre_profit += pos_val * partial_return
+                capital_at_delist = pos_val * (1.0 + partial_return)
+
+                # Post-delist fraction: time remaining in holding year
                 fraction = 0.5  # default when date unknown
                 if has_delist_date:
                     delist_dt = df_year.loc[t, 'Delist_Date']
@@ -266,7 +277,7 @@ def _calculate_annual_return(portfolios: List[Portfolio], df_year: pd.DataFrame,
                         remaining_days = max(0, (holding_end - delist_dt).days)
                         fraction = remaining_days / 365.0
                 delisted_value += pos_val
-                delisted_fractions.append((pos_val, fraction))
+                delisted_post_capital.append((capital_at_delist, fraction))
                 delisted_count += 1
             else:
                 live_positions.append((pos_val, ret_val / 100.0))
@@ -280,21 +291,23 @@ def _calculate_annual_return(portfolios: List[Portfolio], df_year: pd.DataFrame,
     live_profit = sum(pv * ret for pv, ret in live_positions)
 
     if delisting_strategy == 'hold_cash':
-        delisted_profit = sum(
-            risk_free_rate * frac * pv for pv, frac in delisted_fractions
+        post_profit = sum(
+            risk_free_rate * frac * cap for cap, frac in delisted_post_capital
         )
     elif delisting_strategy == 'reinvest':
         if live_value > 0:
-            delisted_profit = sum(
-                frac * (pv / live_value) * sum(lv * lr for lv, lr in live_positions)
-                for pv, frac in delisted_fractions
-            ) if delisted_fractions else 0.0
+            live_return = sum(pv * ret for pv, ret in live_positions) / live_value
+            post_profit = sum(
+                frac * cap * live_return
+                for cap, frac in delisted_post_capital
+            ) if delisted_post_capital else 0.0
         else:
-            delisted_profit = 0.0
+            post_profit = 0.0
     else:  # 'zero_return'
-        delisted_profit = 0.0
+        post_profit = 0.0
 
-    return (live_profit + delisted_profit) / total_val, delisted_count
+    total_profit = live_profit + delisted_pre_profit + post_profit
+    return total_profit / total_val, delisted_count
 
 
 def run_cohort_comparison(data: pd.DataFrame, 

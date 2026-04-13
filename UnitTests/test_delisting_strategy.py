@@ -185,6 +185,80 @@ class TestEdgeCases:
         ret, _ = _calculate_annual_return([p], df, delisting_strategy='reinvest', rebalance_year=2010)
         assert ret == pytest.approx(0.0, abs=1e-9)
 
+    def test_pre_delist_return_positive(self):
+        """Stock gains 50% before delisting; post-delist capital reflects that."""
+        df = pd.DataFrame({
+            'Ending_Price': [100.0, 100.0],
+            'Next-Years_Return': [20.0, np.nan],
+            'Delist_Date': [pd.NaT, pd.Timestamp('2011-07-01')],
+            'Delist_Price': [np.nan, 150.0],  # gained 50%
+        }, index=['LIVE', 'DEAD'])
+        p = Portfolio(name="test")
+        p.add_investment('LIVE', 1.0)
+        p.add_investment('DEAD', 1.0)
+
+        frac = (datetime.date(2011, 12, 31) - datetime.date(2011, 7, 1)).days / 365.0
+        pre_profit = 100.0 * 0.50  # 50% gain before delist
+        capital_at_delist = 150.0
+        rf = 0.04
+
+        # hold_cash: live profit + pre-delist profit + rf on capital_at_delist
+        ret, count = _calculate_annual_return(
+            [p], df, delisting_strategy='hold_cash', risk_free_rate=rf, rebalance_year=2010
+        )
+        live_profit = 100.0 * 0.20
+        post_profit = rf * frac * capital_at_delist
+        expected = (live_profit + pre_profit + post_profit) / 200.0
+        assert ret == pytest.approx(expected, abs=1e-9)
+        assert count == 1
+
+    def test_pre_delist_return_negative(self):
+        """Stock crashes 80% before delisting; post-delist capital is small."""
+        df = pd.DataFrame({
+            'Ending_Price': [100.0],
+            'Next-Years_Return': [np.nan],
+            'Delist_Date': [pd.Timestamp('2011-03-01')],
+            'Delist_Price': [20.0],  # lost 80%
+        }, index=['DEAD'])
+        p = Portfolio(name="test")
+        p.add_investment('DEAD', 1.0)
+
+        frac = (datetime.date(2011, 12, 31) - datetime.date(2011, 3, 1)).days / 365.0
+        pre_profit = 100.0 * -0.80  # -80
+        capital_at_delist = 20.0
+
+        # zero_return: pre-delist loss counted, no post-delist profit
+        ret, _ = _calculate_annual_return(
+            [p], df, delisting_strategy='zero_return', rebalance_year=2010
+        )
+        expected = pre_profit / 100.0  # -80/100 = -0.80
+        assert ret == pytest.approx(expected, abs=1e-9)
+
+        # hold_cash: pre-delist loss + small RF on remaining capital
+        ret, _ = _calculate_annual_return(
+            [p], df, delisting_strategy='hold_cash', risk_free_rate=0.05, rebalance_year=2010
+        )
+        expected = (pre_profit + 0.05 * frac * capital_at_delist) / 100.0
+        assert ret == pytest.approx(expected, abs=1e-9)
+
+    def test_pre_delist_return_missing_price_defaults_zero(self):
+        """No Delist_Price column → partial return is 0%, same as before."""
+        df = pd.DataFrame({
+            'Ending_Price': [100.0, 100.0],
+            'Next-Years_Return': [10.0, np.nan],
+            'Delist_Date': [pd.NaT, pd.Timestamp('2011-07-01')],
+        }, index=['LIVE', 'DEAD'])
+        p = Portfolio(name="test")
+        p.add_investment('LIVE', 1.0)
+        p.add_investment('DEAD', 1.0)
+
+        # No Delist_Price → pre_profit=0, capital_at_delist=100
+        ret, _ = _calculate_annual_return(
+            [p], df, delisting_strategy='zero_return', rebalance_year=2010
+        )
+        # Live: 100*0.10=10, Dead pre: 0, Dead post: 0 → 10/200 = 0.05
+        assert ret == pytest.approx(0.05, abs=1e-9)
+
     def test_delist_date_dec31_full_year(self):
         """Stock with Delist_Date on Dec 31 of holding year => fraction ~0."""
         df = pd.DataFrame({
