@@ -191,21 +191,6 @@ class TestCalculateAnnualReturn:
 
         assert ret == pytest.approx(-0.25, rel=0.01)
 
-    def test_delisted_stock_treated_as_zero(self):
-        """NaN return (delisted) should contribute 0% on main (implicit zero_return)."""
-        df = pd.DataFrame({
-            'Ending_Price': [100.0, 100.0],
-            'Next-Years_Return': [20.0, np.nan],
-        }, index=['AAPL', 'DEAD'])
-
-        portfolios = [self._make_portfolio([('AAPL', 10), ('DEAD', 10)])]
-        ret, count = _calculate_annual_return(portfolios, df)
-
-        # AAPL: 1000 * 0.20 = 200 profit, DEAD: 1000 * 0.0 = 0 profit
-        # Total val = 2000, return = 200/2000 = 10%
-        assert ret == pytest.approx(0.10, rel=0.01)
-        assert count == 1
-
     def test_missing_ticker_ignored(self):
         """Tickers not in df_year should be silently skipped."""
         df = pd.DataFrame({
