@@ -1,8 +1,10 @@
 """
-Test suite for delisting strategy functionality.
+Test suite for time-adjusted delisting strategy functionality.
 Tests the three delisting modes: zero_return, hold_cash, reinvest.
+Time fractions are derived from Delist_Date; missing dates default to 0.5.
 """
 import pytest
+import datetime
 import pandas as pd
 import numpy as np
 
@@ -13,9 +15,20 @@ from src.portfolio import Portfolio
 @pytest.fixture
 def df_year_with_delisted():
     """
-    Synthetic year-slice with 3 live stocks and 1 delisted (NaN return).
-    All stocks priced at $100 for simple math.
+    Synthetic year-slice (formation year 2010, holding period 2011).
+    3 live stocks + 1 delisted mid-year (July 1 => ~183 days remaining => fraction ~0.5014).
+    All priced at $100 for simple math.
     """
+    return pd.DataFrame({
+        'Ending_Price': [100.0, 100.0, 100.0, 100.0],
+        'Next-Years_Return': [10.0, 20.0, 30.0, np.nan],
+        'Delist_Date': [pd.NaT, pd.NaT, pd.NaT, pd.Timestamp('2011-07-01')],
+    }, index=['AAPL', 'MSFT', 'GOOGL', 'DEAD'])
+
+
+@pytest.fixture
+def df_year_no_delist_date():
+    """Same as above but without Delist_Date column — should fall back to 0.5."""
     return pd.DataFrame({
         'Ending_Price': [100.0, 100.0, 100.0, 100.0],
         'Next-Years_Return': [10.0, 20.0, 30.0, np.nan],
@@ -31,77 +44,91 @@ def portfolios_with_delisted():
     return [p]
 
 
+# --- Fraction helper ---
+def _july1_fraction():
+    """Fraction of year remaining after July 1 in a 2011 holding period."""
+    return (datetime.date(2011, 12, 31) - datetime.date(2011, 7, 1)).days / 365.0
+
+
 class TestZeroReturn:
-    """Delisted capital earns 0%."""
+    """Delisted capital earns 0% regardless of time fraction."""
 
     def test_basic(self, portfolios_with_delisted, df_year_with_delisted):
         ret, count = _calculate_annual_return(
             portfolios_with_delisted, df_year_with_delisted,
-            delisting_strategy='zero_return'
+            delisting_strategy='zero_return', rebalance_year=2010
         )
         # Live profit: 100*0.10 + 100*0.20 + 100*0.30 = 60
         # Delisted profit: 0
-        # Total value: 400
-        # Return: 60/400 = 0.15
+        # Total value: 400  =>  60/400 = 0.15
         assert ret == pytest.approx(0.15, abs=1e-9)
         assert count == 1
 
     def test_no_delisted(self, df_year_with_delisted):
-        """All-live portfolio should behave the same regardless of strategy."""
         p = Portfolio(name="live_only")
         for t in ['AAPL', 'MSFT', 'GOOGL']:
             p.add_investment(t, 1.0)
         ret, count = _calculate_annual_return(
             [p], df_year_with_delisted,
-            delisting_strategy='zero_return'
+            delisting_strategy='zero_return', rebalance_year=2010
         )
-        # Profit: 10+20+30=60, value=300, return=0.20
         assert ret == pytest.approx(0.20, abs=1e-9)
         assert count == 0
 
 
 class TestHoldCash:
-    """Delisted capital earns risk-free rate."""
+    """Delisted capital earns risk-free rate scaled by time fraction."""
 
-    def test_basic(self, portfolios_with_delisted, df_year_with_delisted):
-        rf = 0.05  # 5%
+    def test_time_adjusted(self, portfolios_with_delisted, df_year_with_delisted):
+        rf = 0.05
+        frac = _july1_fraction()
         ret, count = _calculate_annual_return(
             portfolios_with_delisted, df_year_with_delisted,
-            delisting_strategy='hold_cash',
-            risk_free_rate=rf
+            delisting_strategy='hold_cash', risk_free_rate=rf, rebalance_year=2010
         )
         # Live profit: 60
-        # Delisted profit: 100 * 0.05 = 5
-        # Total: 65 / 400 = 0.1625
-        assert ret == pytest.approx(0.1625, abs=1e-9)
+        # Delisted profit: 100 * 0.05 * fraction
+        # Return: (60 + 100*0.05*frac) / 400
+        expected = (60.0 + 100.0 * rf * frac) / 400.0
+        assert ret == pytest.approx(expected, abs=1e-9)
+        assert count == 1
+
+    def test_fallback_fraction(self, portfolios_with_delisted, df_year_no_delist_date):
+        """Without Delist_Date column, fraction defaults to 0.5."""
+        rf = 0.10
+        ret, count = _calculate_annual_return(
+            portfolios_with_delisted, df_year_no_delist_date,
+            delisting_strategy='hold_cash', risk_free_rate=rf, rebalance_year=2010
+        )
+        expected = (60.0 + 100.0 * rf * 0.5) / 400.0
+        assert ret == pytest.approx(expected, abs=1e-9)
         assert count == 1
 
     def test_zero_rf(self, portfolios_with_delisted, df_year_with_delisted):
         """hold_cash with rf=0 should match zero_return."""
-        ret, count = _calculate_annual_return(
+        ret, _ = _calculate_annual_return(
             portfolios_with_delisted, df_year_with_delisted,
-            delisting_strategy='hold_cash',
-            risk_free_rate=0.0
+            delisting_strategy='hold_cash', risk_free_rate=0.0, rebalance_year=2010
         )
         assert ret == pytest.approx(0.15, abs=1e-9)
-        assert count == 1
 
 
 class TestReinvest:
-    """Delisted capital redistributed pro-rata across surviving positions."""
+    """Delisted capital redistributed pro-rata, scaled by time fraction."""
 
-    def test_basic(self, portfolios_with_delisted, df_year_with_delisted):
+    def test_time_adjusted(self, portfolios_with_delisted, df_year_with_delisted):
+        frac = _july1_fraction()
         ret, count = _calculate_annual_return(
             portfolios_with_delisted, df_year_with_delisted,
-            delisting_strategy='reinvest'
+            delisting_strategy='reinvest', rebalance_year=2010
         )
-        # Live positions: 3 stocks at $100 each, equal weight
-        # Each live stock gets 1/3 of DEAD's $100 capital
-        # Extra profit: (100/300)*100*0.10 + (100/300)*100*0.20 + (100/300)*100*0.30
-        #             = (1/3)*(10+20+30) = 20
-        # Total profit: 60 (live) + 20 (reinvested) = 80
-        # Return: 80 / 400 = 0.20
-        assert ret == pytest.approx(0.20, abs=1e-9)
+        # Live profit from own positions: 60
+        # Live value: 300
+        # Reinvested profit: frac * (100/300) * (live_profit=60) for DEAD's capital
+        #   = frac * (100/300) * 60 = frac * 20
+        # Total: (60 + frac*20) / 400
+        expected = (60.0 + frac * 20.0) / 400.0
+        assert ret == pytest.approx(expected, abs=1e-9)
         assert count == 1
 
     def test_all_delisted(self):
@@ -109,27 +136,27 @@ class TestReinvest:
         df = pd.DataFrame({
             'Ending_Price': [100.0, 100.0],
             'Next-Years_Return': [np.nan, np.nan],
+            'Delist_Date': [pd.Timestamp('2011-06-01'), pd.NaT],
         }, index=['A', 'B'])
         p = Portfolio(name="all_dead")
         p.add_investment('A', 1.0)
         p.add_investment('B', 1.0)
         ret, count = _calculate_annual_return(
-            [p], df, delisting_strategy='reinvest'
+            [p], df, delisting_strategy='reinvest', rebalance_year=2010
         )
         assert ret == pytest.approx(0.0, abs=1e-9)
         assert count == 2
 
 
 class TestEdgeCases:
-    """Edge cases that apply across all strategies."""
+    """Edge cases across all strategies."""
 
     def test_empty_portfolio(self, df_year_with_delisted):
-        """Empty portfolio returns 0."""
         p = Portfolio(name="empty")
         for strategy in ['zero_return', 'hold_cash', 'reinvest']:
             ret, count = _calculate_annual_return(
                 [p], df_year_with_delisted,
-                delisting_strategy=strategy
+                delisting_strategy=strategy, rebalance_year=2010
             )
             assert ret == 0.0
             assert count == 0
@@ -139,20 +166,41 @@ class TestEdgeCases:
         df = pd.DataFrame({
             'Ending_Price': [50.0],
             'Next-Years_Return': [np.nan],
+            'Delist_Date': [pd.Timestamp('2011-10-01')],
         }, index=['DEAD'])
         p = Portfolio(name="solo_dead")
         p.add_investment('DEAD', 2.0)
 
-        # zero_return: 0 profit / 100 total = 0
-        ret, _ = _calculate_annual_return([p], df, delisting_strategy='zero_return')
+        frac = (datetime.date(2011, 12, 31) - datetime.date(2011, 10, 1)).days / 365.0
+
+        # zero_return: always 0
+        ret, _ = _calculate_annual_return([p], df, delisting_strategy='zero_return', rebalance_year=2010)
         assert ret == pytest.approx(0.0, abs=1e-9)
 
-        # hold_cash: 100 * 0.03 / 100 = 0.03
-        ret, _ = _calculate_annual_return(
-            [p], df, delisting_strategy='hold_cash', risk_free_rate=0.03
+        # hold_cash: rf * fraction * value / value = rf * fraction
+        ret, _ = _calculate_annual_return([p], df, delisting_strategy='hold_cash', risk_free_rate=0.03, rebalance_year=2010)
+        assert ret == pytest.approx(0.03 * frac, abs=1e-9)
+
+        # reinvest: no live positions => 0
+        ret, _ = _calculate_annual_return([p], df, delisting_strategy='reinvest', rebalance_year=2010)
+        assert ret == pytest.approx(0.0, abs=1e-9)
+
+    def test_delist_date_dec31_full_year(self):
+        """Stock with Delist_Date on Dec 31 of holding year => fraction ~0."""
+        df = pd.DataFrame({
+            'Ending_Price': [100.0, 100.0],
+            'Next-Years_Return': [20.0, np.nan],
+            'Delist_Date': [pd.NaT, pd.Timestamp('2011-12-31')],
+        }, index=['LIVE', 'DEAD'])
+        p = Portfolio(name="test")
+        p.add_investment('LIVE', 1.0)
+        p.add_investment('DEAD', 1.0)
+
+        # Fraction remaining = 0 days / 365 = 0
+        # hold_cash profit = rf * 0 * 100 = 0, same as zero_return
+        ret, count = _calculate_annual_return(
+            [p], df, delisting_strategy='hold_cash', risk_free_rate=0.05, rebalance_year=2010
         )
-        assert ret == pytest.approx(0.03, abs=1e-9)
-
-        # reinvest: no live positions to redistribute to → 0
-        ret, _ = _calculate_annual_return([p], df, delisting_strategy='reinvest')
-        assert ret == pytest.approx(0.0, abs=1e-9)
+        expected = (100.0 * 0.20 + 0.0) / 200.0  # = 0.10
+        assert ret == pytest.approx(expected, abs=1e-9)
+        assert count == 1
