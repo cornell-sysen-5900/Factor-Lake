@@ -160,8 +160,7 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
     """Executes simulation using a filtered working copy of the master data.
 
     Args:
-        delisting_strategy: how to treat delisted positions. One of
-            'zero_return' (default/legacy), 'hold_cash', or 'reinvest'.
+        delisting_strategy: 'zero_return', 'hold_cash', or 'reinvest'.
     """
 
     # ON-THE-FLY FILTERING: Apply constraints to a copy
@@ -196,7 +195,8 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
         year_ret, delisted_count = _calculate_annual_return(
             yearly_components, df_year,
             delisting_strategy=delisting_strategy,
-            risk_free_rate=rf_by_year.get(year, 0.0)
+            risk_free_rate=rf_by_year.get(year, 0.0),
+            rebalance_year=year
         )
         total_delisted += delisted_count
         portfolio_returns.append(year_ret)
@@ -211,34 +211,37 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
 
     min_len = min(len(portfolio_returns), len(bench_rets), len(growth_rets), len(value_rets))
 
-    return compute_comprehensive_metrics(
+    results = compute_comprehensive_metrics(
         np.array(portfolio_returns[:min_len]), bench_rets[:min_len],
         growth_rets[:min_len], value_rets[:min_len], rf_rates[:min_len],
-        portfolio_values[:min_len + 1], start_year, start_year + min_len,
-        delisting_strategy=delisting_strategy,
-        total_delisted_positions=total_delisted
+        portfolio_values[:min_len + 1], start_year, start_year + min_len
     )
+    results['delisting_strategy'] = delisting_strategy
+    results['total_delisted_positions'] = total_delisted
+    return results
 
 def _calculate_annual_return(portfolios: List[Portfolio], df_year: pd.DataFrame,
                              delisting_strategy: str = 'zero_return',
-                             risk_free_rate: float = 0.0) -> Tuple[float, int]:
-    """Realized return logic based on SQL 'Next-Years_Return'.
+                             risk_free_rate: float = 0.0,
+                             rebalance_year: int = 0) -> Tuple[float, int]:
+    """Realized return logic with time-adjusted delisting handling.
 
     Args:
-        delisting_strategy: how to handle positions whose stock was delisted
-            (NaN in Next-Years_Return) during the holding period:
-            - 'zero_return': treat as 0% return (legacy behaviour).
-            - 'hold_cash': earn the risk-free rate on delisted capital.
-            - 'reinvest': redistribute delisted capital pro-rata across
-              surviving positions.
-        risk_free_rate: annual risk-free rate as a decimal (e.g. 0.02).
-            Only used when delisting_strategy='hold_cash'.
+        delisting_strategy: 'zero_return', 'hold_cash', or 'reinvest'.
+        risk_free_rate: annual RF rate as decimal (e.g. 0.02).
+        rebalance_year: formation year; holding period is rebalance_year+1.
 
     Returns:
         (annual_return, delisted_count)
     """
-    live_positions = []      # (position_value, return)
+    import datetime
+
+    holding_end = datetime.date(rebalance_year + 1, 12, 31)
+    has_delist_date = 'Delist_Date' in df_year.columns
+
+    live_positions = []       # (position_value, return)
     delisted_value = 0.0
+    delisted_fractions = []   # time-fraction remaining after delist
     delisted_count = 0
 
     for p in portfolios:
@@ -253,7 +256,17 @@ def _calculate_annual_return(portfolios: List[Portfolio], df_year: pd.DataFrame,
             ret_val = df_year.loc[t, 'Next-Years_Return']
 
             if pd.isna(ret_val):
+                # Compute fraction of holding year remaining after delist
+                fraction = 0.5  # default when date unknown
+                if has_delist_date:
+                    delist_dt = df_year.loc[t, 'Delist_Date']
+                    if pd.notna(delist_dt):
+                        if hasattr(delist_dt, 'date'):
+                            delist_dt = delist_dt.date()
+                        remaining_days = max(0, (holding_end - delist_dt).days)
+                        fraction = remaining_days / 365.0
                 delisted_value += pos_val
+                delisted_fractions.append((pos_val, fraction))
                 delisted_count += 1
             else:
                 live_positions.append((pos_val, ret_val / 100.0))
@@ -267,13 +280,15 @@ def _calculate_annual_return(portfolios: List[Portfolio], df_year: pd.DataFrame,
     live_profit = sum(pv * ret for pv, ret in live_positions)
 
     if delisting_strategy == 'hold_cash':
-        delisted_profit = risk_free_rate * delisted_value
+        delisted_profit = sum(
+            risk_free_rate * frac * pv for pv, frac in delisted_fractions
+        )
     elif delisting_strategy == 'reinvest':
         if live_value > 0:
             delisted_profit = sum(
-                (pv / live_value) * delisted_value * ret
-                for pv, ret in live_positions
-            )
+                frac * (pv / live_value) * sum(lv * lr for lv, lr in live_positions)
+                for pv, frac in delisted_fractions
+            ) if delisted_fractions else 0.0
         else:
             delisted_profit = 0.0
     else:  # 'zero_return'
