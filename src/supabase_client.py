@@ -70,7 +70,42 @@ class SupabaseManager:
             logger.warning("Ingestion process completed but returned an empty dataset.")
             return df
 
-        return self._standardize_dataframe(df)
+        df = self._standardize_dataframe(df)
+
+        # Merge delisting dates from last_price_mapping for time-adjusted strategies
+        lpm = self.fetch_last_price_mapping()
+        if not lpm.empty:
+            df = df.merge(lpm[['Ticker-Region', 'Delist_Date']], on='Ticker-Region', how='left')
+
+        return df
+
+    def fetch_last_price_mapping(self) -> pd.DataFrame:
+        """Retrieves the last_price_mapping table containing delisting dates and prices."""
+        page_size = 1000
+        offset = 0
+        all_rows = []
+
+        try:
+            while True:
+                response = self.client.table('last_price_mapping').select('*').range(offset, offset + page_size - 1).execute()
+                batch = response.data if hasattr(response, 'data') else []
+                if not batch:
+                    break
+                all_rows.extend(batch)
+                if len(batch) < page_size:
+                    break
+                offset += page_size
+        except Exception as e:
+            logger.error(f"Failed to fetch last_price_mapping: {str(e)}")
+            return pd.DataFrame()
+
+        if not all_rows:
+            return pd.DataFrame()
+
+        lpm = pd.DataFrame(all_rows)
+        lpm = lpm.rename(columns={'ticker': 'Ticker-Region', 'last_date': 'Delist_Date', 'last_price': 'Delist_Price'})
+        lpm['Delist_Date'] = pd.to_datetime(lpm['Delist_Date'], errors='coerce')
+        return lpm
 
     def _standardize_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """
