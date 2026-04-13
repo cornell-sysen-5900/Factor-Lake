@@ -13,7 +13,6 @@ from typing import Dict, Any, List, Tuple
 from Visualizations.portfolio_growth_plot import plot_portfolio_growth
 from Visualizations.top_bottom_portfolio_plot import plot_top_bottom_percent
 import src.backtest_engine as backtest_engine
-from src.benchmarks import get_benchmark_list
 
 def render_results_tab(results: Dict[str, Any], user_settings: Dict[str, Any]) -> None:
     """
@@ -246,6 +245,7 @@ def _render_cohort_analysis_section(results: Dict[str, Any], user_settings: Dict
         if st.button("Generate Comparison", type="primary"):
             factors = st.session_state.get('selected_factor_names') or st.session_state.get('selected_factors', [])
             
+            # This now returns lists because of the engine fix above
             res_top, res_bot = backtest_engine.run_cohort_comparison(
                 data=st.session_state.rdata,
                 selected_factors=factors,
@@ -259,6 +259,7 @@ def _render_cohort_analysis_section(results: Dict[str, Any], user_settings: Dict
             init_aum = user_settings['initial_aum']
             num_years = len(results['years'])
             
+            # Using [-1] is safe now because res_top is a list again
             stats_df = pd.DataFrame({
                 "Metric": ["Total Return (%)", "Final Value ($)", "CAGR (%)"],
                 "Top Cohort": [
@@ -273,24 +274,14 @@ def _render_cohort_analysis_section(results: Dict[str, Any], user_settings: Dict
                 ]
             })
             st.table(stats_df)
-            
-            # --- DATA RETRIEVAL FOR NEW PLOT PARAMS ---
-            start_year = results['years'][0]
-            # get_benchmark_list uses exclusive end_year; len(years)-1 gives number of return periods
-            end_year = start_year + (len(results['years']) - 1)
-            
-            growth_rets = get_benchmark_list(index=2, start_year=start_year, end_year=end_year)
-            value_rets = get_benchmark_list(index=3, start_year=start_year, end_year=end_year)
+            # -------------------------
 
-            # --- PLOT GENERATION ---
             fig = plot_top_bottom_percent(
                 years=results['years'],
                 percent=cohort_pct,
                 show_bottom=True,
                 benchmark_returns=results.get('benchmark_returns'),
-                growth_returns=growth_rets,
-                value_returns=value_rets,
-                initial_investment=init_aum,
+                initial_investment=user_settings['initial_aum'],
                 baseline_portfolio_values=results['portfolio_values'],
                 precomputed_top=res_top,
                 precomputed_bot=res_bot
