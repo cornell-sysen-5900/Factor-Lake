@@ -71,7 +71,20 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
         )
 
         st.divider()
-        
+
+        # Delisting Strategy
+        st.subheader("Delisting Strategy")
+        delisting_strategy = st.radio(
+            "How to treat delisted positions:",
+            options=["Zero Return", "Hold Cash", "Reinvest"],
+            index=0,
+            help="Zero Return: 0% on delisted capital. Hold Cash: earn risk-free rate (time-adjusted). Reinvest: redistribute pro-rata to survivors."
+        )
+        delisting_map = {"Zero Return": "zero_return", "Hold Cash": "hold_cash", "Reinvest": "reinvest"}
+        delisting_strategy_key = delisting_map[delisting_strategy]
+
+        st.divider()
+
         # Sector Exposure Configuration
         st.subheader("Sector Selection")
         sector_filter_enabled = st.checkbox("Enable Sector Filter", value=False)
@@ -137,5 +150,6 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
         "sector_filter_enabled": sector_filter_enabled,
         "start_year": start_year,
         "end_year": end_year,
-        "initial_aum": initial_aum
+        "initial_aum": initial_aum,
+        "delisting_strategy": delisting_strategy_key
     }

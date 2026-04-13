@@ -224,6 +224,10 @@ def _render_header_captions(settings: Dict[str, Any]) -> None:
     st.caption(f"**Weighting:** {weighting_str}")
     st.caption(f"**Delisting Strategy:** {delisting_str}")
 
+    delisting_label = {"zero_return": "Zero Return", "hold_cash": "Hold Cash", "reinvest": "Reinvest"}
+    strategy = settings.get('delisting_strategy', 'zero_return')
+    st.caption(f"**Delisting Strategy:** {delisting_label.get(strategy, strategy)}")
+
 def _render_summary_metrics(res: Dict[str, Any], settings: Dict[str, Any]) -> None:
     """
     Calculates and displays core summary metrics for the reporting period.
