@@ -9,8 +9,8 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Any
 
-def compute_comprehensive_metrics(p_ret: np.ndarray, b_ret: np.ndarray, g_ret: np.ndarray, 
-                                 v_ret: np.ndarray, rf: np.ndarray, 
+def compute_comprehensive_metrics(p_ret: np.ndarray, b_ret: np.ndarray, g_ret: np.ndarray,
+                                 v_ret: np.ndarray, rf: np.ndarray,
                                  p_vals: List[float], start: int, end: int) -> Dict[str, Any]:
     """Calculates risk/return metrics across all benchmarks."""
     

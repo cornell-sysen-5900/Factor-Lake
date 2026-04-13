@@ -152,34 +152,53 @@ def calculate_holdings(
                 
     return portfolio
 
-def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_directions: Dict[str, str], 
-                        start_year: int, end_year: int, initial_aum: float, 
-                        benchmark_index: int = 1, top_pct: float = 10.0, 
-                        use_market_cap_weight: bool = False) -> Dict[str, Any]:
-    """Executes simulation using a filtered working copy of the master data."""
-    
+def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_directions: Dict[str, str],
+                        start_year: int, end_year: int, initial_aum: float,
+                        benchmark_index: int = 1, top_pct: float = 10.0,
+                        use_market_cap_weight: bool = False,
+                        delisting_strategy: str = 'zero_return') -> Dict[str, Any]:
+    """Executes simulation using a filtered working copy of the master data.
+
+    Args:
+        delisting_strategy: 'zero_return', 'hold_cash', or 'reinvest'.
+    """
+
     # ON-THE-FLY FILTERING: Apply constraints to a copy
     exclude_fossil = st.session_state.get('exclude_fossil_fuels', False)
     selected_sectors = st.session_state.get('selected_sectors', [])
-    
+
     working_data = filter_universe(data, exclude_fossil, selected_sectors)
-    
+
     aum = initial_aum
     portfolio_values = [aum]
     portfolio_returns = []
+    total_delisted = 0
+
+    # Pre-fetch risk-free rates for hold_cash strategy
+    rf_by_year = {}
+    if delisting_strategy == 'hold_cash':
+        rf_full = get_benchmark_list(4, start_year, end_year)
+        for i, yr in enumerate(range(start_year, end_year)):
+            rf_by_year[yr] = rf_full[i] if i < len(rf_full) else 0.0
 
     # Simulation Loop
     for year in range(start_year, end_year):
         df_year = working_data[working_data['Year'] == year].set_index('Ticker')
         if df_year.empty: continue
-            
+
         factor_aum = aum / len(factors)
         yearly_components = [
             calculate_holdings(df_year, f, factor_aum, (factor_directions.get(f) == 'top'), top_pct, use_market_cap_weight)
             for f in factors
         ]
 
-        year_ret = _calculate_annual_return(yearly_components, df_year)
+        year_ret, delisted_count = _calculate_annual_return(
+            yearly_components, df_year,
+            delisting_strategy=delisting_strategy,
+            risk_free_rate=rf_by_year.get(year, 0.0),
+            rebalance_year=year
+        )
+        total_delisted += delisted_count
         portfolio_returns.append(year_ret)
         aum *= (1 + year_ret)
         portfolio_values.append(aum)
@@ -189,29 +208,106 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
     bench_rets = np.array(get_benchmark_list(benchmark_index, start_year + 1, end_year + 1)) / 100.0
     growth_rets = np.array(get_benchmark_list(2, start_year + 1, end_year + 1)) / 100.0
     value_rets = np.array(get_benchmark_list(3, start_year + 1, end_year + 1)) / 100.0
-    
+
     min_len = min(len(portfolio_returns), len(bench_rets), len(growth_rets), len(value_rets))
-    
-    return compute_comprehensive_metrics(
-        np.array(portfolio_returns[:min_len]), bench_rets[:min_len], 
-        growth_rets[:min_len], value_rets[:min_len], rf_rates[:min_len], 
+
+    results = compute_comprehensive_metrics(
+        np.array(portfolio_returns[:min_len]), bench_rets[:min_len],
+        growth_rets[:min_len], value_rets[:min_len], rf_rates[:min_len],
         portfolio_values[:min_len + 1], start_year, start_year + min_len
     )
+    results['delisting_strategy'] = delisting_strategy
+    results['total_delisted_positions'] = total_delisted
+    return results
 
-def _calculate_annual_return(portfolios: List[Portfolio], df_year: pd.DataFrame) -> float:
-    """Realized return logic based on SQL 'Next-Years_Return'."""
-    total_val, total_profit = 0.0, 0.0
+def _calculate_annual_return(portfolios: List[Portfolio], df_year: pd.DataFrame,
+                             delisting_strategy: str = 'zero_return',
+                             risk_free_rate: float = 0.0,
+                             rebalance_year: int = 0) -> Tuple[float, int]:
+    """Realized return logic with time-adjusted delisting handling.
+
+    Args:
+        delisting_strategy: 'zero_return', 'hold_cash', or 'reinvest'.
+        risk_free_rate: annual RF rate as decimal (e.g. 0.02).
+        rebalance_year: formation year; holding period is rebalance_year+1.
+
+    Returns:
+        (annual_return, delisted_count)
+    """
+    import datetime
+
+    holding_end = datetime.date(rebalance_year + 1, 12, 31)
+    has_delist_date = 'Delist_Date' in df_year.columns
+    has_delist_price = 'Delist_Price' in df_year.columns
+
+    live_positions = []       # (position_value, return)
+    delisted_pre_profit = 0.0 # profit earned before delisting
+    delisted_post_capital = [] # (capital_at_delist, fraction) for post-delist strategies
+    delisted_value = 0.0      # total position value at formation
+    delisted_count = 0
+
     for p in portfolios:
         for inv in p.investments:
             t = inv['ticker']
-            if t in df_year.index:
-                price = df_year.loc[t, 'Ending_Price']
-                ret_val = df_year.loc[t, 'Next-Years_Return']
-                ret = (ret_val / 100.0) if not pd.isna(ret_val) else 0.0
-                pos_val = inv['number_of_shares'] * price
-                total_val += pos_val
-                total_profit += pos_val * ret
-    return total_profit / total_val if total_val > 0 else 0.0
+            if t not in df_year.index:
+                continue
+            price = df_year.loc[t, 'Ending_Price']
+            if pd.isna(price) or price <= 0:
+                continue
+            pos_val = inv['number_of_shares'] * price
+            ret_val = df_year.loc[t, 'Next-Years_Return']
+
+            if pd.isna(ret_val):
+                # Pre-delist return: actual price change from formation to delisting
+                partial_return = 0.0
+                if has_delist_price:
+                    dp = df_year.loc[t, 'Delist_Price']
+                    if pd.notna(dp) and dp >= 0:
+                        partial_return = (dp / price) - 1.0
+                delisted_pre_profit += pos_val * partial_return
+                capital_at_delist = pos_val * (1.0 + partial_return)
+
+                # Post-delist fraction: time remaining in holding year
+                fraction = 0.5  # default when date unknown
+                if has_delist_date:
+                    delist_dt = df_year.loc[t, 'Delist_Date']
+                    if pd.notna(delist_dt):
+                        if hasattr(delist_dt, 'date'):
+                            delist_dt = delist_dt.date()
+                        remaining_days = max(0, (holding_end - delist_dt).days)
+                        fraction = remaining_days / 365.0
+                delisted_value += pos_val
+                delisted_post_capital.append((capital_at_delist, fraction))
+                delisted_count += 1
+            else:
+                live_positions.append((pos_val, ret_val / 100.0))
+
+    live_value = sum(pv for pv, _ in live_positions)
+    total_val = live_value + delisted_value
+
+    if total_val == 0:
+        return 0.0, 0
+
+    live_profit = sum(pv * ret for pv, ret in live_positions)
+
+    if delisting_strategy == 'hold_cash':
+        post_profit = sum(
+            risk_free_rate * frac * cap for cap, frac in delisted_post_capital
+        )
+    elif delisting_strategy == 'reinvest':
+        if live_value > 0:
+            live_return = sum(pv * ret for pv, ret in live_positions) / live_value
+            post_profit = sum(
+                frac * cap * live_return
+                for cap, frac in delisted_post_capital
+            ) if delisted_post_capital else 0.0
+        else:
+            post_profit = 0.0
+    else:  # 'zero_return'
+        post_profit = 0.0
+
+    total_profit = live_profit + delisted_pre_profit + post_profit
+    return total_profit / total_val, delisted_count
 
 
 def run_cohort_comparison(data: pd.DataFrame, 
