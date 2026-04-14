@@ -5,11 +5,9 @@ import pytest
 import os
 import streamlit as st
 
-# TODO(supabase): Once Supabase creds are restored, run this with:
-#   SUPABASE_URL=... SUPABASE_KEY=... pytest -m integration UnitTests/test_known_good.py
-# Expected regression values ($4.42, 341.94%) were calibrated against the old OOP
-# code path. If the new normalize_series path shifts results beyond delta=0.01,
-# re-calibrate expected_final_value and expected_growth against a verified run.
+# Regression values recalibrated 2026-04-13 against live Supabase data
+# after time-adjusted delisting engine (pre-delist returns via last_price_mapping).
+# Run with: SUPABASE_URL=... SUPABASE_KEY=... pytest -m integration IntegrationTests/test_known_good.py
 @pytest.mark.integration
 @pytest.mark.slow
 @pytest.mark.skipif(
@@ -30,8 +28,8 @@ class TestFactorLakePortfolio(unittest.TestCase):
         self.start_year = 2002
         self.end_year = 2023
         self.initial_aum = 1
-        self.expected_final_value = 4.42  # error in supabase data sig digits
-        self.expected_growth = 341.94
+        self.expected_final_value = 6.94  # recalibrated after time-adjusted delisting engine
+        self.expected_growth = 594.09
         self.factors = ['6-Mo_Momentum']
         self.factor_directions = {'6-Mo_Momentum': 'top'}
 

@@ -5,10 +5,9 @@ import pytest
 import os
 import streamlit as st
 
-# TODO(supabase): Once Supabase creds are restored, run this with:
-#   SUPABASE_URL=... SUPABASE_KEY=... pytest -m integration UnitTests/test_multiple_factors.py
-# Expected regression values ($5.29, 429.07%) were calibrated against the old OOP
-# code path with 3 factors. Re-calibrate if normalize_series shifts results.
+# Regression values recalibrated 2026-04-13 against live Supabase data
+# after time-adjusted delisting engine (pre-delist returns via last_price_mapping).
+# Run with: SUPABASE_URL=... SUPABASE_KEY=... pytest -m integration IntegrationTests/test_multiple_factors.py
 @pytest.mark.integration
 @pytest.mark.slow
 @pytest.mark.skipif(
@@ -28,8 +27,8 @@ class TestFactorLakePortfolio(unittest.TestCase):
         self.start_year = 2002
         self.end_year = 2023
         self.initial_aum = 1
-        self.expected_final_value = 5.29  # supabase data sig digits
-        self.expected_growth = 429.07
+        self.expected_final_value = 8.36  # recalibrated after time-adjusted delisting engine
+        self.expected_growth = 736.00
         self.factors = ['6-Mo_Momentum', 'ROE_using_9-30_Data', 'ROA_using_9-30_Data']
         self.factor_directions = {
             '6-Mo_Momentum': 'top',
