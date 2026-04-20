@@ -2,17 +2,31 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/components/results_tab.py
 PURPOSE: Visualization of results with strict adherence to original metrics and formatting.
-VERSION: 3.6.1
+VERSION: 3.6.2
 """
 
 import streamlit as st
 import pandas as pd
 import numpy as np
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 
 from Visualizations.portfolio_growth_plot import plot_portfolio_growth
 from Visualizations.top_bottom_portfolio_plot import plot_top_bottom_percent
 import src.backtest_engine as backtest_engine
+from app.streamlit_config import FACTOR_METADATA
+
+
+def _build_wealth_series(returns: Optional[List[float]], initial: float) -> Optional[List[float]]:
+    """
+    Converts a yearly return series (in percent) into a cumulative wealth series.
+    """
+    if not returns:
+        return None
+
+    values = [initial]
+    for r in returns:
+        values.append(values[-1] * (1 + (r / 100.0)))
+    return values
 
 def render_results_tab(results: Dict[str, Any], user_settings: Dict[str, Any]) -> None:
     """
@@ -207,7 +221,7 @@ def _render_header_captions(settings: Dict[str, Any]) -> None:
     """
     Renders identifying metadata regarding the specific backtest configuration.
     """
-    selected_factors = st.session_state.get('selected_factor_names') or st.session_state.get('selected_factors', [])
+    selected_factors = st.session_state.get('selected_factor_names')
     saved_dirs = st.session_state.get('factor_directions', {})
     factors_str = ", ".join([f"{f} ({saved_dirs.get(f, 'top')})" for f in selected_factors])
     weighting_str = "Market Cap Weighted" if settings.get('use_market_cap_weight') else "Equal Weighted"
@@ -255,7 +269,11 @@ def _render_cohort_analysis_section(results: Dict[str, Any], user_settings: Dict
             cohort_pct = st.slider("Cohort Percentage", 1, 50, 10)
         
         if st.button("Generate Comparison", type="primary"):
-            factors = st.session_state.get('selected_factor_names') or st.session_state.get('selected_factors', [])
+            selected_factor_names = st.session_state.get('selected_factor_names', [])
+            factors = [
+                FACTOR_METADATA.get(name, {}).get('column', name)
+                for name in selected_factor_names
+            ]
             
             # This now returns lists because of the engine fix above
             res_top, res_bot = backtest_engine.run_cohort_comparison(
@@ -296,7 +314,15 @@ def _render_cohort_analysis_section(results: Dict[str, Any], user_settings: Dict
                 initial_investment=user_settings['initial_aum'],
                 baseline_portfolio_values=results['portfolio_values'],
                 precomputed_top=res_top,
-                precomputed_bot=res_bot
+                precomputed_bot=res_bot,
+                value_returns=_build_wealth_series(
+                    results.get('value_benchmark_returns'),
+                    user_settings['initial_aum']
+                ),
+                growth_returns=_build_wealth_series(
+                    results.get('growth_benchmark_returns'),
+                    user_settings['initial_aum']
+                )
             )
             st.pyplot(fig)
 
@@ -305,19 +331,14 @@ def _render_growth_plot(res: Dict[str, Any], settings: Dict[str, Any]) -> None:
     Visualizes the growth of $1 (or initial AUM) across the portfolio and benchmarks.
     """
     initial = settings.get('initial_aum', 1000000.0)
-    def build_wealth(rets):
-        if not rets: return None
-        v = [initial]
-        for r in rets: v.append(v[-1] * (1 + (r/100.0)))
-        return v
     
     factors = st.session_state.get('selected_factor_names') or st.session_state.get('selected_factors', [])
     fig = plot_portfolio_growth(
         years=res.get('years', []),
         port_vals=res.get('portfolio_values', []),
-        bench_vals=build_wealth(res.get('benchmark_returns')),
-        val_vals=build_wealth(res.get('value_benchmark_returns')),
-        gro_vals=build_wealth(res.get('growth_benchmark_returns')),
+        bench_vals=_build_wealth_series(res.get('benchmark_returns'), initial),
+        val_vals=_build_wealth_series(res.get('value_benchmark_returns'), initial),
+        gro_vals=_build_wealth_series(res.get('growth_benchmark_returns'), initial),
         factor_names=factors
     )
     st.pyplot(fig)

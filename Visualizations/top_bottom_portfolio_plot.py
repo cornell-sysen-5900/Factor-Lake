@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: Visualizations/top_bottom_portfolio_plot.py
 PURPOSE: Institutional-grade cohort spread analysis visualization.
-VERSION: 2.1.1
+VERSION: 2.1.2
 """
 
 import matplotlib.pyplot as plt
@@ -14,6 +14,8 @@ def plot_top_bottom_percent(
     percent: float = 10.0,
     show_bottom: bool = True,
     benchmark_returns: Optional[List[float]] = None,
+    growth_returns: Optional[List[float]] = None,
+    value_returns: Optional[List[float]] = None,
     benchmark_label: str = 'Russell 2000',
     initial_investment: float = 1000000.0,
     baseline_portfolio_values: Optional[List[float]] = None,
@@ -22,44 +24,53 @@ def plot_top_bottom_percent(
 ) -> plt.Figure:
     """
     Constructs a wealth-index chart comparing performance of top and bottom cohorts.
-    
-    This visualization identifies the predictive power of selected factors by 
-    plotting the divergence between the highest and lowest ranked stocks.
     """
     fig, ax = plt.subplots(figsize=(12, 6), dpi=100)
 
-    # 1. Benchmark Trajectory Construction
-    if benchmark_returns is not None:
-        bench_vals = [initial_investment]
-        for ret in benchmark_returns:
-            # Handle both percentage (8.5) and decimal (0.085) formats
+    def _get_trajectory(series: Optional[List[float]]) -> Optional[List[float]]:
+        if series is None:
+            return None
+
+        if len(series) == 0:
+            return None
+
+        # If the series already looks like wealth levels (same length as years
+        # and starts at the initial investment), plot it directly.
+        if (
+            len(series) == len(years)
+            and abs(float(series[0]) - float(initial_investment)) <= max(1.0, 0.001 * float(initial_investment))
+        ):
+            return series[:len(years)]
+
+        vals = [initial_investment]
+        for ret in series:
             multiplier = (ret / 100.0) if abs(ret) > 1.0 else ret
-            bench_vals.append(bench_vals[-1] * (1 + multiplier))
-        
-        if len(bench_vals) >= len(years):
-            ax.plot(years, bench_vals[:len(years)], label=benchmark_label, color='#d62728', 
-                    linestyle='--', linewidth=1.5, alpha=0.7)
+            vals.append(vals[-1] * (1 + multiplier))
+        return vals[:len(years)]
+
+    # 1. Index Trajectories (Benchmark, Growth, Value)
+    indices = [
+        (benchmark_returns, benchmark_label, '#d62728', '--', None),
+        (growth_returns, 'Growth Index', '#ff7f0e', ':', 'D'),
+        (value_returns, 'Value Index', '#17becf', ':', 's')
+    ]
+
+    for rets, label, color, style, marker in indices:
+        vals = _get_trajectory(rets)
+        if vals and len(vals) == len(years):
+            ax.plot(years, vals, label=label, color=color, linestyle=style, 
+                    marker=marker, markersize=3, linewidth=1.2, alpha=0.6)
 
     # 2. Bottom Cohort (Lower Visual Weight)
     if show_bottom and precomputed_bot is not None:
-        # Resolve either dictionary-style or list-style input
-        if isinstance(precomputed_bot, dict):
-            bot_vals = precomputed_bot.get('portfolio_values', [initial_investment])
-        else:
-            bot_vals = precomputed_bot
-            
+        bot_vals = precomputed_bot.get('portfolio_values', [initial_investment]) if isinstance(precomputed_bot, dict) else precomputed_bot
         if len(bot_vals) >= len(years):
             ax.plot(years, bot_vals[:len(years)], label=f'Bottom {percent}%', color='#9467bd', 
                     marker='v', markersize=4, linewidth=1.5, alpha=0.6)
 
     # 3. Top Cohort (High Contrast)
     if precomputed_top is not None:
-        # Resolve either dictionary-style or list-style input
-        if isinstance(precomputed_top, dict):
-            top_vals = precomputed_top.get('portfolio_values', [initial_investment])
-        else:
-            top_vals = precomputed_top
-
+        top_vals = precomputed_top.get('portfolio_values', [initial_investment]) if isinstance(precomputed_top, dict) else precomputed_top
         if len(top_vals) >= len(years):
             ax.plot(years, top_vals[:len(years)], label=f'Top {percent}%', color='#2ca02c', 
                     marker='^', markersize=5, linewidth=2.0, zorder=4)
@@ -73,22 +84,18 @@ def plot_top_bottom_percent(
 
     # Institutional Chart Formatting
     ax.set_title(f"Factor Efficacy: Top vs. Bottom {percent}% Cohort Spread", 
-                  fontsize=14, fontweight='bold', pad=20)
+                 fontsize=14, fontweight='bold', pad=20)
     ax.set_ylabel("Account Value (USD)", fontsize=11)
     ax.set_xlabel("Year", fontsize=11)
 
-    # Axis and Grid Management
     ax.yaxis.set_major_formatter(mticker.StrMethodFormatter('${x:,.0f}'))
     ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
     
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    ax.grid(True, linestyle='--', alpha=0.4)
-    
-    # Static Reference for Initial Capital
-    ax.axhline(initial_investment, color='#000000', linestyle=':', linewidth=1.2, alpha=0.4)
+    ax.grid(True, linestyle='--', alpha=0.3)
+    ax.axhline(initial_investment, color='#000000', linestyle='-', linewidth=0.8, alpha=0.2)
 
-    ax.legend(loc='upper left', frameon=True, facecolor='white', shadow=True)
-    
+    ax.legend(loc='upper left', frameon=True, facecolor='white', shadow=False, fontsize='small')
     plt.tight_layout()
     return fig
