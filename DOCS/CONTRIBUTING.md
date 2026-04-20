@@ -55,7 +55,7 @@ git commit -m "Added new file and this is my descriptive message."
 git push origin <branch you created in step 4>
 ```
 ### Diagram System Breakdown
-<details>
+<details markdown="1">
 <summary>Portfolio Use Case Diagram</summary>
 
   ![Portfolio Use Case Diagram](./GoogleColabDiagrams/build_portfolio_use_case_042025.drawio.svg)
@@ -65,7 +65,7 @@ git push origin <branch you created in step 4>
 
 </details>
 
-<details>
+<details markdown="1">
 <summary>Class Diagram</summary>
 
   ![Class Diagram](./GoogleColabDiagrams/class_diagram_042025.drawio.svg)
@@ -73,7 +73,7 @@ git push origin <branch you created in step 4>
 
 </details>
 
-<details>
+<details markdown="1">
 <summary>Deployment Diagram</summary>
 
   ![Deployment Diagram](./GoogleColabDiagrams/deployment_042025.drawio.svg)
