@@ -19,6 +19,21 @@ from .portfolio_filters import filter_universe
 from .performance_metrics import compute_comprehensive_metrics
 
 
+def _dedupe_year_slice_by_ticker(df_year: pd.DataFrame) -> pd.DataFrame:
+    """
+    Ensures each ticker appears once in a given rebalance year slice.
+
+    Some source pulls can contain duplicate (Year, Ticker) rows. Downstream
+    `.loc[ticker, col]` access expects a scalar value, so duplicates must be
+    removed to avoid ambiguous Series truth-value errors.
+    """
+    if df_year.empty:
+        return df_year
+    if df_year.index.has_duplicates:
+        return df_year[~df_year.index.duplicated(keep='first')]
+    return df_year
+
+
 def build_ranked_stocks_table(
     data: pd.DataFrame,
     factors: List[str],
@@ -42,7 +57,7 @@ def build_ranked_stocks_table(
     if 'Ticker' not in year_slice.columns:
         return pd.DataFrame()
 
-    df_year = year_slice.set_index('Ticker')
+    df_year = _dedupe_year_slice_by_ticker(year_slice.set_index('Ticker'))
 
     score_components: List[pd.Series] = []
     for factor_col in factors:
@@ -123,7 +138,8 @@ def calculate_holdings(
 
     # 4. Determine Selection Size
     n_select = max(1, math.floor(len(valid_scores) * (top_pct / 100.0)))
-    selected_tickers = valid_scores.head(n_select).index.tolist()
+    # Preserve order while removing duplicate tickers that can appear in some year slices.
+    selected_tickers = list(dict.fromkeys(valid_scores.head(n_select).index.tolist()))
     holdings_data = df_year.loc[selected_tickers]
     
     portfolio = Portfolio(name=f"Portfolio_{factor_key}")
@@ -131,8 +147,9 @@ def calculate_holdings(
     # 5. Calculate Weights (Market Cap vs. Equal Weight)
     if use_market_cap_weight and 'Market_Capitalization' in holdings_data.columns:
         caps = pd.to_numeric(holdings_data['Market_Capitalization'], errors='coerce').fillna(0)
-        if caps.sum() > 0:
-            weights = caps / caps.sum()
+        caps_by_ticker = caps.groupby(level=0).sum()
+        if caps_by_ticker.sum() > 0:
+            weights = caps_by_ticker / caps_by_ticker.sum()
         else:
             weights = pd.Series(1.0 / len(selected_tickers), index=selected_tickers)
     else:
@@ -145,9 +162,24 @@ def calculate_holdings(
     for ticker in selected_tickers:
         if has_price:
             price = holdings_data.loc[ticker, 'Ending_Price']
+            if isinstance(price, pd.Series):
+                price_candidates = pd.to_numeric(price, errors='coerce').dropna()
+                if price_candidates.empty:
+                    continue
+                price = float(price_candidates.iloc[0])
+            else:
+                price = pd.to_numeric(pd.Series([price]), errors='coerce').iloc[0]
+                if pd.isna(price):
+                    continue
+                price = float(price)
+
+            weight = weights.get(ticker, 0.0)
+            if isinstance(weight, pd.Series):
+                weight = pd.to_numeric(weight, errors='coerce').fillna(0).sum()
+            weight = float(weight)
             # Only add investment if price is valid and positive
             if pd.notnull(price) and price > 0:
-                shares = (weights[ticker] * aum) / price
+                shares = (weight * aum) / price
                 portfolio.add_investment(ticker, shares)
                 
     return portfolio
@@ -183,7 +215,9 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
 
     # Simulation Loop
     for year in range(start_year, end_year):
-        df_year = working_data[working_data['Year'] == year].set_index('Ticker')
+        df_year = _dedupe_year_slice_by_ticker(
+            working_data[working_data['Year'] == year].set_index('Ticker')
+        )
         if df_year.empty: continue
 
         factor_aum = aum / len(factors)
