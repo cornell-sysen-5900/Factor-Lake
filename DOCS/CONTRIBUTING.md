@@ -58,7 +58,7 @@ git push origin <branch you created in step 4>
 <details>
 <summary>Portfolio Use Case Diagram</summary>
 
-  ![Portfolio Use Case Diagram](./Diagrams/build_portfolio_use_case_042025.drawio.svg)
+  ![Portfolio Use Case Diagram](./GoogleColabDiagrams/build_portfolio_use_case_042025.drawio.svg)
   <sub><i>This diagram explains how the developer and the portfolio manager interact with the system. The portfolio manager(s) primarily interact with Google Drive and Google Colab, while the developer manages both code and computation via Google Colab and GitHub. This diagram aids in identifying access points and roles therefore supporting secure coding and permission management. </i></sub>
   
 
@@ -68,7 +68,7 @@ git push origin <branch you created in step 4>
 <details>
 <summary>Class Diagram</summary>
 
-  ![Class Diagram](./Diagrams/class_diagram_042025.drawio.svg)
+  ![Class Diagram](./GoogleColabDiagrams/class_diagram_042025.drawio.svg)
   <sub><i>This diagram shows the structure and relationships between major classes in the portfolio construction system. It highlights how user inputs, market data, and various factor classes interact to compute portfolio holdings, returns, and analytics. It is useful for developers that are planning for feature extensions, testing coverage, and/or debugging.</i></sub>
 
 </details>
@@ -76,7 +76,7 @@ git push origin <branch you created in step 4>
 <details>
 <summary>Deployment Diagram</summary>
 
-  ![Deployment Diagram](./Diagrams/deployment_042025.drawio.svg)
+  ![Deployment Diagram](./GoogleColabDiagrams/deployment_042025.drawio.svg)
   <sub><i>This deployment diagram outlines how a user accesses Google Colab to run the factor portfolio notebook. It includes the OAuth-based authentication flow via Cornell IDP and Duo, Google Drive integration for data storage, and repository access from GitHub. It maps the data flow and token exchanges required to mount storage and retrieve market data securely. This is helpful for onboarding new collaborators, security reviews, and cloud resource planning. </i></sub>
 
 </details>
