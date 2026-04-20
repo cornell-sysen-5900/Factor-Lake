@@ -14,6 +14,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Get diagrams from main branch  # ← ADD THIS
+        run: |
+          git fetch origin main
+          git checkout origin/main -- GoogleColabDiagrams
+          cp -r GoogleColabDiagrams DOCS/GoogleColabDiagrams
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
