@@ -35,32 +35,43 @@ def initialize_environment() -> None:
                         key, value = line.split('=', 1)
                         os.environ.setdefault(key, value.strip("'\""))
 
+# PASSWORD AUTHENTICATION (currently disabled for open access)
+# To re-enable password protection:
+# 1. Uncomment the function below
+# 2. Uncomment the check_password call in streamlit_app.py
+# 3. Ensure 'password' is set in .streamlit/secrets.toml or ADMIN_PASSWORD env var
+#
+# def check_password(secrets_map: Dict[str, Any]) -> bool:
+#     """
+#     Implements an HMAC-based authentication gatekeeper.
+#     
+#     Validates user credentials against configured secrets before 
+#     allowing access to the application logic.
+#     """
+#     configured_password = secrets_map.get("password") or os.environ.get("ADMIN_PASSWORD")
+#     if not configured_password:
+#         st.error("Authentication secret is missing. Please check configuration.")
+#         return False
+#
+#     if st.session_state.get("password_correct"):
+#         return True
+#
+#     def validate_input():
+#         if hmac.compare_digest(st.session_state.get("pwd_entry", ""), configured_password):
+#             st.session_state["password_correct"] = True
+#             del st.session_state["pwd_entry"]
+#         else:
+#             st.session_state["password_correct"] = False
+#
+#     st.text_input("Administrator Password", type="password", on_change=validate_input, key="pwd_entry")
+#     if st.session_state.get("password_correct") == False:
+#         st.error("Invalid credentials.")
+#     return False
+#
+# Placeholder function (always returns True when password is disabled)
 def check_password(secrets_map: Dict[str, Any]) -> bool:
-    """
-    Implements an HMAC-based authentication gatekeeper.
-    
-    Validates user credentials against configured secrets before 
-    allowing access to the application logic.
-    """
-    configured_password = secrets_map.get("password") or os.environ.get("ADMIN_PASSWORD")
-    if not configured_password:
-        st.error("Authentication secret is missing. Please check configuration.")
-        return False
-
-    if st.session_state.get("password_correct"):
-        return True
-
-    def validate_input():
-        if hmac.compare_digest(st.session_state.get("pwd_entry", ""), configured_password):
-            st.session_state["password_correct"] = True
-            del st.session_state["pwd_entry"]
-        else:
-            st.session_state["password_correct"] = False
-
-    st.text_input("Administrator Password", type="password", on_change=validate_input, key="pwd_entry")
-    if st.session_state.get("password_correct") == False:
-        st.error("Invalid credentials.")
-    return False
+    """Placeholder for disabled password check. Always returns True for open access."""
+    return True
 
 def initialize_session_state() -> None:
     """

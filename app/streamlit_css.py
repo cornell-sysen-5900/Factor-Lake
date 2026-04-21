@@ -10,14 +10,37 @@ import streamlit as st
 # Global CSS definitions for a unified professional interface.
 CSS_STYLE = """
 <style>
+    /* Header container with icon */
+    .main-header-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        margin-bottom: 2rem;
+    }
+    
     /* Typography and header styling */
     .main-header {
         font-size: 2.5rem;
         font-weight: bold;
         color: #1f77b4;
         text-align: center;
-        margin-bottom: 2rem;
         text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* Documentation icon link */
+    .docs-icon-link {
+        font-size: 2rem;
+        margin-left: 1.5rem;
+        text-decoration: none;
+        cursor: pointer;
+        transition: transform 0.3s ease, opacity 0.3s ease;
+        opacity: 0.7;
+    }
+    
+    .docs-icon-link:hover {
+        transform: scale(1.2) rotate(5deg);
+        opacity: 1;
     }
     
     /* Global component styling */
@@ -73,6 +96,16 @@ CSS_STYLE = """
     @media (max-width: 768px) {
         .main-header {
             font-size: 1.8rem;
+        }
+        
+        .main-header-container {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .docs-icon-link {
+            margin-left: 0;
+            font-size: 1.5rem;
         }
     }
 </style>

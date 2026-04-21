@@ -65,6 +65,13 @@ def render_about_tab() -> None:
     * **Cloud Infrastructure:** Primary relational database for historical market data.
     * **Integration:** Support for local data ingestion and manual overrides.
 
+    ### Student User Guide
+
+    For a step-by-step class workflow, see the
+    [Factor Lake User Guide (Docs Site)](https://cornell-sysen-5900.github.io/Factor-Lake/FACTOR_LAKE_USER_GUIDE/).
+    If your docs deployment is unavailable, use the
+    [repository version](https://github.com/cornell-sysen-5900/Factor-Lake/blob/main/DOCS/FACTOR_LAKE_USER_GUIDE.md).
+
     ---
     **Version:** 1.1.0  
     **Last Updated:** February 2026  

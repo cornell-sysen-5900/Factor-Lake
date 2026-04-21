@@ -8,7 +8,6 @@ This guide walks you through deploying the Factor-Lake app to Streamlit Communit
 
 - ✅ GitHub account (free)
 - ✅ Supabase account with Factor-Lake database
-- ✅ Password you want to use for Cornell student access
 
 ---
 
@@ -19,9 +18,8 @@ This guide walks you through deploying the Factor-Lake app to Streamlit Communit
    cp .streamlit/secrets.toml.example .streamlit/secrets.toml
    ```
 
-2. **Edit `.streamlit/secrets.toml`** and fill in your actual values:
+2. **Edit `.streamlit/secrets.toml`** and fill in your Supabase credentials:
    ```toml
-   password = "Cornell2024!"  # Choose a secure password
    SUPABASE_URL = "https://your-project.supabase.co"
    SUPABASE_KEY = "your-anon-public-key-here"
    ```
@@ -61,9 +59,8 @@ This guide walks you through deploying the Factor-Lake app to Streamlit Communit
 
 1. While the app is deploying, click **"⚙️ Settings"** in the top-right
 2. Go to **"Secrets"** tab
-3. Paste the contents of your `.streamlit/secrets.toml` file:
+3. Paste your Supabase credentials:
    ```toml
-   password = "Cornell2024!"
    SUPABASE_URL = "https://your-project.supabase.co"
    SUPABASE_KEY = "your-anon-public-key-here"
    ```
@@ -74,7 +71,7 @@ This guide walks you through deploying the Factor-Lake app to Streamlit Communit
 
 ## 🎓 Step 3: Share with Cornell Students
 
-Your app is now live! Share these details:
+Your app is now live and open access! Share the link:
 
 **📧 Email Template:**
 ```
@@ -85,16 +82,12 @@ Hi [Student Name],
 The Factor-Lake Portfolio Analysis tool is now available online!
 
 🔗 URL: https://cornell-factor-lake.streamlit.app
-🔒 Password: test3
 
-No installation required - just:
-1. Click the link above
-2. Enter the password
-3. Start analyzing portfolios!
+No installation required - just click the link and start analyzing portfolios!
 
 The app works on any device with a web browser (laptop, tablet, phone).
 
-Questions? Reply to this email.
+Questions? Reply to this email or check the documentation link in the app banner.
 
 Best,
 [Your Name]
@@ -105,31 +98,33 @@ Best,
 ## 🔒 Security Notes
 
 ### ✅ What's Protected:
-- App access is password-gated
 - Supabase credentials are encrypted in Streamlit Cloud
-- Code remains in private/public GitHub repo (read-only for students)
+- Code remains in public GitHub repo (read-only for students)
+- No sensitive data is stored in the app; all analysis is session-based
 
-### ⚠️ Important:
-- Anyone with the password can access the app
-- Don't share the password publicly (email only to Cornell students)
-- Change password if it gets leaked (update in Streamlit Cloud secrets)
+### 📌 Open Access Policy:
+- The app is open to anyone with the URL (no password required)
+- This provides low friction for classroom use
+- All users share the same Supabase database
 
-### 🔐 Enhanced Security (Optional):
-If you need stronger access control later:
-- Use [Streamlit Authenticator](https://github.com/mkhorasani/Streamlit-Authenticator) for user accounts
+### 🔐 If you need access control in the future:
+If the app becomes heavily used and resources need protection:
+- Use [Streamlit Authenticator](https://github.com/mkhorasani/Streamlit-Authenticator) for per-user logins
 - Deploy to Google Cloud Run with [Identity-Aware Proxy](https://cloud.google.com/iap)
-- Use Cornell's SSO/OAuth integration
+- Restrict to Cornell SSO/OAuth via [CIS](https://identity.cornell.edu/)
+
+Password protection code is commented in the source for easy re-enablement.
 
 ---
 
 ## 🛠️ Step 4: Test Locally (Optional)
 
-Before deploying, test the password protection locally:
+Before deploying, test the app locally:
 
 1. **Create secrets file:**
    ```bash
    cp .streamlit/secrets.toml.example .streamlit/secrets.toml
-   # Edit secrets.toml with your values
+   # Edit secrets.toml with your Supabase credentials
    ```
 
 2. **Run Streamlit:**
@@ -137,11 +132,10 @@ Before deploying, test the password protection locally:
    streamlit run app/streamlit_app.py
    ```
 
-3. **Test password gate:**
+3. **Test the app:**
    - Open http://localhost:8501
-   - You should see password prompt
-   - Enter your password
-   - App should load after successful auth
+   - The app should load immediately (no password required)
+   - Try configuring and running an analysis
 
 ---
 

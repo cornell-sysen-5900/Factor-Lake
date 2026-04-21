@@ -4,13 +4,11 @@ An interactive factor-investing toolkit with a clean Streamlit UI, Supabase data
 
 ## Use the App
 
-- Hosted: Share your Streamlit Community Cloud app URL. Users only need the link to use the app.
-- Password: Set a secret named `password` in your app's Settings -> Secrets.
+- Hosted: Share your Streamlit Community Cloud app URL. Users only need the link to use the app (open access, no password required).
 - Supabase: Set `SUPABASE_URL` and `SUPABASE_KEY` in Streamlit secrets for cloud deploys (or `.env` for local runs).
 
 Example secrets (TOML):
 ```
-password = "your-strong-password"
 SUPABASE_URL = "https://your-project.supabase.co"
 SUPABASE_KEY = "your-anon-public-key"
 ```
