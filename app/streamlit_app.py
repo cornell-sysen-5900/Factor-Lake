@@ -41,10 +41,18 @@ def main():
     Orchestrates the primary application flow, including security authentication,
     parameter configuration, and multi-tab rendering.
     """
-    if not utils.check_password(st.secrets):
-        st.stop()
+    # PASSWORD AUTHENTICATION (disabled for open access)
+    # To re-enable: uncomment below and keep password in secrets/env
+    # if not utils.check_password(st.secrets):
+    #     st.stop()
         
-    st.markdown('<div class="main-header">Factor-Lake Portfolio Analysis</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="main-header-container">' +
+        '<div class="main-header">Factor-Lake Portfolio Analysis</div>' +
+        '<a href="https://cornell-sysen-5900.github.io/Factor-Lake/" target="_blank" class="docs-icon-link" title="View Documentation">📚</a>' +
+        '</div>',
+        unsafe_allow_html=True
+    )
     
     # Render Global Sidebar and capture configuration
     user_settings = sidebar.render_sidebar(config.SECTOR_OPTIONS)
