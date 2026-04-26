@@ -112,3 +112,15 @@ python .\scripts\run_tests.py all
 
 6. Submit a PR describing UX/data impacts.
 
+## Supabase Archiver
+
+The `scripts/archive_supabase_tables.py` script automatically discovers, downloads, and archives all of your Supabase tables to Parquet format. It creates a GitHub Release to store the large `.parquet` binary files efficiently without bloating your repository history.
+
+**Usage:**
+1. Copy `.env.example` to `.env` and fill in your `SUPABASE_URL` and `SUPABASE_KEY` (must be the `service_role` secret to bypass RLS and fetch the schema).
+2. Ensure you have the GitHub CLI (`gh`) installed and authenticated (`gh auth login`).
+3. Run the archiver:
+
+```pwsh
+python scripts/archive_supabase_tables.py
+```
