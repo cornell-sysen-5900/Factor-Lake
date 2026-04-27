@@ -59,7 +59,7 @@ git push origin <branch you created in step 4>
 <summary>Portfolio Use Case Diagram</summary>
 
   ![Portfolio Use Case Diagram](./GoogleColabDiagrams/UseCaseDiagram.png)
-  <sub><i>This diagram explains how the developer and the portfolio manager interact with the system. The portfolio manager(s) primarily interact with Google Drive and Google Colab, while the developer manages both code and computation via Google Colab and GitHub. This diagram aids in identifying access points and roles therefore supporting secure coding and permission management. </i></sub>
+  <sub><i>This diagram explains how the portfolio manager and developer interact with the current Streamlit product. It focuses on the real UI flow in the repository today: configure inputs, load Supabase data, run the backtest, review results, and maintain the code, docs, and test workflow through GitHub.</i></sub>
   
 
 
@@ -69,7 +69,7 @@ git push origin <branch you created in step 4>
 <summary>Class Diagram</summary>
 
   ![Class Diagram](./GoogleColabDiagrams/ClassDiagram.png)
-  <sub><i>This diagram shows the structure and relationships between major classes in the portfolio construction system. It highlights how user inputs, market data, and various factor classes interact to compute portfolio holdings, returns, and analytics. It is useful for developers that are planning for feature extensions, testing coverage, and/or debugging.</i></sub>
+  <sub><i>This diagram maps the active module and class relationships in the current codebase. It shows how the Streamlit UI, session-state helpers, Supabase ingestion, backtest engine, benchmark data, performance metrics, visualizations, and the remaining core classes work together during analysis.</i></sub>
 
 </details>
 
@@ -77,7 +77,7 @@ git push origin <branch you created in step 4>
 <summary>Deployment Diagram</summary>
 
   ![Deployment Diagram](./GoogleColabDiagrams/DeploymentDiagram.png)
-  <sub><i>This deployment diagram outlines how a user accesses Google Colab to run the factor portfolio notebook. It includes the OAuth-based authentication flow via Cornell IDP and Duo, Google Drive integration for data storage, and repository access from GitHub. It maps the data flow and token exchanges required to mount storage and retrieve market data securely. This is helpful for onboarding new collaborators, security reviews, and cloud resource planning. </i></sub>
+  <sub><i>This deployment diagram reflects the present Streamlit-oriented setup. It shows the browser client, the Streamlit runtime, the Supabase cloud database, local benchmark and metrics modules, and the GitHub-backed code and documentation workflow instead of the older Google Colab and Google Drive path.</i></sub>
 
 </details>
 
