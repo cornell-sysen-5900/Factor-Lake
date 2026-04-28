@@ -48,12 +48,20 @@ plugins:
             separate_signature: true
             merge_init_into_class: true
 
+markdown_extensions:
+  - md_in_html
+
 nav:
   - Home: index.md
   - Guides:
+    - Factor Lake User Guide: FACTOR_LAKE_USER_GUIDE.md
+    - Developer Onboarding: DEV_ONBOARDING.md
+    - Streamlit Admin Guide: STREAMLIT_ADMIN_GUIDE.md
+    - Documentation Contributor: DOCS_CONTRIBUTOR_GUIDE.md
     - Contributing: CONTRIBUTING.md
     - Deployment: DEPLOYMENT.md
     - Supabase Setup: SUPABASE_SETUP.md
+    - Supabase Maintenance: SUPABASE_MAINTENANCE_GUIDE.md
     - Streamlit Styling: STREAMLIT_STYLING_GUIDE.md
     - Security Scanning: Bandit & Safety.md
     - Reorganization Summary: REORGANIZATION_SUMMARY.md

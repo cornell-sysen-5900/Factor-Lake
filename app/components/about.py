@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/components/about.py
 PURPOSE: Informational UI component detailing factor definitions and methodology.
-VERSION: 1.1.0
+VERSION: 2.1.0
 """
 
 import streamlit as st
@@ -16,57 +16,55 @@ def render_about_tab() -> None:
     and outlines the operational workflow for the backtesting engine.
     """
     st.header("About Factor-Lake Portfolio Analysis")
-    
+
     st.markdown("""
-    ### What is Factor Investing?
-    
-    Factor investing is an empirical strategy that targets specific drivers of risk and return 
-    across asset classes. By isolating these characteristics—such as value, momentum, or 
-    quality—investors can construct portfolios designed to outperform traditional 
-    market-capitalization-weighted indices over long horizons.
+    ### What this app does
 
-    ### Available Factor Categories
-    
-    * **Momentum:** Targets securities that have demonstrated strong recent performance, 
-        betting on the persistence of existing trends.
-    * **Value:** Identifies securities trading at a discount relative to their 
-        intrinsic fundamental value (e.g., Book Value or Earnings).
-    * **Profitability & Quality:** Focuses on firms with superior capital efficiency, 
-        stable earnings, and robust operational margins.
-    * **Growth:** Isolates companies aggressively expanding their asset bases or 
-        capital expenditures to capture future market share.
+    Factor-Lake helps you test stock-selection ideas by building portfolios from financial factors
+    and comparing how they perform over time.
 
-    ### Factor Details & Investment Thesis
-    
-    1.  **ROE (9/30 Data):** Firms generating superior profit from shareholder equity typically demonstrate efficient capital allocation.
-    2.  **ROA (9/30 Data):** Measures how effectively a company utilizes its total asset base to generate earnings.
-    3.  **12-Mo Momentum %:** Captures long-term trend continuation driven by investor behavior.
-    4.  **6-Mo Momentum %:** Targets intermediate-term strength in price action.
-    5.  **1-Mo Momentum %:** Captures short-term tactical strength.
-    6.  **Price to Book (9/30):** A traditional value metric used to identify securities trading at a low multiple of equity.
-    7.  **Next FY Earnings/P:** An earnings yield metric that indicates valuation attractiveness relative to future profits.
-    8.  **1-Yr Price Vol %:** Lower volatility often indicates more stable, "quality" firms.
-    9.  **Accruals/Assets:** High accruals can signal poor earnings quality or aggressive accounting.
-    10. **ROA %:** A standardized measure of operating performance.
-    11. **1-Yr Asset Growth %:** Indicates firm expansion and reinvestment in the business.
-    12. **1-Yr CapEX Growth %:** Suggests management's confidence in future demand through capital investment.
-    13. **Book/Price:** Directly aligns with the value thesis by identifying "cheap" stocks relative to equity.
+    ### Quick start for new users
 
-    ### Return Methodology
-    
-    Portfolio performance is derived from the **Next-Year's Return %** metric. This captures 
-    total return, including dividends, over a one-year investment window. To mitigate 
-    **survivorship bias**, tickers with missing return data (often due to delistings or 
-    bankruptcies) are assigned a 0% return. This ensures the backtest reflects the 
-    real-world impact of holding securities that exit the sample.
+    1. Choose a date range and universe.
+    2. Select one or more factors.
+    3. Pick top/bottom portfolio rules.
+    4. Run the analysis and review returns, holdings, and charts.
 
-    ### Data Governance & Sources
+    ### Factor definitions
+
+    1.  **ROE (9/30 Data):** Profit generated per dollar of shareholder equity.
+    2.  **ROA (9/30 Data):** Profit generated from total assets.
+    3.  **12-Mo Momentum %:** Price strength over the last 12 months.
+    4.  **6-Mo Momentum %:** Price strength over the last 6 months.
+    5.  **1-Mo Momentum %:** Price strength over the last 1 month.
+    6.  **Price to Book (9/30):** Price relative to accounting book value.
+    7.  **Next FY Earnings/P:** Expected next-year earnings yield.
+    8.  **1-Yr Price Vol %:** One-year price volatility (stability/risk measure).
+    9.  **Accruals/Assets:** Accounting accruals scaled by assets (earnings quality signal).
+    10. **ROA %:** Standardized return on assets measure.
+    11. **1-Yr Asset Growth %:** Growth in total assets over one year.
+    12. **1-Yr CapEX Growth %:** Growth in capital spending over one year.
+    13. **Book/Price:** Book value relative to market price.
+
+    ### How performance is measured
+
+    Results use next-year total return (including dividends). If a stock delists, we can choose between three options:
+    1. **hold cash** (0% return)
+    2. **Invest in money market** (risk-free return)
+    3. **Distribute to portfolio** (proportional to other holdings)
+
+
+
+    ### Student User Guide
+
+    For a step-by-step class workflow, see the
+    [Factor Lake User Guide (Docs Site)](https://cornell-sysen-5900.github.io/Factor-Lake/FACTOR_LAKE_USER_GUIDE/).
+    If your docs deployment is unavailable, use the
+    [repository version](https://github.com/cornell-sysen-5900/Factor-Lake/blob/main/DOCS/FACTOR_LAKE_USER_GUIDE.md).
     
-    * **Cloud Infrastructure:** Primary relational database for historical market data.
-    * **Integration:** Support for local data ingestion and manual overrides.
 
     ---
-    **Version:** 1.1.0  
-    **Last Updated:** February 2026  
-    **Project Repository:** [Factor-Lake GitHub](https://github.com/cuddihyd-cornell/Factor-Lake/tree/revamped_ux)
+    **Version:** 2.1.0  
+    **Last Updated:** April 2026  
+    **Project Repository:** [Factor-Lake GitHub](https://github.com/cuddihyd-cornell/Factor-Lake/)
     """)
