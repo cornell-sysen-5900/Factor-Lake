@@ -4,7 +4,7 @@ Tests data loading, pagination, and database connectivity
 
 NOTE: All tests in this module require Supabase credentials.
 Mark as @pytest.mark.integration and @pytest.mark.slow
-Run with: SUPABASE_URL=... SUPABASE_KEY=... pytest -m integration UnitTests/test_supabase_integration.py
+Run with: SUPABASE_URL=... SUPABASE_KEY=... pytest -m integration tests/integration/test_supabase_integration.py
 
 TODO(supabase): Once credentials are restored, verify:
   - The 'FR2000 Annual Quant Data' table still exists (test_load_supabase_data_with_custom_table).
