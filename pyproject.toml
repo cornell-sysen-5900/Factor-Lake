@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "factor-lake"
+version = "3.0.0"
+description = "Factor-based portfolio analysis and backtesting platform"
+readme = "README.md"
+requires-python = ">=3.10"
+
+dependencies = [
+    "matplotlib>=3.9.0",
+    "numpy>=1.23",
+    "pandas>=2.2.2",
+    "scipy>=0.8.0",
+    "supabase>=2.0.0",
+    "streamlit>=1.28.0",
+    "plotly>=5.17.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.0.0",
+    "mkdocstrings[python]>=0.24.0",
+    "mkdocs-gen-files>=0.5.0",
+    "mkdocs-literate-nav>=0.6.0",
+    "mkdocs-section-index>=0.3.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*", "app*", "Visualizations*"]
+
+[tool.pytest.ini_options]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+testpaths = ["tests/unit"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "--disable-warnings",
+    "-p", "no:cacheprovider",
+]
+markers = [
+    "unit: Unit tests (no external services required)",
+    "integration: Integration tests (require Supabase credentials)",
+    "slow: Tests that take longer to run",
+    "fast: Quick tests that run fast",
+]
+minversion = "3.8"
