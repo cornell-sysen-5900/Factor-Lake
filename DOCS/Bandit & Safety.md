@@ -1,6 +1,6 @@
 #### Install Both
 ```
-pip install bandit safety
+uv pip install bandit safety
 ```
 
 #### Created Insecure File
@@ -70,7 +70,7 @@ bandit bad_code.py -s B105
 
 #to demonstrate its usage and value, I've installed a version of numpy that has a known security vulnerability.
 
-pip install numpy==1.22.1
+uv pip install numpy==1.22.1
 
 safety check
 

@@ -127,7 +127,7 @@ Before pushing to main, test your changes locally.
 ### Install MkDocs (if not already installed)
 
 ```bash
-pip install mkdocs mkdocs-material mkdocstrings mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index
+uv sync --group docs
 ```
 
 ### Serve the docs locally
@@ -135,7 +135,7 @@ pip install mkdocs mkdocs-material mkdocstrings mkdocs-gen-files mkdocs-literate
 From the repo root:
 
 ```bash
-mkdocs serve
+uv run mkdocs serve
 ```
 
 You should see:

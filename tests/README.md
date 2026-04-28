@@ -1,11 +1,17 @@
 # Factor-Lake Test Suite
 
+## Setup
+
+```bash
+uv sync --group dev
+```
+
 ## Test Layout
 
 ```
 tests/
-├── conftest.py                # sys.path setup (shared by all tests)
 ├── README.md
+├── conftest.py
 ├── unit/                      # No credentials needed
 │   ├── test_backtest.py       # Portfolio construction, rebalance loop, benchmarks
 │   ├── test_delisting.py      # Time-adjusted delisting strategies
@@ -24,19 +30,16 @@ All commands run from the project root (`Factor-Lake/`).
 ### Unit tests (default)
 
 ```bash
-pytest
+uv run pytest
 ```
 
-`pytest.ini` sets `testpaths = tests/unit`, so bare `pytest` runs unit tests only.
-
-### A single file or test
-
-```bash
-pytest tests/unit/test_portfolio.py
-pytest tests/unit/test_portfolio.py::TestPortfolio::test_add_investment -v
-```
+`pyproject.toml` sets `testpaths = ["tests/unit"]`, so bare `uv run pytest` runs unit tests only.
 
 ### Integration tests
+
+```bash
+uv run pytest tests/integration -v
+```
 
 Integration tests hit live Supabase and require credentials.
 
@@ -44,40 +47,48 @@ Integration tests hit live Supabase and require credentials.
 ```bash
 export SUPABASE_URL="https://your-project.supabase.co"
 export SUPABASE_KEY="your-anon-key"
-pytest tests/integration/ -v
+uv run pytest tests/integration -v
 ```
 
 **Windows PowerShell:**
 ```powershell
 $env:SUPABASE_URL = "https://your-project.supabase.co"
 $env:SUPABASE_KEY = "your-anon-key"
-pytest tests/integration/ -v
+uv run pytest tests/integration -v
 ```
 
 **Windows CMD:**
 ```cmd
 set SUPABASE_URL=https://your-project.supabase.co
 set SUPABASE_KEY=your-anon-key
-pytest tests/integration/ -v
+uv run pytest tests/integration -v
 ```
 
-**Inline (one-liner, Linux/macOS):**
+### All tests (unit + integration)
+
 ```bash
-SUPABASE_URL="..." SUPABASE_KEY="..." pytest tests/integration/ -v
+uv run pytest tests
+```
+
+### A single file or test
+
+```bash
+uv run pytest tests/unit/test_portfolio.py
+uv run pytest tests/unit/test_portfolio.py::TestPortfolio::test_add_investment -v
 ```
 
 ### By marker
 
 ```bash
-pytest -m unit                  # unit-marked tests only
-pytest -m integration           # integration-marked tests only
-pytest -m "not slow"            # skip slow tests
+uv run pytest -m unit                  # unit-marked tests only
+uv run pytest -m integration           # integration-marked tests only
+uv run pytest -m "not slow"            # skip slow tests
 ```
 
 ### Coverage
 
 ```bash
-pytest --cov=src --cov-report=term --cov-report=html
+uv run pytest --cov=src --cov-report=term --cov-report=html
 ```
 
 HTML report lands in `htmlcov/index.html`.
@@ -85,14 +96,14 @@ HTML report lands in `htmlcov/index.html`.
 ## Debugging Failures
 
 ```bash
-pytest tests/unit/test_factors.py -v -s     # show print output
-pytest tests/unit/ -v -l                     # show locals on failure
-pytest tests/unit/ --pdb                     # drop into debugger on failure
+uv run pytest tests/unit/test_factors.py -v -s     # show print output
+uv run pytest tests/unit -v -l                      # show locals on failure
+uv run pytest tests/unit --pdb                      # drop into debugger on failure
 ```
 
 ## Markers
 
-Defined in `pytest.ini`:
+Defined in `pyproject.toml` under `[tool.pytest.ini_options]`:
 
 | Marker        | Purpose                             |
 |---------------|-------------------------------------|
@@ -103,8 +114,8 @@ Defined in `pytest.ini`:
 
 ## Troubleshooting
 
-**Import errors** -- run from project root, not from inside `tests/unit/`.
+**Import errors** -- run from project root, not from inside `tests/`.
 
 **Integration tests skipped** -- `SUPABASE_URL` and `SUPABASE_KEY` are not set. See the env var commands above.
 
-**Regression value mismatch** -- expected values in `test_known_good.py` / `test_multiple_factors.py` were calibrated against live Supabase data. If upstream data changes, recalibrate the expected constants.
+**Regression value mismatch** -- expected values in `test_backtest_regression.py` were calibrated against live Supabase data. If upstream data changes, recalibrate the expected constants.

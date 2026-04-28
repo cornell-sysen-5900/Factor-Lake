@@ -50,7 +50,7 @@ Streamlit Community Cloud should redeploy automatically after a push/merge to `m
 
 1. In Streamlit app dashboard, use reboot/redeploy action.
 2. Check build logs for dependency or import errors.
-3. Confirm `requirements.txt` includes new dependencies.
+3. Confirm `pyproject.toml` includes new dependencies.
 4. Re-run after fixing and merging to `main`.
 
 ## B. Update Streamlit settings (resources, access, limits)
@@ -117,7 +117,7 @@ Actions:
 
 Likely causes:
 
-- missing dependency in `requirements.txt`,
+- missing dependency in `pyproject.toml`,
 - runtime import/path error,
 - incompatible package version.
 

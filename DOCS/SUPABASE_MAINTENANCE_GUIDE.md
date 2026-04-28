@@ -25,7 +25,7 @@ Primary code touchpoints:
 - app/streamlit_utils.py
 - app/streamlit_config.py
 - src/factor_registry.py
-- IntegrationTests/test_supabase_integration.py
+- tests/integration/test_supabase.py
 
 ## 2. Access model and credentials
 
@@ -147,7 +147,7 @@ Safe deletion runbook:
 Dependency checks for this repo:
 
 - src/supabase_client.py may read Full Precision Test and last_price_mapping.
-- IntegrationTests/test_supabase_integration.py references Full Precision Test and FR2000 Annual Quant Data.
+- tests/integration/test_supabase.py references Full Precision Test and FR2000 Annual Quant Data.
 
 ## 8. How to change which table the app uses
 
@@ -170,7 +170,7 @@ To switch default table for the app:
 To load a specific table in test code:
 
 - Integration tests already use fetch_all_data(table_name=...).
-- Example appears in IntegrationTests/test_supabase_integration.py.
+- Example appears in tests/integration/test_supabase.py.
 
 ## 9. Required columns and schema compatibility
 
@@ -257,7 +257,7 @@ For schema or major data changes:
 
 Minimum verification after any table or schema update:
 
-1. Integration: run IntegrationTests/test_supabase_integration.py with valid SUPABASE_URL and SUPABASE_KEY.
+1. Integration: run tests/integration/test_supabase.py with valid SUPABASE_URL and SUPABASE_KEY.
 2. App smoke test:
    - login,
    - Load Market Data,

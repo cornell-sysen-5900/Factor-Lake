@@ -179,7 +179,7 @@ Streamlit Cloud automatically deploys when you push to GitHub:
 ### App won't start?
 - Check Streamlit Cloud logs (click "Manage app" → "Logs")
 - Verify secrets are properly formatted (no extra quotes/spaces)
-- Make sure `requirements.txt` includes all dependencies
+- Make sure `pyproject.toml` includes all dependencies
 
 ### Password not working?
 - Check secrets.toml syntax (no spaces around `=`)

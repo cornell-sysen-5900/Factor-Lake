@@ -93,7 +93,7 @@ Static Application Security Testing (SAST) is a subset of static analysis testin
 
 The first tool we've decided to use for SAST is [Bandit](https://bandit.readthedocs.io/en/latest/). Per their documentation, "Bandit is a tool designed to find common security issues in Python code. To do this, Bandit processes each file, builds an Abstract Syntax Tree (AST) from it, and runs appropriate plugins against the AST nodes. Once Bandit has finished scanning all the files, it generates a report."[^4]
 
-The second tool we've decided to use for SAST is Safety CLI. Per their documentation, "Safety CLI is a Python dependency vulnerability scanner designed to enhance software supply chain security and enable the secure use of Python packages."[^5] In order for Safety CLI to work, our repository's dependencies must be stored in a requirements.txt file.
+The second tool we've decided to use for SAST is Safety CLI. Per their documentation, "Safety CLI is a Python dependency vulnerability scanner designed to enhance software supply chain security and enable the secure use of Python packages."[^5] The project's dependencies are managed in `pyproject.toml` and pinned via `uv.lock`.
 
 [^1]: https://www.pluralsight.com/blog/software-development/secdevops#:~:text=with%20Pluralsight%20Flow-,What%20is%20SecDevOps?,vulnerabilities%20they%20missed%20earlier%20on
 [^2]: https://snyk.io/learn/open-source-static-code-analysis/
