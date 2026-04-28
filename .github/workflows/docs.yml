@@ -14,20 +14,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
 
       - name: Install documentation dependencies
-        run: |
-          pip install \
-            mkdocs>=1.5.0 \
-            mkdocs-material \
-            mkdocstrings[python] \
-            mkdocs-gen-files \
-            mkdocs-literate-nav \
-            mkdocs-section-index \
-            black
+        run: uv sync --group docs
 
       - name: Deploy to GitHub Pages
-        run: mkdocs gh-deploy --force
+        run: uv run mkdocs gh-deploy --force
