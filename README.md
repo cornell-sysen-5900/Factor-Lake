@@ -15,11 +15,26 @@ SUPABASE_KEY = "your-anon-public-key"
 
 ## Quick Start (Local)
 
-```pwsh
+### 1. Install uv (one-time)
+
+**Linux / macOS:**
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+**Windows PowerShell:**
+```powershell
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+### 2. Clone and run
+
+```bash
 git clone https://github.com/cornell-sysen-5900/Factor-Lake.git
 cd Factor-Lake
-pip install -r requirements.txt
-python -m streamlit run .\app\streamlit_app.py
+uv sync --group dev
+uv run pytest                                      # run unit tests
+uv run streamlit run app/streamlit_app.py           # launch the app
 ```
 
 Then open http://localhost:8501
@@ -56,11 +71,13 @@ Factor-Lake/
 │   ├── supabase_client.py
 │   └── ...
 ├── Visualizations/         # Plot helpers
-├── UnitTests/              # Unit test suite (default pytest target)
-├── IntegrationTests/       # Integration tests (run explicitly)
+├── tests/
+│   ├── unit/               # Unit tests (default pytest target)
+│   └── integration/        # Integration tests (require Supabase creds)
 ├── scripts/                # CI / helper scripts
 ├── DOCS/                   # Supplementary documentation
-├── requirements.txt
+├── pyproject.toml          # Dependencies, project metadata, pytest config
+├── uv.lock                 # Pinned dependency lockfile
 └── README.md
 ```
 
@@ -89,26 +106,18 @@ For detailed deployment instructions (Streamlit Community Cloud, secrets managem
 
 Run locally with:
 
-```pwsh
-python -m streamlit run .\app\streamlit_app.py
+```bash
+uv run streamlit run app/streamlit_app.py
 ```
 
 ## Contributing
 
 1. Create a feature branch from `main`.
-2. Add/modify tests in `UnitTests/` and/or `IntegrationTests/`.
-3. Run unit tests with `pytest` (defaults to `UnitTests/` via `pytest.ini`).
-4. Run integration tests explicitly when needed:
-
-```pwsh
-pytest IntegrationTests/ -m integration -v
-```
-
-5. Optionally use the helper runner:
-
-```pwsh
-python .\scripts\run_tests.py all
-```
-
-6. Submit a PR describing UX/data impacts.
+2. Add/modify tests in `tests/unit/` and/or `tests/integration/`.
+3. Run unit tests: `uv run pytest`
+4. Run integration tests (requires Supabase creds):
+   ```bash
+   SUPABASE_URL="..." SUPABASE_KEY="..." uv run pytest tests/integration -v
+   ```
+5. Submit a PR describing UX/data impacts.
 
