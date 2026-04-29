@@ -10,10 +10,14 @@ Use this guide to get the Streamlit app connected to the Supabase project on you
 
 ## 2. Confirm the credentials you will use
 
-Your project should use the current Supabase values provided by the team:
+Your project should use the current Supabase values provided in the Supabase project:
 
 - URL: `https://-----.supabase.co`
 - Key: `sb_publishable_-----`
+
+You can find them here:
+ - Click on the word "copy" underneath the project name in the main page and copy the URL.
+ - For the key, locate "Project settings" in the side bar -> then click "API Keys."
 
 ## 3. Create your local `.env` file
 
