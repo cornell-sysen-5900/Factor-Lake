@@ -26,10 +26,10 @@ You can find them here:
 2. Create a file named `.env` if it does not already exist.
 3. Add these values to the file:
 
-	```env
-	SUPABASE_URL=your-url-here
-	SUPABASE_KEY=your-key-here
-	```
+    ```env
+    SUPABASE_URL=your-url-here
+    SUPABASE_KEY=your-key-here
+    ```
 
 4. Save the file.
 5. Confirm `.env` stays local and is not committed to git.
@@ -39,9 +39,9 @@ You can find them here:
 1. Open a terminal in the repo root.
 2. Run the Streamlit app:
 
-	```bash
-	streamlit run app/streamlit_app.py
-	```
+    ```bash
+    streamlit run app/streamlit_app.py
+    ```
 
 3. Wait for the browser to open.
 4. Confirm the app starts without credential errors.
