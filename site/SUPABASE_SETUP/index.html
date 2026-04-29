@@ -1934,33 +1934,42 @@
 <li><a href="https://cornellfactorlake.streamlit.app/">Factor-Lake Streamlit App</a></li>
 </ul>
 <h2 id="2-confirm-the-credentials-you-will-use">2. Confirm the credentials you will use</h2>
-<p>Your project should use the current Supabase values provided by the team:</p>
+<p>Your project should use the current Supabase values provided in the Supabase project:</p>
 <ul>
 <li>URL: <code>https://-----.supabase.co</code></li>
 <li>Key: <code>sb_publishable_-----</code></li>
+</ul>
+<p>You can find them here:</p>
+<ul>
+<li>Click on the word <code>copy</code> underneath the project name in the main page and copy the URL.</li>
+<li>For the key, locate <code>Project settings</code> in the side bar -&gt; then click <code>API Keys.</code></li>
 </ul>
 <h2 id="3-create-your-local-env-file">3. Create your local <code>.env</code> file</h2>
 <ol>
 <li>Open the repo root.</li>
 <li>Create a file named <code>.env</code> if it does not already exist.</li>
-<li>Add these values to the file:</li>
-</ol>
-<pre><code class="language-env">SUPABASE_URL=your-url-here
-SUPABASE_KEY=your-key-here
-</code></pre>
-<ol>
-<li>Save the file.</li>
+<li>
+<p>Add these values to the file:</p>
+<p><code>env
+SUPABASE_URL=your-url-here
+SUPABASE_KEY=your-key-here</code></p>
+</li>
+<li>
+<p>Save the file.</p>
+</li>
 <li>Confirm <code>.env</code> stays local and is not committed to git.</li>
 </ol>
 <h2 id="4-start-the-app-locally">4. Start the app locally</h2>
 <ol>
 <li>Open a terminal in the repo root.</li>
-<li>Run the Streamlit app:</li>
-</ol>
-<pre><code class="language-bash">streamlit run app/streamlit_app.py
-</code></pre>
-<ol>
-<li>Wait for the browser to open.</li>
+<li>
+<p>Run the Streamlit app:</p>
+<p><code>bash
+streamlit run app/streamlit_app.py</code></p>
+</li>
+<li>
+<p>Wait for the browser to open.</p>
+</li>
 <li>Confirm the app starts without credential errors.</li>
 </ol>
 <h2 id="5-load-data-in-the-app">5. Load data in the app</h2>
