@@ -80,7 +80,7 @@ If you need the exact branch-and-commit workflow, follow [Contributing](CONTRIBU
 ## 9. Your first-week checklist
 
 1. Confirm you can access all required tools.
-2. Read the setup docs in Section 3.
+2. Read the setup docs.
 3. Clone the repo and open the app locally.
 4. Check the Trello Reference list for project links.
 5. Ask one question in Slack if anything is unclear.
