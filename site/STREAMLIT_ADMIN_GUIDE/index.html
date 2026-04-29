@@ -11,10 +11,10 @@
       
       
       
-        <link rel="prev" href="../Bandit%20%26%20Safety/">
+        <link rel="prev" href="../DEV_ONBOARDING/">
       
       
-        <link rel="next" href="../reference/src/backtest_engine/">
+        <link rel="next" href="../DOCS_CONTRIBUTOR_GUIDE/">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>Reorganization Summary - Factor-Lake</title>
+        <title>Streamlit Admin Guide - Factor-Lake</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#factor-lake-project-reorganization-complete" class="md-skip">
+        <a href="#streamlit-admin-workflow" class="md-skip">
           Skip to content
         </a>
       
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Reorganization Summary
+              Streamlit Admin Guide
             
           </span>
         </div>
@@ -453,10 +453,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../STREAMLIT_ADMIN_GUIDE/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streamlit Admin Guide
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -472,6 +499,175 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-know-the-production-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Know the production path
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-check-the-app-after-every-merge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Check the app after every merge
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-run-the-production-smoke-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Run the production smoke test
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-if-the-app-did-not-redeploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. If the app did not redeploy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-manage-secrets-safely" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Manage secrets safely
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-review-app-settings-when-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Review app settings when needed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-handle-common-incidents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Handle common incidents
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Handle common incidents">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-load-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data load error
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#app-loads-but-analysis-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        App loads but analysis fails
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-check-docs-deploys-when-docs-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Check docs deploys when docs change
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-finish-a-semester-handoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Finish a semester handoff
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-related-guides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Related guides
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -677,37 +873,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reorganization Summary
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../REORGANIZATION_SUMMARY/" class="md-nav__link">
         
   
   
@@ -723,303 +892,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#what-was-done" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ✅ What Was Done
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="✅ What Was Done">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-reorganized-project-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Reorganized Project Structure
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-fixed-import-paths" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Fixed Import Paths
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-created-streamlit-web-application" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Created Streamlit Web Application 📊
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-created-google-colab-notebook" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Created Google Colab Notebook 🚀
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-added-supporting-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Added Supporting Files
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-to-run" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        🚀 How to Run
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="🚀 How to Run">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#option-1-local-development" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option 1: Local Development
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#option-2-google-colab-recommended-for-quick-start" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option 2: Google Colab (Recommended for Quick Start)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#new-project-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        New Project Structure
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#key-features-of-streamlit-app" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Key Features of Streamlit App
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Key Features of Streamlit App">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#interactive-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Interactive Configuration
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#factor-selection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Factor Selection
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#professional-ui" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Professional UI
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#testing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Testing
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#for-google-colab-users" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        For Google Colab Users
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Next Steps">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#to-use-the-app" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        To use the app:
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#to-deploy-on-colab" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        To deploy on Colab:
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#to-share-with-team" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        To share with team:
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#quick-test" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quick Test
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#summary" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Summary
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1900,22 +1772,88 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-was-done" class="md-nav__link">
+  <a href="#1-know-the-production-path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ✅ What Was Done
+        1. Know the production path
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="✅ What Was Done">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-check-the-app-after-every-merge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Check the app after every merge
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-run-the-production-smoke-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Run the production smoke test
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-if-the-app-did-not-redeploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. If the app did not redeploy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-manage-secrets-safely" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Manage secrets safely
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-review-app-settings-when-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Review app settings when needed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-handle-common-incidents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Handle common incidents
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Handle common incidents">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-reorganized-project-structure" class="md-nav__link">
+  <a href="#data-load-error" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Reorganized Project Structure
+        Data load error
       
     </span>
   </a>
@@ -1923,43 +1861,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-fixed-import-paths" class="md-nav__link">
+  <a href="#app-loads-but-analysis-fails" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Fixed Import Paths
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-created-streamlit-web-application" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Created Streamlit Web Application 📊
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-created-google-colab-notebook" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Created Google Colab Notebook 🚀
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-added-supporting-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Added Supporting Files
+        App loads but analysis fails
       
     </span>
   </a>
@@ -1972,49 +1877,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-to-run" class="md-nav__link">
+  <a href="#8-check-docs-deploys-when-docs-change" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🚀 How to Run
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="🚀 How to Run">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#option-1-local-development" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option 1: Local Development
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#option-2-google-colab-recommended-for-quick-start" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option 2: Google Colab (Recommended for Quick Start)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#new-project-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        New Project Structure
+        8. Check docs deploys when docs change
       
     </span>
   </a>
@@ -2022,60 +1888,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#key-features-of-streamlit-app" class="md-nav__link">
+  <a href="#9-finish-a-semester-handoff" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Key Features of Streamlit App
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Key Features of Streamlit App">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#interactive-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Interactive Configuration
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#factor-selection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Factor Selection
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#professional-ui" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Professional UI
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#testing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Testing
+        9. Finish a semester handoff
       
     </span>
   </a>
@@ -2083,10 +1899,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
+  <a href="#10-related-guides" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Documentation
+        10. Related guides
       
     </span>
   </a>
@@ -2094,82 +1910,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#for-google-colab-users" class="md-nav__link">
+  <a href="#11-reference" class="md-nav__link">
     <span class="md-ellipsis">
       
-        For Google Colab Users
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Next Steps">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#to-use-the-app" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        To use the app:
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#to-deploy-on-colab" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        To deploy on Colab:
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#to-share-with-team" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        To share with team:
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#quick-test" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quick Test
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#summary" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Summary
+        11. Reference
       
     </span>
   </a>
@@ -2193,227 +1937,99 @@
 
 
 
-<h1 id="factor-lake-project-reorganization-complete">Factor-Lake Project Reorganization Complete!</h1>
-<h2 id="what-was-done">✅ What Was Done</h2>
-<h3 id="1-reorganized-project-structure">1. <strong>Reorganized Project Structure</strong></h3>
-<ul>
-<li>Created <code>src/</code> folder for all Python source files</li>
-<li>Moved 13 core Python modules into <code>src/</code>:<ul>
-<li><code>calculate_holdings.py</code></li>
-<li><code>factors_doc.py</code></li>
-<li><code>factor_function.py</code></li>
-<li><code>factor_utils.py</code></li>
-<li><code>fossil_fuel_restriction.py</code></li>
-<li><code>main.py</code></li>
-<li><code>market_object.py</code></li>
-<li><code>portfolio.py</code></li>
-<li><code>sector_selection.py</code></li>
-<li><code>supabase_client.py</code></li>
-<li><code>supabase_input.py</code></li>
-<li><code>user_input.py</code></li>
-<li><code>verbosity_options.py</code></li>
-</ul>
-</li>
-</ul>
-<h3 id="2-fixed-import-paths">2. <strong>Fixed Import Paths</strong></h3>
-<ul>
-<li>Updated <code>UnitTests/conftest.py</code> to add <code>src/</code> to Python path</li>
-<li>Updated <code>test_excel_loading.py</code> to include src in path</li>
-<li>All test files will now find the modules correctly</li>
-</ul>
-<h3 id="3-created-streamlit-web-application">3. <strong>Created Streamlit Web Application</strong> 📊</h3>
-<p><strong>File: <code>streamlit_app.py</code></strong>
-   - Full-featured interactive web interface
-   - Factor selection with checkboxes
-   - Data source configuration (Supabase or Excel)
-   - ESG and sector filters
-   - Portfolio backtest visualization
-   - Results download (CSV)
-   - Responsive design with tabs</p>
-<p><strong>Features:</strong>
-   - 📊 <strong>Analysis Tab</strong>: Configure and run backtests
-   - 📈 <strong>Results Tab</strong>: View performance metrics and charts
-   - ℹ️ <strong>About Tab</strong>: Documentation and help
-   - 💾 <strong>Export</strong>: Download results as CSV
-   - 🎨 <strong>Professional UI</strong>: Clean, intuitive interface</p>
-<h3 id="4-created-google-colab-notebook">4. <strong>Created Google Colab Notebook</strong> 🚀</h3>
-<p><strong>File: <code>colab_setup.ipynb</code></strong>
-   - Step-by-step setup instructions
-   - Automatic repository cloning
-   - Dependency installation
-   - Ngrok tunnel configuration
-   - One-click deployment</p>
-<h3 id="5-added-supporting-files">5. <strong>Added Supporting Files</strong></h3>
-<ul>
-<li><code>run_streamlit.py</code>: Simple launcher script</li>
-<li><code>STREAMLIT_README.md</code>: Comprehensive documentation</li>
-<li>Updated <code>requirements.txt</code> with Streamlit dependencies</li>
-</ul>
-<h2 id="how-to-run">🚀 How to Run</h2>
-<h3 id="option-1-local-development">Option 1: Local Development</h3>
-<pre><code class="language-bash"># Install dependencies
-pip install -r requirements.txt
-
-# Run the Streamlit app
-python run_streamlit.py
-
-# Or directly
-streamlit run streamlit_app.py
-</code></pre>
-<p>Then open your browser to <code>http://localhost:8501</code></p>
-<h3 id="option-2-google-colab-recommended-for-quick-start">Option 2: Google Colab (Recommended for Quick Start)</h3>
+<h1 id="streamlit-admin-workflow">Streamlit Admin Workflow</h1>
+<p>Use this guide when you need to keep the production <a href="https://cornellfactorlake.streamlit.app/">Factor-Lake Streamlit App</a> running correctly.</p>
+<h2 id="1-know-the-production-path">1. Know the production path</h2>
 <ol>
-<li>
-<p><strong>Upload <code>colab_setup.ipynb</code> to Google Colab</strong></p>
-</li>
-<li>
-<p><strong>Get free ngrok token</strong> from https://dashboard.ngrok.com/</p>
-</li>
-<li>
-<p><strong>Run all cells</strong> in the notebook</p>
-</li>
-<li>
-<p><strong>Click the generated URL</strong> to access your app</p>
-</li>
+<li>Source of truth lives in the <a href="https://github.com/cornell-sysen-5900/Factor-Lake">Factor-Lake GitHub Repo</a>.</li>
+<li>Production app runs from <code>app/streamlit_app.py</code>.</li>
+<li>Data comes from the <a href="https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm">Factor Lake Supabase Project</a>.</li>
+<li>Deploys happen through <a href="https://share.streamlit.io/">Streamlit Cloud</a>.</li>
 </ol>
-<h2 id="new-project-structure">New Project Structure</h2>
-<pre><code>Factor-Lake_2/
-├── src/                          ⭐ NEW: Source code folder
-│   ├── calculate_holdings.py
-│   ├── factor_function.py
-│   ├── factor_utils.py
-│   ├── factors_doc.py
-│   ├── fossil_fuel_restriction.py
-│   ├── main.py
-│   ├── market_object.py
-│   ├── portfolio.py
-│   ├── sector_selection.py
-│   ├── supabase_client.py
-│   ├── supabase_input.py
-│   ├── user_input.py
-│   └── verbosity_options.py
-│
-├── streamlit_app.py              ⭐ NEW: Web application
-├── run_streamlit.py              ⭐ NEW: Launcher script
-├── colab_setup.ipynb             ⭐ NEW: Colab notebook
-├── STREAMLIT_README.md           ⭐ NEW: App documentation
-│
-├── UnitTests/
-│   ├── conftest.py               ✏️ UPDATED: Import paths fixed
-│   └── test_*.py
-│
-├── test_excel_loading.py         ✏️ UPDATED: Import paths fixed
-├── test_local.py
-├── run_tests.py
-│
-├── Visualizations/
-├── requirements.txt              ✏️ UPDATED: Added Streamlit
-├── README.md
-└── ...
-</code></pre>
-<h2 id="key-features-of-streamlit-app">Key Features of Streamlit App</h2>
-<h3 id="interactive-configuration">Interactive Configuration</h3>
-<ul>
-<li>✅ Choose data source (Supabase or Excel)</li>
-<li>✅ Enable/disable fossil fuel restrictions</li>
-<li>✅ Select specific sectors</li>
-<li>✅ Set analysis period (2002-2023)</li>
-<li>✅ Configure initial investment amount</li>
-<li>✅ Adjust verbosity levels</li>
-</ul>
-<h3 id="factor-selection">Factor Selection</h3>
-<p>All factors organized by category:
-- <strong>Momentum</strong>: 1M, 6M, 12M
-- <strong>Value</strong>: P/B, B/P, Forward Earnings Yield
-- <strong>Profitability</strong>: ROE, ROA
-- <strong>Growth</strong>: Asset Growth, CapEx Growth
-- <strong>Quality</strong>: Accruals, Low Volatility</p>
-<ul>
-<li>Performance metrics (Total Return, CAGR, Alpha)</li>
-<li>Portfolio growth chart vs. Russell 2000</li>
-<li>Year-by-year performance table</li>
-<li>CSV export functionality</li>
-</ul>
-<h3 id="professional-ui">Professional UI</h3>
-<ul>
-<li>Clean, modern design</li>
-<li>Responsive layout</li>
-<li>Informative help text</li>
-<li>Error handling with user-friendly messages</li>
-<li>Progress indicators</li>
-</ul>
-<h2 id="testing">Testing</h2>
-<p>All tests still work! The import path fixes ensure:</p>
-<pre><code class="language-bash"># Run all tests
-python run_tests.py all
-
-# Run specific tests
-python run_tests.py factors
-python run_tests.py portfolio
-python run_tests.py holdings
-
-# Run with coverage
-python run_tests.py coverage
-</code></pre>
-<h2 id="documentation">Documentation</h2>
-<ul>
-<li><strong>STREAMLIT_README.md</strong>: Complete Streamlit app guide</li>
-<li><strong>colab_setup.ipynb</strong>: Step-by-step Colab instructions</li>
-<li><strong>README.md</strong>: Original project documentation</li>
-<li><strong>CONTRIBUTING.md</strong>: Contribution guidelines</li>
-</ul>
-<h2 id="for-google-colab-users">For Google Colab Users</h2>
-<p>The <code>colab_setup.ipynb</code> notebook makes it incredibly easy:</p>
+<h2 id="2-check-the-app-after-every-merge">2. Check the app after every merge</h2>
 <ol>
-<li><strong>No local installation needed</strong></li>
-<li><strong>Free GPU/TPU access</strong> (if needed for future enhancements)</li>
-<li><strong>Shareable public URL</strong> via ngrok</li>
-<li><strong>Works from anywhere</strong> with internet</li>
-<li><strong>Pre-configured environment</strong></li>
+<li>Confirm the change is merged to <code>main</code>.</li>
+<li>Open the Streamlit Cloud app dashboard.</li>
+<li>Confirm the latest commit is the one you expect.</li>
+<li>Wait for the build or restart to finish.</li>
+<li>Open the live app URL.</li>
 </ol>
-<h2 id="next-steps">Next Steps</h2>
-<h3 id="to-use-the-app">To use the app:</h3>
+<h2 id="3-run-the-production-smoke-test">3. Run the production smoke test</h2>
 <ol>
-<li>Install Streamlit: <code>pip install streamlit</code></li>
-<li>Run: <code>python run_streamlit.py</code></li>
-<li>Configure your analysis in the web interface</li>
-<li>View results and download data</li>
+<li>Leave the default sidebar settings in place.</li>
+<li>Select at least one factor in Analysis.</li>
+<li>Click Load Market Data.</li>
+<li>Click Run Portfolio Analysis.</li>
+<li>Confirm the Results tab renders metrics and charts.</li>
 </ol>
-<h3 id="to-deploy-on-colab">To deploy on Colab:</h3>
+<h2 id="4-if-the-app-did-not-redeploy">4. If the app did not redeploy</h2>
 <ol>
-<li>Open <code>colab_setup.ipynb</code> in Google Colab</li>
-<li>Follow the instructions in the notebook</li>
-<li>Share the generated URL with others</li>
+<li>Open the app logs in Streamlit Cloud.</li>
+<li>Check for import, dependency, or secret errors.</li>
+<li>Confirm <code>requirements.txt</code> is current.</li>
+<li>Trigger a restart or redeploy if needed.</li>
+<li>Re-test the app after the fix.</li>
 </ol>
-<h3 id="to-share-with-team">To share with team:</h3>
+<h2 id="5-manage-secrets-safely">5. Manage secrets safely</h2>
 <ol>
-<li>Push changes to GitHub</li>
-<li>Share the Colab notebook link</li>
-<li>Anyone can run it with their own ngrok token</li>
+<li>Keep <code>SUPABASE_URL</code> and <code>SUPABASE_KEY</code> in Streamlit Cloud secrets for production.</li>
+<li>Keep <code>.env</code> local for development.</li>
+<li>Never commit real secrets.</li>
+<li>After any secret change, rerun the smoke test.</li>
 </ol>
-<h2 id="quick-test">Quick Test</h2>
-<p>Test that everything works:</p>
-<pre><code class="language-bash"># Navigate to project
-cd Factor-Lake_2
-
-# Test imports
-python -c &quot;import sys; sys.path.insert(0, 'src'); from market_object import load_data; print('✅ Imports work!')&quot;
-
-# Run tests
-python run_tests.py fast
-
-# Start app
-python run_streamlit.py
-</code></pre>
-<h2 id="summary">Summary</h2>
-<p>The Factor-Lake project now has:
-- ✅ Clean, organized structure with <code>src/</code> folder
-- ✅ All import paths fixed and working
-- ✅ Beautiful Streamlit web application
-- ✅ Google Colab integration for easy deployment
-- ✅ Comprehensive documentation
-- ✅ Professional UI/UX
-- ✅ Export and visualization features</p>
+<h2 id="6-review-app-settings-when-needed">6. Review app settings when needed</h2>
+<ol>
+<li>Open the Streamlit Cloud app settings.</li>
+<li>Review app visibility and access.</li>
+<li>Review restart and resource settings.</li>
+<li>Review any deployment-related configuration.</li>
+<li>Use caching or usage windows if you need to reduce pressure on the app.</li>
+</ol>
+<h2 id="7-handle-common-incidents">7. Handle common incidents</h2>
+<h3 id="data-load-error">Data load error</h3>
+<ol>
+<li>Check the app logs.</li>
+<li>Check the Supabase project status.</li>
+<li>Confirm the secrets are correct.</li>
+<li>Confirm the table and required columns still exist.</li>
+</ol>
+<h3 id="app-loads-but-analysis-fails">App loads but analysis fails</h3>
+<ol>
+<li>Check for missing dependencies or import errors.</li>
+<li>Check whether the schema changed.</li>
+<li>Confirm the factor mappings still match the data.</li>
+<li>Re-test after the fix.</li>
+</ol>
+<h2 id="8-check-docs-deploys-when-docs-change">8. Check docs deploys when docs change</h2>
+<ol>
+<li>Open GitHub Actions in the <a href="https://github.com/cornell-sysen-5900/Factor-Lake">Factor-Lake GitHub Repo</a>.</li>
+<li>Confirm <code>Deploy MkDocs to GitHub Pages</code> passed.</li>
+<li>Open the published docs site.</li>
+<li>Confirm the new guide appears under Guides.</li>
+</ol>
+<h2 id="9-finish-a-semester-handoff">9. Finish a semester handoff</h2>
+<ol>
+<li>Confirm app access still works.</li>
+<li>Confirm Supabase credentials are still active.</li>
+<li>Run and record a smoke test.</li>
+<li>Share the current access and support path with the course staff.</li>
+</ol>
+<h2 id="10-related-guides">10. Related guides</h2>
+<ol>
+<li><a href="../FACTOR_LAKE_USER_GUIDE/">Factor Lake User Guide</a></li>
+<li><a href="../DEPLOYMENT/">Deployment</a></li>
+<li><a href="../SUPABASE_SETUP/">Supabase Setup</a></li>
+</ol>
+<h2 id="11-reference">11. Reference</h2>
+<p>Use this section when you want the operational details that sit behind the checklist.</p>
+<ol>
+<li>The app entrypoint is <code>app/streamlit_app.py</code>.</li>
+<li>The production app reads data from the <a href="https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm">Factor Lake Supabase Project</a>.</li>
+<li>Streamlit Cloud handles the deploy after pushes to <code>main</code>.</li>
+<li><code>SUPABASE_URL</code> and <code>SUPABASE_KEY</code> must exist in production secrets.</li>
+<li>The smoke test should always include data load, analysis run, and Results rendering.</li>
+<li>If docs changed, verify the GitHub Actions workflow for MkDocs as part of the same release check.</li>
+</ol>
 
 
 

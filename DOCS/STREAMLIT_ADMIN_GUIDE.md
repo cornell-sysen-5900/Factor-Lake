@@ -1,148 +1,96 @@
-# Streamlit Admin Guide (Factor Lake)
+# Streamlit Admin Workflow
 
-This guide is for team members who maintain the production Streamlit app. It covers common admin activities such as confirming production deploys and updating app settings.
+Use this guide when you need to keep the production [Factor-Lake Streamlit App](https://cornellfactorlake.streamlit.app/) running correctly.
 
-## Scope
+## 1. Know the production path
 
-Use this runbook for:
+1. Source of truth lives in the [Factor-Lake GitHub Repo](https://github.com/cornell-sysen-5900/Factor-Lake).
+2. Production app runs from `app/streamlit_app.py`.
+3. Data comes from the [Factor Lake Supabase Project](https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm).
+4. Deploys happen through [Streamlit Cloud](https://share.streamlit.io/).
 
-- deployment verification after code merges,
-- secrets management (Supabase credentials only),
-- basic operational checks,
-- common troubleshooting for app availability.
+## 2. Check the app after every merge
 
-## Admin checklist (quick version)
-
-1. Confirm latest code is merged to `main`.
-2. Confirm Streamlit app auto-redeployed from `main`.
-3. Verify basic analysis flow works.
-4. Review app settings (resources, access, and limits).
-5. Check docs site deploy from `main` if docs were updated.
-
-## System overview
-
-Production depends on three parts:
-
-- GitHub repository (`main` branch is source of truth),
-- Streamlit Community Cloud app (`app/streamlit_app.py` entrypoint),
-- Supabase project (data source via `SUPABASE_URL` and `SUPABASE_KEY`).
-
-## A. Deploy latest changes to production
-
-### Expected behavior
-
-Streamlit Community Cloud should redeploy automatically after a push/merge to `main`.
-
-### Runbook
-
-1. Confirm PR is merged into `main`.
-2. Open Streamlit Community Cloud app dashboard.
-3. Verify the latest commit hash in app deployment history.
-4. Wait for build/restart to complete.
+1. Confirm the change is merged to `main`.
+2. Open the Streamlit Cloud app dashboard.
+3. Confirm the latest commit is the one you expect.
+4. Wait for the build or restart to finish.
 5. Open the live app URL.
-6. Validate minimum smoke test:
-   - App loads immediately (no login required),
-   - `Load Market Data` succeeds,
-   - `Run Portfolio Analysis` succeeds,
-   - `Results` tab renders summary metrics.
 
-### If auto-deploy does not trigger
+## 3. Run the production smoke test
 
-1. In Streamlit app dashboard, use reboot/redeploy action.
-2. Check build logs for dependency or import errors.
-3. Confirm `requirements.txt` includes new dependencies.
-4. Re-run after fixing and merging to `main`.
+1. Leave the default sidebar settings in place.
+2. Select at least one factor in Analysis.
+3. Click Load Market Data.
+4. Click Run Portfolio Analysis.
+5. Confirm the Results tab renders metrics and charts.
 
-## B. Update Streamlit settings (resources, access, limits)
+## 4. If the app did not redeploy
 
-Streamlit Community Cloud exposes settings in the app management UI. Available controls can evolve over time.
+1. Open the app logs in Streamlit Cloud.
+2. Check for import, dependency, or secret errors.
+3. Confirm `requirements.txt` is current.
+4. Trigger a restart or redeploy if needed.
+5. Re-test the app after the fix.
 
-### Typical admin settings to review
+## 5. Manage secrets safely
 
-- App visibility and sharing/access settings,
-- restart/reboot controls,
-- resource tier or limits (if available on your plan),
-- environment/secrets configuration.
+1. Keep `SUPABASE_URL` and `SUPABASE_KEY` in Streamlit Cloud secrets for production.
+2. Keep `.env` local for development.
+3. Never commit real secrets.
+4. After any secret change, rerun the smoke test.
 
-### "Max concurrent users" guidance
+## 6. Review app settings when needed
 
-- Community Cloud does not always provide a direct, fixed "max concurrent users" knob.
-- Concurrency is usually constrained by app resources and runtime behavior.
-- If you need stricter concurrency control, use one or more of:
-  - optimize app performance and caching,
-  - split usage windows by class section,
-  - move to an infrastructure option with explicit autoscaling/concurrency controls (for example container platform deployment).
+1. Open the Streamlit Cloud app settings.
+2. Review app visibility and access.
+3. Review restart and resource settings.
+4. Review any deployment-related configuration.
+5. Use caching or usage windows if you need to reduce pressure on the app.
 
-## C. Secrets and configuration management
+## 7. Handle common incidents
 
-Required production secrets:
+### Data load error
 
-- `SUPABASE_URL`
-- `SUPABASE_KEY`
+1. Check the app logs.
+2. Check the Supabase project status.
+3. Confirm the secrets are correct.
+4. Confirm the table and required columns still exist.
 
-Best practices:
+### App loads but analysis fails
 
-- update secrets in Streamlit Cloud, not in committed files,
-- keep `.env` for local development only,
-- never commit real credentials to git,
-- after secret changes, run smoke test immediately.
+1. Check for missing dependencies or import errors.
+2. Check whether the schema changed.
+3. Confirm the factor mappings still match the data.
+4. Re-test after the fix.
 
-## D. Production smoke test (after every deploy)
+## 8. Check docs deploys when docs change
 
-1. Open app URL.
-2. The app should load immediately (no login required).
-3. In sidebar, keep default settings.
-4. In Analysis, select at least one factor.
-5. Click `Load Market Data`.
-6. Click `Run Portfolio Analysis`.
-7. Confirm Results sections render without errors.
+1. Open GitHub Actions in the [Factor-Lake GitHub Repo](https://github.com/cornell-sysen-5900/Factor-Lake).
+2. Confirm `Deploy MkDocs to GitHub Pages` passed.
+3. Open the published docs site.
+4. Confirm the new guide appears under Guides.
 
-## E. Common admin incidents
+## 9. Finish a semester handoff
 
-### Incident: data load errors
+1. Confirm app access still works.
+2. Confirm Supabase credentials are still active.
+3. Run and record a smoke test.
+4. Share the current access and support path with the course staff.
 
-Likely causes:
+## 10. Related guides
 
-- invalid `SUPABASE_URL`/`SUPABASE_KEY`,
-- paused Supabase project,
-- schema drift.
+1. [Factor Lake User Guide](FACTOR_LAKE_USER_GUIDE.md)
+2. [Deployment](DEPLOYMENT.md)
+3. [Supabase Setup](SUPABASE_SETUP.md)
 
-Actions:
+## 11. Reference
 
-1. Validate Supabase credentials in secrets.
-2. Confirm Supabase project status.
-3. Check app logs for failing query/field names.
+Use this section when you want the operational details that sit behind the checklist.
 
-### Incident: deploy succeeded but app broken
-
-Likely causes:
-
-- missing dependency in `requirements.txt`,
-- runtime import/path error,
-- incompatible package version.
-
-Actions:
-
-1. Inspect Streamlit build/runtime logs.
-2. Patch and merge fix to `main`.
-3. Confirm new deploy hash and smoke test.
-
-## G. Docs deploy checks (for guide updates)
-
-MkDocs site deploys from GitHub Actions on push to `main`.
-
-1. Open GitHub Actions and confirm `Deploy MkDocs to GitHub Pages` passed.
-2. Open docs URL and verify new/updated guide appears under Guides.
-
-## F. Semester handoff checklist
-
-1. Validate Supabase credentials are still active.
-2. Confirm app URL is reachable.
-3. Run smoke test and record date/result.
-4. Share updated access instructions with course staff.
-
-## Related guides
-
-- Factor Lake User Guide: student workflow
-- Deployment: Streamlit deployment details
-- Supabase Setup: data source credential setup
+1. The app entrypoint is `app/streamlit_app.py`.
+2. The production app reads data from the [Factor Lake Supabase Project](https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm).
+3. Streamlit Cloud handles the deploy after pushes to `main`.
+4. `SUPABASE_URL` and `SUPABASE_KEY` must exist in production secrets.
+5. The smoke test should always include data load, analysis run, and Results rendering.
+6. If docs changed, verify the GitHub Actions workflow for MkDocs as part of the same release check.

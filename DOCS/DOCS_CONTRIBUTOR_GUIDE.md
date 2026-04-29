@@ -1,22 +1,27 @@
 # Documentation Contributor Guide
 
-This guide is for team members who want to add new guides or edit existing documentation on the Factor Lake docs site.
+This guide is for team members who want to add or edit documentation on the Factor-Lake docs site.
 
 ## Overview
 
-The docs site is built with MkDocs and publishes automatically to GitHub Pages when you push to `main`. To add or edit documentation, you:
+The docs site is built with [MkDocs](https://www.mkdocs.org/user-guide/writing-your-docs/) and publishes automatically to GitHub Pages when you push to `main` in the [Factor-Lake GitHub Repo](https://github.com/cornell-sysen-5900/Factor-Lake). To add or edit documentation, follow this sequence:
 
-1. Create or edit a markdown file in the `DOCS/` folder.
-2. Update `mkdocs.yml` to register the page in navigation.
-3. Update `DOCS/index.md` to add a quick link (optional but recommended).
-4. Push to `main` and GitHub Actions deploys it.
+1. Edit or create a markdown file in `DOCS/`.
+2. Register the page in `mkdocs.yml`.
+3. Add a quick link in `DOCS/index.md`.
+4. Preview locally if needed.
+5. Push to `main` and let GitHub Actions deploy the site.
 
-## Prerequisites
+## Project links
 
-- Write access to the Factor-Lake GitHub repository.
-- Ability to commit and push to the `main` branch.
-- Basic markdown knowledge (headers, lists, tables, links).
-- Optionally: MkDocs installed locally to preview before pushing.
+| Tool | Link |
+|---|---|
+| GitHub Repo | [Factor-Lake GitHub Repo](https://github.com/cornell-sysen-5900/Factor-Lake) |
+| Streamlit App | [Factor-Lake Streamlit App](https://cornellfactorlake.streamlit.app/) |
+| Supabase Project | [Factor Lake Supabase Project](https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm) |
+| Trello Board | [Quant Finance Project Trello](https://trello.com/b/fFJ81SzB/quantfinanceproj) |
+| ScrumPoker | [ScrumPoker Online](https://www.scrumpoker-online.org/en/) |
+| Streamlit Cloud | [Streamlit Cloud](https://share.streamlit.io/) |
 
 ## Step 1: Create or edit your markdown file
 
@@ -24,28 +29,37 @@ The docs site is built with MkDocs and publishes automatically to GitHub Pages w
 
 1. Create a new `.md` file in the `DOCS/` folder.
    - Example: `DOCS/MY_NEW_GUIDE.md`
-2. Use a descriptive filename (no spaces; use underscores or hyphens).
-3. Start with a top-level heading:
+2. Use a descriptive filename with no spaces.
+3. Start the file with a top-level heading.
+4. Write the guide as a step-by-step procedure with short sections.
+
+Example:
 
 ```markdown
 # My New Guide Title
 
-Your content here...
+1. Do the first thing.
+2. Do the next thing.
+3. Verify the result.
 ```
 
 ### For an existing guide
 
-1. Open the `.md` file in the `DOCS/` folder.
-2. Edit the content directly.
-3. Commit and push to `main`.
+1. Open the `.md` file in `DOCS/`.
+2. Rewrite the content so a new team member can follow it without guessing.
+3. Replace plain-text tool names with embedded links where possible.
+4. Save the file.
 
-## Step 2: Update mkdocs.yml navigation
+## Step 2: Update `mkdocs.yml`
 
-The `mkdocs.yml` file at the repo root controls the site's navigation structure.
+The `mkdocs.yml` file at the repo root controls site navigation.
 
-### Open mkdocs.yml
+1. Open `mkdocs.yml`.
+2. Find the `nav:` section.
+3. Add your guide under `Guides` in the same style as the existing entries.
+4. Make sure the display name and filename are correct and case-sensitive.
 
-Find the `nav:` section, which looks like:
+Example:
 
 ```yaml
 nav:
@@ -53,186 +67,99 @@ nav:
   - Guides:
     - Factor Lake User Guide: FACTOR_LAKE_USER_GUIDE.md
     - Developer Onboarding: DEV_ONBOARDING.md
-    - Streamlit Admin Guide: STREAMLIT_ADMIN_GUIDE.md
-    - Contributing: CONTRIBUTING.md
-    - Deployment: DEPLOYMENT.md
-    - Supabase Setup: SUPABASE_SETUP.md
-    - Supabase Maintenance: SUPABASE_MAINTENANCE_GUIDE.md
-    - Streamlit Styling: STREAMLIT_STYLING_GUIDE.md
-    - Security Scanning: Bandit & Safety.md
-    - Reorganization Summary: REORGANIZATION_SUMMARY.md
-  - API Reference: reference/
+    - New Guide Name: NEW_GUIDE.md
 ```
 
-### Add your guide to the Guides section
+## Step 3: Update `DOCS/index.md`
 
-Under `- Guides:`, add a new line with the format:
+The home page of the docs site has a quick-links table.
 
-```yaml
-    - Display Name: FILENAME.md
-```
+1. Open `DOCS/index.md`.
+2. Find the quick-links table.
+3. Add a row for the new guide.
+4. Keep the link text and file name consistent with `mkdocs.yml`.
 
-**Example:** to add a new guide called `DOCS/TESTING_GUIDE.md`:
-
-```yaml
-  - Guides:
-    - Factor Lake User Guide: FACTOR_LAKE_USER_GUIDE.md
-    - Developer Onboarding: DEV_ONBOARDING.md
-    - Testing Guide: TESTING_GUIDE.md
-    - Streamlit Admin Guide: STREAMLIT_ADMIN_GUIDE.md
-    ...
-```
-
-**Rules:**
-- The **display name** (left side) is what users see in the navigation menu.
-- The **filename** (right side) must exactly match the markdown file in DOCS/.
-- Filenames are case-sensitive on GitHub.
-- Organize guides in logical order (new guides often go near related ones).
-
-## Step 3: Update DOCS/index.md (quick links)
-
-The home page of the docs site has a quick-links table. Add your guide there so users can find it immediately.
-
-### Open DOCS/index.md
-
-Find the `Quick links` table:
+Example:
 
 ```markdown
-| Section | Description |
-|---|---|
-| [Factor Lake User Guide](FACTOR_LAKE_USER_GUIDE.md) | Student-focused walkthrough for NBA5220/Equity Research workflows |
-| [Developer Onboarding](DEV_ONBOARDING.md) | Getting access, workspace setup, and understanding workflow for new team members |
-| [API Reference](reference/SUMMARY.md) | Auto-generated docs for every function and class in the codebase |
-...
+| [New Guide Name](NEW_GUIDE.md) | Short description of what the guide covers |
 ```
 
-### Add a row for your guide
+## Step 4: Preview locally
 
-Insert a new row in the table:
-
-```markdown
-| [Testing Guide](TESTING_GUIDE.md) | Best practices for writing and running tests in Factor Lake |
-```
-
-**Rules:**
-- The link text should match the display name from mkdocs.yml.
-- The link path should point to the markdown file.
-- Write a clear, concise description (1-2 sentences).
-- Keep descriptions consistent with the section's purpose.
-
-## Step 4: Test locally (optional but recommended)
-
-Before pushing to main, test your changes locally.
-
-### Install MkDocs (if not already installed)
+1. Install MkDocs if you have not already:
 
 ```bash
 pip install mkdocs mkdocs-material mkdocstrings mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index
 ```
 
-### Serve the docs locally
-
-From the repo root:
+2. From the repo root, run:
 
 ```bash
 mkdocs serve
 ```
 
-You should see:
+3. Open the local site at `http://127.0.0.1:8000/`.
+4. Verify the new page appears in the navigation and renders correctly.
+5. Check that links, tables, and code blocks display as expected.
 
-```
-INFO     -  Building documentation...
-INFO     -  Serving on http://127.0.0.1:8000/
-```
+## Step 5: Commit and push
 
-### View your changes
+1. Stage the changed files.
+2. Commit with a clear message.
+3. Push to `main`.
 
-1. Open http://127.0.0.1:8000/ in your browser.
-2. Navigate to your guide and verify:
-   - The page appears in the Guides menu.
-   - The content renders correctly (tables, code blocks, links).
-   - Quick links on the home page work.
-3. Check for markdown syntax errors or broken links.
-
-### Stop the server
-
-Press Ctrl+C in the terminal.
-
-## Step 5: Commit and push to main
-
-Once you're satisfied with your changes:
+Example:
 
 ```bash
 git add DOCS/MY_NEW_GUIDE.md mkdocs.yml DOCS/index.md
-git commit -m "Add: testing guide for contributor workflow"
+git commit -m "Add documentation guide"
 git push origin main
 ```
 
-## Step 6: Verify the deploy
+## Step 6: Verify deployment
 
-### Check GitHub Actions
+1. Open the [Factor-Lake GitHub Repo](https://github.com/cornell-sysen-5900/Factor-Lake).
+2. Check the **Actions** tab.
+3. Confirm the workflow named **Deploy MkDocs to GitHub Pages** passed.
+4. Open the published docs site and confirm the new page appears.
 
-1. Go to GitHub: https://github.com/cornell-sysen-5900/Factor-Lake
-2. Click the **Actions** tab.
-3. Look for the workflow named **Deploy MkDocs to GitHub Pages**.
-4. Confirm the most recent run has a ✅ (passed).
-5. If it has a ❌, click the workflow to see error logs.
+## Common pitfalls and fixes
 
-### Check the live site
+### The page does not appear in the menu
 
-1. Once the GitHub Actions workflow passes, the site updates automatically.
-2. Open https://cornell-sysen-5900.github.io/Factor-Lake/ in your browser.
-3. Navigate to your guide in the Guides menu.
-4. Verify the content appears correctly.
+1. Check the filename in `mkdocs.yml`.
+2. Make sure the file exists in `DOCS/`.
+3. Confirm the indentation in `mkdocs.yml` is correct.
 
-## Common pitfalls and solutions
+### The quick link is broken
 
-### "My guide doesn't appear in the menu"
+1. Check the file path in `DOCS/index.md`.
+2. Use the filename only, not `DOCS/filename.md`.
+3. Make sure the link text and filename match the nav entry.
 
-**Cause:** mkdocs.yml has a typo or incorrect filename.
+### Tables or code blocks render incorrectly
 
-**Solution:**
-- Check that the filename in mkdocs.yml **exactly** matches the .md file in DOCS/ (case-sensitive).
-- Ensure there are no trailing spaces or special characters.
-- Confirm the indentation in mkdocs.yml is correct (2 spaces per level).
+1. Check Markdown syntax carefully.
+2. Verify table pipes and code fences are balanced.
+3. Re-run `mkdocs serve` and confirm the page builds cleanly.
 
-### "The page renders but the quick link is broken"
+### The workflow fails
 
-**Cause:** The link path in index.md doesn't match the actual filename.
-
-**Solution:**
-- Check that the link in DOCS/index.md points to the correct filename.
-- Ensure relative paths start with the filename, not a folder path (e.g., `TESTING_GUIDE.md`, not `DOCS/TESTING_GUIDE.md`).
-
-### "Tables or code blocks don't render correctly"
-
-**Cause:** Markdown syntax error.
-
-**Solution:**
-- Verify table pipes are properly aligned: `| Header 1 | Header 2 |`
-- Ensure code blocks have proper backtick fences: `` ``` `` above and below.
-- Check for unescaped special characters (e.g., `_` should be escaped as `\_` if not intended as italics).
-- Test locally with `mkdocs serve` to catch issues early.
-
-### "The GitHub Actions workflow failed"
-
-**Cause:** mkdocs.yml syntax error or missing dependencies.
-
-**Solution:**
-- Click the failed workflow run in GitHub Actions to see the error log.
-- Common errors: YAML indentation, missing quotes around filenames with special characters.
-- Fix the error locally, commit, and push again.
+1. Open the failing GitHub Actions run.
+2. Read the build log for YAML or dependency errors.
+3. Fix the file locally and push again.
 
 ## Markdown syntax quick reference
 
-For more detailed markdown help, see the MkDocs documentation: https://www.mkdocs.org/user-guide/writing-your-docs/
+For detailed Markdown help, see the [MkDocs documentation](https://www.mkdocs.org/user-guide/writing-your-docs/).
 
 ### Headers
 
 ```markdown
-# Level 1 (page title, use once)
-## Level 2 (section)
-### Level 3 (subsection)
+# Level 1
+## Level 2
+### Level 3
 ```
 
 ### Lists
@@ -258,6 +185,10 @@ For more detailed markdown help, see the MkDocs documentation: https://www.mkdoc
 ### Code blocks
 
 ```markdown
+```python
+print("hello")
+```
+```
     Inline `code` with backticks
 
     Block code with fence:

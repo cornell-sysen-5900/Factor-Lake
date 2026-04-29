@@ -1,13 +1,19 @@
 # 🚀 Deployment Guide - Streamlit Community Cloud
 
-This guide walks you through deploying the Factor-Lake app to Streamlit Community Cloud (100% free!) so Cornell students can access it via a simple URL. (This is for SYSEN 5900 - Software Systems Engineering in Quant Finance students)
+This guide walks you through deploying the Factor-Lake app to [Streamlit Cloud](https://share.streamlit.io/) so Cornell students can access it via a simple URL. (This is for SYSEN 5900 - Software Systems Engineering in Quant Finance students)
+
+## Project links
+
+- [Factor-Lake GitHub Repo](https://github.com/cornell-sysen-5900/Factor-Lake)
+- [Factor-Lake Streamlit App](https://cornellfactorlake.streamlit.app/)
+- [Factor Lake Supabase Project](https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm)
 
 ---
 
 ## 📋 Prerequisites
 
-- ✅ GitHub account (free)
-- ✅ Supabase account with Factor-Lake database
+- ✅ [Factor-Lake GitHub Repo](https://github.com/cornell-sysen-5900/Factor-Lake) access
+- ✅ [Factor Lake Supabase Project](https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm) access
 
 ---
 
@@ -25,7 +31,7 @@ This guide walks you through deploying the Factor-Lake app to Streamlit Communit
    ```
 
 3. **Get your Supabase credentials:**
-   - Go to [Supabase Dashboard](https://app.supabase.com)
+   - Go to the [Factor Lake Supabase Project](https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm)
    - Select your project
    - Settings → API
    - Copy "Project URL" and "anon public" key
@@ -38,7 +44,7 @@ This guide walks you through deploying the Factor-Lake app to Streamlit Communit
 
 ### A. Sign Up for Streamlit Cloud
 
-1. Go to [share.streamlit.io](https://share.streamlit.io/)
+1. Go to [Streamlit Cloud](https://share.streamlit.io/)
 2. Click **"Sign up"** and connect your GitHub account
 3. Authorize Streamlit to access your repositories
 4. Secrets Configruation moves into the streamlit community UI
@@ -48,7 +54,7 @@ This guide walks you through deploying the Factor-Lake app to Streamlit Communit
 
 1. Click **"New app"** button
 2. Fill in the deployment form:
-   - **Repository:** `https://github.com/cornell-sysen-5900/Factor-Lake.git`
+   - **Repository:** [Factor-Lake GitHub Repo](https://github.com/cornell-sysen-5900/Factor-Lake)
    - **Branch:** `main`
    - **Main file path:** `app/streamlit_app.py`
    - **App URL:** Choose a custom name (e.g., `cornell-factor-lake`)
@@ -79,9 +85,9 @@ Subject: Access to Factor-Lake Portfolio Analysis Tool
 
 Hi [Student Name],
 
-The Factor-Lake Portfolio Analysis tool is now available online!
+The Factor-Lake Portfolio Analysis tool is now available online at [Factor-Lake Streamlit App](https://cornellfactorlake.streamlit.app/)!
 
-🔗 URL: https://cornell-factor-lake.streamlit.app
+🔗 URL: [Factor-Lake Streamlit App](https://cornellfactorlake.streamlit.app/)
 
 No installation required - just click the link and start analyzing portfolios!
 
@@ -99,7 +105,7 @@ Best,
 
 ### ✅ What's Protected:
 - Supabase credentials are encrypted in Streamlit Cloud
-- Code remains in public GitHub repo (read-only for students)
+- Code remains in the public [Factor-Lake GitHub Repo](https://github.com/cornell-sysen-5900/Factor-Lake) (read-only for students)
 - No sensitive data is stored in the app; all analysis is session-based
 
 ### 📌 Open Access Policy:
@@ -218,9 +224,9 @@ Streamlit Cloud automatically deploys when you push to GitHub:
 
 ## 📚 Additional Resources
 
-- **Streamlit Docs:** https://docs.streamlit.io/streamlit-community-cloud/get-started
-- **Secrets Management:** https://docs.streamlit.io/streamlit-community-cloud/deploy-your-app/secrets-management
-- **Custom Domains:** https://docs.streamlit.io/streamlit-community-cloud/manage-your-app/custom-domains (optional)
+- **[Streamlit Docs](https://docs.streamlit.io/streamlit-community-cloud/get-started)**
+- **[Secrets Management](https://docs.streamlit.io/streamlit-community-cloud/deploy-your-app/secrets-management)**
+- **[Custom Domains](https://docs.streamlit.io/streamlit-community-cloud/manage-your-app/custom-domains)** (optional)
 
 ---
 

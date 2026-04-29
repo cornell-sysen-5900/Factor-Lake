@@ -1,284 +1,163 @@
-# Supabase Maintenance and Operations Guide
+# Supabase Maintenance Workflow
 
-This guide is for maintainers who operate Supabase for Factor Lake day-to-day.
+Use this guide when you need to add, clean, change, verify, or troubleshoot data in the [Factor Lake Supabase Project](https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm).
 
-It is intentionally practical and covers:
+## 1. Know the moving parts
 
-- using the Supabase UI to manage data and tables,
-- data cleaning before insertion,
-- safe schema changes,
-- how code maps to Supabase tables/columns,
-- how to switch the table used by the app,
-- validation, testing, and incident response.
+1. The [Factor Lake Supabase Project](https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm) stores the data.
+2. The [Factor-Lake Streamlit App](https://cornellfactorlake.streamlit.app/) reads that data.
+3. `src/supabase_client.py` controls the data fetch path.
+4. `app/streamlit_utils.py` calls the fetch path during app startup.
+5. `app/streamlit_config.py` and `src/factor_registry.py` define column mappings used by the app.
 
-## 1. Architecture and ownership
+## 2. Use the right access model
 
-Factor Lake depends on:
+1. Use `SUPABASE_URL` and `SUPABASE_KEY` for the app.
+2. Use the anon/public key for read-only app usage.
+3. Keep service role keys out of the app and out of git.
+4. Store production secrets in Streamlit Cloud and local secrets in `.env`.
 
-- Supabase project (Postgres database and API),
-- Streamlit app that reads Supabase data,
-- integration tests that verify data shape and load behavior.
+## 3. Add data to an existing table
 
-Primary code touchpoints:
+For a small edit:
 
-- src/supabase_client.py
-- app/streamlit_utils.py
-- app/streamlit_config.py
-- src/factor_registry.py
-- IntegrationTests/test_supabase_integration.py
+1. Open the [Factor Lake Supabase Project](https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm).
+2. Open Table Editor.
+3. Select the target table.
+4. Insert or edit the row.
+5. Save the change.
+6. Run a quick SQL check to confirm the change looks right.
 
-## 2. Access model and credentials
+For a bulk import:
 
-Production app secrets:
+1. Prepare a CSV with the exact column headers expected by the table.
+2. Import it into a staging table first when possible.
+3. Check row counts after import.
+4. Check for nulls, duplicates, and bad numeric values.
+5. Promote the cleaned data into the production table only after the checks pass.
 
-- SUPABASE_URL
-- SUPABASE_KEY
+## 4. Clean data before you insert it
 
-Recommended key usage:
+1. Trim whitespace from IDs and ticker values.
+2. Normalize tickers to a consistent case.
+3. Replace sentinel strings like `N/A` or `--` with nulls.
+4. Make sure `Date` is a valid date.
+5. Derive `Year` consistently from `Date`.
+6. Convert price, return, and factor columns to numeric types.
+7. Remove duplicate business-key rows before promoting data.
 
-- Use anon/public key for Streamlit app read flows.
-- Keep service_role keys out of the app and out of git.
-- Store secrets in Streamlit Cloud settings for production and .env for local development.
+Example staging flow:
 
-## 3. Supabase UI basics for maintainers
+```sql
+update staging_prices
+set "Ending_Price" = null
+where "Ending_Price" in ('--', 'N/A', '#N/A', 'NULL', 'null', 'nan', '');
 
-Use Supabase dashboard sections:
+delete from staging_prices a
+using staging_prices b
+where a.ctid < b.ctid
+   and a."Ticker-Region" = b."Ticker-Region"
+   and a."Date" = b."Date";
 
-- Table Editor: add/edit/delete rows and tables.
-- SQL Editor: bulk updates, cleanup queries, schema migrations.
-- Authentication and Policies: RLS and table policies.
-- Logs: query and API error diagnosis.
-- Backups: point-in-time recovery options by plan.
+insert into "Full Precision Test" ("Ticker-Region", "Date", "Ending_Price")
+select "Ticker-Region", "Date", "Ending_Price"
+from staging_prices;
+```
 
-## 4. Add data to an existing table (UI workflow)
+## 5. Add a new table
 
-For small/manual updates:
-
-1. Open Supabase dashboard.
-2. Go to Table Editor.
-3. Select target table.
-4. Use Insert Row or Edit Cells.
-5. Save changes.
-6. Run a quick spot check query in SQL Editor.
-
-For bulk updates (recommended):
-
-1. Prepare CSV with exact column headers expected by table.
-2. In Table Editor, use Import Data (CSV).
-3. Validate row count added.
-4. Run post-import quality checks.
-
-Post-import checks (minimum):
-
-- no duplicate primary keys or duplicate business keys,
-- Date and Year fields parse correctly,
-- required metric columns are numeric,
-- no unexpected null spikes in required columns.
-
-## 5. Data cleaning before insertion
-
-Use a staging-first pattern:
-
-1. Create staging table with raw columns.
-2. Import raw data into staging table.
-3. Clean/transform in SQL.
-4. Insert into production table only after checks pass.
-
-Recommended cleaning checklist:
-
-- trim whitespace from text IDs,
-- normalize ticker casing to uppercase,
-- coerce sentinel values to null (for example --, N/A, null),
-- ensure Date is valid date,
-- derive Year consistently from Date,
-- enforce numeric types for price/return/factor columns,
-- deduplicate by business key such as (Ticker-Region, Date).
-
-Example SQL snippets:
-
-    -- Replace common sentinels with NULL in a staging column
-    update staging_prices
-    set "Ending_Price" = null
-    where "Ending_Price" in ('--', 'N/A', '#N/A', 'NULL', 'null', 'nan', '');
-
-    -- Remove exact duplicate business-key rows, keep newest by inserted_at
-    delete from staging_prices a
-    using staging_prices b
-    where a.ctid < b.ctid
-      and a."Ticker-Region" = b."Ticker-Region"
-      and a."Date" = b."Date";
-
-    -- Promote cleaned data into production table
-    insert into "Full Precision Test" ("Ticker-Region", "Date", "Ending_Price")
-    select "Ticker-Region", "Date", "Ending_Price"
-    from staging_prices;
-
-## 6. Add a new table
-
-UI path:
-
-1. Table Editor -> New Table.
-2. Define table name and columns.
-3. Set primary key.
-4. Create indexes for common filters/joins.
-5. Configure RLS policies (if RLS enabled).
+1. Open Table Editor.
+2. Create the new table.
+3. Define columns and the primary key.
+4. Add indexes for the columns you will filter or join on.
+5. Configure RLS if the table needs it.
 6. Load seed data.
+7. Confirm the app does not depend on any missing columns.
 
-Design guidance for Factor Lake tables:
+## 6. Change which table the app uses
 
-- Keep ticker identifier consistent with Ticker-Region convention when relevant.
-- Keep Date column parseable and derive Year in code or SQL.
-- Use numeric types for return and factor metrics.
-- Avoid spaces in new column names when possible to reduce downstream friction.
+1. Open `src/supabase_client.py`.
+2. Find `SupabaseManager.fetch_all_data(table_name='Full Precision Test')`.
+3. Change the default table name if you want the app to read a different table.
+4. Confirm that the new table still has the fields the app expects.
+5. Run the app and load data.
+6. Run the integration tests.
 
-## 7. Delete a table safely
+## 7. Keep schema compatibility intact
 
-Never drop a table before dependency checks.
+1. Preserve `Ticker` or `Ticker-Region` behavior.
+2. Preserve `Year` behavior.
+3. Preserve `Ending_Price` and `Next-Years_Return`.
+4. Keep factor columns in sync with `app/streamlit_config.py` and `src/factor_registry.py`.
+5. If you rename a column, update code and retest immediately.
 
-Safe deletion runbook:
+## 8. Maintain the delisting mapping table
 
-1. Confirm no app path currently reads the table.
-2. Confirm no integration tests rely on the table.
-3. Export backup snapshot.
-4. Drop table in non-production first.
-5. Validate app + tests.
-6. Drop in production only after validation.
+1. Keep `last_price_mapping` aligned with the code.
+2. Preserve the source fields `ticker`, `last_date`, and `last_price` unless you are also updating `src/supabase_client.py`.
+3. Confirm the app still merges `Delist_Date` and `Delist_Price` correctly.
 
-Dependency checks for this repo:
+## 9. Review policies and logs
 
-- src/supabase_client.py may read Full Precision Test and last_price_mapping.
-- IntegrationTests/test_supabase_integration.py references Full Precision Test and FR2000 Annual Quant Data.
+1. Check RLS policies when access changes.
+2. Keep read policies broad enough for the app to work.
+3. Avoid broad write access.
+4. Use Supabase logs when app data loads fail.
 
-## 8. How to change which table the app uses
+## 10. Troubleshoot a broken data load
 
-Current default source table is set in:
+1. Check the [Factor-Lake Streamlit App](https://cornellfactorlake.streamlit.app/) logs.
+2. Check Supabase logs for rejected queries.
+3. Confirm the secrets are correct.
+4. Confirm the table exists.
+5. Confirm the required columns still exist.
+6. Run the failing query manually in SQL Editor.
 
-- src/supabase_client.py -> SupabaseManager.fetch_all_data(table_name='Full Precision Test')
+## 11. Make a safe schema change
 
-Current load path:
-
-1. app/streamlit_utils.py calls SupabaseManager().fetch_all_data() without a table argument.
-2. That means the default table_name in src/supabase_client.py is used.
-
-To switch default table for the app:
-
-1. Update the default table_name string in src/supabase_client.py.
-2. Ensure required columns still exist after standardization.
-3. Run integration tests.
-4. Run Streamlit smoke test.
-
-To load a specific table in test code:
-
-- Integration tests already use fetch_all_data(table_name=...).
-- Example appears in IntegrationTests/test_supabase_integration.py.
-
-## 9. Required columns and schema compatibility
-
-The ingestion pipeline expects key fields.
-
-Hard requirements checked by standardization:
-
-- Ticker (derived from Ticker-Region when present)
-- Year (derived from Date when present)
-- Ending_Price
-- Next-Years_Return
-
-Additional project-critical columns:
-
-- factor columns listed in app/streamlit_config.py and src/factor_registry.py,
-- sector and industry columns used by filters,
-- market cap column if market-cap weighting is used.
-
-If you rename columns in Supabase:
-
-1. Update app/streamlit_config.py factor mappings.
-2. Update src/factor_registry.py if internal key mappings depend on name.
-3. Re-run integration tests and unit tests.
-
-## 10. Delisting support table maintenance
-
-The app also attempts to merge delisting info from last_price_mapping.
-
-Expected source columns in that table include:
-
-- ticker
-- last_date
-- last_price
-
-Code transforms those to:
-
-- Ticker-Region
-- Delist_Date
-- Delist_Price
-
-If you change this table schema, update src/supabase_client.py accordingly.
-
-## 11. RLS and policy guidance
-
-If Row Level Security is enabled:
-
-- create read policy for anon/app role on tables needed by Streamlit,
-- validate policy with a test query from app context,
-- avoid over-broad write policies.
-
-If RLS is disabled for specific tables, document why and review periodically.
-
-## 12. Monitoring and troubleshooting
-
-When app data load fails:
-
-1. Check Streamlit app logs first.
-2. Check Supabase logs for rejected queries/errors.
-3. Confirm secrets are valid and project is not paused.
-4. Confirm target table exists and has expected columns.
-5. Test query directly in Supabase SQL Editor.
-
-Common failure classes:
-
-- invalid credentials,
-- table not found,
-- missing required columns,
-- type conversion issues after import,
-- policy/RLS blocks.
-
-## 13. Change management process
-
-For schema or major data changes:
-
-1. Make change in development/staging project first.
-2. Validate with test queries and row-count checks.
-3. Update code mappings if needed.
+1. Make the change in development or staging first.
+2. Verify row counts and field types.
+3. Update app mappings if needed.
 4. Run integration tests.
-5. Deploy code to main.
-6. Verify production app smoke test.
-7. Record the change in team notes/changelog.
+5. Run the Streamlit smoke test.
+6. Deploy only after the app still works.
 
-## 14. Test plan for Supabase changes
+## 12. Delete a table safely
 
-Minimum verification after any table or schema update:
+1. Confirm no app code uses the table.
+2. Confirm no tests depend on the table.
+3. Export a backup.
+4. Delete the table in non-production first.
+5. Verify the app and tests still pass.
+6. Delete in production only after that check.
 
-1. Integration: run IntegrationTests/test_supabase_integration.py with valid SUPABASE_URL and SUPABASE_KEY.
-2. App smoke test:
-   - login,
-   - Load Market Data,
-   - Run Portfolio Analysis,
-   - confirm Results render.
-3. Data sanity checks:
-   - row counts,
-   - null rates in key columns,
-   - plausible numeric ranges.
+## 13. Verify a Supabase change
 
-## 15. Operational best practices
+1. Run `IntegrationTests/test_supabase_integration.py`.
+2. Open the Streamlit app.
+3. Click Load Market Data.
+4. Run Portfolio Analysis.
+5. Confirm the Results tab renders.
+6. Check row counts and numeric ranges.
 
-- Keep a separate staging table for bulk imports.
-- Prefer additive schema changes over destructive changes during semester.
-- Use consistent naming and data types across yearly loads.
-- Backup before drops or irreversible updates.
-- Batch large updates during low-usage windows.
-- Keep integration tests aligned with the active source tables.
+## 14. What success looks like
 
-## Related guides
+You are done when the app loads data cleanly, the tests pass, the schema matches the code, and the production app still runs after the change.
 
-- SUPABASE_SETUP.md
-- STREAMLIT_ADMIN_GUIDE.md
-- DEPLOYMENT.md
+## 15. Related guides
+
+1. [Supabase Setup](SUPABASE_SETUP.md)
+2. [Streamlit Admin Guide](STREAMLIT_ADMIN_GUIDE.md)
+3. [Deployment](DEPLOYMENT.md)
+
+## 16. Reference
+
+Use this section when you need the background details that support the workflow above.
+
+1. The app reads from `src/supabase_client.py`.
+2. The app startup path passes through `app/streamlit_utils.py`.
+3. Factor labels and column names are mapped in `app/streamlit_config.py` and `src/factor_registry.py`.
+4. The default table is `Full Precision Test` unless code changes it.
+5. `last_price_mapping` supplies delisting fields that the client merges into the dataset.
+6. Common required fields include `Ticker`, `Year`, `Ending_Price`, and `Next-Years_Return`.
+7. Integration tests in `IntegrationTests/test_supabase_integration.py` should be kept aligned with any schema change.

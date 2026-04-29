@@ -1,97 +1,102 @@
-# 🔐 Supabase Credentials Setup Guide
+# Supabase Credentials Setup Workflow
 
-## Your Supabase Configuration
+Use this guide to get the Streamlit app connected to the Supabase project on your local machine.
 
-Your Factor-Lake project is configured to use Supabase with these credentials: 
+## 1. Open the project links
 
-- **URL:** `https://-----.supabase.co`
-- **Key:** `sb_publishable_-----`
+- [Factor Lake Supabase Project](https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm)
+- [Factor-Lake GitHub Repo](https://github.com/cornell-sysen-5900/Factor-Lake)
+- [Factor-Lake Streamlit App](https://cornellfactorlake.streamlit.app/)
 
-## ✅ Setup Complete!
+## 2. Confirm the credentials you will use
 
-Your credentials are now configured in **three places**:
+Your project should use the current Supabase values provided by the team:
 
-### 1. **Local Development** (`.env` file)
-- Location: `Factor-Lake_2/.env`
-- Used when running locally with `python run_streamlit.py`
-- **Protected by .gitignore** - won't be committed to GitHub
+- URL: `https://-----.supabase.co`
+- Key: `sb_publishable_-----`
 
-### 2. **Streamlit App** (`streamlit_app.py`)
-- Automatically loads credentials from `.env` file
-- No code changes needed when running locally
+## 3. Create your local `.env` file
 
-### 3. **Google Colab** (`colab_setup.ipynb`)
- *Now Obsolete as of Dec 1, 2025*
-- Credentials are set directly in the notebook
-- Ready to use when deployed to Colab
+1. Open the repo root.
+2. Create a file named `.env` if it does not already exist.
+3. Add these values to the file:
 
-## 🚀 How to Use
-
-### Running Locally:
-```bash
-# Just run the app - credentials load automatically from .env
-python run_streamlit.py
+```env
+SUPABASE_URL=your-url-here
+SUPABASE_KEY=your-key-here
 ```
 
-### Running on Google Colab:
-1. Open `colab_setup.ipynb` in Google Colab
-2. Run all cells - credentials are already configured
-3. Access via the ngrok URL
+4. Save the file.
+5. Confirm `.env` stays local and is not committed to git.
 
-### In the Streamlit App:
-1. In the sidebar, select **"Supabase (Cloud)"** as data source
-2. Click **"Load Data"**
-3. Data loads automatically using your credentials
+## 4. Start the app locally
 
-## 🔒 Security Notes
+1. Open a terminal in the repo root.
+2. Run the Streamlit app:
 
-✅ **Local `.env` file** - Protected by .gitignore (won't push to GitHub)  
-✅ **Supabase key is publishable** - Safe to use on client-side  
-⚠️ **Colab notebook currently outdated** - Contains credentials, but that's OK for personal use  
+```bash
+streamlit run app/streamlit_app.py
+```
 
-If you need to share the project publicly:
-- Keep the `.env` file local only
-- Remove credentials from `colab_setup.ipynb` before sharing
-- Ask users to add their own credentials
+3. Wait for the browser to open.
+4. Confirm the app starts without credential errors.
 
-## 🛠️ Changing Credentials
+## 5. Load data in the app
 
-If you need to update your credentials:
+1. In the sidebar, select **Supabase (Cloud)** as the data source.
+2. Click **Load Data**.
+3. Wait for the success message.
+4. Confirm the dataset loads into the app without errors.
 
-1. **Edit `.env` file:**
-   ```env
-   SUPABASE_URL=your-new-url
-   SUPABASE_KEY=your-new-key
-   ```
+## 6. Verify the setup worked
 
-2. **Restart the Streamlit app** - it will load the new credentials
+1. Restart the app once after editing `.env` if needed.
+2. Re-open the app.
+3. Click **Load Data** again.
+4. Confirm the message says data loaded successfully.
 
-## 📋 Verification
+## 7. Update credentials when they change
 
-To verify your credentials are working:
+1. Edit `.env`.
+2. Replace `SUPABASE_URL` and/or `SUPABASE_KEY` with the new values.
+3. Save the file.
+4. Restart `streamlit run app/streamlit_app.py`.
+5. Load data again to confirm the new credentials work.
 
-1. Start the app: `python run_streamlit.py`
-2. Select "Supabase (Cloud)" in the sidebar
-3. Click "Load Data"
-4. If successful, you'll see: "✅ Data loaded successfully!"
+## 8. Use Colab only if you still need it
 
-## 🆘 Troubleshooting
+1. Open `colab_setup.ipynb`.
+2. Confirm the notebook is still appropriate for your use case.
+3. Run the notebook cells only if you are using the Colab path.
 
-### "Connection failed" error:
-- Check your internet connection
-- Verify the Supabase URL is correct
-- Ensure your Supabase project is active
+## 9. Keep credentials safe
 
-### "Authentication failed" error:
-- Verify the SUPABASE_KEY is correct
-- Check if the key has expired
-- Try regenerating the key in Supabase dashboard
+1. Never commit real secrets.
+2. Keep `.env` local.
+3. Remove credentials from any shareable notebook or demo artifact.
+4. Use the publishable key only in the allowed client-side context.
 
-### App can't find .env file:
-- Make sure `.env` is in the root directory (same level as `streamlit_app.py`)
-- Check that the file is named exactly `.env` (not `.env.txt`)
+## 10. Troubleshoot the common failures
 
-## 🔗 Resources
+1. If you see a connection failure, check your internet access and the Supabase project status.
+2. If you see an authentication failure, confirm the key is correct and not expired.
+3. If the app cannot find `.env`, make sure it is in the repo root next to `app/`.
+
+## 11. What success looks like
+
+You are done when the app starts, **Supabase (Cloud)** loads data successfully, and the analysis workflow can continue without credential-related errors.
+
+## 12. Reference
+
+Use this section when you need to remember how the setup is wired.
+
+1. Local development reads credentials from `.env` in the repo root.
+2. `app/streamlit_app.py` loads the credentials automatically when the app starts.
+3. The publishable key is the expected client-side key for the app workflow.
+4. `colab_setup.ipynb` is only relevant if you are still using the Colab path.
+5. The Streamlit app should only need the credentials you placed in `.env` or Streamlit Cloud secrets.
+
+## 13. Reference links
 
 - [Supabase Dashboard](https://supabase.com/dashboard)
 - [Supabase Documentation](https://supabase.com/docs)

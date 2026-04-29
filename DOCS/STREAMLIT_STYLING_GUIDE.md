@@ -1,5 +1,9 @@
 # 🎨 Streamlit Customization Guide
 
+Use this guide when you need to change the appearance of the [Factor-Lake Streamlit App](https://cornellfactorlake.streamlit.app/).
+
+For platform-level styling guidance, refer to the [Streamlit docs](https://docs.streamlit.io/).
+
 ## Levels of Customization
 
 ### 1. **Theme Configuration** (.streamlit/config.toml)
