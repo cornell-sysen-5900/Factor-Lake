@@ -16,6 +16,7 @@ Your project should use the current Supabase values provided in the Supabase pro
 - Key: `sb_publishable_-----`
 
 You can find them here:
+
 - Click on the word `copy` underneath the project name in the main page and copy the URL.
 - For the key, locate `Project settings` in the side bar -> then click `API Keys.`
 
