@@ -1,59 +1,68 @@
 ## How to contribute to Factor Lake
 
-### Git Basics
+Use this workflow whenever you make a change in the [Factor-Lake GitHub Repo](https://github.com/cornell-sysen-5900/Factor-Lake).
 
-The Quebec team follows the standard git workflow to manage this repository. Beginners will find the steps detailed below helpful in making their first contributions.
+### Step 1: Clone the repository
 
-1. Clone Repository
-
-```
+```bash
 git clone https://github.com/cornell-sysen-5900/Factor-Lake.git
 ```
 
-2. Move to repository directory 
+### Step 2: Move into the project folder
 
-```
+```bash
 cd Factor-Lake
 ```
 
-3. Check status and confirm its up to date.
+### Step 3: Check your branch state
 
-```
+```bash
 git status
 ```
 
-4. Create a new branch.
+### Step 4: Create a feature branch
 
-```
-git checkout -b <new branch>
+```bash
+git checkout -b <new-branch>
 ```
 
-5. Check that you're working in the newly created branch.
+### Step 5: Confirm the branch changed
 
-```
+```bash
 git branch
 ```
 
-The branch your working on will be marked with an asterisk.
+The active branch will have an asterisk.
 
-6. Add a new file or make changes to an existing file using VSCode or preferred editor.
+### Step 6: Edit the files you need
 
-7. Stage file for next commit.
+Use VS Code or your preferred editor to make the change.
 
-```
+### Step 7: Stage the files
+
+```bash
 git add <filename>
 ```
-8. Commit changes with descriptive message.
 
-```
-git commit -m "Added new file and this is my descriptive message."
+### Step 8: Commit the change
+
+```bash
+git commit -m "Describe the change clearly"
 ```
 
-9. Push changes to repository branch.
+### Step 9: Push the branch
 
+```bash
+git push origin <new-branch>
 ```
-git push origin <branch you created in step 4>
-```
+
+### Step 10: Open a pull request
+
+1. Go to the [Factor-Lake GitHub Repo](https://github.com/cornell-sysen-5900/Factor-Lake).
+2. Open the branch comparison view.
+3. Create a pull request into `main`.
+4. Describe what changed and how you tested it.
+
 ### Diagram System Breakdown
 <details markdown="1">
 <summary>Portfolio Use Case Diagram</summary>

@@ -11,10 +11,10 @@
       
       
       
-        <link rel="prev" href="../Bandit%20%26%20Safety/">
+        <link rel="prev" href="../STREAMLIT_ADMIN_GUIDE/">
       
       
-        <link rel="next" href="../reference/src/backtest_engine/">
+        <link rel="next" href="../CONTRIBUTING/">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>Reorganization Summary - Factor-Lake</title>
+        <title>Documentation Contributor - Factor-Lake</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#factor-lake-project-reorganization-complete" class="md-skip">
+        <a href="#documentation-contributor-guide" class="md-skip">
           Skip to content
         </a>
       
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Reorganization Summary
+              Documentation Contributor
             
           </span>
         </div>
@@ -481,10 +481,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../DOCS_CONTRIBUTOR_GUIDE/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Contributor
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -500,6 +527,347 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#project-links" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Project links
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-1-create-or-edit-your-markdown-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Create or edit your markdown file
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 1: Create or edit your markdown file">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#for-a-new-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        For a new guide
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#for-an-existing-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        For an existing guide
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-2-update-mkdocsyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Update mkdocs.yml
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-3-update-docsindexmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Update DOCS/index.md
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-4-preview-locally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4: Preview locally
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-5-commit-and-push" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5: Commit and push
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-6-verify-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 6: Verify deployment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-pitfalls-and-fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common pitfalls and fixes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common pitfalls and fixes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-page-does-not-appear-in-the-menu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The page does not appear in the menu
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-quick-link-is-broken" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The quick link is broken
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tables-or-code-blocks-render-incorrectly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tables or code blocks render incorrectly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-workflow-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The workflow fails
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#markdown-syntax-quick-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Markdown syntax quick reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Markdown syntax quick reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#headers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Headers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lists
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#code-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Code blocks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#links" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Links
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#organization-and-naming-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Organization and naming conventions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Organization and naming conventions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#filename-naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filename naming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#navigation-ordering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Navigation ordering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#guide-templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guide templates
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-checklist-for-adding-a-new-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick checklist for adding a new guide
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-guides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related guides
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -677,37 +1045,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reorganization Summary
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../REORGANIZATION_SUMMARY/" class="md-nav__link">
         
   
   
@@ -723,303 +1064,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#what-was-done" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ✅ What Was Done
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="✅ What Was Done">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-reorganized-project-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Reorganized Project Structure
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-fixed-import-paths" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Fixed Import Paths
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-created-streamlit-web-application" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Created Streamlit Web Application 📊
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-created-google-colab-notebook" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Created Google Colab Notebook 🚀
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-added-supporting-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Added Supporting Files
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-to-run" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        🚀 How to Run
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="🚀 How to Run">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#option-1-local-development" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option 1: Local Development
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#option-2-google-colab-recommended-for-quick-start" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option 2: Google Colab (Recommended for Quick Start)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#new-project-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        New Project Structure
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#key-features-of-streamlit-app" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Key Features of Streamlit App
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Key Features of Streamlit App">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#interactive-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Interactive Configuration
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#factor-selection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Factor Selection
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#professional-ui" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Professional UI
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#testing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Testing
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#for-google-colab-users" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        For Google Colab Users
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Next Steps">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#to-use-the-app" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        To use the app:
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#to-deploy-on-colab" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        To deploy on Colab:
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#to-share-with-team" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        To share with team:
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#quick-test" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quick Test
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#summary" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Summary
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1900,22 +1944,44 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-was-done" class="md-nav__link">
+  <a href="#overview" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ✅ What Was Done
+        Overview
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="✅ What Was Done">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#project-links" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Project links
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-1-create-or-edit-your-markdown-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Create or edit your markdown file
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 1: Create or edit your markdown file">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-reorganized-project-structure" class="md-nav__link">
+  <a href="#for-a-new-guide" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Reorganized Project Structure
+        For a new guide
       
     </span>
   </a>
@@ -1923,43 +1989,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-fixed-import-paths" class="md-nav__link">
+  <a href="#for-an-existing-guide" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Fixed Import Paths
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-created-streamlit-web-application" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Created Streamlit Web Application 📊
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-created-google-colab-notebook" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Created Google Colab Notebook 🚀
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-added-supporting-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Added Supporting Files
+        For an existing guide
       
     </span>
   </a>
@@ -1972,22 +2005,77 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-to-run" class="md-nav__link">
+  <a href="#step-2-update-mkdocsyml" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🚀 How to Run
+        Step 2: Update mkdocs.yml
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="🚀 How to Run">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-3-update-docsindexmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Update DOCS/index.md
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-4-preview-locally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4: Preview locally
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-5-commit-and-push" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5: Commit and push
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-6-verify-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 6: Verify deployment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-pitfalls-and-fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common pitfalls and fixes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common pitfalls and fixes">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#option-1-local-development" class="md-nav__link">
+  <a href="#the-page-does-not-appear-in-the-menu" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 1: Local Development
+        The page does not appear in the menu
       
     </span>
   </a>
@@ -1995,10 +2083,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#option-2-google-colab-recommended-for-quick-start" class="md-nav__link">
+  <a href="#the-quick-link-is-broken" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 2: Google Colab (Recommended for Quick Start)
+        The quick link is broken
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tables-or-code-blocks-render-incorrectly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tables or code blocks render incorrectly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-workflow-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The workflow fails
       
     </span>
   </a>
@@ -2011,33 +2121,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#new-project-structure" class="md-nav__link">
+  <a href="#markdown-syntax-quick-reference" class="md-nav__link">
     <span class="md-ellipsis">
       
-        New Project Structure
+        Markdown syntax quick reference
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#key-features-of-streamlit-app" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Key Features of Streamlit App
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Key Features of Streamlit App">
+    <nav class="md-nav" aria-label="Markdown syntax quick reference">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#interactive-configuration" class="md-nav__link">
+  <a href="#headers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Interactive Configuration
+        Headers
       
     </span>
   </a>
@@ -2045,10 +2144,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#factor-selection" class="md-nav__link">
+  <a href="#lists" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Factor Selection
+        Lists
       
     </span>
   </a>
@@ -2056,10 +2155,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#professional-ui" class="md-nav__link">
+  <a href="#tables" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Professional UI
+        Tables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#code-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Code blocks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#links" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Links
       
     </span>
   </a>
@@ -2072,55 +2193,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#testing" class="md-nav__link">
+  <a href="#organization-and-naming-conventions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Testing
+        Organization and naming conventions
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#for-google-colab-users" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        For Google Colab Users
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Next Steps">
+    <nav class="md-nav" aria-label="Organization and naming conventions">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#to-use-the-app" class="md-nav__link">
+  <a href="#filename-naming" class="md-nav__link">
     <span class="md-ellipsis">
       
-        To use the app:
+        Filename naming
       
     </span>
   </a>
@@ -2128,10 +2216,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#to-deploy-on-colab" class="md-nav__link">
+  <a href="#navigation-ordering" class="md-nav__link">
     <span class="md-ellipsis">
       
-        To deploy on Colab:
+        Navigation ordering
       
     </span>
   </a>
@@ -2139,10 +2227,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#to-share-with-team" class="md-nav__link">
+  <a href="#guide-templates" class="md-nav__link">
     <span class="md-ellipsis">
       
-        To share with team:
+        Guide templates
       
     </span>
   </a>
@@ -2155,10 +2243,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#quick-test" class="md-nav__link">
+  <a href="#quick-checklist-for-adding-a-new-guide" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick Test
+        Quick checklist for adding a new guide
       
     </span>
   </a>
@@ -2166,10 +2254,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#summary" class="md-nav__link">
+  <a href="#related-guides" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Summary
+        Related guides
       
     </span>
   </a>
@@ -2193,227 +2281,241 @@
 
 
 
-<h1 id="factor-lake-project-reorganization-complete">Factor-Lake Project Reorganization Complete!</h1>
-<h2 id="what-was-done">✅ What Was Done</h2>
-<h3 id="1-reorganized-project-structure">1. <strong>Reorganized Project Structure</strong></h3>
-<ul>
-<li>Created <code>src/</code> folder for all Python source files</li>
-<li>Moved 13 core Python modules into <code>src/</code>:<ul>
-<li><code>calculate_holdings.py</code></li>
-<li><code>factors_doc.py</code></li>
-<li><code>factor_function.py</code></li>
-<li><code>factor_utils.py</code></li>
-<li><code>fossil_fuel_restriction.py</code></li>
-<li><code>main.py</code></li>
-<li><code>market_object.py</code></li>
-<li><code>portfolio.py</code></li>
-<li><code>sector_selection.py</code></li>
-<li><code>supabase_client.py</code></li>
-<li><code>supabase_input.py</code></li>
-<li><code>user_input.py</code></li>
-<li><code>verbosity_options.py</code></li>
-</ul>
-</li>
-</ul>
-<h3 id="2-fixed-import-paths">2. <strong>Fixed Import Paths</strong></h3>
-<ul>
-<li>Updated <code>UnitTests/conftest.py</code> to add <code>src/</code> to Python path</li>
-<li>Updated <code>test_excel_loading.py</code> to include src in path</li>
-<li>All test files will now find the modules correctly</li>
-</ul>
-<h3 id="3-created-streamlit-web-application">3. <strong>Created Streamlit Web Application</strong> 📊</h3>
-<p><strong>File: <code>streamlit_app.py</code></strong>
-   - Full-featured interactive web interface
-   - Factor selection with checkboxes
-   - Data source configuration (Supabase or Excel)
-   - ESG and sector filters
-   - Portfolio backtest visualization
-   - Results download (CSV)
-   - Responsive design with tabs</p>
-<p><strong>Features:</strong>
-   - 📊 <strong>Analysis Tab</strong>: Configure and run backtests
-   - 📈 <strong>Results Tab</strong>: View performance metrics and charts
-   - ℹ️ <strong>About Tab</strong>: Documentation and help
-   - 💾 <strong>Export</strong>: Download results as CSV
-   - 🎨 <strong>Professional UI</strong>: Clean, intuitive interface</p>
-<h3 id="4-created-google-colab-notebook">4. <strong>Created Google Colab Notebook</strong> 🚀</h3>
-<p><strong>File: <code>colab_setup.ipynb</code></strong>
-   - Step-by-step setup instructions
-   - Automatic repository cloning
-   - Dependency installation
-   - Ngrok tunnel configuration
-   - One-click deployment</p>
-<h3 id="5-added-supporting-files">5. <strong>Added Supporting Files</strong></h3>
-<ul>
-<li><code>run_streamlit.py</code>: Simple launcher script</li>
-<li><code>STREAMLIT_README.md</code>: Comprehensive documentation</li>
-<li>Updated <code>requirements.txt</code> with Streamlit dependencies</li>
-</ul>
-<h2 id="how-to-run">🚀 How to Run</h2>
-<h3 id="option-1-local-development">Option 1: Local Development</h3>
-<pre><code class="language-bash"># Install dependencies
-pip install -r requirements.txt
+<h1 id="documentation-contributor-guide">Documentation Contributor Guide</h1>
+<p>This guide is for team members who want to add or edit documentation on the Factor-Lake docs site.</p>
+<h2 id="overview">Overview</h2>
+<p>The docs site is built with <a href="https://www.mkdocs.org/user-guide/writing-your-docs/">MkDocs</a> and publishes automatically to GitHub Pages when you push to <code>main</code> in the <a href="https://github.com/cornell-sysen-5900/Factor-Lake">Factor-Lake GitHub Repo</a>. To add or edit documentation, follow this sequence:</p>
+<ol>
+<li>Edit or create a markdown file in <code>DOCS/</code>.</li>
+<li>Register the page in <code>mkdocs.yml</code>.</li>
+<li>Add a quick link in <code>DOCS/index.md</code>.</li>
+<li>Preview locally if needed.</li>
+<li>Push to <code>main</code> and let GitHub Actions deploy the site.</li>
+</ol>
+<h2 id="project-links">Project links</h2>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Link</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GitHub Repo</td>
+<td><a href="https://github.com/cornell-sysen-5900/Factor-Lake">Factor-Lake GitHub Repo</a></td>
+</tr>
+<tr>
+<td>Streamlit App</td>
+<td><a href="https://cornellfactorlake.streamlit.app/">Factor-Lake Streamlit App</a></td>
+</tr>
+<tr>
+<td>Supabase Project</td>
+<td><a href="https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm">Factor Lake Supabase Project</a></td>
+</tr>
+<tr>
+<td>Trello Board</td>
+<td><a href="https://trello.com/b/fFJ81SzB/quantfinanceproj">Quant Finance Project Trello</a></td>
+</tr>
+<tr>
+<td>ScrumPoker</td>
+<td><a href="https://www.scrumpoker-online.org/en/">ScrumPoker Online</a></td>
+</tr>
+<tr>
+<td>Streamlit Cloud</td>
+<td><a href="https://share.streamlit.io/">Streamlit Cloud</a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="step-1-create-or-edit-your-markdown-file">Step 1: Create or edit your markdown file</h2>
+<h3 id="for-a-new-guide">For a new guide</h3>
+<ol>
+<li>Create a new <code>.md</code> file in the <code>DOCS/</code> folder.</li>
+<li>Example: <code>DOCS/MY_NEW_GUIDE.md</code></li>
+<li>Use a descriptive filename with no spaces.</li>
+<li>Start the file with a top-level heading.</li>
+<li>Write the guide as a step-by-step procedure with short sections.</li>
+</ol>
+<p>Example:</p>
+<pre><code class="language-markdown"># My New Guide Title
 
-# Run the Streamlit app
-python run_streamlit.py
-
-# Or directly
-streamlit run streamlit_app.py
+1. Do the first thing.
+2. Do the next thing.
+3. Verify the result.
 </code></pre>
-<p>Then open your browser to <code>http://localhost:8501</code></p>
-<h3 id="option-2-google-colab-recommended-for-quick-start">Option 2: Google Colab (Recommended for Quick Start)</h3>
+<h3 id="for-an-existing-guide">For an existing guide</h3>
 <ol>
-<li>
-<p><strong>Upload <code>colab_setup.ipynb</code> to Google Colab</strong></p>
-</li>
-<li>
-<p><strong>Get free ngrok token</strong> from https://dashboard.ngrok.com/</p>
-</li>
-<li>
-<p><strong>Run all cells</strong> in the notebook</p>
-</li>
-<li>
-<p><strong>Click the generated URL</strong> to access your app</p>
-</li>
+<li>Open the <code>.md</code> file in <code>DOCS/</code>.</li>
+<li>Rewrite the content so a new team member can follow it without guessing.</li>
+<li>Replace plain-text tool names with embedded links where possible.</li>
+<li>Save the file.</li>
 </ol>
-<h2 id="new-project-structure">New Project Structure</h2>
-<pre><code>Factor-Lake_2/
-├── src/                          ⭐ NEW: Source code folder
-│   ├── calculate_holdings.py
-│   ├── factor_function.py
-│   ├── factor_utils.py
-│   ├── factors_doc.py
-│   ├── fossil_fuel_restriction.py
-│   ├── main.py
-│   ├── market_object.py
-│   ├── portfolio.py
-│   ├── sector_selection.py
-│   ├── supabase_client.py
-│   ├── supabase_input.py
-│   ├── user_input.py
-│   └── verbosity_options.py
-│
-├── streamlit_app.py              ⭐ NEW: Web application
-├── run_streamlit.py              ⭐ NEW: Launcher script
-├── colab_setup.ipynb             ⭐ NEW: Colab notebook
-├── STREAMLIT_README.md           ⭐ NEW: App documentation
-│
-├── UnitTests/
-│   ├── conftest.py               ✏️ UPDATED: Import paths fixed
-│   └── test_*.py
-│
-├── test_excel_loading.py         ✏️ UPDATED: Import paths fixed
-├── test_local.py
-├── run_tests.py
-│
-├── Visualizations/
-├── requirements.txt              ✏️ UPDATED: Added Streamlit
-├── README.md
-└── ...
+<h2 id="step-2-update-mkdocsyml">Step 2: Update <code>mkdocs.yml</code></h2>
+<p>The <code>mkdocs.yml</code> file at the repo root controls site navigation.</p>
+<ol>
+<li>Open <code>mkdocs.yml</code>.</li>
+<li>Find the <code>nav:</code> section.</li>
+<li>Add your guide under <code>Guides</code> in the same style as the existing entries.</li>
+<li>Make sure the display name and filename are correct and case-sensitive.</li>
+</ol>
+<p>Example:</p>
+<pre><code class="language-yaml">nav:
+  - Home: index.md
+  - Guides:
+    - Factor Lake User Guide: FACTOR_LAKE_USER_GUIDE.md
+    - Developer Onboarding: DEV_ONBOARDING.md
+    - New Guide Name: NEW_GUIDE.md
 </code></pre>
-<h2 id="key-features-of-streamlit-app">Key Features of Streamlit App</h2>
-<h3 id="interactive-configuration">Interactive Configuration</h3>
-<ul>
-<li>✅ Choose data source (Supabase or Excel)</li>
-<li>✅ Enable/disable fossil fuel restrictions</li>
-<li>✅ Select specific sectors</li>
-<li>✅ Set analysis period (2002-2023)</li>
-<li>✅ Configure initial investment amount</li>
-<li>✅ Adjust verbosity levels</li>
-</ul>
-<h3 id="factor-selection">Factor Selection</h3>
-<p>All factors organized by category:
-- <strong>Momentum</strong>: 1M, 6M, 12M
-- <strong>Value</strong>: P/B, B/P, Forward Earnings Yield
-- <strong>Profitability</strong>: ROE, ROA
-- <strong>Growth</strong>: Asset Growth, CapEx Growth
-- <strong>Quality</strong>: Accruals, Low Volatility</p>
-<ul>
-<li>Performance metrics (Total Return, CAGR, Alpha)</li>
-<li>Portfolio growth chart vs. Russell 2000</li>
-<li>Year-by-year performance table</li>
-<li>CSV export functionality</li>
-</ul>
-<h3 id="professional-ui">Professional UI</h3>
-<ul>
-<li>Clean, modern design</li>
-<li>Responsive layout</li>
-<li>Informative help text</li>
-<li>Error handling with user-friendly messages</li>
-<li>Progress indicators</li>
-</ul>
-<h2 id="testing">Testing</h2>
-<p>All tests still work! The import path fixes ensure:</p>
-<pre><code class="language-bash"># Run all tests
-python run_tests.py all
-
-# Run specific tests
-python run_tests.py factors
-python run_tests.py portfolio
-python run_tests.py holdings
-
-# Run with coverage
-python run_tests.py coverage
+<h2 id="step-3-update-docsindexmd">Step 3: Update <code>DOCS/index.md</code></h2>
+<p>The home page of the docs site has a quick-links table.</p>
+<ol>
+<li>Open <code>DOCS/index.md</code>.</li>
+<li>Find the quick-links table.</li>
+<li>Add a row for the new guide.</li>
+<li>Keep the link text and file name consistent with <code>mkdocs.yml</code>.</li>
+</ol>
+<p>Example:</p>
+<pre><code class="language-markdown">| [New Guide Name](NEW_GUIDE.md) | Short description of what the guide covers |
 </code></pre>
-<h2 id="documentation">Documentation</h2>
-<ul>
-<li><strong>STREAMLIT_README.md</strong>: Complete Streamlit app guide</li>
-<li><strong>colab_setup.ipynb</strong>: Step-by-step Colab instructions</li>
-<li><strong>README.md</strong>: Original project documentation</li>
-<li><strong>CONTRIBUTING.md</strong>: Contribution guidelines</li>
-</ul>
-<h2 id="for-google-colab-users">For Google Colab Users</h2>
-<p>The <code>colab_setup.ipynb</code> notebook makes it incredibly easy:</p>
+<h2 id="step-4-preview-locally">Step 4: Preview locally</h2>
 <ol>
-<li><strong>No local installation needed</strong></li>
-<li><strong>Free GPU/TPU access</strong> (if needed for future enhancements)</li>
-<li><strong>Shareable public URL</strong> via ngrok</li>
-<li><strong>Works from anywhere</strong> with internet</li>
-<li><strong>Pre-configured environment</strong></li>
+<li>Install MkDocs if you have not already:</li>
 </ol>
-<h2 id="next-steps">Next Steps</h2>
-<h3 id="to-use-the-app">To use the app:</h3>
-<ol>
-<li>Install Streamlit: <code>pip install streamlit</code></li>
-<li>Run: <code>python run_streamlit.py</code></li>
-<li>Configure your analysis in the web interface</li>
-<li>View results and download data</li>
-</ol>
-<h3 id="to-deploy-on-colab">To deploy on Colab:</h3>
-<ol>
-<li>Open <code>colab_setup.ipynb</code> in Google Colab</li>
-<li>Follow the instructions in the notebook</li>
-<li>Share the generated URL with others</li>
-</ol>
-<h3 id="to-share-with-team">To share with team:</h3>
-<ol>
-<li>Push changes to GitHub</li>
-<li>Share the Colab notebook link</li>
-<li>Anyone can run it with their own ngrok token</li>
-</ol>
-<h2 id="quick-test">Quick Test</h2>
-<p>Test that everything works:</p>
-<pre><code class="language-bash"># Navigate to project
-cd Factor-Lake_2
-
-# Test imports
-python -c &quot;import sys; sys.path.insert(0, 'src'); from market_object import load_data; print('✅ Imports work!')&quot;
-
-# Run tests
-python run_tests.py fast
-
-# Start app
-python run_streamlit.py
+<pre><code class="language-bash">pip install mkdocs mkdocs-material mkdocstrings mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index
 </code></pre>
-<h2 id="summary">Summary</h2>
-<p>The Factor-Lake project now has:
-- ✅ Clean, organized structure with <code>src/</code> folder
-- ✅ All import paths fixed and working
-- ✅ Beautiful Streamlit web application
-- ✅ Google Colab integration for easy deployment
-- ✅ Comprehensive documentation
-- ✅ Professional UI/UX
-- ✅ Export and visualization features</p>
+<ol>
+<li>From the repo root, run:</li>
+</ol>
+<pre><code class="language-bash">mkdocs serve
+</code></pre>
+<ol>
+<li>Open the local site at <code>http://127.0.0.1:8000/</code>.</li>
+<li>Verify the new page appears in the navigation and renders correctly.</li>
+<li>Check that links, tables, and code blocks display as expected.</li>
+</ol>
+<h2 id="step-5-commit-and-push">Step 5: Commit and push</h2>
+<ol>
+<li>Stage the changed files.</li>
+<li>Commit with a clear message.</li>
+<li>Push to <code>main</code>.</li>
+</ol>
+<p>Example:</p>
+<pre><code class="language-bash">git add DOCS/MY_NEW_GUIDE.md mkdocs.yml DOCS/index.md
+git commit -m &quot;Add documentation guide&quot;
+git push origin main
+</code></pre>
+<h2 id="step-6-verify-deployment">Step 6: Verify deployment</h2>
+<ol>
+<li>Open the <a href="https://github.com/cornell-sysen-5900/Factor-Lake">Factor-Lake GitHub Repo</a>.</li>
+<li>Check the <strong>Actions</strong> tab.</li>
+<li>Confirm the workflow named <strong>Deploy MkDocs to GitHub Pages</strong> passed.</li>
+<li>Open the published docs site and confirm the new page appears.</li>
+</ol>
+<h2 id="common-pitfalls-and-fixes">Common pitfalls and fixes</h2>
+<h3 id="the-page-does-not-appear-in-the-menu">The page does not appear in the menu</h3>
+<ol>
+<li>Check the filename in <code>mkdocs.yml</code>.</li>
+<li>Make sure the file exists in <code>DOCS/</code>.</li>
+<li>Confirm the indentation in <code>mkdocs.yml</code> is correct.</li>
+</ol>
+<h3 id="the-quick-link-is-broken">The quick link is broken</h3>
+<ol>
+<li>Check the file path in <code>DOCS/index.md</code>.</li>
+<li>Use the filename only, not <code>DOCS/filename.md</code>.</li>
+<li>Make sure the link text and filename match the nav entry.</li>
+</ol>
+<h3 id="tables-or-code-blocks-render-incorrectly">Tables or code blocks render incorrectly</h3>
+<ol>
+<li>Check Markdown syntax carefully.</li>
+<li>Verify table pipes and code fences are balanced.</li>
+<li>Re-run <code>mkdocs serve</code> and confirm the page builds cleanly.</li>
+</ol>
+<h3 id="the-workflow-fails">The workflow fails</h3>
+<ol>
+<li>Open the failing GitHub Actions run.</li>
+<li>Read the build log for YAML or dependency errors.</li>
+<li>Fix the file locally and push again.</li>
+</ol>
+<h2 id="markdown-syntax-quick-reference">Markdown syntax quick reference</h2>
+<p>For detailed Markdown help, see the <a href="https://www.mkdocs.org/user-guide/writing-your-docs/">MkDocs documentation</a>.</p>
+<h3 id="headers">Headers</h3>
+<pre><code class="language-markdown"># Level 1
+## Level 2
+### Level 3
+</code></pre>
+<h3 id="lists">Lists</h3>
+<pre><code class="language-markdown">- Bullet point
+- Another point
+  - Nested point
+
+1. Numbered item
+2. Another item
+</code></pre>
+<h3 id="tables">Tables</h3>
+<pre><code class="language-markdown">| Header 1 | Header 2 |
+|----------|----------|
+| Data 1   | Data 2   |
+| Data 3   | Data 4   |
+</code></pre>
+<h3 id="code-blocks">Code blocks</h3>
+<pre><code class="language-markdown">```python
+print(&quot;hello&quot;)
+</code></pre>
+<pre><code>    Inline `code` with backticks
+
+    Block code with fence:
+    ```python
+    def hello():
+        print(&quot;Hello&quot;)
+    ```
+</code></pre>
+<h3 id="links">Links</h3>
+<pre><code class="language-markdown">[Display text](path/to/file.md)
+[External link](https://example.com)
+</code></pre>
+<h2 id="organization-and-naming-conventions">Organization and naming conventions</h2>
+<h3 id="filename-naming">Filename naming</h3>
+<ul>
+<li>Use UPPERCASE_WITH_UNDERSCORES for guide names (e.g., <code>TESTING_GUIDE.md</code>, <code>SUPABASE_MAINTENANCE_GUIDE.md</code>).</li>
+<li>Keep filenames descriptive but concise (max 40 characters).</li>
+<li>Avoid spaces; use underscores instead.</li>
+</ul>
+<h3 id="navigation-ordering">Navigation ordering</h3>
+<p>Guides are organized by audience and workflow:</p>
+<ol>
+<li><strong>Student Guides</strong> (Factor Lake User Guide)</li>
+<li><strong>Developer Guides</strong> (Developer Onboarding, Contributing)</li>
+<li><strong>Admin/Operations Guides</strong> (Streamlit Admin Guide, Supabase Maintenance, Deployment)</li>
+<li><strong>Setup and Reference</strong> (Supabase Setup, Streamlit Styling, Security Scanning, Reorganization Summary)</li>
+</ol>
+<p>When adding a new guide, place it near related guides.</p>
+<h3 id="guide-templates">Guide templates</h3>
+<p>Consider these sections for new guides:</p>
+<ul>
+<li><strong>Purpose/Overview:</strong> What problem does this guide solve?</li>
+<li><strong>Audience:</strong> Who should read this?</li>
+<li><strong>Prerequisites:</strong> What must the reader already know or have access to?</li>
+<li><strong>Step-by-step sections:</strong> Clear numbered or bulleted workflows.</li>
+<li><strong>Troubleshooting:</strong> Common issues and solutions.</li>
+<li><strong>Quick reference:</strong> Links to related guides and resources.</li>
+<li><strong>Related guides:</strong> Links to other relevant documentation.</li>
+</ul>
+<h2 id="quick-checklist-for-adding-a-new-guide">Quick checklist for adding a new guide</h2>
+<ul>
+<li>[ ] Created markdown file in <code>DOCS/</code> with clear filename.</li>
+<li>[ ] Added entry to <code>mkdocs.yml</code> under <code>Guides:</code> with correct filename.</li>
+<li>[ ] Added row to quick-links table in <code>DOCS/index.md</code>.</li>
+<li>[ ] Tested locally with <code>mkdocs serve</code> (or manually verified syntax).</li>
+<li>[ ] Committed and pushed to <code>main</code> branch.</li>
+<li>[ ] Verified GitHub Actions workflow passed.</li>
+<li>[ ] Opened live docs site and confirmed guide appears and renders correctly.</li>
+</ul>
+<h2 id="related-guides">Related guides</h2>
+<ul>
+<li>CONTRIBUTING.md - How to contribute code to the project</li>
+<li>DEPLOYMENT.md - How to deploy the Streamlit app</li>
+<li>Trello Reference - External tools and resources</li>
+</ul>
 
 
 
