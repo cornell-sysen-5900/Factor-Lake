@@ -45,7 +45,11 @@ data/
 .mypy_cache/
 .pytest_cache/
 
-# Build artifacts (if any appear later)
+# Build artifacts
 dist/
 build/
 *.egg-info/
+site/
+
+# Claude Code ctags index
+.claude/tags

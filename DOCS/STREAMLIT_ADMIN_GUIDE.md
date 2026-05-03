@@ -29,7 +29,7 @@ Use this guide when you need to keep the production [Factor-Lake Streamlit App](
 
 1. Open the app logs in Streamlit Cloud.
 2. Check for import, dependency, or secret errors.
-3. Confirm `requirements.txt` is current.
+3. Confirm `pyproject.toml` includes new dependencies.
 4. Trigger a restart or redeploy if needed.
 5. Re-test the app after the fix.
 

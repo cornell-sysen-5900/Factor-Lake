@@ -90,13 +90,13 @@ Example:
 1. Install MkDocs if you have not already:
 
 ```bash
-pip install mkdocs mkdocs-material mkdocstrings mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index
+uv sync --group docs
 ```
 
 2. From the repo root, run:
 
 ```bash
-mkdocs serve
+uv run mkdocs serve
 ```
 
 3. Open the local site at `http://127.0.0.1:8000/`.

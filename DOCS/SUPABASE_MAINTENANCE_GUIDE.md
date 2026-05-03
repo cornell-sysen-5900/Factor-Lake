@@ -133,7 +133,7 @@ from staging_prices;
 
 ## 13. Verify a Supabase change
 
-1. Run `IntegrationTests/test_supabase_integration.py`.
+1. Run `tests/integration/test_supabase.py`.
 2. Open the Streamlit app.
 3. Click Load Market Data.
 4. Run Portfolio Analysis.
@@ -160,4 +160,4 @@ Use this section when you need the background details that support the workflow 
 4. The default table is `Full Precision Test` unless code changes it.
 5. `last_price_mapping` supplies delisting fields that the client merges into the dataset.
 6. Common required fields include `Ticker`, `Year`, `Ending_Price`, and `Next-Years_Return`.
-7. Integration tests in `IntegrationTests/test_supabase_integration.py` should be kept aligned with any schema change.
+7. Integration tests in `tests/integration/test_supabase.py` should be kept aligned with any schema change.
