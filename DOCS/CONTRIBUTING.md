@@ -1,65 +1,74 @@
 ## How to contribute to Factor Lake
 
-### Git Basics
+Use this workflow whenever you make a change in the [Factor-Lake GitHub Repo](https://github.com/cornell-sysen-5900/Factor-Lake).
 
-The Quebec team follows the standard git workflow to manage this repository. Beginners will find the steps detailed below helpful in making their first contributions.
+### Step 1: Clone the repository
 
-1. Clone Repository
-
-```
+```bash
 git clone https://github.com/cornell-sysen-5900/Factor-Lake.git
 ```
 
-2. Move to repository directory 
+### Step 2: Move into the project folder
 
-```
+```bash
 cd Factor-Lake
 ```
 
-3. Check status and confirm its up to date.
+### Step 3: Check your branch state
 
-```
+```bash
 git status
 ```
 
-4. Create a new branch.
+### Step 4: Create a feature branch
 
-```
-git checkout -b <new branch>
+```bash
+git checkout -b <new-branch>
 ```
 
-5. Check that you're working in the newly created branch.
+### Step 5: Confirm the branch changed
 
-```
+```bash
 git branch
 ```
 
-The branch your working on will be marked with an asterisk.
+The active branch will have an asterisk.
 
-6. Add a new file or make changes to an existing file using VSCode or preferred editor.
+### Step 6: Edit the files you need
 
-7. Stage file for next commit.
+Use VS Code or your preferred editor to make the change.
 
-```
+### Step 7: Stage the files
+
+```bash
 git add <filename>
 ```
-8. Commit changes with descriptive message.
 
-```
-git commit -m "Added new file and this is my descriptive message."
+### Step 8: Commit the change
+
+```bash
+git commit -m "Describe the change clearly"
 ```
 
-9. Push changes to repository branch.
+### Step 9: Push the branch
 
+```bash
+git push origin <new-branch>
 ```
-git push origin <branch you created in step 4>
-```
+
+### Step 10: Open a pull request
+
+1. Go to the [Factor-Lake GitHub Repo](https://github.com/cornell-sysen-5900/Factor-Lake).
+2. Open the branch comparison view.
+3. Create a pull request into `main`.
+4. Describe what changed and how you tested it.
+
 ### Diagram System Breakdown
 <details markdown="1">
 <summary>Portfolio Use Case Diagram</summary>
 
   ![Portfolio Use Case Diagram](./GoogleColabDiagrams/UseCaseDiagram.png)
-  <sub><i>This diagram explains how the developer and the portfolio manager interact with the system. The portfolio manager(s) primarily interact with Google Drive and Google Colab, while the developer manages both code and computation via Google Colab and GitHub. This diagram aids in identifying access points and roles therefore supporting secure coding and permission management. </i></sub>
+  <sub><i>This diagram explains how the portfolio manager and developer interact with the current Streamlit product. It focuses on the real UI flow in the repository today: configure inputs, load Supabase data, run the backtest, review results, and maintain the code, docs, and test workflow through GitHub.</i></sub>
   
 
 
@@ -69,7 +78,7 @@ git push origin <branch you created in step 4>
 <summary>Class Diagram</summary>
 
   ![Class Diagram](./GoogleColabDiagrams/ClassDiagram.png)
-  <sub><i>This diagram shows the structure and relationships between major classes in the portfolio construction system. It highlights how user inputs, market data, and various factor classes interact to compute portfolio holdings, returns, and analytics. It is useful for developers that are planning for feature extensions, testing coverage, and/or debugging.</i></sub>
+  <sub><i>This diagram maps the active module and class relationships in the current codebase. It shows how the Streamlit UI, session-state helpers, Supabase ingestion, backtest engine, benchmark data, performance metrics, visualizations, and the remaining core classes work together during analysis.</i></sub>
 
 </details>
 
@@ -77,7 +86,7 @@ git push origin <branch you created in step 4>
 <summary>Deployment Diagram</summary>
 
   ![Deployment Diagram](./GoogleColabDiagrams/DeploymentDiagram.png)
-  <sub><i>This deployment diagram outlines how a user accesses Google Colab to run the factor portfolio notebook. It includes the OAuth-based authentication flow via Cornell IDP and Duo, Google Drive integration for data storage, and repository access from GitHub. It maps the data flow and token exchanges required to mount storage and retrieve market data securely. This is helpful for onboarding new collaborators, security reviews, and cloud resource planning. </i></sub>
+  <sub><i>This deployment diagram reflects the present Streamlit-oriented setup. It shows the browser client, the Streamlit runtime, the Supabase cloud database, local benchmark and metrics modules, and the GitHub-backed code and documentation workflow instead of the older Google Colab and Google Drive path.</i></sub>
 
 </details>
 
@@ -93,7 +102,7 @@ Static Application Security Testing (SAST) is a subset of static analysis testin
 
 The first tool we've decided to use for SAST is [Bandit](https://bandit.readthedocs.io/en/latest/). Per their documentation, "Bandit is a tool designed to find common security issues in Python code. To do this, Bandit processes each file, builds an Abstract Syntax Tree (AST) from it, and runs appropriate plugins against the AST nodes. Once Bandit has finished scanning all the files, it generates a report."[^4]
 
-The second tool we've decided to use for SAST is Safety CLI. Per their documentation, "Safety CLI is a Python dependency vulnerability scanner designed to enhance software supply chain security and enable the secure use of Python packages."[^5] In order for Safety CLI to work, our repository's dependencies must be stored in a requirements.txt file.
+The second tool we've decided to use for SAST is Safety CLI. Per their documentation, "Safety CLI is a Python dependency vulnerability scanner designed to enhance software supply chain security and enable the secure use of Python packages."[^5] The project's dependencies are managed in `pyproject.toml` and pinned via `uv.lock`.
 
 [^1]: https://www.pluralsight.com/blog/software-development/secdevops#:~:text=with%20Pluralsight%20Flow-,What%20is%20SecDevOps?,vulnerabilities%20they%20missed%20earlier%20on
 [^2]: https://snyk.io/learn/open-source-static-code-analysis/

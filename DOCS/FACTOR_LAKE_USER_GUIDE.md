@@ -1,163 +1,130 @@
-# Factor Lake User Guide
+# Factor Lake User Workflow
 
-This guide is for users who want a practical walkthrough of what Factor Lake does and how to use it effectively for coursework.
+Use this guide when you want to run a factor experiment in the [Factor-Lake Streamlit App](https://cornellfactorlake.streamlit.app/) and turn it into a class result.
 
-## What Factor Lake does
+## 1. Open the project links
 
-Factor Lake is a portfolio backtesting tool. You pick a set of stock-selection factors (for example momentum, value, profitability, or growth), define how each factor should be ranked, and run a historical simulation.
+| Tool | Link |
+|---|---|
+| Streamlit App | [Factor-Lake Streamlit App](https://cornellfactorlake.streamlit.app/) |
+| GitHub Repo | [Factor-Lake GitHub Repo](https://github.com/cornell-sysen-5900/Factor-Lake) |
+| Supabase Project | [Factor Lake Supabase Project](https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm) |
 
-At a high level, the app helps you:
+## 2. Understand the app in one sentence
 
-- test a factor hypothesis on historical Russell 2000-style universes,
-- compare your strategy against benchmark indices,
-- evaluate return and risk metrics (CAGR, drawdown, Sharpe, win rate, etc.),
-- inspect ranked stocks and top-vs-bottom cohort behavior.
+Factor Lake lets you choose a group of stock-selection factors, rank stocks by those factors, run a historical backtest, and compare the result to benchmarks.
 
-## Before you start
+## 3. Start each analysis with the same order
 
-Make sure you have:
+1. Open the Streamlit app.
+2. Set sidebar controls.
+3. Choose factors.
+4. Load data.
+5. Run the backtest.
+6. Read the results.
+7. Write down the assumptions you used.
 
-- access to the Streamlit app URL.
+## 4. Set the sidebar first
 
-## App workflow (recommended order)
+1. Decide whether to restrict fossil fuel companies.
+2. Choose equal weight or market cap weight.
+3. Turn on sector filtering only if you need it.
+4. Set the start and end years.
+5. Set the initial investment amount.
+6. Pick the delisting strategy you want to test.
 
-Use this sequence each time so results are reproducible.
+## 5. Choose factors and directions
 
-1. Configure global settings in the sidebar.
-2. Select one or more factors in the Analysis tab.
-3. Click Load Market Data.
-4. Click Run Portfolio Analysis.
-5. Review outputs in the Results tab.
-6. Save your assumptions and findings for your class write-up.
+1. Open the Analysis tab.
+2. Select one or more factors.
+3. Decide whether each selected factor should rank high-to-low or low-to-high.
+4. Keep the direction consistent with the financial meaning of the factor.
+5. If you are unsure, start with one factor and add more later.
 
-## Step 1: Sidebar settings
+## 6. Load the market data
 
-The sidebar controls universe constraints and simulation settings.
+1. Click Load Market Data.
+2. Wait for the app to fetch data from the [Factor Lake Supabase Project](https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm).
+3. Confirm the filters you chose are applied.
+4. Make sure the app says the data loaded successfully.
 
-### ESG Filters
+## 7. Run the backtest
 
-- Restrict Fossil Fuel Companies: excludes oil/gas/coal-related industries.
+1. Click Run Portfolio Analysis.
+2. Wait for the simulation to complete.
+3. Confirm you see a success message.
+4. Open the Results tab if the app does not move there automatically.
 
-### Portfolio Weighting
+## 8. Read the results in order
 
-- Equal Weight: each selected stock gets the same weight.
-- Market Cap Weight: larger companies get larger weights.
+1. Start with Performance Summary.
+2. Check the Ranked Stocks table.
+3. Review Portfolio Growth Over Time.
+4. Review Year-by-Year Performance.
+5. Review Top vs Bottom Cohort Analysis.
+6. Review Advanced Backtest Statistics.
+7. Review Yearly Win/Loss Summary.
 
-### Delisting Strategy
+## 9. Use the result to answer the assignment question
 
-- Zero Return: assigns 0% return to delisted names.
-- Hold Cash: moves delisted capital to risk-free cash.
-- Reinvest: reallocates delisted capital across surviving positions.
+1. Write down the factor set you used.
+2. Write down the sidebar settings you used.
+3. Write down the main performance result.
+4. Write down how it compared with the benchmark.
+5. Explain why the result may have happened.
+6. Repeat the test with a second window or factor combination if you need more evidence.
 
-### Sector Selection
+## 10. Keep the factor logic straight
 
-- Enable Sector Filter to restrict analysis to selected sectors.
+1. ROE and ROA are profitability signals.
+2. Momentum signals look for continuation in price performance.
+3. Price-to-book and earnings yield are valuation signals.
+4. Volatility and accruals are quality/risk proxies.
+5. Asset growth and CapEx growth are growth signals.
 
-### Analysis Period
+## 11. Know what the app is measuring
 
-- Set Start Year and End Year for your backtest window.
+1. Returns come from the Next-Year Return % field.
+2. Delisting handling depends on the strategy you choose.
+3. The backtest is historical, not predictive.
+4. One strong result is not enough on its own.
 
-### Initial Investment
+## 12. Avoid the common mistakes
 
-- Set Initial AUM ($) to define portfolio starting value.
+1. Do not run the backtest before loading data.
+2. Do not change settings and forget to rerun.
+3. Do not compare experiments with different time windows without noting it.
+4. Do not assume one factor is always best.
 
-## Step 2: Choose factors and directions
+## 13. Troubleshoot when results look wrong
 
-In the Analysis tab, choose factors from categories such as:
+1. If you get no records, broaden the filters.
+2. If results are empty, try a different factor or longer time window.
+3. If data fails to load, check the Supabase-related guides.
+4. If the UI changed, check the Streamlit guide for maintainers.
 
-- Momentum
-- Value
-- Profitability
-- Quality
-- Growth
+## 14. Write up your experiment the same way every time
 
-For each selected factor, set direction:
+1. State your research question.
+2. List the factors and directions.
+3. List your sidebar settings.
+4. Report the main numbers.
+5. Explain the result.
+6. Note any follow-up test you would run.
 
-- High to Low: favors high factor values.
-- Low to High: favors low factor values.
+## 15. Related guides
 
-Use directions intentionally. For example, some valuation metrics are often used with low-to-high ranking to target cheaper stocks.
+1. [Deployment](DEPLOYMENT.md)
+2. [Supabase Setup](SUPABASE_SETUP.md)
+3. [Streamlit Styling Guide](STREAMLIT_STYLING_GUIDE.md)
 
-## Step 3: Load market data
+## 16. Reference
 
-Click Load Market Data.
+Use this section when you want a quick reminder of what the app is doing behind the scenes.
 
-What this does:
-
-- fetches market/factor data from Supabase,
-- applies your sector and ESG filters,
-- applies your date range.
-
-If data loads successfully, the app confirms record count and enables the run step.
-
-## Step 4: Run the backtest
-
-Click Run Portfolio Analysis.
-
-The engine then:
-
-- maps your factor choices to internal data columns,
-- builds yearly ranked cohorts,
-- simulates rebalancing over your selected years,
-- computes benchmark-relative and risk statistics.
-
-When finished, a success message appears and the app routes you to Results.
-
-## Step 5: Interpret the Results tab
-
-Key sections you will use for assignments:
-
-- Performance Summary: final value, total return, CAGR, cumulative outperformance.
-- Ranked Stocks: selected cohort and composite scores for the ranking year.
-- Portfolio Growth Over Time: strategy growth vs benchmarks.
-- Year-by-Year Performance: annual returns across portfolio and benchmarks.
-- Top vs Bottom Cohort Analysis: sanity-check whether your signal differentiates outcomes.
-- Advanced Backtest Statistics: drawdown, Sharpe, volatility, beta, information ratios.
-- Yearly Win/Loss Summary: annual head-to-head vs benchmarks.
-
-## Understanding core factor ideas (quick reference)
-
-This section mirrors the in-app About tab and adds class-friendly context.
-
-- ROE / ROA: profitability and capital efficiency.
-- 12M / 6M / 1M Momentum: trend persistence at different horizons.
-- Price-to-Book, Book/Price, Next FY Earnings/P: valuation signals.
-- 1Y Price Volatility: stability/risk proxy.
-- Accruals/Assets: earnings quality proxy.
-- 1Y Asset Growth / 1Y CapEx Growth: corporate growth and reinvestment behavior.
-
-## Notes on methodology and assumptions
-
-- Returns are based on Next-Year Return % in the dataset.
-- Delisting handling depends on the selected Delisting Strategy.
-- Results are historical simulations, not forecasts.
-- Factor performance is regime-dependent, so test multiple periods.
-
-## Suggested classwork template
-
-For each experiment in your assignment, document:
-
-1. Research question.
-2. Factor set and directions.
-3. Sidebar settings (weighting, ESG, sectors, years, AUM, delisting strategy).
-4. Main outcomes (CAGR, total return, drawdown, benchmark outperformance).
-5. Interpretation: why results may have occurred.
-6. Robustness checks (different time windows, sectors, or factor combinations).
-
-## Common mistakes to avoid
-
-- Running analysis without loading data first.
-- Changing settings after a run but forgetting to rerun.
-- Comparing experiments with different date windows or delisting strategies.
-- Over-interpreting one strong period without robustness checks.
-
-## Troubleshooting
-
-- No records after filtering: broaden sector/ESG/date constraints.
-- Empty or weak results: try additional factors, different directions, or a longer period.
-
-## Related guides
-
-- Deployment: how the app is hosted and configured.
-- Supabase Setup: data source and credentials details.
-- Streamlit Styling Guide: UI customization for maintainers.
+1. Factor categories include momentum, value, profitability, quality, and growth.
+2. The Results tab is where you verify the backtest output.
+3. The app compares your strategy with benchmark behavior.
+4. Returns come from the dataset's next-year return field.
+5. Delisting behavior changes the outcome, so keep that setting recorded in every experiment.
+6. The [Factor Lake Supabase Project](https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm) is the backing data source.

@@ -19,9 +19,12 @@ jobs:
 
     steps:
       # 🧾 Checkout repo
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      # 🛠️ Install Bandit & Safety
+      # 🛠️ Install uv + security tools
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
       - name: 📦 Install Bandit & Safety
         run: |
           python -m pip install --upgrade pip
@@ -43,15 +46,15 @@ jobs:
       - name: ⚠️ Bandit - Scan bad_code.py (expected issues)
         continue-on-error: true
         run: |
-          echo "Scanning known-bad file (UnitTests/bad_code.py)..."
-          bandit UnitTests/bad_code.py -f json -o scan-results/bandit-bad-code-results.json || true
+          echo "Scanning known-bad file (tests/fixtures/bad_code.py)..."
+          bandit tests/fixtures/bad_code.py -f json -o scan-results/bandit-bad-code-results.json || true
 
       # ✅ Evaluate Bandit results (exclude test file)
       - name: 🚨 Evaluate Bandit scan (exclude test file)
         run: |
           echo "Checking for Bandit issues outside bad_code.py..."
           if [ -f scan-results/bandit-results.json ] && jq '.results | length > 0' scan-results/bandit-results.json | grep -q 'true'; then
-            if ! grep -q "UnitTests/bad_code.py" scan-results/bandit-results.json; then
+            if ! grep -q "tests/fixtures/bad_code.py" scan-results/bandit-results.json; then
               echo "❌ Security issues found in actual code!"
               exit 1
             else
@@ -101,7 +104,8 @@ jobs:
         if: ${{ env.Vulnerabilities_found == 'true' }}
         run: |
           echo "Converting Safety output to SARIF..."
-          python scripts/convert_safety_to_sarif.py ./scan-results/safety_output.json ./scan-results/safety_output.sarif requirements.txt || echo "❌ Safety SARIF conversion failed"
+          uv export --format requirements-txt --no-hashes > scan-results/requirements.txt
+          python scripts/convert_safety_to_sarif.py ./scan-results/safety_output.json ./scan-results/safety_output.sarif scan-results/requirements.txt || echo "❌ Safety SARIF conversion failed"
 
       # ✅ Confirm SARIF file exists before uploading
       - name: ✅ Check if Safety SARIF file exists
