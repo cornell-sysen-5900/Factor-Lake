@@ -19,7 +19,7 @@ Use this guide when you need to add, clean, change, verify, or troubleshoot data
 
 ## 3. Add or bulk-upload data
 
-Use the dedicated upload workflow in [Supabase Upload Tool](SUPABASE_UPLAOD_TOOL.md).
+Use the dedicated upload workflow in [Supabase Upload Tool](SUPABASE_UPLOAD_TOOL.md).
 
 Use this maintenance guide for operational checks after upload (schema compatibility, policies, logs, and app validation).
 
@@ -96,7 +96,7 @@ You are done when the app loads data cleanly, the tests pass, the schema matches
 ## 13. Related guides
 
 1. [Supabase Setup](SUPABASE_SETUP.md)
-2. [Supabase Upload Tool](SUPABASE_UPLAOD_TOOL.md)
+2. [Supabase Upload Tool](SUPABASE_UPLOAD_TOOL.md)
 3. [Streamlit Admin Guide](STREAMLIT_ADMIN_GUIDE.md)
 4. [Deployment](DEPLOYMENT.md)
 

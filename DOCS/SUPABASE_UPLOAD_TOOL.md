@@ -15,8 +15,10 @@ Use this guide when you need to create Supabase table(s) and upload local files 
 
 1. You have `SUPABASE_URL` and a service role key.
 2. You can run from repo root (`D:/Factor-Lake` on Windows or `/mnt/d/Factor-Lake` in WSL).
-3. Your Python environment includes the required packages for file formats you use:
-   `pandas`, `supabase`, `openpyxl` (Excel), and parquet dependencies.
+3. Sync the project environment first:
+   `uv sync --group dev`
+4. Upload format dependencies are included in `pyproject.toml` and installed by `uv sync`:
+   `pandas`, `supabase`, `openpyxl` (`.xlsx`), `xlrd` (`.xls`), and `pyarrow` (`.parquet`).
 
 ## 3. Run the one-time Supabase SQL setup
 
@@ -109,8 +111,8 @@ bash tools/run_data_upload_supabase.sh "C:/Users/<you>/Downloads/data.parquet"
    Run the SQL setup in Section 3.
 4. `PGRST205` table not found in schema cache:
    Retry; schema reload and retry logic are built in.
-5. Excel dependency error for `openpyxl`:
-   Install or upgrade `openpyxl>=3.1.0` in the same Python environment.
+5. Excel dependency error for `openpyxl`/`xlrd` or parquet engine error for `pyarrow`:
+   Re-sync dependencies in the same environment: `uv sync --group dev`.
 
 ## 8. Verify the upload result
 
