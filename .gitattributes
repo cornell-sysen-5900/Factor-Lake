@@ -1,0 +1,4 @@
+# Exclude generated MkDocs output from GitHub language stats.
+site/** linguist-generated=true
+# Exclude generated MkDocs output from GitHub language stats/diffs.
+site/** linguist-generated=true
