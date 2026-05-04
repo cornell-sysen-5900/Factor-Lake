@@ -12,13 +12,15 @@ requires-python = ">=3.10"
 dependencies = [
     "matplotlib>=3.9.0",
     "numpy>=1.23",
+    "openpyxl>=3.1.0",
     "pandas>=2.2.2",
-    "pyarrow>=14.0.0",
+    "pyarrow>=15.0.0",
     "python-dotenv>=1.0.0",
     "scipy>=0.8.0",
     "supabase>=2.0.0",
     "streamlit>=1.28.0",
     "plotly>=5.17.0",
+    "xlrd>=2.0.1",
 ]
 
 [dependency-groups]

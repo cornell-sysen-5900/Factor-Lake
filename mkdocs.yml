@@ -61,6 +61,7 @@ nav:
     - Contributing: CONTRIBUTING.md
     - Deployment: DEPLOYMENT.md
     - Supabase Setup: SUPABASE_SETUP.md
+    - Supabase Upload Tool: SUPABASE_UPLOAD_TOOL.md
     - Supabase Maintenance: SUPABASE_MAINTENANCE_GUIDE.md
     - Streamlit Styling: STREAMLIT_STYLING_GUIDE.md
     - Security Scanning: Bandit & Safety.md

@@ -20,6 +20,13 @@ You can find them here:
 - Click on the word `copy` underneath the project name in the main page and copy the URL.
 - For the key, locate `Project settings` in the side bar -> then click `API Keys.`
 
+### Supabase key types (quick reference)
+
+- **Publishable key**: Intended for client-side or public app contexts with RLS enforcement.
+- **Secret keys**: Server-side keys for trusted backend environments only.
+- **Legacy anon key**: Older public key format used in existing setups; similar purpose to publishable key.
+- **Service role key**: Admin-level server key that bypasses RLS; use only for controlled backend/admin operations.
+
 ## 3. Create your local `.env` file
 
 1. Open the repo root.

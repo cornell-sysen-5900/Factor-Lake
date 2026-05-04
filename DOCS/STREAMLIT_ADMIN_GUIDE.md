@@ -27,10 +27,10 @@ Use this guide when you need to keep the production [Factor-Lake Streamlit App](
 
 ## 4. If the app did not redeploy
 
-1. Open the app logs in Streamlit Cloud.
+1. Sign in to Streamlit Cloud with your GitHub account, then open the app logs from the app control panel.
 2. Check for import, dependency, or secret errors.
 3. Confirm `pyproject.toml` includes new dependencies.
-4. Trigger a restart or redeploy if needed.
+4. Trigger a restart or redeploy from the control panel if needed.
 5. Re-test the app after the fix.
 
 ## 5. Manage secrets safely

@@ -2,7 +2,7 @@
 
 This guide walks a new contributor through access, setup, and day-to-day workflow in the order they should do it.
 
-## 1. Wait for access
+## 1. Confirm access to required tools
 
 Before you start, the professor must add you to the required workspaces:
 
@@ -13,15 +13,9 @@ Before you start, the professor must add you to the required workspaces:
 
 Do not start work until all four are available.
 
-## 2. Confirm you can open every tool
+After access is granted, confirm you can open each tool and read team channels/boards.
 
-1. Sign in to the [GitHub Repo](https://github.com/cornell-sysen-5900/Factor-Lake).
-2. Open the [Supabase Project](https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm).
-3. Open the [Trello board](https://trello.com/b/fFJ81SzB/quantfinanceproj).
-4. Open [Slack](https://join.slack.com/t/sysen5900/shared_invite/zt-3wraoys1t-yQUj9Hwn7pLrFMISAqG1KQ).
-5. Confirm you can read the team channels and project boards.
-
-## 3. Read the setup docs in order
+## 2. Read the setup docs in order
 
 Use these docs as your first local setup path:
 
@@ -31,7 +25,7 @@ Use these docs as your first local setup path:
 4. Read [Deployment](DEPLOYMENT.md) if you need to publish or verify the app.
 5. Read [Factor Lake User Guide](FACTOR_LAKE_USER_GUIDE.md) to understand the app workflow.
 
-## 4. Set up your local repository
+## 3. Set up your local repository
 
 1. Clone the [Factor-Lake GitHub Repo](https://github.com/cornell-sysen-5900/Factor-Lake).
 2. Create a branch before making changes.
@@ -40,7 +34,7 @@ Use these docs as your first local setup path:
 
 If you need the exact branch-and-commit workflow, follow [Contributing](CONTRIBUTING.md).
 
-## 5. Understand the main tools
+## 4. Understand the main tools
 
 | Tool | What it is for | What to do first |
 |---|---|---|
@@ -52,7 +46,7 @@ If you need the exact branch-and-commit workflow, follow [Contributing](CONTRIBU
 | [ScrumPoker](https://www.scrumpoker-online.org/en/) | Estimation tool | Use it during sprint planning to estimate effort |
 | [Streamlit Cloud](https://share.streamlit.io/) | App hosting | Use it to deploy and verify the Streamlit app |
 
-## 6. Learn the project workflow
+## 5. Learn the project workflow
 
 1. Check the [Trello board](https://trello.com/b/fFJ81SzB/quantfinanceproj) for the story you will work on.
 2. Clarify the story before starting implementation.
@@ -62,14 +56,14 @@ If you need the exact branch-and-commit workflow, follow [Contributing](CONTRIBU
 6. Move the card to `Awaiting PR Approval` while it is under review.
 7. After merge, the card becomes ready for demo in the professor meeting.
 
-## 7. Use Slack correctly
+## 6. Use Slack correctly
 
 1. Use the semester [Slack Workspace](https://join.slack.com/t/sysen5900/shared_invite/zt-3wraoys1t-yQUj9Hwn7pLrFMISAqG1KQ) for questions and coordination.
 2. Post blockers early.
 3. Ask for clarification before editing code or data.
 4. Keep discussions in the semester channel so the whole team stays aligned.
 
-## 8. Know where each deeper guide lives
+## 7. Know where each deeper guide lives
 
 1. [Documentation Contributor Guide](DOCS_CONTRIBUTOR_GUIDE.md) explains how to add or edit docs.
 2. [Contributing](CONTRIBUTING.md) explains the branch-and-commit workflow.
@@ -77,7 +71,7 @@ If you need the exact branch-and-commit workflow, follow [Contributing](CONTRIBU
 4. [Supabase Setup](SUPABASE_SETUP.md) explains how to configure the database connection.
 5. [Streamlit Admin Guide](STREAMLIT_ADMIN_GUIDE.md) explains production app operations.
 
-## 9. Your first-week checklist
+## 8. Your first-week checklist
 
 1. Confirm you can access all required tools.
 2. Read the setup docs.
@@ -85,7 +79,7 @@ If you need the exact branch-and-commit workflow, follow [Contributing](CONTRIBU
 4. Check the Trello Reference list for project links.
 5. Ask one question in Slack if anything is unclear.
 
-## 10. Quick reference
+## 9. Quick reference
 
 | Need | Go here |
 |---|---|
@@ -96,6 +90,6 @@ If you need the exact branch-and-commit workflow, follow [Contributing](CONTRIBU
 | Understand the app workflow | [Factor Lake User Guide](FACTOR_LAKE_USER_GUIDE.md) |
 | Ask questions | [Slack Workspace](https://join.slack.com/t/sysen5900/shared_invite/zt-3wraoys1t-yQUj9Hwn7pLrFMISAqG1KQ) |
 
-## 11. Final rule
+## 10. Final rule
 
 If something is already documented, follow the doc instead of improvising. If something is not clear, ask in [Slack](https://join.slack.com/t/sysen5900/shared_invite/zt-3wraoys1t-yQUj9Hwn7pLrFMISAqG1KQ) and update the relevant guide later if the missing step should be documented.
