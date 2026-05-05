@@ -7,8 +7,6 @@ Use this guide when you want to run a factor experiment in the [Factor-Lake Stre
 | Tool | Link |
 |---|---|
 | Streamlit App | [Factor-Lake Streamlit App](https://cornellfactorlake.streamlit.app/) |
-| GitHub Repo | [Factor-Lake GitHub Repo](https://github.com/cornell-sysen-5900/Factor-Lake) |
-| Supabase Project | [Factor Lake Supabase Project](https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm) |
 
 ## 2. Understand the app in one sentence
 
@@ -22,7 +20,6 @@ Factor Lake lets you choose a group of stock-selection factors, rank stocks by t
 4. Load data.
 5. Run the backtest.
 6. Read the results.
-7. Write down the assumptions you used.
 
 ## 4. Set the sidebar first
 
@@ -65,16 +62,7 @@ Factor Lake lets you choose a group of stock-selection factors, rank stocks by t
 6. Review Advanced Backtest Statistics.
 7. Review Yearly Win/Loss Summary.
 
-## 9. Use the result to answer the assignment question
-
-1. Write down the factor set you used.
-2. Write down the sidebar settings you used.
-3. Write down the main performance result.
-4. Write down how it compared with the benchmark.
-5. Explain why the result may have happened.
-6. Repeat the test with a second window or factor combination if you need more evidence.
-
-## 10. Keep the factor logic straight
+## 9. Keep the factor logic straight
 
 1. ROE and ROA are profitability signals.
 2. Momentum signals look for continuation in price performance.
@@ -82,28 +70,28 @@ Factor Lake lets you choose a group of stock-selection factors, rank stocks by t
 4. Volatility and accruals are quality/risk proxies.
 5. Asset growth and CapEx growth are growth signals.
 
-## 11. Know what the app is measuring
+## 10. Know what the app is measuring
 
 1. Returns come from the Next-Year Return % field.
 2. Delisting handling depends on the strategy you choose.
 3. The backtest is historical, not predictive.
 4. One strong result is not enough on its own.
 
-## 12. Avoid the common mistakes
+## 11. Avoid the common mistakes
 
 1. Do not run the backtest before loading data.
 2. Do not change settings and forget to rerun.
 3. Do not compare experiments with different time windows without noting it.
 4. Do not assume one factor is always best.
 
-## 13. Troubleshoot when results look wrong
+## 12. Troubleshoot when results look wrong
 
 1. If you get no records, broaden the filters.
 2. If results are empty, try a different factor or longer time window.
 3. If data fails to load, check the Supabase-related guides.
 4. If the UI changed, check the Streamlit guide for maintainers.
 
-## 14. Write up your experiment the same way every time
+## 13. Write up your experiment the same way every time
 
 1. State your research question.
 2. List the factors and directions.
@@ -112,13 +100,8 @@ Factor Lake lets you choose a group of stock-selection factors, rank stocks by t
 5. Explain the result.
 6. Note any follow-up test you would run.
 
-## 15. Related guides
 
-1. [Deployment](DEPLOYMENT.md)
-2. [Supabase Setup](SUPABASE_SETUP.md)
-3. [Streamlit Styling Guide](STREAMLIT_STYLING_GUIDE.md)
-
-## 16. Reference
+## 14. Reference
 
 Use this section when you want a quick reminder of what the app is doing behind the scenes.
 
