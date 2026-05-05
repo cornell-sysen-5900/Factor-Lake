@@ -203,10 +203,47 @@ def load_schema_sample(file_path: str, sample_rows: int = 1000) -> pd.DataFrame:
     )
 
 
-def map_dtype_to_postgres(dtype: Any) -> str:
-    """Map inferred dtypes to a robust ingestion-first Postgres column type."""
-    # Spreadsheets frequently contain mixed types within a single column.
-    # Using TEXT prevents insert failures when values vary across rows.
+def map_dtype_to_postgres(series: pd.Series) -> str:
+    """Infer a Postgres type from a pandas Series using conservative parsing rules."""
+    non_null = series.dropna()
+    if non_null.empty:
+        return "TEXT"
+
+    if pd.api.types.is_bool_dtype(non_null):
+        return "BOOLEAN"
+    if pd.api.types.is_integer_dtype(non_null):
+        return "NUMERIC"
+    if pd.api.types.is_float_dtype(non_null):
+        return "NUMERIC"
+    if pd.api.types.is_datetime64_any_dtype(non_null):
+        # Use DATE when all timestamps are midnight; otherwise use TIMESTAMP.
+        as_dt = pd.to_datetime(non_null, errors="coerce")
+        is_date_only = (
+            as_dt.dt.hour.eq(0)
+            & as_dt.dt.minute.eq(0)
+            & as_dt.dt.second.eq(0)
+            & as_dt.dt.microsecond.eq(0)
+        ).all()
+        return "DATE" if is_date_only else "TIMESTAMP"
+
+    normalized_text = non_null.astype(str).str.replace(",", "", regex=False).str.strip()
+
+    numeric_candidate = pd.to_numeric(normalized_text, errors="coerce")
+    if numeric_candidate.notna().all():
+        finite = np.isfinite(numeric_candidate.to_numpy(dtype=float, na_value=np.nan))
+        if finite.all():
+            return "NUMERIC"
+
+    datetime_candidate = pd.to_datetime(normalized_text, errors="coerce")
+    if datetime_candidate.notna().all():
+        is_date_only = (
+            datetime_candidate.dt.hour.eq(0)
+            & datetime_candidate.dt.minute.eq(0)
+            & datetime_candidate.dt.second.eq(0)
+            & datetime_candidate.dt.microsecond.eq(0)
+        ).all()
+        return "DATE" if is_date_only else "TIMESTAMP"
+
     return "TEXT"
 
 
@@ -220,7 +257,7 @@ def build_create_table_sql(table_name: str, sample_df: pd.DataFrame) -> str:
         column = str(column_name).strip()
         if not column:
             raise RuntimeError("Input file contains an empty column name, cannot create SQL schema.")
-        column_type = map_dtype_to_postgres(sample_df[column_name].dtype)
+        column_type = map_dtype_to_postgres(sample_df[column_name])
         column_lines.append(f"{_quote_identifier(column)} {column_type}")
 
     table_identifier = _quote_identifier(table_name)
@@ -303,22 +340,47 @@ def clean_record(row_dict: Dict[str, Any]) -> Dict[str, Any]:
     return cleaned
 
 
+def coerce_numeric_columns(data_frame: pd.DataFrame) -> pd.DataFrame:
+    """Convert fully numeric-looking string/object columns to numeric dtypes."""
+    normalized = data_frame.copy()
+
+    for column in normalized.columns:
+        series = normalized[column]
+        if not (pd.api.types.is_object_dtype(series) or pd.api.types.is_string_dtype(series)):
+            continue
+
+        non_null_mask = series.notna()
+        non_null_count = int(non_null_mask.sum())
+        if non_null_count == 0:
+            continue
+
+        candidate = pd.to_numeric(
+            series.astype(str).str.replace(",", "", regex=False).str.strip(),
+            errors="coerce",
+        )
+        if int(candidate.notna().sum()) == non_null_count:
+            normalized[column] = candidate
+
+    return normalized
+
+
 def iter_data_chunks(file_path: str, chunk_size: int):
     """Yield DataFrame chunks from supported file types."""
     extension = os.path.splitext(file_path)[1].lower()
 
     if extension == ".csv":
-        yield from pd.read_csv(file_path, chunksize=chunk_size)
+        for chunk in pd.read_csv(file_path, chunksize=chunk_size):
+            yield coerce_numeric_columns(chunk)
         return
 
     if extension in {".xlsx", ".xls"}:
-        data_frame = pd.read_excel(file_path, sheet_name=0)
+        data_frame = coerce_numeric_columns(pd.read_excel(file_path, sheet_name=0))
         for start in range(0, len(data_frame), chunk_size):
             yield data_frame.iloc[start : start + chunk_size].copy()
         return
 
     if extension == ".parquet":
-        data_frame = pd.read_parquet(file_path)
+        data_frame = coerce_numeric_columns(pd.read_parquet(file_path))
         for start in range(0, len(data_frame), chunk_size):
             yield data_frame.iloc[start : start + chunk_size].copy()
         return

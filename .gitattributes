@@ -2,3 +2,7 @@
 site/** linguist-generated=true
 # Exclude generated MkDocs output from GitHub language stats/diffs.
 site/** linguist-generated=true
+
+# Preserve Unix line endings for runtime scripts used in WSL/Git Bash.
+*.sh text eol=lf
+*.py text eol=lf
