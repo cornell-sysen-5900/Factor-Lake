@@ -41,7 +41,7 @@ Factor Lake lets you choose a group of stock-selection factors, rank stocks by t
 ## 6. Load the market data
 
 1. Click Load Market Data.
-2. Wait for the app to fetch data from the [Factor Lake Supabase Project](https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm).
+2. Wait for the app to fetch data.
 3. Confirm the filters you chose are applied.
 4. Make sure the app says the data loaded successfully.
 
@@ -103,11 +103,11 @@ Factor Lake lets you choose a group of stock-selection factors, rank stocks by t
 
 ## 14. Reference
 
-Use this section when you want a quick reminder of what the app is doing behind the scenes.
+Use this section if you want a quick understanding of what the app is doing behind the scenes.
 
 1. Factor categories include momentum, value, profitability, quality, and growth.
 2. The Results tab is where you verify the backtest output.
 3. The app compares your strategy with benchmark behavior.
 4. Returns come from the dataset's next-year return field.
 5. Delisting behavior changes the outcome, so keep that setting recorded in every experiment.
-6. The [Factor Lake Supabase Project](https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm) is the backing data source.
+6. The **Factor Lake Supabase Project** is the backing data source.
