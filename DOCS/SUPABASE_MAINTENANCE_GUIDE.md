@@ -34,9 +34,9 @@ Use this maintenance guide for operational checks after upload (schema compatibi
 
 ## 5. Keep schema compatibility intact
 
-1. Preserve `Ticker` or `Ticker-Region` behavior.
-2. Preserve `Year` behavior.
-3. Preserve `Ending_Price` and `Next-Years_Return`.
+1. Preserve `Ticker` or `Ticker-Region` format/type.
+2. Preserve `Year` format/type.
+3. Preserve `Ending_Price` and `Next-Years_Return` format/type.
 4. Keep factor columns in sync with `app/streamlit_config.py` and `src/factor_registry.py`.
 5. If you rename a column, update code and retest immediately.
 
