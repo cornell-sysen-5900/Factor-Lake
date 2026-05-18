@@ -89,5 +89,8 @@ def compute_comprehensive_metrics(p_ret: np.ndarray, b_ret: np.ndarray, g_ret: n
         'information_ratio': get_ir(p_ret, b_ret),
         'information_ratio_growth': get_ir(p_ret, g_ret),
         'information_ratio_value': get_ir(p_ret, v_ret),
+        'win_rate': float(np.mean(p_ret > b_ret)) if len(p_ret) > 0 else 0.0,
+        'win_rate_growth': float(np.mean(p_ret > g_ret)) if len(p_ret) > 0 else 0.0,
+        'win_rate_value': float(np.mean(p_ret > v_ret)) if len(p_ret) > 0 else 0.0,
         'risk_free_rate_source': "FRED 4 Week T-Bill (Oct 1)"
     }
