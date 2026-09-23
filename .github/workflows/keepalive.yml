@@ -1,0 +1,64 @@
+name: Keepalive
+
+# Supabase free-tier projects pause after ~1 week with no API activity, and the
+# Streamlit Community Cloud app sleeps after a period with no visitors. This
+# workflow pings both on a schedule so they stay warm for class use.
+#
+# Required repo secrets (Settings -> Secrets and variables -> Actions):
+#   SUPABASE_URL - Project URL (Project Settings -> API)
+#   SUPABASE_KEY - anon public key (read-only; same one used in Streamlit secrets)
+
+on:
+  schedule:
+    - cron: "0 6 * * *"  # once a day
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping Supabase
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${SUPABASE_URL}/rest/v1/last_price_mapping?select=ticker&limit=1" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}")
+          echo "Supabase responded with HTTP $status"
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "::error::Supabase ping failed with HTTP $status"
+            exit 1
+          fi
+
+      - name: Wake Streamlit app
+        continue-on-error: true
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+          python - <<'EOF'
+          from playwright.sync_api import sync_playwright
+
+          APP_URL = "https://cornellfactorlake.streamlit.app/"
+
+          with sync_playwright() as p:
+              browser = p.chromium.launch()
+              page = browser.new_page()
+              page.goto(APP_URL, timeout=60000)
+
+              wake_button = page.get_by_role(
+                  "button", name="get this app back up", exact=False
+              )
+              try:
+                  wake_button.wait_for(timeout=10000)
+                  wake_button.click()
+                  print("App was asleep; clicked wake-up button.")
+                  page.wait_for_timeout(15000)
+              except Exception:
+                  print("No wake-up button found; app was likely already awake.")
+
+              browser.close()
+          EOF
