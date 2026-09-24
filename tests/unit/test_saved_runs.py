@@ -12,6 +12,7 @@ import pandas as pd
 import pytest
 from streamlit.testing.v1 import AppTest
 
+import src.backtest_engine as backtest_engine
 from app.saved_runs import add_saved_run, build_run_label, remove_saved_run
 
 APP_DIR = Path(__file__).resolve().parents[2] / 'app'
@@ -169,6 +170,11 @@ def test_cohort_comparison_uses_the_runs_own_snapshot(at):
     run_1 = next(r for r in at.session_state['saved_runs'] if r['id'] == 1)
     assert run_1['cohort']['pct'] == 10
     assert run_1['cohort']['top'] != run_1['cohort']['bottom']  # regression: both were 'bottom'
+    # Run 1's own direction (High to Low) is used, not the live toggle or Run 2's
+    exp_top, exp_bot = backtest_engine.run_cohort_comparison(
+        run_1['data'], ['ROE_using_9-30_Data'], {'ROE_using_9-30_Data': 'top'}, 10, run_1['settings'])
+    assert run_1['cohort']['top'] == list(exp_top)
+    assert run_1['cohort']['bottom'] == list(exp_bot)
     assert len(at.table) == 1
 
     at.run()                                          # newest tab (Run 2) open
@@ -202,6 +208,7 @@ def test_invalid_or_failed_runs_are_not_saved(at, monkeypatch):
     at.number_input(key='end_year_input').set_value(2024).run()
     _click(at, RUN)
     assert any('Backtest Execution Error: engine failed' in e.value for e in at.error)
+    assert not at.exception, [e.value for e in at.exception]
 
     assert at.session_state['saved_runs'] == []
     assert at.session_state['next_run_id'] == 1

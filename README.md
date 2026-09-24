@@ -49,7 +49,7 @@ Then open http://localhost:8501
 - Benchmark comparison vs Russell 2000, Growth, and Value
 - Performance metrics: CAGR, yearly returns, drawdown, Sharpe, Information Ratio, win rate
 - Ranked-stock table and top-vs-bottom cohort analysis
-- Saved runs: each backtest run is kept as its own tab in Results (newest first, last 5 per browser session), shows the settings that produced it, and can be removed
+- Saved runs: each backtest run is kept as its own tab in Results (newest first, last 5; cleared when the page is refreshed), shows the settings that produced it, and can be removed
 
 ## Project Layout
 
