@@ -6,6 +6,7 @@ VERSION: 2.3.0
 """
 
 import streamlit as st
+import streamlit_config as config
 from typing import Dict, List, Tuple
 
 def render_factor_selection() -> Tuple[List[str], Dict[str, str]]:
@@ -32,7 +33,7 @@ def render_factor_selection() -> Tuple[List[str], Dict[str, str]]:
         for name, key in factors_config:
             fcol1, fcol2 = st.columns([3, 2])
             with fcol1:
-                checked = st.checkbox(name, key=key)
+                checked = st.checkbox(name, key=key, help=config.FACTOR_TOOLTIPS.get(name))
             with fcol2:
                 if checked:
                     is_bottom = st.toggle(
