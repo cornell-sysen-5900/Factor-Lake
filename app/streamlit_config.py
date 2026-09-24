@@ -2,10 +2,13 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/streamlit_config.py
 PURPOSE: Centralized registry mapping UI labels to backend database column names.
-VERSION: 2.2.0
+VERSION: 2.3.0
 """
 
 from typing import Dict, List, Any
+
+# Maximum number of backtest runs kept as tabs in Results (oldest dropped first)
+MAX_SAVED_RUNS: int = 5
 
 # Standardized sector classifications for universe filtering
 SECTOR_OPTIONS: List[str] = [

@@ -49,6 +49,7 @@ Then open http://localhost:8501
 - Benchmark comparison vs Russell 2000, Growth, and Value
 - Performance metrics: CAGR, yearly returns, drawdown, Sharpe, Information Ratio, win rate
 - Ranked-stock table and top-vs-bottom cohort analysis
+- Saved runs: each backtest run is kept as its own tab in Results (newest first, last 5 per browser session), shows the settings that produced it, and can be removed
 
 ## Project Layout
 
@@ -58,6 +59,7 @@ Factor-Lake/
 │   ├── streamlit_app.py    # Main entrypoint
 │   ├── streamlit_utils.py  # Session state / orchestration helpers
 │   ├── streamlit_config.py # Factor and UI metadata
+│   ├── saved_runs.py       # Saved-run list helpers (Results tabs)
 │   └── components/         # Sidebar, factor selection, results, about
 ├── src/                    # Library & core logic
 │   ├── backtest_engine.py

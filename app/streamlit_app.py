@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/streamlit_app.py
 PURPOSE: Main application entry point orchestrating UI components and analysis logic.
-VERSION: 3.3.0
+VERSION: 3.4.0
 """
 
 import sys
@@ -21,7 +21,7 @@ import streamlit_config as config
 
 import components.sidebar as sidebar
 from components.factor_selection import render_factor_selection
-from components.results_tab import render_results_tab
+from components.results_tab import render_saved_runs
 from components.about import render_about_tab
 
 # Global Page Configuration
@@ -63,8 +63,6 @@ def main():
     with tab_analysis:
         # Configuration phase: Capture factors and directions
         selected_factor_names, factor_directions = render_factor_selection()
-        st.session_state['selected_factor_names'] = selected_factor_names
-        st.session_state['factor_directions'] = factor_directions
         
         # Step 1: Data Acquisition
         if st.button("Load Market Data", type="primary", use_container_width=True):
@@ -75,14 +73,14 @@ def main():
         if st.session_state.get('data_loaded', False):
             if st.button("Run Portfolio Analysis", type="primary", use_container_width=True):
                 with st.spinner("Executing backtest simulation..."):
-                    utils.run_backtest_logic(
+                    run = utils.run_backtest_logic(
                         user_settings, 
                         selected_factor_names, 
                         factor_directions
                     )
                 
-                if st.session_state.get('results') is not None:
-                    st.success("Analysis complete. Review performance in the Results tab.")
+                if run is not None:
+                    st.success(f"Analysis complete. Saved as \"{run['label']}\" in the Results tab.")
                     # Trigger automatic tab switch to Results via JavaScript injection
                     st.markdown("""
                         <script>
@@ -92,8 +90,8 @@ def main():
 
     with tab_results:
         # Performance Visualization phase
-        if st.session_state.get('results') is not None:
-            render_results_tab(st.session_state.results, user_settings)
+        if st.session_state.get('saved_runs'):
+            render_saved_runs(st.session_state.saved_runs)
         else:
             st.info("Performance metrics will appear here after a successful analysis run.")
     

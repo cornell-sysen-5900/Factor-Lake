@@ -17,7 +17,8 @@ tests/
 │   ├── test_delisting.py      # Time-adjusted delisting strategies
 │   ├── test_factors.py        # Factor registry and signal normalization
 │   ├── test_filters.py        # Sector and ESG universe filters
-│   └── test_portfolio.py      # Portfolio object CRUD and valuation
+│   ├── test_portfolio.py      # Portfolio object CRUD and valuation
+│   └── test_saved_runs.py     # Saved-run helpers + AppTest of Results run tabs
 └── integration/               # Require SUPABASE_URL + SUPABASE_KEY
     ├── test_backtest_regression.py  # Regression: known-good portfolio values
     └── test_supabase.py             # Connection, pagination, data quality

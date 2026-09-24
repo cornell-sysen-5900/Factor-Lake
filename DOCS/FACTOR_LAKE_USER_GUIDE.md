@@ -49,18 +49,27 @@ Factor Lake lets you choose a group of stock-selection factors, rank stocks by t
 
 1. Click Run Portfolio Analysis.
 2. Wait for the simulation to complete.
-3. Confirm you see a success message.
-4. Open the Results tab if the app does not move there automatically.
+3. Confirm you see a success message. It names the saved run, e.g. "Run 2: ROA %".
+4. Open the Results tab. The newest run's tab is selected automatically.
+
+### Saved runs
+
+1. Every successful run is saved as its own tab in Results, newest first.
+2. The captions at the top of each tab show the factors and directions, period, initial AUM, universe, weighting, and delisting strategy that run used.
+3. Saved tabs do not change when you edit the sidebar or factors afterwards. Run the analysis again to create a new tab.
+4. Click Remove this run to delete a tab you no longer need.
+5. Only the last 5 runs are kept, and all saved runs are cleared when you refresh the page, so record your numbers.
 
 ## 8. Read the results in order
 
-1. Start with Performance Summary.
-2. Check the Ranked Stocks table.
-3. Review Portfolio Growth Over Time.
-4. Review Year-by-Year Performance.
-5. Review Top vs Bottom Cohort Analysis.
-6. Review Advanced Backtest Statistics.
-7. Review Yearly Win/Loss Summary.
+1. Pick the run tab you want and check its captions.
+2. Start with Performance Summary.
+3. Check the Ranked Stocks table.
+4. Review Portfolio Growth Over Time.
+5. Review Year-by-Year Performance.
+6. Review Top vs Bottom Cohort Analysis. It uses the settings of the run tab it is in.
+7. Review Advanced Backtest Statistics.
+8. Review Yearly Win/Loss Summary.
 
 ## 9. Keep the factor logic straight
 
@@ -80,7 +89,7 @@ Factor Lake lets you choose a group of stock-selection factors, rank stocks by t
 ## 11. Avoid the common mistakes
 
 1. Do not run the backtest before loading data.
-2. Do not change settings and forget to rerun.
+2. Changing settings does not update saved tabs. Run again to create a new tab. If you change sectors, the fossil-fuel filter, or years, click Load Market Data first.
 3. Do not compare experiments with different time windows without noting it.
 4. Do not assume one factor is always best.
 
@@ -94,7 +103,7 @@ Factor Lake lets you choose a group of stock-selection factors, rank stocks by t
 ## 13. Write up your experiment the same way every time
 
 1. State your research question.
-2. List the factors and directions.
+2. Note the run label and list the factors and directions.
 3. List your sidebar settings.
 4. Report the main numbers.
 5. Explain the result.
