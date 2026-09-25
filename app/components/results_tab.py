@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/components/results_tab.py
 PURPOSE: Visualization of results with strict adherence to original metrics and formatting.
-VERSION: 3.6.2
+VERSION: 3.7.0
 """
 
 import streamlit as st
@@ -13,7 +13,10 @@ from typing import Dict, Any, List, Tuple, Optional
 from Visualizations.portfolio_growth_plot import plot_portfolio_growth
 from Visualizations.top_bottom_portfolio_plot import plot_top_bottom_percent
 import src.backtest_engine as backtest_engine
-from app.streamlit_config import FACTOR_METADATA
+from app.streamlit_config import MAX_SAVED_RUNS
+from app.saved_runs import remove_saved_run
+
+DIRECTION_LABELS = {'top': 'High to Low', 'bottom': 'Low to High'}
 
 
 def _build_wealth_series(returns: Optional[List[float]], initial: float) -> Optional[List[float]]:
@@ -28,25 +31,65 @@ def _build_wealth_series(returns: Optional[List[float]], initial: float) -> Opti
         values.append(values[-1] * (1 + (r / 100.0)))
     return values
 
-def render_results_tab(results: Dict[str, Any], user_settings: Dict[str, Any]) -> None:
+def render_saved_runs(saved_runs: List[Dict[str, Any]]) -> None:
     """
-    Orchestrates the rendering of the results tab within the Streamlit interface.
+    Shows each saved backtest run in its own tab, newest first.
 
-    This function serves as the primary view controller for backtest outputs, 
-    organizing metrics, growth charts, and advanced statistical analysis into 
-    a cohesive reporting dashboard.
+    The tabs are stateful (key + on_change="rerun"), so only the open tab is
+    rendered. When a run is added or removed the tab labels change, Streamlit
+    treats the tab bar as a new widget and opens the first tab: the newest run.
     """
+    st.header("Portfolio Performance Results")
+    st.caption(
+        f"Each analysis run is saved as its own tab (newest first). Only the last "
+        f"{MAX_SAVED_RUNS} runs are kept, and they are cleared when you refresh the page."
+    )
+    tabs = st.tabs(
+        [run['label'] for run in saved_runs],
+        key="saved_run_tabs",
+        on_change="rerun",
+    )
+    for tab, run in zip(tabs, saved_runs):
+        if not tab.open:
+            continue
+        with tab:
+            st.button(
+                "Remove this run",
+                key=f"remove_run_{run['id']}",
+                on_click=_remove_run,
+                args=(run['id'],),
+            )
+            # A run that fails to render must not break the other tabs or its Remove button
+            try:
+                render_results_tab(run)
+            except Exception as e:
+                st.error(f"Could not display {run['label']}: {str(e)}")
+
+
+def _remove_run(run_id: int) -> None:
+    """on_click callback: drops one saved run before the script reruns."""
+    st.session_state.saved_runs = remove_saved_run(st.session_state.saved_runs, run_id)
+
+
+def render_results_tab(run: Dict[str, Any]) -> None:
+    """
+    Renders one saved backtest run.
+
+    Everything shown comes from the run snapshot, never from the live sidebar
+    or factor selections, so a saved tab does not change after it is created.
+    """
+    results = run.get('results')
     if not results:
         st.warning("No backtest results found. Please execute the analysis.")
         return
+    settings = run['settings']
 
     # 1. Header Information
-    st.header("Portfolio Performance Results")
-    _render_header_captions(user_settings)
+    _render_header_captions(run)
     
     # 2. Performance Summary
     st.subheader("Performance Summary")
-    _render_summary_metrics(results, user_settings)
+    _render_summary_metrics(results, settings)
     total_delisted = results.get('total_delisted_positions', 0)
     if total_delisted > 0:
         st.caption(f"**Delisted positions encountered:** {total_delisted}")
@@ -59,7 +102,7 @@ def render_results_tab(results: Dict[str, Any], user_settings: Dict[str, Any]) -
 
     # 4. Main Growth Plot
     st.subheader("Portfolio Growth Over Time")
-    _render_growth_plot(results, user_settings)
+    _render_growth_plot(results, settings, run['factor_labels'])
     st.divider()
 
     # 5. Year-by-Year Performance
@@ -68,7 +111,7 @@ def render_results_tab(results: Dict[str, Any], user_settings: Dict[str, Any]) -
     st.divider()
 
     # 6. Top vs Bottom Cohort Analysis
-    _render_cohort_analysis_section(results, user_settings)
+    _render_cohort_analysis_section(run)
     st.divider()
 
     # 7. Advanced Backtest Statistics
@@ -217,13 +260,16 @@ def _render_advanced_stats_grid(res: Dict[str, Any]) -> None:
     i4.empty()
 
 
-def _render_header_captions(settings: Dict[str, Any]) -> None:
+def _render_header_captions(run: Dict[str, Any]) -> None:
     """
-    Renders identifying metadata regarding the specific backtest configuration.
+    Renders the settings this run was created with (from its snapshot).
     """
-    selected_factors = st.session_state.get('selected_factor_names')
-    saved_dirs = st.session_state.get('factor_directions', {})
-    factors_str = ", ".join([f"{f} ({saved_dirs.get(f, 'top')})" for f in selected_factors])
+    settings = run['settings']
+    directions = run['factor_directions']
+    factors_str = ", ".join([
+        f"{label} ({DIRECTION_LABELS.get(directions.get(col, 'top'), 'High to Low')})"
+        for label, col in zip(run['factor_labels'], run['factors'])
+    ])
     weighting_str = "Market Cap Weighted" if settings.get('use_market_cap_weight') else "Equal Weighted"
     delisting_labels = {
         "zero_return": "Zero Return",
@@ -235,6 +281,16 @@ def _render_header_captions(settings: Dict[str, Any]) -> None:
     )
 
     st.caption(f"**Factors:** {factors_str}")
+    st.caption(
+        f"**Period:** {int(settings['start_year'])}-{int(settings['end_year'])} | "
+        f"**Initial AUM:** ${settings['initial_aum']:,.0f}"
+    )
+    universe = run.get('universe') or {}
+    if universe:
+        sectors = universe.get('selected_sectors') or []
+        sectors_str = ", ".join(sectors) if sectors else "All sectors"
+        fossil_str = "excluded" if universe.get('restrict_fossil_fuels') else "included"
+        st.caption(f"**Universe:** {sectors_str} | Fossil fuels {fossil_str}")
     st.caption(f"**Weighting:** {weighting_str}")
     st.caption(f"**Delisting Strategy:** {delisting_str}")
 
@@ -258,87 +314,89 @@ def _render_summary_metrics(res: Dict[str, Any], settings: Dict[str, Any]) -> No
     col3.metric("CAGR", f"{cagr:.2%}")
     col4.metric("Cumulative Outperformance", f"{cum_outperformance:.2%}")
 
-def _render_cohort_analysis_section(results: Dict[str, Any], user_settings: Dict[str, Any]) -> None:
+def _render_cohort_analysis_section(run: Dict[str, Any]) -> None:
     """
-    Executes and visualizes a comparison between top and bottom factor cohorts.
+    Runs and shows a comparison between the top and bottom factor cohorts.
+
+    Uses the run's own data, factor columns, directions and settings. The
+    result is stored on the run, so it is still shown after reruns and tab
+    switches. Widget keys include the run id so every run has its own controls.
     """
+    results = run['results']
+    settings = run['settings']
+    run_id = run['id']
     st.subheader("Top vs Bottom Cohort Analysis")
-    with st.expander("Run Cohort Comparison", expanded=False):
+    with st.expander("Run Cohort Comparison", expanded=run.get('cohort') is not None):
         col1, col2 = st.columns(2)
         with col1:
-            cohort_pct = st.slider("Cohort Percentage", 1, 50, 10)
-        
-        if st.button("Generate Comparison", type="primary"):
-            selected_factor_names = st.session_state.get('selected_factor_names', [])
-            factors = [
-                FACTOR_METADATA.get(name, {}).get('column', name)
-                for name in selected_factor_names
-            ]
-            
-            # This now returns lists because of the engine fix above
+            cohort_pct = st.slider(
+                "Cohort Percentage", 1, 50,
+                value=run['cohort']['pct'] if run.get('cohort') else 10,
+                key=f"cohort_pct_{run_id}",
+            )
+
+        if st.button("Generate Comparison", type="primary", key=f"cohort_btn_{run_id}"):
             res_top, res_bot = backtest_engine.run_cohort_comparison(
-                data=st.session_state.rdata,
-                selected_factors=factors,
-                factor_directions=st.session_state.get('factor_directions', {}),
+                data=run['data'],
+                selected_factors=run['factors'],
+                factor_directions=run['factor_directions'],
                 cohort_pct=cohort_pct,
-                user_settings=user_settings
+                user_settings=settings
             )
+            run['cohort'] = {'pct': cohort_pct, 'top': list(res_top), 'bottom': list(res_bot)}
 
-            # --- THE 4 STATS BLOCK ---
-            st.write("### Cohort Performance Summary")
-            init_aum = user_settings['initial_aum']
-            num_years = len(results['years'])
-            
-            # Using [-1] is safe now because res_top is a list again
-            stats_df = pd.DataFrame({
-                "Metric": ["Total Return (%)", "Final Value ($)", "CAGR (%)"],
-                "Top Cohort": [
-                    f"{((res_top[-1] / init_aum) - 1) * 100:.2f}%",
-                    f"${res_top[-1]:,.0f}",
-                    f"{(((res_top[-1] / init_aum) ** (1 / num_years)) - 1) * 100:.2f}%"
-                ],
-                "Bottom Cohort": [
-                    f"{((res_bot[-1] / init_aum) - 1) * 100:.2f}%",
-                    f"${res_bot[-1]:,.0f}",
-                    f"{(((res_bot[-1] / init_aum) ** (1 / num_years)) - 1) * 100:.2f}%"
-                ]
-            })
-            st.table(stats_df)
-            # -------------------------
+        cohort = run.get('cohort')
+        if not cohort:
+            return
+        res_top, res_bot = cohort['top'], cohort['bottom']
 
-            fig = plot_top_bottom_percent(
-                years=results['years'],
-                percent=cohort_pct,
-                show_bottom=True,
-                benchmark_returns=results.get('benchmark_returns'),
-                initial_investment=user_settings['initial_aum'],
-                baseline_portfolio_values=results['portfolio_values'],
-                precomputed_top=res_top,
-                precomputed_bot=res_bot,
-                value_returns=_build_wealth_series(
-                    results.get('value_benchmark_returns'),
-                    user_settings['initial_aum']
-                ),
-                growth_returns=_build_wealth_series(
-                    results.get('growth_benchmark_returns'),
-                    user_settings['initial_aum']
-                )
-            )
-            st.pyplot(fig)
+        # --- THE 4 STATS BLOCK ---
+        st.write(f"### Cohort Performance Summary (top vs bottom {cohort['pct']}%)")
+        init_aum = settings['initial_aum']
+        num_years = len(results['years'])
 
-def _render_growth_plot(res: Dict[str, Any], settings: Dict[str, Any]) -> None:
+        stats_df = pd.DataFrame({
+            "Metric": ["Total Return (%)", "Final Value ($)", "CAGR (%)"],
+            "Top Cohort": [
+                f"{((res_top[-1] / init_aum) - 1) * 100:.2f}%",
+                f"${res_top[-1]:,.0f}",
+                f"{(((res_top[-1] / init_aum) ** (1 / num_years)) - 1) * 100:.2f}%"
+            ],
+            "Bottom Cohort": [
+                f"{((res_bot[-1] / init_aum) - 1) * 100:.2f}%",
+                f"${res_bot[-1]:,.0f}",
+                f"{(((res_bot[-1] / init_aum) ** (1 / num_years)) - 1) * 100:.2f}%"
+            ]
+        })
+        st.table(stats_df)
+        # -------------------------
+
+        fig = plot_top_bottom_percent(
+            years=results['years'],
+            percent=cohort['pct'],
+            show_bottom=True,
+            benchmark_returns=results.get('benchmark_returns'),
+            initial_investment=init_aum,
+            baseline_portfolio_values=results['portfolio_values'],
+            precomputed_top=res_top,
+            precomputed_bot=res_bot,
+            value_returns=_build_wealth_series(results.get('value_benchmark_returns'), init_aum),
+            growth_returns=_build_wealth_series(results.get('growth_benchmark_returns'), init_aum)
+        )
+        st.pyplot(fig)
+
+def _render_growth_plot(res: Dict[str, Any], settings: Dict[str, Any], factor_labels: List[str]) -> None:
     """
     Visualizes the growth of $1 (or initial AUM) across the portfolio and benchmarks.
     """
     initial = settings.get('initial_aum', 1000000.0)
     
-    factors = st.session_state.get('selected_factor_names') or st.session_state.get('selected_factors', [])
     fig = plot_portfolio_growth(
         years=res.get('years', []),
         port_vals=res.get('portfolio_values', []),
         bench_vals=_build_wealth_series(res.get('benchmark_returns'), initial),
         val_vals=_build_wealth_series(res.get('value_benchmark_returns'), initial),
         gro_vals=_build_wealth_series(res.get('growth_benchmark_returns'), initial),
-        factor_names=factors
+        factor_names=factor_labels
     )
     st.pyplot(fig)

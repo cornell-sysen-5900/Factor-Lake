@@ -742,7 +742,7 @@ requires-dist = [
     { name = "pyarrow", specifier = ">=15.0.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "scipy", specifier = ">=0.8.0" },
-    { name = "streamlit", specifier = ">=1.28.0" },
+    { name = "streamlit", specifier = ">=1.55.0" },
     { name = "supabase", specifier = ">=2.0.0" },
     { name = "xlrd", specifier = ">=2.0.1" },
 ]

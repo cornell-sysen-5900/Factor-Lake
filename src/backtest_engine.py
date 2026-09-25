@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: src/backtest_engine.py
 PURPOSE: Backtesting engine with integrated on-the-fly filtering.
-VERSION: 2.4.1
+VERSION: 2.4.2
 """
 
 import numpy as np
@@ -363,7 +363,8 @@ def run_cohort_comparison(data: pd.DataFrame,
         initial_aum=user_settings['initial_aum'],
         benchmark_index=1,
         top_pct=cohort_pct,
-        use_market_cap_weight=user_settings['use_market_cap_weight']
+        use_market_cap_weight=user_settings['use_market_cap_weight'],
+        delisting_strategy=user_settings.get('delisting_strategy', 'zero_return')
     )
 
     # 2. Run Bottom Cohort (Inverse Strategy)
@@ -377,7 +378,8 @@ def run_cohort_comparison(data: pd.DataFrame,
         initial_aum=user_settings['initial_aum'],
         benchmark_index=1,
         top_pct=cohort_pct,
-        use_market_cap_weight=user_settings['use_market_cap_weight']
+        use_market_cap_weight=user_settings['use_market_cap_weight'],
+        delisting_strategy=user_settings.get('delisting_strategy', 'zero_return')
     )
 
     top_list = res_top['portfolio_values'] if isinstance(res_top, dict) else res_top

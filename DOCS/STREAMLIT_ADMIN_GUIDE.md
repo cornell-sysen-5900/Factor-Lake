@@ -24,6 +24,7 @@ Use this guide when you need to keep the production [Factor-Lake Streamlit App](
 3. Click Load Market Data.
 4. Click Run Portfolio Analysis.
 5. Confirm the Results tab renders metrics and charts.
+6. Change one factor or direction and run again. Confirm a second run tab appears and is selected, and that clicking the first tab still shows its original settings.
 
 ## 4. If the app did not redeploy
 

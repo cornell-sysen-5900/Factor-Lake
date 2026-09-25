@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/streamlit_utils.py
 PURPOSE: Utility functions for session management, authentication, and data orchestration.
-VERSION: 3.1.0
+VERSION: 3.2.0
 """
 
 import os
@@ -84,9 +84,9 @@ def initialize_session_state() -> None:
         'data_loaded': False,
         'raw_data': None,
         'rdata': None,
-        'results': None,
-        'selected_factors': [],
-        'factor_directions': {}
+        'loaded_filters': None,
+        'saved_runs': [],
+        'next_run_id': 1
     }
     for key, default_value in default_state.items():
         if key not in st.session_state:
@@ -124,6 +124,10 @@ def load_and_process_data(user_settings: Dict[str, Any]) -> None:
         df = df[(df['Year'] >= start_yr) & (df['Year'] <= end_yr)]
 
         st.session_state.rdata = df
+        st.session_state.loaded_filters = {
+            'restrict_fossil_fuels': bool(user_settings.get('restrict_fossil_fuels')),
+            'selected_sectors': list(user_settings.get('selected_sectors') or []),
+        }
         st.session_state.data_loaded = True
         st.success(f"Universe Refined: {len(df):,} records prepared.")
     except Exception as e:
@@ -131,32 +135,42 @@ def load_and_process_data(user_settings: Dict[str, Any]) -> None:
 
 def run_backtest_logic(user_settings: Dict[str, Any], 
                        factor_names: List[str], 
-                       factor_dirs: Dict[str, str]) -> None:
+                       factor_dirs: Dict[str, str]) -> Optional[Dict[str, Any]]:
     """
-    Executes the portfolio backtesting engine.
-    
-    Translates UI-friendly labels to internal database columns, 
-    persists directional tilts, and updates the session results.
+    Executes the portfolio backtesting engine and saves the run.
+
+    Translates UI-friendly labels to internal database columns, runs the
+    backtest, and saves a snapshot of the run (results plus the factors,
+    directions, settings and data it used) as the newest entry in
+    st.session_state.saved_runs.
+
+    Returns:
+        The saved run, or None if the run was rejected or failed (nothing is saved).
     """
     from src.backtest_engine import rebalance_portfolio, build_ranked_stocks_table
-    from app.streamlit_config import FACTOR_METADATA
+    from app.streamlit_config import FACTOR_METADATA, MAX_SAVED_RUNS
+    from app.saved_runs import add_saved_run, build_run_label
+
+    factor_labels = [f for f in factor_names if f in FACTOR_METADATA]
+    if not factor_labels:
+        st.warning("Select at least one factor before running the analysis.")
+        return None
+    if float(user_settings['initial_aum']) <= 0:
+        st.warning("Initial AUM must be greater than $0.")
+        return None
 
     try:
         # Mapping UI labels to internal SQL columns
-        internal_factor_cols = [FACTOR_METADATA[f]['column'] for f in factor_names if f in FACTOR_METADATA]
-        
+        internal_factor_cols = [FACTOR_METADATA[f]['column'] for f in factor_labels]
         internal_directions = {
-            FACTOR_METADATA[f]['column']: factor_dirs.get(f, 'top') 
-            for f in factor_names if f in FACTOR_METADATA
+            FACTOR_METADATA[f]['column']: factor_dirs.get(f, 'top')
+            for f in factor_labels
         }
-
-        # Persisting mappings for Results and Cohort components
-        st.session_state['selected_factor_names'] = internal_factor_cols
-        st.session_state['factor_directions'] = internal_directions
+        data = st.session_state.rdata
 
         # Portfolio simulation execution
         results = rebalance_portfolio(
-            st.session_state.rdata,
+            data,
             internal_factor_cols,
             factor_directions=internal_directions,
             start_year=int(user_settings['start_year']),
@@ -171,7 +185,7 @@ def run_backtest_logic(user_settings: Dict[str, Any],
         # Build a ranked list for the most recent rebalance year used by the backtest loop.
         ranking_year = int(user_settings['end_year']) - 1
         ranked_stocks_df = build_ranked_stocks_table(
-            data=st.session_state.rdata,
+            data=data,
             factors=internal_factor_cols,
             factor_directions=internal_directions,
             target_year=ranking_year,
@@ -179,8 +193,33 @@ def run_backtest_logic(user_settings: Dict[str, Any],
         )
         results['ranking_year'] = ranking_year
         results['ranked_stocks'] = ranked_stocks_df.to_dict('records')
-        
-        st.session_state.results = results
-        
     except Exception as e:
         st.error(f"Backtest Execution Error: {str(e)}")
+        return None
+
+    if not results.get('yearly_returns'):
+        st.warning(
+            "The backtest produced no yearly returns. "
+            "Choose an End Year after the Start Year and check the loaded data covers that period."
+        )
+        return None
+
+    # Save a snapshot so later sidebar/factor changes never alter this run
+    run_id = st.session_state.next_run_id
+    run = {
+        'id': run_id,
+        'label': build_run_label(run_id, factor_labels),
+        'factor_labels': factor_labels,
+        'factors': internal_factor_cols,
+        'factor_directions': internal_directions,
+        'settings': dict(user_settings),
+        'universe': dict(st.session_state.get('loaded_filters') or {}),
+        'data': data,
+        'results': results,
+        'cohort': None,
+    }
+    st.session_state.next_run_id = run_id + 1
+    st.session_state.saved_runs = add_saved_run(
+        st.session_state.saved_runs, run, MAX_SAVED_RUNS
+    )
+    return run
