@@ -32,7 +32,7 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
         restrict_fossil_fuels = st.checkbox(
             "Restrict Fossil Fuel Companies",
             value=False,
-            help="Exclude companies involved in oil, gas, coal, and fossil energy production."
+            help="Exclude coal, oil, gas and petroleum companies."
         )
         
         st.divider()
@@ -43,7 +43,7 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
             "Select weighting method:",
             options=["Equal Weight", "Market Cap Weight"],
             index=0,
-            help="Equal Weight: Uniform dollar distribution. Market Cap Weight: Proportional to market capitalization."
+            help="Equal: same dollars per stock. Market Cap: sized by company value."
         )
         use_market_cap_weight = (weighting_method == "Market Cap Weight")
         
@@ -58,7 +58,7 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
             "How to treat delisted positions:",
             options=["Zero Return", "Hold Cash", "Reinvest"],
             index=0,
-            help="Zero Return: 0% on delisted capital. Hold Cash: earn risk-free rate (time-adjusted). Reinvest: redistribute pro-rata to survivors."
+            help="Zero Return: earns 0%. Hold Cash: earns the risk free rate. Reinvest: spread across remaining stocks."
         )
         delisting_map = {"Zero Return": "zero_return", "Hold Cash": "hold_cash", "Reinvest": "reinvest"}
         delisting_strategy_key = delisting_map[delisting_strategy]
@@ -67,14 +67,18 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
 
         # Sector Exposure Configuration
         st.subheader("Sector Selection")
-        sector_filter_enabled = st.checkbox("Enable Sector Filter", value=False)
+        sector_filter_enabled = st.checkbox(
+            "Enable Sector Filter",
+            value=False,
+            help="Limit the portfolio to chosen sectors."
+        )
         selected_sectors = []
         if sector_filter_enabled:
             selected_sectors = st.multiselect(
                 "Include following sectors:",
                 options=sector_options,
                 default=sector_options,
-                help="Only tickers within these selected sectors will be eligible for portfolio inclusion."
+                help="Only stocks in these sectors can be held."
             )
             
         st.divider()
@@ -90,6 +94,7 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
                 value=2002,
                 step=1,
                 format="%d",
+                help="First year of the backtest. Earliest is 2008.",
                 key="start_year_input"
             )
         with col2:
@@ -100,6 +105,7 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
                 value=2024,
                 step=1,
                 format="%d",
+                help="Last year of the backtest. Latest is 2024.",
                 key="end_year_input"
             )
 
@@ -119,7 +125,7 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
             value=1000.0,
             step=100.0,
             format="%.0f",
-            help="The starting dollar value of the portfolio at the beginning of the backtest."
+            help="Starting portfolio value."
         )
 
     return {
