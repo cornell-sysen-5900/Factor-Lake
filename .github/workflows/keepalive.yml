@@ -26,8 +26,8 @@ jobs:
         run: |
           status=$(curl -s -o /dev/null -w "%{http_code}" \
             "${SUPABASE_URL}/rest/v1/last_price_mapping?select=ticker&limit=1" \
-            -H "apikey: ${SUPABASE_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_KEY}")
+            -H "apikey: ${SUPABASE_KEY}" )
+
           echo "Supabase responded with HTTP $status"
           if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
             echo "::error::Supabase ping failed with HTTP $status"
