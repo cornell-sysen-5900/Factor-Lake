@@ -151,7 +151,7 @@ def test_each_run_is_saved_in_its_own_tab(at):
     assert any('Saved as "Run 2: ROE using 9/30 Data +1"' in s.value for s in at.success)
     # Only the open tab is rendered.
     assert [c for c in _captions(at) if c.startswith('**Factors:**')] == [
-        '**Factors:** ROE using 9/30 Data (High to Low), ROA % (High to Low)']
+        '**Factors:** ROE using 9/30 Data (Higher is better), ROA % (Higher is better)']
 
 
 def test_saved_tab_ignores_later_sidebar_and_factor_changes(at):
@@ -170,9 +170,9 @@ def test_saved_tab_ignores_later_sidebar_and_factor_changes(at):
 
 def test_cohort_comparison_uses_the_runs_own_snapshot(at):
     _add_roe_and_load(at)
-    _click(at, RUN)                                   # Run 1: ROE, High to Low
+    _click(at, RUN)                                   # Run 1: ROE, Higher is better
     at.button_group(key='factor_dir_roe').set_value('Lower is better').run()  # live direction now differs
-    _click(at, RUN)                                   # Run 2: ROE, Low to High
+    _click(at, RUN)                                   # Run 2: ROE, Lower is better
 
     label_1 = 'Run 1: ROE using 9/30 Data'
     _open_tab(at, label_1)
@@ -184,7 +184,7 @@ def test_cohort_comparison_uses_the_runs_own_snapshot(at):
     run_1 = next(r for r in at.session_state['saved_runs'] if r['id'] == 1)
     assert run_1['cohort']['pct'] == 10
     assert run_1['cohort']['top'] != run_1['cohort']['bottom']  # regression: both were 'bottom'
-    # Run 1's own direction (High to Low) is used, not the live direction control or Run 2's
+    # Run 1's own direction (Higher is better) is used, not the live direction control or Run 2's
     exp_top, exp_bot = backtest_engine.run_cohort_comparison(
         run_1['data'], ['ROE_using_9-30_Data'], {'ROE_using_9-30_Data': 'top'}, 10, run_1['settings'])
     assert run_1['cohort']['top'] == list(exp_top)

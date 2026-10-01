@@ -16,7 +16,7 @@ import src.backtest_engine as backtest_engine
 from app.streamlit_config import MAX_SAVED_RUNS
 from app.saved_runs import remove_saved_run
 
-DIRECTION_LABELS = {'top': 'High to Low', 'bottom': 'Low to High'}
+DIRECTION_LABELS = {'top': 'Higher is better', 'bottom': 'Lower is better'}
 
 
 def _build_wealth_series(returns: Optional[List[float]], initial: float) -> Optional[List[float]]:
@@ -267,7 +267,7 @@ def _render_header_captions(run: Dict[str, Any]) -> None:
     settings = run['settings']
     directions = run['factor_directions']
     factors_str = ", ".join([
-        f"{label} ({DIRECTION_LABELS.get(directions.get(col, 'top'), 'High to Low')})"
+        f"{label} ({DIRECTION_LABELS.get(directions.get(col, 'top'), 'Higher is better')})"
         for label, col in zip(run['factor_labels'], run['factors'])
     ])
     weighting_str = "Market Cap Weighted" if settings.get('use_market_cap_weight') else "Equal Weighted"
