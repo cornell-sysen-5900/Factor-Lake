@@ -24,13 +24,19 @@ This guide walks you through deploying the Factor-Lake app to [Streamlit Cloud](
    cp .streamlit/secrets.toml.example .streamlit/secrets.toml
    ```
 
-2. **Edit `.streamlit/secrets.toml`** and fill in your Supabase credentials:
+2. **Edit `.streamlit/secrets.toml`** and fill in the AWS credentials for the S3 data (see [AWS S3 Data Source](AWS_S3_DATA.md)). Supabase credentials are only needed for the fallback:
    ```toml
+   # Market data in S3 (required)
+   AWS_ACCESS_KEY_ID = "your-access-key-id"
+   AWS_SECRET_ACCESS_KEY = "your-secret-access-key"
+   AWS_DEFAULT_REGION = "us-east-1"
+
+   # Supabase fallback (optional)
    SUPABASE_URL = "https://your-project.supabase.co"
    SUPABASE_KEY = "your-anon-public-key-here"
    ```
 
-3. **Get your Supabase credentials:**
+3. **Get your Supabase credentials (fallback only):**
    - Go to the [Factor Lake Supabase Project](https://supabase.com/dashboard/project/ozusfgnnzanaxpcfidbm)
    - Select your project
    - Settings → API
@@ -65,8 +71,14 @@ This guide walks you through deploying the Factor-Lake app to [Streamlit Cloud](
 
 1. While the app is deploying, click **"⚙️ Settings"** in the top-right
 2. Go to **"Secrets"** tab
-3. Paste your Supabase credentials:
+3. Paste your AWS credentials (and, optionally, the Supabase fallback credentials):
    ```toml
+   # Market data in S3 (required)
+   AWS_ACCESS_KEY_ID = "your-access-key-id"
+   AWS_SECRET_ACCESS_KEY = "your-secret-access-key"
+   AWS_DEFAULT_REGION = "us-east-1"
+
+   # Supabase fallback (optional)
    SUPABASE_URL = "https://your-project.supabase.co"
    SUPABASE_KEY = "your-anon-public-key-here"
    ```
