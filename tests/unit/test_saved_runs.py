@@ -99,9 +99,7 @@ def _click(at, label):
 def _add_factor(at, name):
     from app.streamlit_config import FACTOR_GROUPS, FACTOR_METADATA
     group_idx = FACTOR_GROUPS.index(FACTOR_METADATA[name]['group'])
-    nonce = at.session_state['factor_builder_add_nonce']
-    at.button_group(key=f"factor_pick_{group_idx}_{nonce}").set_value([name]).run()
-    at.button(key='factor_add').click().run()
+    at.button_group(key=f"factor_pick_{group_idx}").set_value(name).run()   # a click adds it
 
 
 def _add_roe_and_load(at):

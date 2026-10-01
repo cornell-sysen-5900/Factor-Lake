@@ -49,26 +49,15 @@ def _button(at, label):
 
 
 def _pills(at, group):
-    nonce = at.session_state['factor_builder_add_nonce']
-    return at.button_group(key=f"factor_pick_{FACTOR_GROUPS.index(group)}_{nonce}")
-
-
-def _pick(at, *names):
-    for name in names:
-        pills = _pills(at, FACTOR_METADATA[name]['group'])
-        pills.set_value(list(pills.value) + [name]).run()
+    return at.button_group(key=f"factor_pick_{FACTOR_GROUPS.index(group)}")
 
 
 def _add(at, *names):
-    _pick(at, *names)
-    at.button(key='factor_add').click().run()
+    # One click on a factor adds it
+    for name in names:
+        _pills(at, FACTOR_METADATA[name]['group']).set_value(name).run()
 
 
-def _pick_keys(at):
-    # Only the current panel's pickers (AppTest can keep elements from the replaced one)
-    nonce = at.session_state['factor_builder_add_nonce']
-    return [b.key for b in at.button_group
-            if b.key.startswith('factor_pick_') and b.key.endswith(f"_{nonce}")]
 
 
 def _direction(at, name):
@@ -88,11 +77,10 @@ def test_config_defaults_and_groups():
 
 def test_initial_state(at):
     _assert_clean(at)
-    assert at.button(key='factor_add').label == 'Add'
-    assert at.button(key='factor_add').disabled
-    assert all(_pills(at, g).value == [] for g in FACTOR_GROUPS)
+    assert all(_pills(at, g).value is None for g in FACTOR_GROUPS)
+    assert not any(b.key == 'factor_add' for b in at.button)   # no Add button: a click adds
     assert _button(at, 'Load Market Data').disabled
-    assert 'No factors added yet. Choose one above.' in [c.value for c in at.caption]
+    assert 'No factors added yet. Click one above.' in [c.value for c in at.caption]
     assert [w.value for w in at.warning] == ['Please select at least one factor to run the analysis']
     assert not at.success
 
@@ -107,27 +95,20 @@ def test_options_are_grouped_under_category_titles(at):
     ]
 
 
-def test_add_uses_default_direction_and_removes_option(at):
-    _pick(at, '1-Yr Price Vol %')
-    assert at.button(key='factor_add').label == 'Add 1 factor(s)'
-    assert not at.button(key='factor_add').disabled
-    at.button(key='factor_add').click().run()
+def test_click_adds_with_default_direction_and_removes_option(at):
+    _pills(at, 'Quality').set_value('1-Yr Price Vol %').run()
 
     _assert_clean(at)
     assert _direction(at, '1-Yr Price Vol %').value == LOWER
     assert _pills(at, 'Quality').options == ['Accruals/Assets']
-    assert all(_pills(at, g).value == [] for g in FACTOR_GROUPS)   # picks are cleared after Add
-    assert at.button(key='factor_add').disabled
+    assert _pills(at, 'Quality').value is None                 # the pick is cleared
     assert not _button(at, 'Load Market Data').disabled
-    assert 'No factors added yet. Choose one above.' not in [c.value for c in at.caption]
+    assert 'No factors added yet. Click one above.' not in [c.value for c in at.caption]
     assert [s.value for s in at.success] == ['Selected 1 factor(s): 1-Yr Price Vol % (Lower is better)']
 
 
-def test_add_several_factors_at_once(at):
-    _pick(at, '12-Mo Momentum %', 'Price to Book Using 9/30 Data', '1-Yr Asset Growth %')
-    assert at.button(key='factor_add').label == 'Add 3 factor(s)'
-    at.button(key='factor_add').click().run()
-
+def test_factors_are_listed_in_click_order(at):
+    _add(at, '12-Mo Momentum %', 'Price to Book Using 9/30 Data', '1-Yr Asset Growth %')
     _assert_clean(at)
     assert list(at.session_state['factor_builder_selected']) == [
         '12-Mo Momentum %', 'Price to Book Using 9/30 Data', '1-Yr Asset Growth %']
@@ -139,7 +120,8 @@ def test_every_factor_gets_its_default(at):
     _add(at, *EXPECTED_DEFAULTS)
     _assert_clean(at)
     assert {n: _direction(at, n).value for n in EXPECTED_DEFAULTS} == EXPECTED_DEFAULTS
-    assert _pick_keys(at) == []                        # nothing left to add
+    assert all(_pills(at, g).options == [] and _pills(at, g).disabled for g in FACTOR_GROUPS)
+    assert [c.value for c in at.caption].count('All added') == len(FACTOR_GROUPS)
 
 
 def test_direction_change_summary_and_deselect(at):
@@ -164,7 +146,7 @@ def test_remove_returns_factor_and_readd_resets_default(at):
     _assert_clean(at)
     assert _pills(at, 'Quality').options == ['Accruals/Assets', '1-Yr Price Vol %']
     assert _button(at, 'Load Market Data').disabled
-    assert 'No factors added yet. Choose one above.' in [c.value for c in at.caption]
+    assert 'No factors added yet. Click one above.' in [c.value for c in at.caption]
 
     _add(at, '1-Yr Price Vol %')
     assert _direction(at, '1-Yr Price Vol %').value == LOWER
