@@ -2,13 +2,13 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/components/sidebar.py
 PURPOSE: Configuration interface for global backtest parameters and ESG filters.
-VERSION: 2.4.0
+VERSION: 2.5.0
 """
 
 import streamlit as st
 from typing import Dict, Any, List
 
-def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
+def render_sidebar(sector_options: List[str], data_source_label: str) -> Dict[str, Any]:
     """
     Constructs the application sidebar to capture user configuration settings.
     
@@ -23,7 +23,7 @@ def render_sidebar(sector_options: List[str]) -> Dict[str, Any]:
         
         # Data Source Information
         st.subheader("Data Source")
-        st.caption("Primary Source: Supabase (Cloud Relational Database)")
+        st.caption(f"Primary Source: {data_source_label}")
 
         st.divider()
         

@@ -2,14 +2,19 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: src/supabase_client.py
 PURPOSE: Silent, high-performance data ingestion with schema-aligned standardization.
-VERSION: 2.4.0
+VERSION: 2.5.0
 """
 
 import os
 import logging
 import pandas as pd
-import numpy as np
 from supabase import create_client, Client
+
+from .data_standardization import (
+    attach_delisting_info,
+    prepare_last_price_mapping,
+    standardize_universe,
+)
 
 # Suppress external library verbosity to maintain clean terminal output
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -70,14 +75,31 @@ class SupabaseManager:
             logger.warning("Ingestion process completed but returned an empty dataset.")
             return df
 
-        df = self._standardize_dataframe(df)
+        df = standardize_universe(df)
 
         # Merge delisting dates from last_price_mapping for time-adjusted strategies
-        lpm = self.fetch_last_price_mapping()
-        if not lpm.empty:
-            df = df.merge(lpm[['Ticker-Region', 'Delist_Date', 'Delist_Price']], on='Ticker-Region', how='left')
+        return attach_delisting_info(df, self.fetch_last_price_mapping())
 
-        return df
+    def fetch_table(self, table_name: str) -> pd.DataFrame:
+        """
+        Downloads one table exactly as stored (no standardization), paginating
+        past the response limit. Raises on failure instead of returning an empty frame.
+
+        Used to export tables, e.g. by scripts/publish_data_to_s3.py.
+        """
+        page_size = 1000
+        offset = 0
+        all_rows = []
+        while True:
+            response = self.client.table(table_name).select('*').range(offset, offset + page_size - 1).execute()
+            batch = response.data if hasattr(response, 'data') else []
+            if not batch:
+                break
+            all_rows.extend(batch)
+            if len(batch) < page_size:
+                break
+            offset += page_size
+        return pd.DataFrame(all_rows)
 
     def fetch_last_price_mapping(self) -> pd.DataFrame:
         """Retrieves the last_price_mapping table containing delisting dates and prices."""
@@ -102,43 +124,12 @@ class SupabaseManager:
         if not all_rows:
             return pd.DataFrame()
 
-        lpm = pd.DataFrame(all_rows)
-        lpm = lpm.rename(columns={'ticker': 'Ticker-Region', 'last_date': 'Delist_Date', 'last_price': 'Delist_Price'})
-        lpm['Delist_Date'] = pd.to_datetime(lpm['Delist_Date'], errors='coerce')
-        return lpm
+        return prepare_last_price_mapping(pd.DataFrame(all_rows))
 
     def _standardize_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Enforces structural and numerical consistency across the dataset.
+        Kept for compatibility; the logic lives in src/data_standardization.py
+        so every data source cleans the data the same way.
         """
-        # 1. Column Hygiene
-        df.columns = df.columns.str.strip()
-        df = df.loc[:, ~df.columns.duplicated(keep='first')]
-
-        # 2. Identifier Parsing
-        if 'Ticker-Region' in df.columns:
-            df['Ticker'] = df['Ticker-Region'].str.split('-').str[0].str.strip().str.upper()
-
-        # 3. Temporal Alignment
-        if 'Date' in df.columns:
-            df['Year'] = pd.to_datetime(df['Date'], errors='coerce').dt.year
-
-        # 4. Standardized Null Conversion
-        sentinel_values = ['--', 'N/A', '#N/A', 'NULL', 'null', 'nan', '']
-        df = df.replace(sentinel_values, np.nan)
-
-        # 5. Dynamic Numeric Conversion
-        # Automatically cast columns that contain factor-lake signals or price data
-        numeric_keywords = ['Price', 'Return', 'Weight', 'Data', 'ROE', 'ROA', 'Cap']
-        for col in df.columns:
-            if any(key in col for key in numeric_keywords):
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-
-        # 6. Schema Integrity Validation
-        required_cols = ['Ticker', 'Year', 'Ending_Price', 'Next-Years_Return']
-        missing = [col for col in required_cols if col not in df.columns]
-        
-        if missing:
-            logger.error(f"Integrity Error: Missing critical schema columns: {missing}")
-            
-        return df
+        return standardize_universe(df)
