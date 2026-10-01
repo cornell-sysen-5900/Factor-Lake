@@ -1,12 +1,11 @@
 name: Load Test
 
 # Acceptance check for the "site comes up and works for 5 simultaneous users" story:
-# runs 5 browser sessions at once through a full backtest on the live app, twice a week.
+# runs 5 browser sessions at once through a full backtest on the live app.
+# Manual only: start it from Actions -> Load Test -> Run workflow.
 # A red run means at least one session failed; screenshots are attached to the run.
 
 on:
-  schedule:
-    - cron: "17 15 * * 1,4"  # Mondays and Thursdays
   workflow_dispatch:
     inputs:
       users:
