@@ -77,32 +77,30 @@ def _render_add_factors(selected: Dict[str, str]) -> None:
         group: [name for name, meta in config.FACTOR_METADATA.items() if meta['group'] == group]
         for group in config.FACTOR_GROUPS
     }
-    # Size each column by its longest factor name so the pills are not truncated
+    # Size each column by its longest factor name so the buttons are not truncated
     widths = [max(18, *(len(n) for n in names)) for names in group_names.values()]
     for col, (group, names) in zip(st.columns(widths), group_names.items()):
         remaining = [name for name in names if name not in selected]
-        pick_key = f"factor_pick_{config.FACTOR_GROUPS.index(group)}"
         with col:
-            st.pills(
-                f"**{group}**",
-                options=remaining,
-                # Pills have no per-option tooltip, so the group help lists its definitions
-                help="\n\n".join(f"**{n}**: {config.FACTOR_METADATA[n]['tooltip']}" for n in names),
-                disabled=not remaining,
-                key=pick_key,
-                on_change=_on_factor_picked,
-                args=(pick_key,),
-            )
+            st.markdown(f"**{group}**")
+            for name in remaining:
+                meta = config.FACTOR_METADATA[name]
+                st.button(
+                    name,
+                    icon=":material/add:",
+                    help=meta['tooltip'],
+                    key=f"factor_add_{meta['key']}",
+                    on_click=_add_factor,
+                    args=(name,),
+                )
             if not remaining:
                 st.caption("All added")
 
 
-def _on_factor_picked(pick_key: str) -> None:
-    """Adds the clicked factor with its default direction and clears the pick."""
-    name = st.session_state[pick_key]
-    st.session_state[pick_key] = None
+def _add_factor(name: str) -> None:
+    """on_click callback: adds the factor with its default direction."""
     selected = st.session_state[SELECTED_KEY]
-    if name is None or name in selected:
+    if name in selected:
         return
     default = HIGHER if config.FACTOR_METADATA[name]['higher_is_better'] else LOWER
     selected[name] = DIRECTION_TO_ENGINE[default]

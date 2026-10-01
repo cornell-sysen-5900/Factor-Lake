@@ -97,9 +97,8 @@ def _click(at, label):
 
 
 def _add_factor(at, name):
-    from app.streamlit_config import FACTOR_GROUPS, FACTOR_METADATA
-    group_idx = FACTOR_GROUPS.index(FACTOR_METADATA[name]['group'])
-    at.button_group(key=f"factor_pick_{group_idx}").set_value(name).run()   # a click adds it
+    from app.streamlit_config import FACTOR_METADATA
+    at.button(key=f"factor_add_{FACTOR_METADATA[name]['key']}").click().run()   # a click adds it
 
 
 def _add_roe_and_load(at):
