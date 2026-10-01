@@ -60,6 +60,7 @@ nav:
     - Documentation Contributor: DOCS_CONTRIBUTOR_GUIDE.md
     - Contributing: CONTRIBUTING.md
     - Deployment: DEPLOYMENT.md
+    - AWS S3 Data Source: AWS_S3_DATA.md
     - Supabase Setup: SUPABASE_SETUP.md
     - Supabase Upload Tool: SUPABASE_UPLOAD_TOOL.md
     - Supabase Maintenance: SUPABASE_MAINTENANCE_GUIDE.md

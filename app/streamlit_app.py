@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/streamlit_app.py
 PURPOSE: Main application entry point orchestrating UI components and analysis logic.
-VERSION: 3.4.0
+VERSION: 3.5.0
 """
 
 import sys
@@ -55,7 +55,7 @@ def main():
     )
     
     # Render Global Sidebar and capture configuration
-    user_settings = sidebar.render_sidebar(config.SECTOR_OPTIONS)
+    user_settings = sidebar.render_sidebar(config.SECTOR_OPTIONS, utils.describe_data_source())
     
     # Define primary application layout
     tab_analysis, tab_results, tab_about = st.tabs(["Analysis", "Results", "About"])

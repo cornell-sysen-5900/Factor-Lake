@@ -2,15 +2,22 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/streamlit_utils.py
 PURPOSE: Utility functions for session management, authentication, and data orchestration.
-VERSION: 3.2.0
+VERSION: 3.3.0
 """
 
 import os
 import sys
 import hmac
+import pandas as pd
 import streamlit as st
+from datetime import timedelta
 from pathlib import Path
 from typing import Dict, Any, List, Optional
+
+# Where market data can come from (see get_data_source)
+DATA_SOURCES = ('s3', 'supabase')
+# How long the shared copy of the market data is reused before it is downloaded again
+DATA_CACHE_TTL = timedelta(hours=6)
 
 def initialize_environment() -> None:
     """
@@ -92,18 +99,57 @@ def initialize_session_state() -> None:
         if key not in st.session_state:
             st.session_state[key] = default_value
 
+def get_data_source() -> str:
+    """
+    Picks where the market data is loaded from.
+
+    FACTOR_LAKE_DATA_SOURCE ("s3" or "supabase") wins when it is set. Otherwise
+    S3 is used whenever AWS credentials are configured, and Supabase is the fallback.
+    """
+    source = os.environ.get('FACTOR_LAKE_DATA_SOURCE', '').strip().lower()
+    if source:
+        if source not in DATA_SOURCES:
+            raise ValueError(f"FACTOR_LAKE_DATA_SOURCE must be one of {DATA_SOURCES}, not '{source}'.")
+        return source
+    return 's3' if os.environ.get('AWS_ACCESS_KEY_ID') else 'supabase'
+
+def describe_data_source() -> str:
+    """Human-readable name of the configured data source, for the sidebar."""
+    labels = {'s3': 'AWS S3 (Parquet files)', 'supabase': 'Supabase (Cloud Relational Database)'}
+    try:
+        return labels[get_data_source()]
+    except ValueError as e:
+        return f"Misconfigured ({e})"
+
+@st.cache_resource(ttl=DATA_CACHE_TTL, show_spinner=False)
+def load_shared_universe(source: str) -> pd.DataFrame:
+    """
+    Downloads the full universe once and shares it with every user session.
+
+    Loading per session made each visitor wait for (and hold) a separate copy.
+    A failed download raises and is not cached, so the next click retries.
+    The returned frame is shared between sessions: copy it before modifying it.
+    """
+    from src.data_standardization import validate_universe
+    if source == 's3':
+        from src.s3_client import S3DataManager
+        df = S3DataManager().fetch_all_data()
+    else:
+        from src.supabase_client import SupabaseManager
+        df = SupabaseManager().fetch_all_data()
+    validate_universe(df, source)
+    return df
+
 def load_and_process_data(user_settings: Dict[str, Any]) -> None:
     """
     Orchestrates data fetching and universe filtering.
     
     Applies ESG restrictions, sector filters, and date constraints 
-    to the raw dataset retrieved from the cloud database.
+    to the raw dataset retrieved from the configured data source.
     """
-    from src.supabase_client import SupabaseManager
     try:
         if st.session_state.raw_data is None:
-            manager = SupabaseManager()
-            st.session_state.raw_data = manager.fetch_all_data()
+            st.session_state.raw_data = load_shared_universe(get_data_source())
 
         df = st.session_state.raw_data.copy()
 

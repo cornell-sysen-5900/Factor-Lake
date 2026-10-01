@@ -1,14 +1,19 @@
 # Factor-Lake
 
-An interactive factor-investing toolkit with a clean Streamlit UI, Supabase data integration, and a pytest test suite. The codebase uses a modern `src/` layout and a clean UX.
+An interactive factor-investing toolkit with a clean Streamlit UI, market data stored in AWS S3, and a pytest test suite. The codebase uses a modern `src/` layout and a clean UX.
 
 ## Use the App
 
 - Hosted: Share your Streamlit Community Cloud app URL. Users only need the link to use the app (open access, no password required).
-- Supabase: Set `SUPABASE_URL` and `SUPABASE_KEY` in Streamlit secrets for cloud deploys (or `.env` for local runs).
+- Data: Set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_DEFAULT_REGION` in Streamlit secrets for cloud deploys (or `.env` for local runs). The app then loads its data from S3; see `DOCS/AWS_S3_DATA.md`. Supabase (`SUPABASE_URL`, `SUPABASE_KEY`) still works as a fallback.
 
 Example secrets (TOML):
 ```
+AWS_ACCESS_KEY_ID = "your-access-key-id"
+AWS_SECRET_ACCESS_KEY = "your-secret-access-key"
+AWS_DEFAULT_REGION = "us-east-1"
+
+# Optional fallback
 SUPABASE_URL = "https://your-project.supabase.co"
 SUPABASE_KEY = "your-anon-public-key"
 ```
@@ -44,7 +49,7 @@ Then open http://localhost:8501
 - Clean factor selection (13 core factors: Momentum, Value, Quality, Growth, Profitability)
 - ESG exclusion (fossil fuel filter)
 - Sector filtering (configurable sector universe)
-- Supabase data loading with column normalization
+- Market data loaded from AWS S3 (Parquet), shared by all sessions, with Supabase as a fallback
 - Annual rebalancing backtest (configurable period, currently 2002-2024 in UI)
 - Benchmark comparison vs Russell 2000, Growth, and Value
 - Performance metrics: CAGR, yearly returns, drawdown, Sharpe, Information Ratio, win rate
@@ -70,7 +75,9 @@ Factor-Lake/
 │   ├── factor_registry.py
 │   ├── factor_utils.py
 │   ├── factors_doc.py
-│   ├── supabase_client.py
+│   ├── s3_client.py        # S3 data source (default)
+│   ├── supabase_client.py  # Supabase data source (fallback)
+│   ├── data_standardization.py
 │   └── ...
 ├── Visualizations/         # Plot helpers
 ├── tests/
@@ -117,11 +124,15 @@ uv run streamlit run app/streamlit_app.py
 1. Create a feature branch from `main`.
 2. Add/modify tests in `tests/unit/` and/or `tests/integration/`.
 3. Run unit tests: `uv run pytest`
-4. Run integration tests (requires Supabase creds):
+4. Run integration tests (requires Supabase and/or AWS creds):
    ```bash
    SUPABASE_URL="..." SUPABASE_KEY="..." uv run pytest tests/integration -v
    ```
 5. Submit a PR describing UX/data impacts.
+
+## Market Data in S3
+
+The app reads its data from Parquet files in AWS S3 (`s3://sysen-5900-factor-lake/factor-lake-data/`). Publish new data with `scripts/publish_data_to_s3.py`, and check the live app with 5 simultaneous sessions using `scripts/load_test_sessions.py` (also run twice a week by the Load Test workflow). See `DOCS/AWS_S3_DATA.md`.
 
 ## Supabase Archiver
 

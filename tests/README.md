@@ -18,9 +18,11 @@ tests/
 │   ├── test_factors.py        # Factor registry and signal normalization
 │   ├── test_filters.py        # Sector and ESG universe filters
 │   ├── test_portfolio.py      # Portfolio object CRUD and valuation
+│   ├── test_s3_data.py        # S3 data source, source selection, publish script
 │   └── test_saved_runs.py     # Saved-run helpers + AppTest of Results run tabs
-└── integration/               # Require SUPABASE_URL + SUPABASE_KEY
+└── integration/               # Require Supabase or AWS credentials
     ├── test_backtest_regression.py  # Regression: known-good portfolio values
+    ├── test_s3_data.py              # Loads the real S3 data (needs AWS creds)
     └── test_supabase.py             # Connection, pagination, data quality
 ```
 

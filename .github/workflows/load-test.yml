@@ -1,0 +1,50 @@
+name: Load Test
+
+# Acceptance check for the "site comes up and works for 5 simultaneous users" story:
+# runs 5 browser sessions at once through a full backtest on the live app, twice a week.
+# A red run means at least one session failed; screenshots are attached to the run.
+
+on:
+  schedule:
+    - cron: "17 15 * * 1,4"  # Mondays and Thursdays
+  workflow_dispatch:
+    inputs:
+      users:
+        description: "Simultaneous sessions"
+        default: "5"
+      rounds:
+        description: "Rounds"
+        default: "1"
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Playwright
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Run simultaneous sessions against the live app
+        env:
+          USERS: ${{ github.event.inputs.users || '5' }}
+          ROUNDS: ${{ github.event.inputs.rounds || '1' }}
+        run: |
+          python scripts/load_test_sessions.py \
+            --users "$USERS" --rounds "$ROUNDS" \
+            --screenshots load-test-screenshots
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-screenshots
+          path: load-test-screenshots
+          if-no-files-found: ignore
