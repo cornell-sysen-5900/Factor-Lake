@@ -46,6 +46,7 @@ def render_factor_selection() -> Tuple[List[str], Dict[str, str]]:
 
     st.header("Factor Selection")
     st.write("Click the factors you want to add, then choose which direction the portfolio should favor.")
+    st.caption(":material/lightbulb: Tip: hover over a factor to see its full description.")
 
     _render_add_factors(selected)
 

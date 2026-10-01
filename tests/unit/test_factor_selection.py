@@ -82,6 +82,8 @@ def test_config_defaults_and_groups():
 def test_initial_state(at):
     _assert_clean(at)
     assert _available(at) == list(EXPECTED_DEFAULTS)
+    assert ':material/lightbulb: Tip: hover over a factor to see its full description.' \
+        in [c.value for c in at.caption]
     assert _button(at, 'Load Market Data').disabled
     assert 'No factors added yet. Click one above.' in [c.value for c in at.caption]
     assert [w.value for w in at.warning] == ['Please select at least one factor to run the analysis']
