@@ -24,8 +24,8 @@ ENGINE_TO_DIRECTION = {'top': HIGHER, 'bottom': LOWER}
 
 # Session state: {UI label: 'top' | 'bottom'}, in the order the factors were added
 SELECTED_KEY = 'factor_builder_selected'
-# Bumped after each Add so the "Add factor" box is a new, empty widget
-PICKER_NONCE_KEY = 'factor_builder_picker_nonce'
+# Bumped after each Add so the "Add factors" panel is a new, closed and empty widget
+ADD_NONCE_KEY = 'factor_builder_add_nonce'
 
 # The old checkbox grid returned factors in this group order (left column, then
 # right). Returning the same order keeps run labels, Results captions and the
@@ -35,21 +35,22 @@ _OUTPUT_GROUP_ORDER = ['Momentum', 'Profitability', 'Growth', 'Value', 'Quality'
 
 def render_factor_selection() -> Tuple[List[str], Dict[str, str]]:
     """
-    Renders the factor builder: an "Add factor" dropdown, one row per added
-    factor with its direction control, and a summary of the strategy.
+    Renders the factor builder: an "Add factors" panel grouped by category,
+    one row per added factor with its direction control, and a summary of the
+    strategy.
 
     Returns:
         Tuple[List[str], Dict[str, str]]: A list of selected factor names and
             a dictionary mapping those names to their ranking direction ('top' or 'bottom').
     """
     st.session_state.setdefault(SELECTED_KEY, {})
-    st.session_state.setdefault(PICKER_NONCE_KEY, 0)
+    st.session_state.setdefault(ADD_NONCE_KEY, 0)
     selected: Dict[str, str] = st.session_state[SELECTED_KEY]
 
     st.header("Factor Selection")
     st.write("Add the factors you want, then choose which direction the portfolio should favor.")
 
-    _render_add_factor_row(selected)
+    _render_add_factors(selected)
 
     if not selected:
         st.caption("No factors added yet. Choose one above.")
@@ -70,32 +71,46 @@ def render_factor_selection() -> Tuple[List[str], Dict[str, str]]:
     return selected_names, {name: selected[name] for name in selected_names}
 
 
-def _render_add_factor_row(selected: Dict[str, str]) -> None:
-    """Dropdown of factors not yet added (grouped) and the Add button."""
-    available = [
-        name
+def _render_add_factors(selected: Dict[str, str]) -> None:
+    """
+    Dropdown panel listing the factors not yet added under their category titles.
+    Several factors can be picked at once; Add appends them with their default directions.
+    """
+    nonce = st.session_state[ADD_NONCE_KEY]
+    remaining = {
+        group: [name for name, meta in config.FACTOR_METADATA.items()
+                if meta['group'] == group and name not in selected]
         for group in config.FACTOR_GROUPS
-        for name, meta in config.FACTOR_METADATA.items()
-        if meta['group'] == group and name not in selected
-    ]
-    pick_col, add_col = st.columns([4, 1], vertical_alignment="bottom")
-    with pick_col:
-        choice = st.selectbox(
-            "Add factor",
-            options=available,
-            index=None,
-            placeholder="Choose a factor" if available else "All factors added",
-            format_func=lambda name: f"{config.FACTOR_METADATA[name]['group']}: {name}",
-            disabled=not available,
-            key=f"factor_picker_{st.session_state[PICKER_NONCE_KEY]}",
-        )
-    with add_col:
-        if st.button("Add", disabled=choice is None, width="stretch", key="factor_add"):
-            default = HIGHER if config.FACTOR_METADATA[choice]['higher_is_better'] else LOWER
-            selected[choice] = DIRECTION_TO_ENGINE[default]
-            # Seed the row's direction control with the factor's default
-            st.session_state[_direction_key(choice)] = default
-            st.session_state[PICKER_NONCE_KEY] += 1
+    }
+    with st.popover(
+        "Add factors",
+        icon=":material/add:",
+        disabled=not any(remaining.values()),
+        help=None if any(remaining.values()) else "All factors are added.",
+        key=f"factor_add_popover_{nonce}",
+    ):
+        st.caption("Pick one or more factors, then click Add.")
+        chosen: List[str] = []
+        for group, names in remaining.items():
+            if not names:
+                continue
+            picked = st.pills(
+                f"**{group}**",
+                options=names,
+                selection_mode="multi",
+                # Pills have no per-option tooltip, so the group help lists its definitions
+                help="\n\n".join(f"**{n}**: {config.FACTOR_METADATA[n]['tooltip']}" for n in names),
+                key=f"factor_pick_{config.FACTOR_GROUPS.index(group)}_{nonce}",
+            )
+            chosen += picked
+        label = f"Add {len(chosen)} factor(s)" if chosen else "Add"
+        if st.button(label, type="primary", disabled=not chosen, key="factor_add"):
+            for name in chosen:
+                default = HIGHER if config.FACTOR_METADATA[name]['higher_is_better'] else LOWER
+                selected[name] = DIRECTION_TO_ENGINE[default]
+                # Seed the row's direction control with the factor's default
+                st.session_state[_direction_key(name)] = default
+            st.session_state[ADD_NONCE_KEY] += 1
             st.rerun()
 
 

@@ -97,12 +97,11 @@ def _click(at, label):
 
 
 def _add_factor(at, name):
-    at.selectbox(key=_picker_key(at)).set_value(name).run()
-    _click(at, 'Add')
-
-
-def _picker_key(at):
-    return f"factor_picker_{at.session_state['factor_builder_picker_nonce']}"
+    from app.streamlit_config import FACTOR_GROUPS, FACTOR_METADATA
+    group_idx = FACTOR_GROUPS.index(FACTOR_METADATA[name]['group'])
+    nonce = at.session_state['factor_builder_add_nonce']
+    at.button_group(key=f"factor_pick_{group_idx}_{nonce}").set_value([name]).run()
+    at.button(key='factor_add').click().run()
 
 
 def _add_roe_and_load(at):
