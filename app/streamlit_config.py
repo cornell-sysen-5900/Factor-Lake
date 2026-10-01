@@ -24,84 +24,116 @@ SECTOR_OPTIONS: List[str] = [
 
 """
 FACTOR_METADATA:
-A configuration registry that maps Streamlit UI strings to specific 
-SQL column names in the Supabase 'Full Precision Test' table. 
+The single registry for every factor offered in the UI, keyed by its UI label
+(the label is what the Analysis tab returns and what run_backtest_logic maps).
 
 Each entry defines:
+- key: Short id used in widget keys.
+- group: Category shown in the "Add factor" dropdown and under the factor name.
 - column: The exact database field name.
-- higher_is_better: The default directional rank for the factor tilt.
+- tooltip: Hover text shown next to the factor name.
+- higher_is_better: Default direction when the factor is added
+  (True = "Higher is better" = 'top', False = "Lower is better" = 'bottom').
+
+Entries are listed in FACTOR_GROUPS order, which is the dropdown order.
 """
 FACTOR_METADATA: Dict[str, Dict[str, Any]] = {
-    'ROE using 9/30 Data': {
-        'column': 'ROE_using_9-30_Data',
-        'higher_is_better': True
-    },
-    'ROA using 9/30 Data': {
-        'column': 'ROA_using_9-30_Data',
-        'higher_is_better': True
-    },
     '12-Mo Momentum %': {
+        'key': '12m',
+        'group': 'Momentum',
         'column': '12-Mo_Momentum',
+        'tooltip': "Price change over the past 12 months. Excludes dividends.",
         'higher_is_better': True
     },
     '6-Mo Momentum %': {
+        'key': '6m',
+        'group': 'Momentum',
         'column': '6-Mo_Momentum',
+        'tooltip': "Price change over the past 6 months. Excludes dividends.",
         'higher_is_better': True
     },
     '1-Mo Momentum %': {
+        'key': '1m',
+        'group': 'Momentum',
         'column': '1-Mo_Momentum',
+        'tooltip': "Price change over the past month. Excludes dividends.",
+        # Default pending confirmation: short term reversal may argue for Lower.
         'higher_is_better': True
     },
     'Price to Book Using 9/30 Data': {
+        'key': 'ptb',
+        'group': 'Value',
         'column': 'Price_to_Book_Using_9-30_Data',
-        'higher_is_better': False
-    },
-    'Next FY Earns/P': {
-        'column': 'Next_FY_Earns-P',
-        'higher_is_better': True
-    },
-    '1-Yr Price Vol %': {
-        'column': '1-Yr_Price_Vol',
-        'higher_is_better': False
-    },
-    'Accruals/Assets': {
-        'column': 'Accruals-Assets',
-        'higher_is_better': False
-    },
-    'ROA %': {
-        'column': 'ROA',
-        'higher_is_better': True
-    },
-    '1-Yr Asset Growth %': {
-        'column': '1-Yr_Asset_Growth',
-        'higher_is_better': False
-    },
-    '1-Yr CapEX Growth %': {
-        'column': '1-Yr_CapEX_Growth',
+        'tooltip': "Price divided by book value per share.",
         'higher_is_better': False
     },
     'Book/Price': {
+        'key': 'btp',
+        'group': 'Value',
         'column': 'Book-Price',
+        'tooltip': "Book equity divided by market cap, from the latest quarter.",
         'higher_is_better': True
+    },
+    'Next FY Earns/P': {
+        'key': 'fey',
+        'group': 'Value',
+        'column': 'Next_FY_Earns-P',
+        'tooltip': "Analyst consensus EPS for next fiscal year divided by price. Needs 3+ analysts.",
+        'higher_is_better': True
+    },
+    'ROE using 9/30 Data': {
+        'key': 'roe',
+        'group': 'Profitability',
+        'column': 'ROE_using_9-30_Data',
+        'tooltip': "Net income divided by shareholders' equity.",
+        'higher_is_better': True
+    },
+    'ROA using 9/30 Data': {
+        'key': 'roa',
+        'group': 'Profitability',
+        'column': 'ROA_using_9-30_Data',
+        'tooltip': "Net income divided by total assets.",
+        'higher_is_better': True
+    },
+    'ROA %': {
+        'key': 'roa_pct',
+        'group': 'Profitability',
+        'column': 'ROA',
+        'tooltip': "Trailing 12 month net income divided by total assets.",
+        'higher_is_better': True
+    },
+    'Accruals/Assets': {
+        'key': 'accruals',
+        'group': 'Quality',
+        'column': 'Accruals-Assets',
+        'tooltip': "Net income minus operating cash flow, over total assets. Lower means more cash backed earnings.",
+        'higher_is_better': False
+    },
+    '1-Yr Price Vol %': {
+        'key': 'vol',
+        'group': 'Quality',
+        'column': '1-Yr_Price_Vol',
+        'tooltip': "Annualized volatility of daily returns over the past year.",
+        'higher_is_better': False
+    },
+    '1-Yr Asset Growth %': {
+        'key': 'asset_growth',
+        'group': 'Growth',
+        'column': '1-Yr_Asset_Growth',
+        'tooltip': "Change in total assets vs one year ago.",
+        'higher_is_better': False
+    },
+    '1-Yr CapEX Growth %': {
+        'key': 'capex_growth',
+        'group': 'Growth',
+        'column': '1-Yr_CapEX_Growth',
+        'tooltip': "Change in 12 month capex vs the prior year.",
+        'higher_is_better': False
     }
 }
 
+# Factor categories in the order the "Add factor" dropdown lists them
+FACTOR_GROUPS: List[str] = ['Momentum', 'Value', 'Profitability', 'Quality', 'Growth']
+
 # Derived list of available factors for UI rendering
 FACTOR_OPTIONS: List[str] = list(FACTOR_METADATA.keys())
-
-# Hover tooltips for each factor checkbox, keyed by UI label.
-FACTOR_TOOLTIPS: Dict[str, str] = {
-    '12-Mo Momentum %': "Price change over the past 12 months. Excludes dividends.",
-    '6-Mo Momentum %': "Price change over the past 6 months. Excludes dividends.",
-    '1-Mo Momentum %': "Price change over the past month. Excludes dividends.",
-    'Price to Book Using 9/30 Data': "Price divided by book value per share.",
-    'Book/Price': "Book equity divided by market cap, from the latest quarter.",
-    'Next FY Earns/P': "Analyst consensus EPS for next fiscal year divided by price. Needs 3+ analysts.",
-    'ROE using 9/30 Data': "Net income divided by shareholders' equity.",
-    'ROA using 9/30 Data': "Net income divided by total assets.",
-    'ROA %': "Trailing 12 month net income divided by total assets.",
-    'Accruals/Assets': "Net income minus operating cash flow, over total assets. Lower means more cash backed earnings.",
-    '1-Yr Price Vol %': "Annualized volatility of daily returns over the past year.",
-    '1-Yr Asset Growth %': "Change in total assets vs one year ago.",
-    '1-Yr CapEX Growth %': "Change in 12 month capex vs the prior year.",
-}

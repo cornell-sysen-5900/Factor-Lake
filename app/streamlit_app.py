@@ -65,7 +65,8 @@ def main():
         selected_factor_names, factor_directions = render_factor_selection()
         
         # Step 1: Data Acquisition
-        if st.button("Load Market Data", type="primary", use_container_width=True):
+        if st.button("Load Market Data", type="primary", use_container_width=True,
+                     disabled=not selected_factor_names):
             with st.spinner("Accessing cloud database..."):
                 utils.load_and_process_data(user_settings)
 
