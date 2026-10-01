@@ -89,12 +89,26 @@ def at(monkeypatch):
     app = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=60)
     app.session_state['raw_data'] = _synthetic_universe()
     app.run()
-    _click(app, 'Load Market Data')
     return app
 
 
 def _click(at, label):
     next(b for b in at.button if b.label == label).click().run()
+
+
+def _add_factor(at, name):
+    at.selectbox(key=_picker_key(at)).set_value(name).run()
+    _click(at, 'Add')
+
+
+def _picker_key(at):
+    return f"factor_picker_{at.session_state['factor_builder_picker_nonce']}"
+
+
+def _add_roe_and_load(at):
+    # Load Market Data stays disabled until at least one factor is added
+    _add_factor(at, 'ROE using 9/30 Data')
+    _click(at, 'Load Market Data')
 
 
 def _assert_clean(at):
@@ -121,9 +135,9 @@ def _captions(at):
 
 
 def test_each_run_is_saved_in_its_own_tab(at):
-    at.checkbox(key='roe').check().run()
+    _add_roe_and_load(at)
     _click(at, RUN)
-    at.checkbox(key='roa_pct').check().run()
+    _add_factor(at, 'ROA %')
     _click(at, RUN)
 
     _assert_clean(at)
@@ -141,12 +155,12 @@ def test_each_run_is_saved_in_its_own_tab(at):
 
 
 def test_saved_tab_ignores_later_sidebar_and_factor_changes(at):
-    at.checkbox(key='roe').check().run()
+    _add_roe_and_load(at)
     _click(at, RUN)
     before = (_metric(at, 'Total Return'), _metric(at, 'CAGR'), _captions(at))
 
     next(n for n in at.number_input if n.label == 'Initial AUM ($)').set_value(5000.0)
-    at.toggle(key='roe_dir').set_value(True)
+    at.button_group(key='factor_dir_roe').set_value('Lower is better')
     at.run()
 
     _assert_clean(at)
@@ -155,9 +169,9 @@ def test_saved_tab_ignores_later_sidebar_and_factor_changes(at):
 
 
 def test_cohort_comparison_uses_the_runs_own_snapshot(at):
-    at.checkbox(key='roe').check().run()
+    _add_roe_and_load(at)
     _click(at, RUN)                                   # Run 1: ROE, High to Low
-    at.toggle(key='roe_dir').set_value(True).run()   # live direction now differs
+    at.button_group(key='factor_dir_roe').set_value('Lower is better').run()  # live direction now differs
     _click(at, RUN)                                   # Run 2: ROE, Low to High
 
     label_1 = 'Run 1: ROE using 9/30 Data'
@@ -170,7 +184,7 @@ def test_cohort_comparison_uses_the_runs_own_snapshot(at):
     run_1 = next(r for r in at.session_state['saved_runs'] if r['id'] == 1)
     assert run_1['cohort']['pct'] == 10
     assert run_1['cohort']['top'] != run_1['cohort']['bottom']  # regression: both were 'bottom'
-    # Run 1's own direction (High to Low) is used, not the live toggle or Run 2's
+    # Run 1's own direction (High to Low) is used, not the live direction control or Run 2's
     exp_top, exp_bot = backtest_engine.run_cohort_comparison(
         run_1['data'], ['ROE_using_9-30_Data'], {'ROE_using_9-30_Data': 'top'}, 10, run_1['settings'])
     assert run_1['cohort']['top'] == list(exp_top)
@@ -185,10 +199,12 @@ def test_cohort_comparison_uses_the_runs_own_snapshot(at):
 
 
 def test_invalid_or_failed_runs_are_not_saved(at, monkeypatch):
+    _add_roe_and_load(at)
+    at.button(key='factor_remove_roe').click().run()
     _click(at, RUN)                                   # no factors selected
     assert any('Select at least one factor' in w.value for w in at.warning)
 
-    at.checkbox(key='roe').check().run()
+    _add_factor(at, 'ROE using 9/30 Data')
     aum = next(n for n in at.number_input if n.label == 'Initial AUM ($)')
     aum.set_value(0.0).run()
     _click(at, RUN)
@@ -216,7 +232,7 @@ def test_invalid_or_failed_runs_are_not_saved(at, monkeypatch):
 
 
 def test_remove_run(at):
-    at.checkbox(key='roe').check().run()
+    _add_roe_and_load(at)
     _click(at, RUN)
     _click(at, RUN)
     assert _run_tab_labels(at) == ['Run 2: ROE using 9/30 Data', 'Run 1: ROE using 9/30 Data']
