@@ -132,7 +132,7 @@ uv run streamlit run app/streamlit_app.py
 
 ## Market Data in S3
 
-The app reads its data from Parquet files in AWS S3 (`s3://sysen-5900-factor-lake/factor-lake-data/`). Publish new data with `scripts/publish_data_to_s3.py`, and check the live app with 5 simultaneous sessions using `scripts/load_test_sessions.py` (also run twice a week by the Load Test workflow). See `DOCS/AWS_S3_DATA.md`.
+The app reads its data from Parquet files in AWS S3 (`s3://sysen-5900-factor-lake/factor-lake-data/`). Publish new data with `scripts/publish_data_to_s3.py`, and check the live app with 5 simultaneous sessions using `scripts/load_test_sessions.py` (or on demand from the Load Test workflow in GitHub Actions). See `DOCS/AWS_S3_DATA.md`.
 
 ## Supabase Archiver
 

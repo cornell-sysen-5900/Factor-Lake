@@ -64,8 +64,8 @@ uv run python scripts/publish_data_to_s3.py --universe new_data.xlsx --delisting
 
 `scripts/load_test_sessions.py` opens 5 browser sessions at the same time, and each runs a full backtest: Load Market Data, Run Portfolio Analysis, Results, and the cohort comparison.
 
-1. GitHub Actions runs it against the live app every Monday and Thursday (`.github/workflows/load-test.yml`). A failed run means at least one session failed; screenshots are attached to the run.
-2. Run it on demand from the Actions tab (Load Test → Run workflow), or locally:
+1. Run it against the live app from the Actions tab (Load Test → Run workflow, `.github/workflows/load-test.yml`). It only runs when someone starts it. A failed run means at least one session failed; screenshots are attached to the run.
+2. Or run it locally:
 
 ```bash
 pip install playwright && playwright install chromium
