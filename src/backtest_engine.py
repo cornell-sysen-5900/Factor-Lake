@@ -39,13 +39,17 @@ def build_ranked_stocks_table(
     factors: List[str],
     factor_directions: Dict[str, str],
     target_year: int,
-    top_pct: float = 10.0
+    top_pct: float = 10.0,
+    factor_labels: Optional[Dict[str, str]] = None
 ) -> pd.DataFrame:
     """
     Builds a best-to-worst ranked stock table for a single rebalance year.
 
     The ranking is a composite score formed by averaging each selected factor's
     normalized signal after applying its selected direction (top or bottom).
+    Each selected factor's raw value for that year follows the Composite Score,
+    headed by its label from factor_labels (column -> display label), or by the
+    column name when no label is given.
     """
     if data.empty or not factors:
         return pd.DataFrame()
@@ -84,6 +88,15 @@ def build_ranked_stocks_table(
         'Rank': np.arange(1, len(selected_scores) + 1)
     })
 
+    factor_headers = []
+    for factor_col in factors:
+        header = (factor_labels or {}).get(factor_col, factor_col)
+        if factor_col in df_year.columns:
+            ranked_df[header] = df_year.reindex(selected_scores.index)[factor_col].values
+        else:
+            ranked_df[header] = np.nan
+        factor_headers.append(header)
+
     if 'Next-Years_Return' in df_year.columns:
         ranked_df['Next-Year Return %'] = pd.to_numeric(
             df_year.reindex(selected_scores.index)['Next-Years_Return'], errors='coerce'
@@ -92,10 +105,36 @@ def build_ranked_stocks_table(
     if 'Scotts_Sector_5' in df_year.columns:
         ranked_df['Sector'] = df_year.reindex(selected_scores.index)['Scotts_Sector_5'].values
 
-    return ranked_df[['Rank', 'Ticker', 'Composite Score'] + [
+    return ranked_df[['Rank', 'Ticker', 'Composite Score'] + factor_headers + [
         c for c in ['Next-Year Return %', 'Sector'] if c in ranked_df.columns
     ]]
-    
+
+
+def build_ranked_stocks_by_year(
+    data: pd.DataFrame,
+    factors: List[str],
+    factor_directions: Dict[str, str],
+    start_year: int,
+    end_year: int,
+    top_pct: float = 10.0,
+    factor_labels: Optional[Dict[str, str]] = None
+) -> Dict[int, List[Dict[str, Any]]]:
+    """
+    Builds the ranked stock table for every rebalance year of the backtest
+    (range(start_year, end_year), matching rebalance_portfolio).
+
+    Returns:
+        {year: list of row dicts}, skipping years whose table is empty.
+    """
+    ranked_by_year: Dict[int, List[Dict[str, Any]]] = {}
+    for year in range(start_year, end_year):
+        table = build_ranked_stocks_table(
+            data, factors, factor_directions, year, top_pct, factor_labels
+        )
+        if not table.empty:
+            ranked_by_year[year] = table.to_dict('records')
+    return ranked_by_year
+
 def calculate_holdings(
     df_year: pd.DataFrame, 
     factor_key: str, 
