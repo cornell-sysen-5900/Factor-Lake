@@ -12,18 +12,24 @@ Usage (from the project root, with AWS keys in .env or the environment):
 
 Output in s3://<bucket>/<prefix>/ (default s3://sysen-5900-factor-lake/factor-lake-data/):
     daily_prices/year=YYYY/data.parquet   one file per year, sorted by security and date
-    daily_last_prices.parquet             each security's last trading day and price (delistings)
+    daily_last_prices.parquet             each security's last trading day and price; ended_early marks
+                                          rows that stop more than 7 days before the data ends (a delisting,
+                                          or leaving the universe if the file is cut to index membership)
     daily_prices/_manifest.json           years, row counts, columns and cleaning summary (uploaded last)
 
 Cleaning, matching the PR #21 daily loader and the yearly data:
     - Column names are matched case-insensitively (date, permno, ticker, prc, cfacpr, shrout, ret, vol).
     - Text placeholders ('--', 'N/A', ...) and CRSP letter codes in numeric columns become missing.
+    - CRSP's numeric missing codes count as missing too: returns below -100% (-66, -77, -88, -99),
+      negative volume (-99) and non-positive shares outstanding.
     - Rows without a date, a price, or an identifier (permno or ticker) are dropped. A price of 0
       (CRSP's "no price available") counts as missing.
     - prc = |prc| (CRSP marks bid/ask midpoints with a negative price).
     - prc_adj = prc / cfacpr (split-adjusted price; prc when cfacpr is missing or 0).
     - mkt_cap = prc * shrout (CRSP shrout is in thousands of shares, so mkt_cap is in $ thousands).
-    - Duplicate security/date rows keep the first occurrence.
+    - Duplicate permno/date rows keep the first occurrence. Without a permno column only exact
+      duplicate rows are dropped, because share classes can share a ticker; the number of
+      ticker/date pairs that still have several rows is reported.
 """
 
 import argparse
@@ -33,7 +39,7 @@ import logging
 import shutil
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -89,7 +95,7 @@ def _parse_dates(raw: pd.Series) -> pd.Series:
     return dates
 
 
-def clean_chunk(chunk: pd.DataFrame, counts: Dict[str, int]) -> pd.DataFrame:
+def clean_chunk(chunk: pd.DataFrame, counts: Dict[str, int], start: Optional[date] = None) -> pd.DataFrame:
     """
     Cleans one block of CSV rows (all read as text) into the output columns.
     Adds the number of rows dropped for each reason to `counts`.
@@ -102,7 +108,7 @@ def clean_chunk(chunk: pd.DataFrame, counts: Dict[str, int]) -> pd.DataFrame:
         raise ValueError(f"The CSV needs date, prc and permno or ticker columns; missing {missing or ['permno/ticker']}. "
                          f"Found: {list(chunk.columns)}")
 
-    df = df.replace(SENTINELS, np.nan)
+    df = df.mask(df.isin(SENTINELS))   # placeholders -> missing (all columns are text here)
     out = pd.DataFrame(index=df.index)
     out['date'] = _parse_dates(df['date'])
     for col in NUMERIC_COLUMNS:
@@ -112,10 +118,18 @@ def clean_chunk(chunk: pd.DataFrame, counts: Dict[str, int]) -> pd.DataFrame:
     out['ticker'] = (df['ticker'].astype('string').str.strip().str.upper().replace('', pd.NA)
                      if 'ticker' in df.columns else pd.Series(pd.NA, index=df.index, dtype='string'))
     out.loc[out['prc'] == 0, 'prc'] = np.nan
+    # CRSP numeric missing codes: a simple return cannot be below -100%, volume cannot be negative
+    out.loc[out['ret'] < -1, 'ret'] = np.nan
+    out.loc[out['vol'] < 0, 'vol'] = np.nan
+    out.loc[out['shrout'] <= 0, 'shrout'] = np.nan
 
     total = len(out)
     out = out[out['date'].notna()]
     counts['dropped_missing_date'] += total - len(out)
+    if start is not None:
+        before = len(out)
+        out = out[out['date'] >= pd.Timestamp(start)]
+        counts['dropped_before_start'] += before - len(out)
     before = len(out)
     out = out[out['prc'].notna()]
     counts['dropped_missing_price'] += before - len(out)
@@ -131,23 +145,38 @@ def clean_chunk(chunk: pd.DataFrame, counts: Dict[str, int]) -> pd.DataFrame:
     return out[OUTPUT_COLUMNS]
 
 
-def build_daily_dataset(csv_path: Path, output_dir: Path, chunk_rows: int = 500_000) -> Dict[str, Any]:
+def build_daily_dataset(csv_path: Path, output_dir: Path, chunk_rows: int = 500_000,
+                        start: Optional[date] = None) -> Dict[str, Any]:
     """
     Cleans the CSV in chunks into output_dir/daily_prices/year=YYYY/data.parquet plus
     output_dir/daily_last_prices.parquet, and returns the manifest describing them.
     """
-    counts = {'rows_read': 0, 'dropped_missing_date': 0, 'dropped_missing_price': 0,
-              'dropped_missing_id': 0, 'dropped_duplicates': 0}
-    staging = output_dir / '_staging'
-    staging.mkdir(parents=True, exist_ok=True)
+    counts = {'rows_read': 0, 'dropped_missing_date': 0, 'dropped_before_start': 0, 'dropped_missing_price': 0,
+              'dropped_missing_id': 0, 'dropped_duplicates': 0, 'ticker_date_conflicts': 0}
     header = pd.read_csv(csv_path, nrows=0).columns
     ignored = [c for c in header if c.strip().lower() not in COLUMN_ALIASES]
     key = 'permno' if any(c.strip().lower() == 'permno' for c in header) else 'ticker'
+    staging = output_dir / '_staging'
+    shutil.rmtree(staging, ignore_errors=True)   # never mix in parts left by an interrupted run
+    staging.mkdir(parents=True)
+    try:
+        years, last_rows = _stage_and_write_years(csv_path, output_dir, staging, key, chunk_rows, counts, start)
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+    if not years:
+        raise ValueError("No usable rows: every row was missing a date, price or identifier.")
+    manifest = _finish(csv_path, output_dir, key, years, last_rows, ignored, counts)
+    manifest['start_date'] = start.isoformat() if start else None
+    return manifest
 
+
+def _stage_and_write_years(csv_path: Path, output_dir: Path, staging: Path, key: str, chunk_rows: int,
+                           counts: Dict[str, int], start: Optional[date] = None):
+    """Pass 1 stages cleaned rows by year; pass 2 writes one sorted, de-duplicated file per year."""
     # Pass 1: clean each chunk and stage its rows by year
     for i, chunk in enumerate(pd.read_csv(csv_path, chunksize=chunk_rows, dtype=str, keep_default_na=False)):
         counts['rows_read'] += len(chunk)
-        cleaned = clean_chunk(chunk, counts)
+        cleaned = clean_chunk(chunk, counts, start)
         for year, rows in cleaned.groupby(cleaned['date'].dt.year):
             part_dir = staging / f'year={int(year)}'
             part_dir.mkdir(exist_ok=True)
@@ -162,7 +191,13 @@ def build_daily_dataset(csv_path: Path, output_dir: Path, chunk_rows: int = 500_
         year = int(part_dir.name.split('=')[1])
         df = pq.read_table(part_dir, schema=SCHEMA).to_pandas()
         before = len(df)
-        df = df.drop_duplicates(subset=[key, 'date'], keep='first').sort_values([key, 'date'], kind='stable')
+        if key == 'permno':
+            df = df.drop_duplicates(subset=['permno', 'date'], keep='first')
+        else:
+            # Share classes can share a ticker: drop only exact copies and report what is left
+            df = df.drop_duplicates(keep='first')
+            counts['ticker_date_conflicts'] += int(df.duplicated(subset=['ticker', 'date']).sum())
+        df = df.sort_values([key, 'date'], kind='stable')
         counts['dropped_duplicates'] += before - len(df)
         target = output_dir / daily_year_file(year)
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -174,18 +209,21 @@ def build_daily_dataset(csv_path: Path, output_dir: Path, chunk_rows: int = 500_
         last_rows.append(df.groupby(key, sort=False).tail(1))
         shutil.rmtree(part_dir)
         logger.info(f"{year}: {len(df):,} rows, {years[str(year)]['securities']:,} securities")
-    shutil.rmtree(staging)
-    if not years:
-        raise ValueError("No usable rows: every row was missing a date, price or identifier.")
+    return years, last_rows
 
+
+def _finish(csv_path: Path, output_dir: Path, key: str, years: Dict[str, Dict[str, int]],
+            last_rows: List[pd.DataFrame], ignored: List[str], counts: Dict[str, int]) -> Dict[str, Any]:
+    """Writes the last-price file and returns the manifest."""
     # Each security's last trading day, like last_price_mapping for the yearly data
     last = pd.concat(last_rows).sort_values('date').groupby(key, sort=False).tail(1)
     last_date = last['date'].max()
     last_prices = pd.DataFrame({
         'permno': last['permno'], 'ticker': last['ticker'], 'last_date': last['date'],
         'last_prc': last['prc'], 'last_prc_adj': last['prc_adj'],
-        # Stopped trading more than a week before the data ends
-        'delisted': last['date'] < last_date - pd.Timedelta(days=7),
+        # Rows stop more than a week before the data ends: a delisting, or leaving the
+        # universe if the file only covers index membership periods
+        'ended_early': last['date'] < last_date - pd.Timedelta(days=7),
     }).sort_values([key]).reset_index(drop=True)
     last_prices.to_parquet(output_dir / DAILY_LAST_PRICES_FILE, index=False)
 
@@ -200,7 +238,7 @@ def build_daily_dataset(csv_path: Path, output_dir: Path, chunk_rows: int = 500_
         'date_range': [str(pc.min(first_day).as_py().date()), str(pc.max(final_day).as_py().date())],
         'rows_written': sum(y['rows'] for y in years.values()),
         'securities': int(last_prices[key].nunique()),
-        'delisted_securities': int(last_prices['delisted'].sum()),
+        'ended_early_securities': int(last_prices['ended_early'].sum()),
         'years': years,
         'columns': {f.name: str(f.type) for f in SCHEMA},
         'ignored_csv_columns': ignored,
@@ -251,6 +289,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument('--bucket', help="S3 bucket (default: FACTOR_LAKE_S3_BUCKET or sysen-5900-factor-lake)")
     parser.add_argument('--prefix', help="Key prefix (default: FACTOR_LAKE_S3_PREFIX or factor-lake-data)")
     parser.add_argument('--chunk-rows', type=int, default=500_000, help="CSV rows per chunk (default 500,000)")
+    parser.add_argument('--start-date', type=date.fromisoformat,
+                        help="Drop rows before this date, e.g. 2010-01-01 (default: keep everything)")
     args = parser.parse_args(argv)
     # Expand ~ even when the path was quoted (the shell only expands it unquoted)
     args.csv = args.csv.expanduser()
@@ -259,14 +299,25 @@ def main(argv: Optional[List[str]] = None) -> int:
     if not args.csv.is_file():
         parser.error(f"CSV not found: {args.csv}")
 
+    manager = None
+    if not args.dry_run:
+        # Fail in seconds on bad keys or permissions, not after cleaning the whole file
+        manager = S3DataManager(bucket=args.bucket, prefix=args.prefix)
+        manager.check_write_access()
+        logger.info(f"AWS access OK for s3://{manager.bucket}/{manager.prefix}/")
+
     with tempfile.TemporaryDirectory(prefix='factor_lake_daily_') as tmp:
         output_dir = args.output_dir or Path(tmp)
-        manifest = build_daily_dataset(args.csv, output_dir, args.chunk_rows)
+        manifest = build_daily_dataset(args.csv, output_dir, args.chunk_rows, args.start_date)
         c = manifest['cleaning']
         logger.info(f"Cleaned {c['rows_read']:,} rows into {manifest['rows_written']:,} "
                     f"({manifest['securities']:,} securities, {manifest['date_range'][0]} to {manifest['date_range'][1]}). "
-                    f"Dropped: {c['dropped_missing_date']:,} no date, {c['dropped_missing_price']:,} no price, "
+                    f"Dropped: {c['dropped_missing_date']:,} no date, {c['dropped_before_start']:,} before the start date, "
+                    f"{c['dropped_missing_price']:,} no price, "
                     f"{c['dropped_missing_id']:,} no identifier, {c['dropped_duplicates']:,} duplicates.")
+        if c['ticker_date_conflicts']:
+            logger.warning(f"{c['ticker_date_conflicts']:,} ticker/date pairs still have more than one row "
+                           "(e.g. share classes sharing a ticker). Add a permno column to tell them apart.")
         if manifest['ignored_csv_columns']:
             logger.info(f"Columns not published: {manifest['ignored_csv_columns']}")
         if args.dry_run:
@@ -274,7 +325,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             logger.info(f"Dry run: nothing uploaded. Files are in {output_dir}"
                         + ("" if args.output_dir else " (deleted on exit; use --output-dir to keep them)"))
             return 0
-        publish(output_dir, manifest, S3DataManager(bucket=args.bucket, prefix=args.prefix))
+        publish(output_dir, manifest, manager)
     logger.info("Done.")
     return 0
 

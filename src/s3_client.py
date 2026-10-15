@@ -115,22 +115,12 @@ class S3DataManager:
 
     def _read_bytes(self, filename: str) -> bytes:
         """Downloads one object under the prefix, turning AWS errors into readable S3DataErrors."""
-        from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
-
         uri = self.s3_uri(filename)
         try:
             response = self.client.get_object(Bucket=self.bucket, Key=self.object_key(filename))
             return response['Body'].read()
-        except NoCredentialsError as e:
-            raise S3DataError(
-                "AWS credentials are not configured. Set AWS_ACCESS_KEY_ID and "
-                "AWS_SECRET_ACCESS_KEY (Streamlit secrets or .env)."
-            ) from e
-        except ClientError as e:
-            code = e.response.get('Error', {}).get('Code', 'Unknown')
-            raise S3DataError(f"Could not read {uri} ({code}).") from e
-        except BotoCoreError as e:
-            raise S3DataError(f"Could not reach S3 for {uri}: {e}") from e
+        except Exception as e:
+            raise _readable_error(e, 'read', uri) from e
 
     def upload_parquet(self, df: pd.DataFrame, filename: str, key: Optional[str] = None) -> str:
         """Writes a DataFrame as Parquet to S3 and returns the key it was written to."""
@@ -144,10 +134,51 @@ class S3DataManager:
     def upload_file(self, local_path: str, filename: str, content_type: str) -> str:
         """Uploads a local file (multipart for large files) and returns its S3 key."""
         key = self.object_key(filename)
-        self.client.upload_file(str(local_path), self.bucket, key,
-                                ExtraArgs={'ContentType': content_type})
+        try:
+            self.client.upload_file(str(local_path), self.bucket, key,
+                                    ExtraArgs={'ContentType': content_type})
+        except Exception as e:
+            raise _readable_error(e, 'write', self.s3_uri(filename)) from e
         return key
 
     def object_size(self, filename: str) -> int:
         """Size in bytes of an object under the prefix (used to verify uploads)."""
-        return int(self.client.head_object(Bucket=self.bucket, Key=self.object_key(filename))['ContentLength'])
+        try:
+            return int(self.client.head_object(Bucket=self.bucket, Key=self.object_key(filename))['ContentLength'])
+        except Exception as e:
+            raise _readable_error(e, 'check', self.s3_uri(filename)) from e
+
+    def check_write_access(self) -> None:
+        """Writes and deletes a tiny object so bad keys or permissions fail fast, before long work."""
+        filename = '_write_check'
+        try:
+            self.client.put_object(Bucket=self.bucket, Key=self.object_key(filename), Body=b'ok')
+            self.client.delete_object(Bucket=self.bucket, Key=self.object_key(filename))
+        except Exception as e:
+            raise _readable_error(e, 'write', self.s3_uri(filename)) from e
+
+
+def _readable_error(error: Exception, action: str, uri: str) -> Exception:
+    """Turns AWS errors into a short S3DataError; anything else is returned unchanged."""
+    from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
+
+    if isinstance(error, NoCredentialsError):
+        return S3DataError("AWS credentials are not configured. Set AWS_ACCESS_KEY_ID and "
+                           "AWS_SECRET_ACCESS_KEY (Streamlit secrets or .env).")
+    if isinstance(error, ClientError):
+        code = error.response.get('Error', {}).get('Code', 'Unknown')
+        hint = {
+            'InvalidAccessKeyId': ' AWS_ACCESS_KEY_ID is not a valid key.',
+            'SignatureDoesNotMatch': ' AWS_SECRET_ACCESS_KEY does not match AWS_ACCESS_KEY_ID; re-copy it exactly.',
+            'AccessDenied': ' This key is not allowed to do that.',
+        }.get(code, '')
+        return S3DataError(f"Could not {action} {uri} ({code}).{hint}")
+    if isinstance(error, BotoCoreError):
+        return S3DataError(f"Could not reach S3 for {uri}: {error}")
+    # s3transfer wraps client errors raised during multipart uploads
+    cause = getattr(error, '__cause__', None) or getattr(error, '__context__', None)
+    if cause is not None and cause is not error:
+        mapped = _readable_error(cause, action, uri)
+        if isinstance(mapped, S3DataError):
+            return mapped
+    return error

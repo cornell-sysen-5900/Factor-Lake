@@ -72,27 +72,30 @@ uv run python scripts/publish_daily_data_to_s3.py path/to/russell2000_cleaned.cs
 uv run python scripts/publish_daily_data_to_s3.py path/to/russell2000_cleaned.csv
 ```
 
-4. Expect about 1–2 minutes and under 1 GB of memory for 7.5 million rows.
+   Add `--start-date 2010-01-01` to drop earlier rows. The data published on 2026-10-15 used this option: 6.57M rows, 5,117 securities, 2010-01-04 to 2024-12-31.
+4. It first checks that the AWS keys can write to the bucket (a few seconds), so a wrong key fails right away with a readable message. Expect about 1 minute and under 1 GB of memory for 7.5 million rows.
 
 The cleaning matches the old daily loader and the yearly data:
 
 - Column names can be upper or lower case: `date`, `permno`, `ticker`, `prc`, `cfacpr`, `shrout`, `ret`, `vol`. Other columns are not published, and the script lists them.
-- Placeholders such as `--` and CRSP letter codes in the numbers become missing values.
+- Placeholders such as `--`, CRSP letter codes, and CRSP's numeric missing codes become missing values. That covers returns below -100% (-66, -77, -88, -99), negative volume, and shares outstanding of 0.
 - Rows without a date, a price or an identifier are dropped. A price of 0 counts as missing.
 - `prc` is made positive, because CRSP marks bid/ask midpoints with a negative price.
 - `prc_adj` = `prc / cfacpr` (split-adjusted).
 - `mkt_cap` = `prc × shrout`, in $ thousands.
-- For duplicate security/date rows, the first one is kept.
+- For duplicate `permno`/date rows, the first one is kept. If the file has no `permno` column, only exact copies are dropped, because share classes can share a ticker. The script reports how many ticker/date pairs still have more than one row.
 
 What ends up in S3:
 
 | File | Contents |
 |---|---|
 | `factor-lake-data/daily_prices/year=YYYY/data.parquet` | One file per year, sorted by security and date |
-| `factor-lake-data/daily_last_prices.parquet` | Each security's last trading day and price, with a `delisted` flag (stopped trading more than a week before the data ends) |
+| `factor-lake-data/daily_last_prices.parquet` | Each security's last trading day and price. `ended_early` is set when its rows stop more than 7 days before the data ends. That is a delisting, or leaving the universe if the file only covers Russell 2000 membership periods |
 | `factor-lake-data/daily_prices/_manifest.json` | Years, row counts, columns and the cleaning summary. Uploaded last, so readers never see a half-published set |
 
 Read it in Python with `S3DataManager().read_daily_prices(years=[2020, 2021])`. Leave out `years` to load everything.
+
+Re-publishing replaces the yearly files in place and uploads the manifest last. If a re-publish is interrupted, run it again before using the data.
 
 ## 5. Roll back a bad publish
 
