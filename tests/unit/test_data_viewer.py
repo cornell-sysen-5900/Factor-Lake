@@ -16,11 +16,13 @@ from streamlit.runtime.media_file_manager import MediaFileManager
 from streamlit.testing.v1 import AppTest
 
 from app.data_viewer_filters import (
+    DISPLAY_ROW_LIMIT,
     category_options,
     csv_file_name,
     filter_raw_data,
     industry_column,
     raw_data_to_csv,
+    rows_caption,
     year_options,
 )
 from src.s3_client import S3DataManager
@@ -36,7 +38,7 @@ SECTOR_INDUSTRIES = {
 }
 
 
-def _universe(industry_col='FactSet_Industry'):
+def _universe(industry_col='FactSet_Industry', per_industry=3):
     """Tickers x 2002-2006 across three sectors and five industries."""
     rng = np.random.RandomState(0)
     rows = []
@@ -44,9 +46,9 @@ def _universe(industry_col='FactSet_Industry'):
         i = 0
         for sector, industries in SECTOR_INDUSTRIES.items():
             for industry in industries:
-                for _ in range(3):
+                for _ in range(per_industry):
                     rows.append({
-                        'Ticker': f'T{i:02d}',
+                        'Ticker': f'T{i:03d}',
                         'Year': year,
                         'Ending_Price': rng.uniform(10, 100),
                         'Next-Years_Return': rng.normal(8, 20),
@@ -113,6 +115,11 @@ class TestFilterRawData:
         df = filter_raw_data(_universe(), (2003, 2004), ['Technology'])
         exported = pd.read_csv(io.BytesIO(raw_data_to_csv(df)), float_precision='round_trip')
         pd.testing.assert_frame_equal(exported, df, check_exact=True)
+
+    def test_rows_caption(self):
+        assert rows_caption(6) == '**Rows:** 6'
+        assert rows_caption(DISPLAY_ROW_LIMIT) == '**Rows:** 1,000'
+        assert rows_caption(1600) == 'Showing 1,000 of 1,600 rows. Download CSV for all rows.'
 
     def test_csv_file_name(self):
         assert csv_file_name((2003, 2005)) == 'raw_data_2003_2005.csv'
@@ -274,14 +281,37 @@ def test_clear_button_clears_the_slice(at):
     assert not _viewer_tab(at).dataframe
 
 
-def test_downloaded_csv_matches_table_on_screen(at, deferred_downloads):
+def test_screen_shows_first_1000_rows_and_csv_has_all(at, deferred_downloads, monkeypatch):
+    big = _universe(per_industry=80)                      # 400 tickers x 5 years
+    monkeypatch.setattr(S3DataManager, 'fetch_all_data', lambda self: big)
+    _load_market_data(at)
+    at.select_slider(key='dv_years').set_value((2003, 2006)).run()
+    at.button(key='dv_load').click().run()
+
+    _assert_clean(at)
+    viewer = _viewer_tab(at)
+    shown = viewer.dataframe[0].value
+    full = at.session_state[SLICE_KEY]['df']
+    assert len(full) == 1600
+    assert len(shown) == DISPLAY_ROW_LIMIT
+    assert any(c.value == 'Showing 1,000 of 1,600 rows. Download CSV for all rows.' for c in viewer.caption)
+
+    callable_, file_name = deferred_downloads[viewer.get('download_button')[0].proto.deferred_file_id]
+    assert file_name == 'raw_data_2003_2006.csv'
+    exported = pd.read_csv(io.BytesIO(callable_()), float_precision='round_trip')
+    assert exported.columns.tolist() == shown.columns.tolist()
+    pd.testing.assert_frame_equal(exported, full, check_exact=True)                  # every filtered row
+    pd.testing.assert_frame_equal(exported.head(DISPLAY_ROW_LIMIT), shown, check_exact=True)
+
+
+def test_small_result_shows_every_row_and_csv_matches(at, deferred_downloads):
     _load_market_data(at)
     at.select_slider(key='dv_years').set_value((2004, 2006)).run()
     at.multiselect(key='dv_sectors').set_value(['Health Care', 'Energy']).run()
     at.button(key='dv_load').click().run()
 
-    button = _viewer_tab(at).get('download_button')[0]
-    callable_, file_name = deferred_downloads[button.proto.deferred_file_id]
-    assert file_name == 'raw_data_2004_2006.csv'
+    viewer = _viewer_tab(at)
+    callable_, _ = deferred_downloads[viewer.get('download_button')[0].proto.deferred_file_id]
     exported = pd.read_csv(io.BytesIO(callable_()), float_precision='round_trip')
-    pd.testing.assert_frame_equal(exported, _viewer_tab(at).dataframe[0].value, check_exact=True)
+    assert len(exported) == 3 * 9
+    pd.testing.assert_frame_equal(exported, viewer.dataframe[0].value, check_exact=True)

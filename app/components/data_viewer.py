@@ -17,12 +17,14 @@ from typing import Any, Dict
 import streamlit as st
 
 from app.data_viewer_filters import (
+    DISPLAY_ROW_LIMIT,
     SECTOR_COLUMN,
     category_options,
     csv_file_name,
     filter_raw_data,
     industry_column,
     raw_data_to_csv,
+    rows_caption,
     year_options,
 )
 
@@ -66,11 +68,11 @@ def render_data_viewer() -> None:
         return
 
     df = stored['df']
-    st.caption(f"**Rows:** {len(df):,}")
-    st.dataframe(df, width="stretch", hide_index=True)
+    st.caption(rows_caption(len(df)))
+    st.dataframe(df.head(DISPLAY_ROW_LIMIT), width="stretch", hide_index=True)
     st.download_button(
         "Download CSV",
-        data=lambda: raw_data_to_csv(df),   # built only when clicked
+        data=lambda: raw_data_to_csv(df),   # every filtered row, built only when clicked
         file_name=csv_file_name(filters['years']),
         mime="text/csv",
         key='dv_download',

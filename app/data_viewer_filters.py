@@ -12,6 +12,8 @@ from typing import List, Optional, Sequence, Tuple
 import pandas as pd
 
 SECTOR_COLUMN = 'Scotts_Sector_5'
+# Rows shown on screen; the CSV export always has every filtered row
+DISPLAY_ROW_LIMIT = 1000
 # The industry column has been published under both names
 INDUSTRY_COLUMNS = ('FactSet_Industry', 'FactSet Industry')
 
@@ -56,8 +58,15 @@ def filter_raw_data(
 
 
 def raw_data_to_csv(df: pd.DataFrame) -> bytes:
-    """CSV export of the table exactly as displayed (no index column)."""
+    """CSV export of every filtered row (no index column)."""
     return df.to_csv(index=False).encode('utf-8')
+
+
+def rows_caption(total_rows: int) -> str:
+    """Row count caption, noting when only the first DISPLAY_ROW_LIMIT rows are shown."""
+    if total_rows > DISPLAY_ROW_LIMIT:
+        return f"Showing {DISPLAY_ROW_LIMIT:,} of {total_rows:,} rows. Download CSV for all rows."
+    return f"**Rows:** {total_rows:,}"
 
 
 def csv_file_name(years: Tuple[int, int]) -> str:
