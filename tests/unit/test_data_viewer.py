@@ -223,6 +223,7 @@ def test_viewer_makes_no_extra_data_source_requests(monkeypatch):
         at.run()
         _load_market_data(at)
         assert len(calls) == 1                     # the one download done by Load Market Data
+        st.cache_resource.clear()                  # so any loader call from the viewer would download again
 
         _load_viewer(at, date(2004, 9, 30), date(2009, 9, 30), ['Healthcare'])
         _widget(at.multiselect, 'Industry').set_value(['Biotech']).run()
@@ -232,3 +233,76 @@ def test_viewer_makes_no_extra_data_source_requests(monkeypatch):
         assert len(calls) == 1                     # the viewer added no S3 requests
     finally:
         st.cache_resource.clear()
+
+
+@pytest.fixture
+def downloads(monkeypatch):
+    """Records the data callable of every st.download_button, then renders the real button."""
+    captured = []
+    real = st.download_button
+
+    def spy(label, data, *args, **kwargs):
+        captured.append(data)
+        return real(label, data, *args, **kwargs)
+
+    monkeypatch.setattr(st, 'download_button', spy)
+    return captured
+
+
+def test_download_serves_exactly_the_table_on_screen(at, downloads):
+    _load_market_data(at)
+    _load_viewer(at, date(2005, 9, 30), date(2012, 9, 30), ['Healthcare'])
+    _assert_clean(at)
+
+    payload = downloads[-1]()                       # the bytes the button would send
+    shown = at.dataframe[0].value.reset_index(drop=True)
+    assert payload == to_csv_bytes(shown)
+    pd.testing.assert_frame_equal(pd.read_csv(io.BytesIO(payload)), shown, check_dtype=False)
+
+
+def test_download_clicked_during_a_clear_still_gets_the_whole_file(at, downloads):
+    _load_market_data(at)
+    _load_viewer(at)
+    callable_before_clear = downloads[-1]
+    expected = callable_before_clear()
+
+    at.button(key='viewer_clear').click().run()
+    assert VIEWER_STATE_KEY not in at.session_state
+    assert callable_before_clear() == expected and len(expected) > 0   # never a silent empty file
+
+
+def test_typed_range_starting_before_the_data_is_accepted_and_shown(at):
+    _load_market_data(at)
+    _load_viewer(at, date(2002, 1, 1), date(2010, 12, 31))
+    _assert_clean(at)
+    table = at.session_state[VIEWER_STATE_KEY]['df']
+    assert table['Date'].min() == '2002-09-30' and table['Date'].max() == '2010-09-30'
+    assert any(c.value.endswith('· 2002-01-01 to 2010-12-31') for c in at.caption)
+    assert any(c.value == 'Data available from 2002-09-30 to 2024-09-30.' for c in at.caption)
+
+
+def test_viewer_uses_the_sidebar_filtered_analysis_data(at):
+    at.number_input(key='start_year_input').set_value(2015).run()
+    _load_market_data(at)
+    rdata = at.session_state['rdata']
+    assert rdata['Year'].min() == 2015 and len(rdata) < len(at.session_state['raw_data'])
+
+    _load_viewer(at)
+    table = at.session_state[VIEWER_STATE_KEY]['df']
+    assert table['Date'].min() == '2015-09-30'
+    assert len(table) == len(rdata)
+    assert any(c.value == 'Data available from 2015-09-30 to 2024-09-30.' for c in at.caption)
+
+
+def test_table_is_dropped_when_reloaded_data_is_empty(at):
+    _load_market_data(at)
+    _load_viewer(at)
+    assert VIEWER_STATE_KEY in at.session_state
+
+    _widget(at.sidebar.checkbox, 'Enable Sector Filter').check().run()
+    _widget(at.sidebar.multiselect, 'Include following sectors:').set_value(['Utilities']).run()  # no such rows
+    next(b for b in at.button if b.label == 'Load Market Data').click().run()
+
+    assert at.session_state['rdata'].empty
+    assert VIEWER_STATE_KEY not in at.session_state
+    assert any('Load market data in the Analysis tab first' in i.value for i in at.info)
