@@ -14,6 +14,7 @@ tests/
 ├── conftest.py
 ├── unit/                      # No credentials needed
 │   ├── test_backtest.py       # Portfolio construction, rebalance loop, benchmarks
+│   ├── test_daily_publish.py  # Daily CSV cleaning, yearly Parquet, S3 publish + read back
 │   ├── test_data_viewer.py    # Data Viewer filtering, CSV export, clearing (AppTest)
 │   ├── test_delisting.py      # Time-adjusted delisting strategies
 │   ├── test_factors.py        # Factor registry and signal normalization
