@@ -29,6 +29,7 @@ from app.data_viewer_filters import (
 )
 from src.s3_client import S3DataManager
 from src.supabase_client import SupabaseManager
+from tests.unit.test_saved_runs import _click_main_tab, browser_like_widget_states
 
 APP_DIR = Path(__file__).resolve().parents[2] / 'app'
 SLICE_KEY = 'data_viewer_slice'
@@ -214,15 +215,18 @@ def deferred_downloads(monkeypatch):
 def at(monkeypatch, data_calls):
     """The app before any market data is loaded (data comes from patched S3)."""
     monkeypatch.syspath_prepend(str(APP_DIR))
+    browser_like_widget_states(monkeypatch)
     app = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=60)
     app.run()
     return app
 
 
 def _load_market_data(at):
+    """Loads market data in the Analysis tab, then opens the Data Viewer."""
     from app.streamlit_config import FACTOR_METADATA
     at.button(key=f"factor_add_{FACTOR_METADATA['ROE using 9/30 Data']['key']}").click().run()
     next(b for b in at.button if b.label == 'Load Market Data').click().run()
+    _click_main_tab(at, 'Data Viewer')
 
 
 def _viewer_tab(at):
@@ -239,6 +243,7 @@ def test_tabs_keep_results_second(at):
 
 
 def test_info_message_until_market_data_is_loaded(at, data_calls):
+    _click_main_tab(at, 'Data Viewer')
     viewer = _viewer_tab(at)
     assert any('Load market data in the Analysis tab first' in i.value for i in viewer.info)
     assert not viewer.select_slider and not viewer.multiselect and not viewer.button
@@ -394,3 +399,45 @@ def test_industries_still_in_the_sectors_are_kept(at):
 
     assert at.multiselect(key='dv_industries').value == ['Software']
     assert at.session_state['dv_industries'] == ['Software']
+
+
+@pytest.mark.parametrize('other_tab', ['Analysis', 'Results', 'About'])
+def test_leaving_the_data_viewer_clears_the_slice(at, other_tab):
+    _load_market_data(at)
+    at.button(key='dv_load').click().run()
+    assert SLICE_KEY in at.session_state
+
+    _click_main_tab(at, other_tab)
+
+    _assert_clean(at)
+    assert at.session_state['main_tabs'] == other_tab
+    assert SLICE_KEY not in at.session_state
+    assert not _viewer_tab(at).dataframe                # the viewer is not drawn at all
+
+    _click_main_tab(at, 'Data Viewer')                  # coming back starts empty
+    assert not _viewer_tab(at).dataframe
+    assert any('click **Load data**' in c.value for c in _viewer_tab(at).caption)
+
+
+def test_staying_on_the_data_viewer_keeps_the_slice(at):
+    _load_market_data(at)
+    at.button(key='dv_load').click().run()
+    shown = _viewer_tab(at).dataframe[0].value
+
+    at.run()                                            # any rerun while the viewer is open
+    _click_main_tab(at, 'Data Viewer')                  # clicking the open tab again
+
+    _assert_clean(at)
+    assert SLICE_KEY in at.session_state
+    pd.testing.assert_frame_equal(_viewer_tab(at).dataframe[0].value, shown)
+
+
+def test_only_the_open_tab_is_drawn(at):
+    _load_market_data(at)                               # Data Viewer open
+    assert at.select_slider(key='dv_years') is not None
+    assert not any(b.label == 'Load Market Data' for b in at.button)   # Analysis not drawn
+    assert not any('About Factor-Lake' in h.value for h in at.header)  # About not drawn
+
+    _click_main_tab(at, 'About')
+    assert any('About Factor-Lake' in h.value for h in at.header)
+    assert not at.select_slider
