@@ -252,6 +252,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument('--prefix', help="Key prefix (default: FACTOR_LAKE_S3_PREFIX or factor-lake-data)")
     parser.add_argument('--chunk-rows', type=int, default=500_000, help="CSV rows per chunk (default 500,000)")
     args = parser.parse_args(argv)
+    # Expand ~ even when the path was quoted (the shell only expands it unquoted)
+    args.csv = args.csv.expanduser()
+    if args.output_dir:
+        args.output_dir = args.output_dir.expanduser()
     if not args.csv.is_file():
         parser.error(f"CSV not found: {args.csv}")
 

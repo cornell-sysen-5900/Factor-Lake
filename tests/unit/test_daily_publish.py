@@ -177,3 +177,10 @@ def test_dry_run_keeps_files_locally_and_uploads_nothing(csv_path, tmp_path, mon
 def test_missing_csv_is_reported(tmp_path):
     with pytest.raises(SystemExit):
         daily.main([str(tmp_path / 'nope.csv')])
+
+
+def test_quoted_home_paths_are_expanded(csv_path, tmp_path, monkeypatch):
+    monkeypatch.setenv('HOME', str(csv_path.parent))
+    out = tmp_path / 'kept'
+    assert daily.main(['~/' + csv_path.name, '--dry-run', '--output-dir', str(out)]) == 0
+    assert (out / DAILY_MANIFEST_FILE).exists()
