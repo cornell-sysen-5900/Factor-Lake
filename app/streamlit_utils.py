@@ -193,7 +193,7 @@ def run_backtest_logic(user_settings: Dict[str, Any],
     Returns:
         The saved run, or None if the run was rejected or failed (nothing is saved).
     """
-    from src.backtest_engine import rebalance_portfolio, build_ranked_stocks_table
+    from src.backtest_engine import rebalance_portfolio, build_ranked_stocks_by_year
     from app.streamlit_config import FACTOR_METADATA, MAX_SAVED_RUNS
     from app.saved_runs import add_saved_run, build_run_label
 
@@ -228,17 +228,16 @@ def run_backtest_logic(user_settings: Dict[str, Any],
             delisting_strategy=user_settings.get('delisting_strategy', 'zero_return')
         )
 
-        # Build a ranked list for the most recent rebalance year used by the backtest loop.
-        ranking_year = int(user_settings['end_year']) - 1
-        ranked_stocks_df = build_ranked_stocks_table(
+        # Build the ranked list for every rebalance year used by the backtest loop.
+        results['ranked_stocks_by_year'] = build_ranked_stocks_by_year(
             data=data,
             factors=internal_factor_cols,
             factor_directions=internal_directions,
-            target_year=ranking_year,
-            top_pct=float(user_settings.get('top_pct', 10.0))
+            start_year=int(user_settings['start_year']),
+            end_year=int(user_settings['end_year']),
+            top_pct=float(user_settings.get('top_pct', 10.0)),
+            factor_labels={FACTOR_METADATA[f]['column']: f for f in factor_labels}
         )
-        results['ranking_year'] = ranking_year
-        results['ranked_stocks'] = ranked_stocks_df.to_dict('records')
     except Exception as e:
         st.error(f"Backtest Execution Error: {str(e)}")
         return None

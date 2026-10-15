@@ -15,6 +15,9 @@ from Visualizations.top_bottom_portfolio_plot import plot_top_bottom_percent
 import src.backtest_engine as backtest_engine
 from app.streamlit_config import MAX_SAVED_RUNS
 from app.saved_runs import remove_saved_run
+from app.ranked_stocks import (
+    build_ranked_display_table, default_ranked_year, ranked_number_formats, ranked_table_to_csv
+)
 
 DIRECTION_LABELS = {'top': 'Higher is better', 'bottom': 'Lower is better'}
 
@@ -97,7 +100,7 @@ def render_results_tab(run: Dict[str, Any]) -> None:
 
     # 3. Main Growth Plot
     st.subheader("Ranked Stocks (Best to Worst)")
-    _render_ranked_stocks_table(results)
+    _render_ranked_stocks_table(run)
     st.divider()
 
     # 4. Main Growth Plot
@@ -125,33 +128,47 @@ def render_results_tab(run: Dict[str, Any]) -> None:
     st.divider()
 
 
-def _render_ranked_stocks_table(res: Dict[str, Any]) -> None:
+def _render_ranked_stocks_table(run: Dict[str, Any]) -> None:
     """
-    Displays the selected top cohort ranked by composite multi-factor score.
+    Displays the selected top cohort ranked by composite multi-factor score,
+    for the rebalance year chosen in the year selector, with a CSV download.
     """
-    ranked_rows = res.get('ranked_stocks', [])
-    ranking_year = res.get('ranking_year')
+    ranked_by_year = run['results'].get('ranked_stocks_by_year') or {}
+    years = sorted(ranked_by_year)
 
-    if ranking_year is not None:
-        st.caption(f"Ranking year: {int(ranking_year)}")
-
-    if not ranked_rows:
+    if not years:
         st.info("No ranked stocks are available for the selected factors and date range.")
         return
 
-    ranked_df = pd.DataFrame(ranked_rows)
+    # Only the open run tab is rendered, and Streamlit drops the state of widgets
+    # that are not rendered, so keep a copy to restore the year after a tab switch.
+    saved_key = f"ranked_year_saved_{run['id']}"
+    saved_year = st.session_state.get(saved_key)
+    year = st.selectbox(
+        "Ranking year",
+        options=years,
+        index=years.index(saved_year if saved_year in years else default_ranked_year(years)),
+        key=f"ranked_year_{run['id']}",
+    )
+    st.session_state[saved_key] = year
 
-    if 'Composite Score' in ranked_df.columns:
-        ranked_df['Composite Score'] = pd.to_numeric(
-            ranked_df['Composite Score'], errors='coerce'
-        ).round(4)
+    ranked_df = build_ranked_display_table(ranked_by_year[year], run['factor_labels'])
+    # Round on screen only; the data (and the CSV) keep full precision
+    column_config = {
+        col: st.column_config.NumberColumn(format=fmt)
+        for col, fmt in ranked_number_formats(run['factor_labels']).items()
+        if col in ranked_df.columns
+    }
+    st.dataframe(ranked_df, width="stretch", hide_index=True, column_config=column_config)
 
-    if 'Next-Year Return %' in ranked_df.columns:
-        ranked_df['Next-Year Return %'] = pd.to_numeric(
-            ranked_df['Next-Year Return %'], errors='coerce'
-        ).round(2)
-
-    st.dataframe(ranked_df, use_container_width=True, hide_index=True)
+    st.download_button(
+        "Download CSV",
+        data=ranked_table_to_csv(ranked_df),
+        file_name=f"ranked_stocks_{year}.csv",
+        mime="text/csv",
+        key=f"ranked_csv_{run['id']}",
+        on_click="ignore",
+    )
 
 def _render_year_by_year_table(res: Dict[str, Any]) -> None:
     """
