@@ -21,15 +21,16 @@ def build_ranked_display_table(rows: List[Dict[str, Any]], factor_headers: List[
     """
     Turns one year's ranked rows into the table shown on screen (and exported).
 
-    Composite Score is rounded to 4 places, Next-Year Return % to 2, and the
-    factor value columns are converted to numbers.
+    Composite Score and the factor value columns are converted to numbers but
+    kept at full precision (they are rounded on screen only, see
+    ranked_number_formats); Next-Year Return % is rounded to 2 places.
     """
     ranked_df = pd.DataFrame(rows)
 
     if 'Composite Score' in ranked_df.columns:
         ranked_df['Composite Score'] = pd.to_numeric(
             ranked_df['Composite Score'], errors='coerce'
-        ).round(4)
+        )
 
     for header in factor_headers:
         if header in ranked_df.columns:
@@ -41,6 +42,11 @@ def build_ranked_display_table(rows: List[Dict[str, Any]], factor_headers: List[
         ).round(2)
 
     return ranked_df
+
+
+def ranked_number_formats(factor_headers: List[str]) -> Dict[str, str]:
+    """On-screen number formats: Composite Score and factor values to 4 places."""
+    return {header: '%.4f' for header in ['Composite Score'] + list(factor_headers)}
 
 
 def ranked_table_to_csv(ranked_df: pd.DataFrame) -> bytes:

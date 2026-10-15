@@ -15,7 +15,9 @@ from Visualizations.top_bottom_portfolio_plot import plot_top_bottom_percent
 import src.backtest_engine as backtest_engine
 from app.streamlit_config import MAX_SAVED_RUNS
 from app.saved_runs import remove_saved_run
-from app.ranked_stocks import build_ranked_display_table, default_ranked_year, ranked_table_to_csv
+from app.ranked_stocks import (
+    build_ranked_display_table, default_ranked_year, ranked_number_formats, ranked_table_to_csv
+)
 
 DIRECTION_LABELS = {'top': 'Higher is better', 'bottom': 'Lower is better'}
 
@@ -151,7 +153,13 @@ def _render_ranked_stocks_table(run: Dict[str, Any]) -> None:
     st.session_state[saved_key] = year
 
     ranked_df = build_ranked_display_table(ranked_by_year[year], run['factor_labels'])
-    st.dataframe(ranked_df, width="stretch", hide_index=True)
+    # Round on screen only; the data (and the CSV) keep full precision
+    column_config = {
+        col: st.column_config.NumberColumn(format=fmt)
+        for col, fmt in ranked_number_formats(run['factor_labels']).items()
+        if col in ranked_df.columns
+    }
+    st.dataframe(ranked_df, width="stretch", hide_index=True, column_config=column_config)
 
     st.download_button(
         "Download CSV",

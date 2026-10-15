@@ -18,6 +18,7 @@ from src.factor_utils import normalize_series
 from app.ranked_stocks import (
     build_ranked_display_table,
     default_ranked_year,
+    ranked_number_formats,
     ranked_table_to_csv,
 )
 from tests.unit.test_saved_runs import RUN, _add_factor, _assert_clean, _click, _open_tab, at  # noqa: F401
@@ -134,19 +135,36 @@ class TestRankedTableHelpers:
     def test_no_default_without_years(self):
         assert default_ranked_year([]) is None
 
-    def test_display_table_converts_and_rounds(self):
+    def test_display_table_converts_without_rounding_scores_or_factors(self):
         rows = [{'Rank': 1, 'Ticker': 'A', 'Composite Score': '1.234567',
-                 'ROA %': '0.0512', 'Next-Year Return %': '12.3456', 'Sector': 'Tech'}]
+                 'ROA %': '0.05123456', 'Next-Year Return %': '12.3456', 'Sector': 'Tech'}]
         df = build_ranked_display_table(rows, ['ROA %'])
-        assert df.loc[0, 'Composite Score'] == 1.2346
-        assert df.loc[0, 'ROA %'] == 0.0512
+        assert df.loc[0, 'Composite Score'] == 1.234567
+        assert df.loc[0, 'ROA %'] == 0.05123456
         assert df.loc[0, 'Next-Year Return %'] == 12.35
+
+    def test_score_and_factors_rounded_to_4_places_on_screen(self):
+        assert ranked_number_formats(['ROE using 9/30 Data', 'ROA %']) == {
+            'Composite Score': '%.4f', 'ROE using 9/30 Data': '%.4f', 'ROA %': '%.4f',
+        }
+
+    def test_csv_keeps_full_precision(self):
+        data = _universe()
+        by_year = build_ranked_stocks_by_year(data, FACTORS, DIRECTIONS, 2020, 2023, 25.0, LABELS)
+        df = build_ranked_display_table(by_year[2021], list(LABELS.values()))
+        exported = pd.read_csv(io.BytesIO(ranked_table_to_csv(df)), float_precision='round_trip')
+        raw = data[data['Year'] == 2021].set_index('Ticker')
+        expected = _expected_ranking(data, 2021, 25.0)
+        assert exported['Composite Score'].tolist() == expected.values.tolist()
+        assert exported['ROA %'].tolist() == raw.loc[exported['Ticker'], 'ROA'].tolist()
+        assert exported['ROE using 9/30 Data'].tolist() == raw.loc[exported['Ticker'], 'ROE_using_9-30_Data'].tolist()
+        assert any(round(v, 4) != v for v in exported['ROA %'])   # really more than 4 places
 
     def test_csv_has_same_rows_and_columns_as_table(self):
         by_year = build_ranked_stocks_by_year(_universe(), FACTORS, DIRECTIONS, 2020, 2023, 25.0, LABELS)
         df = build_ranked_display_table(by_year[2021], list(LABELS.values()))
-        exported = pd.read_csv(io.BytesIO(ranked_table_to_csv(df)))
-        pd.testing.assert_frame_equal(exported, df)
+        exported = pd.read_csv(io.BytesIO(ranked_table_to_csv(df)), float_precision='round_trip')
+        pd.testing.assert_frame_equal(exported, df, check_exact=True)
 
 
 # ---------------------------------------------------------------------------
@@ -213,7 +231,23 @@ def test_downloaded_csv_matches_table_on_screen(at, served_files):
     file = _downloaded_csv(at, served_files, 'ranked_csv_1')
     assert file.filename == 'ranked_stocks_2010.csv'
     assert file.mimetype == 'text/csv'
-    pd.testing.assert_frame_equal(pd.read_csv(io.BytesIO(file.content)), at.dataframe[0].value)
+    pd.testing.assert_frame_equal(pd.read_csv(io.BytesIO(file.content), float_precision='round_trip'),
+                                  at.dataframe[0].value, check_exact=True)
+
+
+def test_screen_rounds_but_downloaded_csv_is_unrounded(at, served_files):
+    import json
+    _run_two_factor_backtest(at)
+    table = at.dataframe[0]
+    formats = {col: cfg['type_config']['format']
+               for col, cfg in json.loads(table.proto.columns).items() if 'type_config' in cfg}
+    assert formats == {'Composite Score': '%.4f', 'ROE using 9/30 Data': '%.4f', 'ROA %': '%.4f'}
+
+    exported = pd.read_csv(io.BytesIO(_downloaded_csv(at, served_files, 'ranked_csv_1').content), float_precision='round_trip')
+    data = at.session_state['saved_runs'][0]['data']
+    raw = data[data['Year'] == 2023].set_index('Ticker')
+    assert exported['ROA %'].tolist() == raw.loc[exported['Ticker'], 'ROA'].tolist()
+    assert any(round(v, 4) != v for v in exported['Composite Score'])
 
 
 def test_saved_runs_have_independent_year_selectors(at, served_files):
