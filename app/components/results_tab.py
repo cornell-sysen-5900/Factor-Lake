@@ -195,7 +195,7 @@ def _render_year_by_year_table(res: Dict[str, Any]) -> None:
         "Growth Returns": [f"{r:.2f}%" for r in g_rets[:min_len]],
         "Value Returns": [f"{r:.2f}%" for r in v_rets[:min_len]]
     })
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
 
 def _render_win_loss_ledger(res: Dict[str, Any]) -> None:
     """
@@ -216,7 +216,7 @@ def _render_win_loss_ledger(res: Dict[str, Any]) -> None:
             'Value Index Return': [f"{c.get('v_ret', 0):.2f}%" for c in comps],
             'Outperformed Value': ['✅' if c.get('v_win') else '❌' for c in comps],
         })
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(df, width="stretch", hide_index=True)
 
 def _render_advanced_stats_grid(res: Dict[str, Any]) -> None:
     """
@@ -400,7 +400,7 @@ def _render_cohort_analysis_section(run: Dict[str, Any]) -> None:
             value_returns=_build_wealth_series(results.get('value_benchmark_returns'), init_aum),
             growth_returns=_build_wealth_series(results.get('growth_benchmark_returns'), init_aum)
         )
-        st.pyplot(fig)
+        st.plotly_chart(fig, width="stretch")
 
 def _render_growth_plot(res: Dict[str, Any], settings: Dict[str, Any], factor_labels: List[str]) -> None:
     """
@@ -416,4 +416,4 @@ def _render_growth_plot(res: Dict[str, Any], settings: Dict[str, Any], factor_la
         gro_vals=_build_wealth_series(res.get('growth_benchmark_returns'), initial),
         factor_names=factor_labels
     )
-    st.pyplot(fig)
+    st.plotly_chart(fig, width="stretch")

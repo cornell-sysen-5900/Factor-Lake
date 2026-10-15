@@ -66,14 +66,14 @@ def main():
         selected_factor_names, factor_directions = render_factor_selection()
         
         # Step 1: Data Acquisition
-        if st.button("Load Market Data", type="primary", use_container_width=True,
+        if st.button("Load Market Data", type="primary", width="stretch",
                      disabled=not selected_factor_names):
             with st.spinner("Accessing cloud database..."):
                 utils.load_and_process_data(user_settings)
 
         # Step 2: Execution
         if st.session_state.get('data_loaded', False):
-            if st.button("Run Portfolio Analysis", type="primary", use_container_width=True):
+            if st.button("Run Portfolio Analysis", type="primary", width="stretch"):
                 with st.spinner("Executing backtest simulation..."):
                     run = utils.run_backtest_logic(
                         user_settings, 

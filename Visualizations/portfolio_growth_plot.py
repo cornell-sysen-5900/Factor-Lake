@@ -1,27 +1,29 @@
 """
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: visualizations/portfolio_growth_plot.py
-PURPOSE: Standalone plotting utility for comparative wealth-index visualizations.
-VERSION: 2.5.0
+PURPOSE: Standalone plotting utility for comparative wealth-index visualizations,
+         rendered as an interactive Plotly figure (zoom, pan, hover values).
+VERSION: 3.0.0
 """
 
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
-from matplotlib.ticker import FuncFormatter
+import plotly.graph_objects as go
 from typing import List, Optional
 
+HOVER_TEMPLATE = '%{fullData.name}: $%{y:,.0f}<extra></extra>'
+
+
 def plot_portfolio_growth(
-    years: List[int], 
-    port_vals: List[float], 
+    years: List[int],
+    port_vals: List[float],
     bench_vals: Optional[List[float]] = None,
     val_vals: Optional[List[float]] = None,
     gro_vals: Optional[List[float]] = None,
     factor_names: Optional[List[str]] = None
-) -> plt.Figure:
+) -> go.Figure:
     """
     Constructs a time-series line chart comparing strategy growth against multiple benchmarks.
-    
-    This utility provides a high-fidelity visualization of cumulative wealth, 
+
+    This utility provides an interactive visualization of cumulative wealth,
     supporting overlays for market, value, and growth indices.
 
     Args:
@@ -33,85 +35,99 @@ def plot_portfolio_growth(
         factor_names: A list of active factor labels to be included in the chart title.
 
     Returns:
-        plt.Figure: The generated Matplotlib figure object.
+        go.Figure: The generated Plotly figure object.
     """
-    fig, ax = plt.subplots(figsize=(12, 6))
-    
-    # 1. Primary Portfolio Strategy
-    ax.plot(
-        years, 
-        port_vals, 
-        label='Portfolio', 
-        linewidth=2.5, 
-        color='#1f77b4',
-        marker='o', 
-        markersize=6,
-        zorder=5
-    )
-    
+    fig = go.Figure()
+
+    # Benchmarks are added first so the portfolio line is drawn on top of them;
+    # legendrank keeps the legend in the original order (Portfolio first).
+
     # 2. Market Benchmark (Russell 2000)
     if bench_vals and len(years) == len(bench_vals):
-        ax.plot(
-            years, 
-            bench_vals, 
-            label='Russell 2000', 
-            linewidth=2, 
-            linestyle='--', 
-            color='#ff7f0e',
-            marker='s',
-            markersize=4,
-            alpha=0.8
-        )
-        
+        fig.add_trace(go.Scatter(
+            x=years,
+            y=bench_vals,
+            name='Russell 2000',
+            mode='lines+markers',
+            line=dict(color='#ff7f0e', width=2, dash='dash'),
+            marker=dict(symbol='square', size=4),
+            opacity=0.8,
+            legendrank=2,
+            hovertemplate=HOVER_TEMPLATE
+        ))
+
     # 3. Style Benchmark: Value Index
     if val_vals and len(years) == len(val_vals):
-        ax.plot(
-            years, 
-            val_vals, 
-            label='Value Index', 
-            linewidth=1.5, 
-            linestyle=':', 
-            color='#2ca02c',
-            marker='^',
-            markersize=4,
-            alpha=0.6
-        )
+        fig.add_trace(go.Scatter(
+            x=years,
+            y=val_vals,
+            name='Value Index',
+            mode='lines+markers',
+            line=dict(color='#2ca02c', width=1.5, dash='dot'),
+            marker=dict(symbol='triangle-up', size=4),
+            opacity=0.6,
+            legendrank=3,
+            hovertemplate=HOVER_TEMPLATE
+        ))
 
     # 4. Style Benchmark: Growth Index
     if gro_vals and len(years) == len(gro_vals):
-        ax.plot(
-            years, 
-            gro_vals, 
-            label='Growth Index', 
-            linewidth=1.5, 
-            linestyle=':', 
-            color='#d62728',
-            marker='D',
-            markersize=4,
-            alpha=0.6
-        )
-    
+        fig.add_trace(go.Scatter(
+            x=years,
+            y=gro_vals,
+            name='Growth Index',
+            mode='lines+markers',
+            line=dict(color='#d62728', width=1.5, dash='dot'),
+            marker=dict(symbol='diamond', size=4),
+            opacity=0.6,
+            legendrank=4,
+            hovertemplate=HOVER_TEMPLATE
+        ))
+
+    # 1. Primary Portfolio Strategy
+    fig.add_trace(go.Scatter(
+        x=years,
+        y=port_vals,
+        name='Portfolio',
+        mode='lines+markers',
+        line=dict(color='#1f77b4', width=2.5),
+        marker=dict(symbol='circle', size=6),
+        legendrank=1,
+        hovertemplate=HOVER_TEMPLATE
+    ))
+
     # Title and Label Configuration
     if factor_names:
         clean_names = [name.replace('_', ' ').title() for name in factor_names]
         title_str = f'Cumulative Wealth: {", ".join(clean_names)}'
     else:
         title_str = 'Portfolio Growth Comparison'
-        
-    ax.set_title(title_str, fontsize=14, fontweight='bold', pad=15)
-    ax.set_ylabel("Portfolio Value (USD)", fontsize=12)
-    ax.set_xlabel("Year", fontsize=12)
-    
-    # Grid and Legend Aesthetics
-    ax.legend(loc='upper left', frameon=True, shadow=True)
-    ax.grid(True, linestyle='--', alpha=0.5)
-    
+
+    fig.update_layout(
+        title=dict(text=f'<b>{title_str}</b>', font=dict(size=14)),
+        height=500,
+        hovermode='x unified',
+        # Legend in the upper left, inside the plot area
+        legend=dict(x=0.01, y=0.99, xanchor='left', yanchor='top')
+    )
+
     # Financial Axis Formatting
-    formatter = FuncFormatter(lambda x, p: f'${x:,.0f}')
-    ax.yaxis.set_major_formatter(formatter)
-    
+    fig.update_yaxes(
+        title=dict(text='Portfolio Value (USD)', font=dict(size=12)),
+        tickprefix='$',
+        tickformat=',.0f',
+        showgrid=True,
+        griddash='dash'
+    )
+
     # Ensure X-axis utilizes integer year ticks
-    ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-    
-    plt.tight_layout()
+    fig.update_xaxes(
+        title=dict(text='Year', font=dict(size=12)),
+        tickformat='d',
+        hoverformat='d',
+        dtick=1,
+        showgrid=True,
+        griddash='dash'
+    )
+
     return fig

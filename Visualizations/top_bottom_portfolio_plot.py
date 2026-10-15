@@ -1,13 +1,16 @@
 """
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: Visualizations/top_bottom_portfolio_plot.py
-PURPOSE: Institutional-grade cohort spread analysis visualization.
-VERSION: 2.1.2
+PURPOSE: Institutional-grade cohort spread analysis visualization,
+         rendered as an interactive Plotly figure (zoom, pan, hover values).
+VERSION: 3.0.0
 """
 
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
+import plotly.graph_objects as go
 from typing import List, Optional, Dict, Any, Union
+
+HOVER_TEMPLATE = '%{fullData.name}: $%{y:,.0f}<extra></extra>'
+
 
 def plot_top_bottom_percent(
     years: List[int],
@@ -21,11 +24,14 @@ def plot_top_bottom_percent(
     baseline_portfolio_values: Optional[List[float]] = None,
     precomputed_top: Optional[Union[Dict[str, Any], List[float]]] = None,
     precomputed_bot: Optional[Union[Dict[str, Any], List[float]]] = None
-) -> plt.Figure:
+) -> go.Figure:
     """
     Constructs a wealth-index chart comparing performance of top and bottom cohorts.
+
+    Returns:
+        go.Figure: The generated Plotly figure object.
     """
-    fig, ax = plt.subplots(figsize=(12, 6), dpi=100)
+    fig = go.Figure()
 
     def _get_trajectory(series: Optional[List[float]]) -> Optional[List[float]]:
         if series is None:
@@ -50,52 +56,85 @@ def plot_top_bottom_percent(
 
     # 1. Index Trajectories (Benchmark, Growth, Value)
     indices = [
-        (benchmark_returns, benchmark_label, '#d62728', '--', None),
-        (growth_returns, 'Growth Index', '#ff7f0e', ':', 'D'),
-        (value_returns, 'Value Index', '#17becf', ':', 's')
+        (benchmark_returns, benchmark_label, '#d62728', 'dash', 'x'),
+        (growth_returns, 'Growth Index', '#ff7f0e', 'dot', 'diamond'),
+        (value_returns, 'Value Index', '#17becf', 'dot', 'square')
     ]
 
     for rets, label, color, style, marker in indices:
         vals = _get_trajectory(rets)
         if vals and len(vals) == len(years):
-            ax.plot(years, vals, label=label, color=color, linestyle=style, 
-                    marker=marker, markersize=3, linewidth=1.2, alpha=0.6)
+            fig.add_trace(go.Scatter(
+                x=years, y=vals, name=label,
+                mode='lines+markers',
+                line=dict(color=color, dash=style, width=1.2),
+                marker=dict(symbol=marker, size=3),
+                opacity=0.6, hovertemplate=HOVER_TEMPLATE
+            ))
 
     # 2. Bottom Cohort (Lower Visual Weight)
     if show_bottom and precomputed_bot is not None:
         bot_vals = precomputed_bot.get('portfolio_values', [initial_investment]) if isinstance(precomputed_bot, dict) else precomputed_bot
         if len(bot_vals) >= len(years):
-            ax.plot(years, bot_vals[:len(years)], label=f'Bottom {percent}%', color='#9467bd', 
-                    marker='v', markersize=4, linewidth=1.5, alpha=0.6)
+            fig.add_trace(go.Scatter(
+                x=years, y=bot_vals[:len(years)], name=f'Bottom {percent}%',
+                mode='lines+markers',
+                line=dict(color='#9467bd', width=1.5),
+                marker=dict(symbol='triangle-down', size=4),
+                opacity=0.6, hovertemplate=HOVER_TEMPLATE
+            ))
 
     # 3. Top Cohort (High Contrast)
     if precomputed_top is not None:
         top_vals = precomputed_top.get('portfolio_values', [initial_investment]) if isinstance(precomputed_top, dict) else precomputed_top
         if len(top_vals) >= len(years):
-            ax.plot(years, top_vals[:len(years)], label=f'Top {percent}%', color='#2ca02c', 
-                    marker='^', markersize=5, linewidth=2.0, zorder=4)
+            fig.add_trace(go.Scatter(
+                x=years, y=top_vals[:len(years)], name=f'Top {percent}%',
+                mode='lines+markers',
+                line=dict(color='#2ca02c', width=2.0),
+                marker=dict(symbol='triangle-up', size=5),
+                hovertemplate=HOVER_TEMPLATE
+            ))
 
     # 4. Active Portfolio Strategy
     if baseline_portfolio_values:
         common_len = min(len(years), len(baseline_portfolio_values))
-        ax.plot(years[:common_len], baseline_portfolio_values[:common_len], 
-                label='Active Strategy', color='#003366', linewidth=2.5, 
-                marker='o', markersize=4, zorder=5)
+        fig.add_trace(go.Scatter(
+            x=years[:common_len], y=baseline_portfolio_values[:common_len],
+            name='Active Strategy',
+            mode='lines+markers',
+            line=dict(color='#003366', width=2.5),
+            marker=dict(symbol='circle', size=4),
+            hovertemplate=HOVER_TEMPLATE
+        ))
 
     # Institutional Chart Formatting
-    ax.set_title(f"Factor Efficacy: Top vs. Bottom {percent}% Cohort Spread", 
-                 fontsize=14, fontweight='bold', pad=20)
-    ax.set_ylabel("Account Value (USD)", fontsize=11)
-    ax.set_xlabel("Year", fontsize=11)
+    fig.update_layout(
+        title=dict(text=f'<b>Factor Efficacy: Top vs. Bottom {percent}% Cohort Spread</b>',
+                   font=dict(size=14)),
+        height=500,
+        hovermode='x unified',
+        # Legend in the upper left, inside the plot area
+        legend=dict(x=0.01, y=0.99, xanchor='left', yanchor='top', font=dict(size=10))
+    )
 
-    ax.yaxis.set_major_formatter(mticker.StrMethodFormatter('${x:,.0f}'))
-    ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-    
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.grid(True, linestyle='--', alpha=0.3)
-    ax.axhline(initial_investment, color='#000000', linestyle='-', linewidth=0.8, alpha=0.2)
+    fig.update_yaxes(
+        title=dict(text='Account Value (USD)', font=dict(size=11)),
+        tickprefix='$',
+        tickformat=',.0f',
+        showgrid=True,
+        griddash='dash'
+    )
+    fig.update_xaxes(
+        title=dict(text='Year', font=dict(size=11)),
+        tickformat='d',
+        hoverformat='d',
+        dtick=1,
+        showgrid=True,
+        griddash='dash'
+    )
 
-    ax.legend(loc='upper left', frameon=True, facecolor='white', shadow=False, fontsize='small')
-    plt.tight_layout()
+    fig.add_hline(y=initial_investment, line_color='#000000', line_dash='solid',
+                  line_width=0.8, opacity=0.2)
+
     return fig
