@@ -119,6 +119,15 @@ class TestPlotTopBottomPercent:
             'Active Strategy': '#003366',
         }
 
+    def test_index_lines_have_markers(self):
+        fig = plot_top_bottom_percent(YEARS, benchmark_returns=BENCH, growth_returns=GROWTH, value_returns=VALUE)
+        traces = _traces(fig)
+        assert traces['Russell 2000'].mode == 'lines+markers'
+        assert {t.marker.size for t in fig.data} == {3}
+        symbols = [t.marker.symbol for t in fig.data]
+        assert traces['Russell 2000'].marker.symbol == 'x'
+        assert len(set(symbols)) == len(symbols)
+
     def test_precomputed_top_as_list(self):
         fig = plot_top_bottom_percent(YEARS, precomputed_top=PORT)
         assert list(_traces(fig)['Top 10.0%'].y) == PORT

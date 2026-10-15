@@ -151,7 +151,7 @@ def _render_ranked_stocks_table(res: Dict[str, Any]) -> None:
             ranked_df['Next-Year Return %'], errors='coerce'
         ).round(2)
 
-    st.dataframe(ranked_df, use_container_width=True, hide_index=True)
+    st.dataframe(ranked_df, width="stretch", hide_index=True)
 
 def _render_year_by_year_table(res: Dict[str, Any]) -> None:
     """
@@ -178,7 +178,7 @@ def _render_year_by_year_table(res: Dict[str, Any]) -> None:
         "Growth Returns": [f"{r:.2f}%" for r in g_rets[:min_len]],
         "Value Returns": [f"{r:.2f}%" for r in v_rets[:min_len]]
     })
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
 
 def _render_win_loss_ledger(res: Dict[str, Any]) -> None:
     """
@@ -199,7 +199,7 @@ def _render_win_loss_ledger(res: Dict[str, Any]) -> None:
             'Value Index Return': [f"{c.get('v_ret', 0):.2f}%" for c in comps],
             'Outperformed Value': ['✅' if c.get('v_win') else '❌' for c in comps],
         })
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(df, width="stretch", hide_index=True)
 
 def _render_advanced_stats_grid(res: Dict[str, Any]) -> None:
     """

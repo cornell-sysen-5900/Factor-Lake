@@ -56,7 +56,7 @@ def plot_top_bottom_percent(
 
     # 1. Index Trajectories (Benchmark, Growth, Value)
     indices = [
-        (benchmark_returns, benchmark_label, '#d62728', 'dash', None),
+        (benchmark_returns, benchmark_label, '#d62728', 'dash', 'x'),
         (growth_returns, 'Growth Index', '#ff7f0e', 'dot', 'diamond'),
         (value_returns, 'Value Index', '#17becf', 'dot', 'square')
     ]
@@ -66,9 +66,9 @@ def plot_top_bottom_percent(
         if vals and len(vals) == len(years):
             fig.add_trace(go.Scatter(
                 x=years, y=vals, name=label,
-                mode='lines+markers' if marker else 'lines',
+                mode='lines+markers',
                 line=dict(color=color, dash=style, width=1.2),
-                marker=dict(symbol=marker, size=3) if marker else None,
+                marker=dict(symbol=marker, size=3),
                 opacity=0.6, hovertemplate=HOVER_TEMPLATE
             ))
 
