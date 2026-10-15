@@ -22,6 +22,7 @@ import streamlit_config as config
 import components.sidebar as sidebar
 from components.factor_selection import render_factor_selection
 from components.results_tab import render_saved_runs
+from components.data_viewer import render_data_viewer
 from components.about import render_about_tab
 
 # Global Page Configuration
@@ -57,8 +58,10 @@ def main():
     # Render Global Sidebar and capture configuration
     user_settings = sidebar.render_sidebar(config.SECTOR_OPTIONS, utils.describe_data_source())
     
-    # Define primary application layout
-    tab_analysis, tab_results, tab_about = st.tabs(["Analysis", "Results", "About"])
+    # Define primary application layout (Results stays at index 1 for the auto-switch below)
+    tab_analysis, tab_results, tab_data_viewer, tab_about = st.tabs(
+        ["Analysis", "Results", "Data Viewer", "About"]
+    )
 
     with tab_analysis:
         # Configuration phase: Capture factors and directions
@@ -96,6 +99,10 @@ def main():
         else:
             st.info("Performance metrics will appear here after a successful analysis run.")
     
+    with tab_data_viewer:
+        # Raw data inspection: reads the already-loaded market data only
+        render_data_viewer()
+
     with tab_about:
         # Documentation phase
         render_about_tab()
