@@ -71,6 +71,13 @@ Factor Lake lets you choose a group of stock-selection factors, rank stocks by t
 7. Review Advanced Backtest Statistics.
 8. Review Yearly Win/Loss Summary.
 
+### Check the raw data
+
+1. Open the Data Viewer tab after loading market data in the Analysis tab. It uses that data and downloads nothing new.
+2. Pick a date range, and optionally one or more sectors or industries. Leaving a list empty means all of them.
+3. Click Load data to see the matching rows, then Download CSV to save exactly that table.
+4. Changing a filter or clicking Clear removes the table. Click Load data again to see it.
+
 ## 9. Keep the factor logic straight
 
 1. ROE and ROA are profitability signals.

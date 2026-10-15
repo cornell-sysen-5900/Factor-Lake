@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/streamlit_app.py
 PURPOSE: Main application entry point orchestrating UI components and analysis logic.
-VERSION: 3.5.0
+VERSION: 3.6.0
 """
 
 import sys
@@ -22,6 +22,7 @@ import streamlit_config as config
 import components.sidebar as sidebar
 from components.factor_selection import render_factor_selection
 from components.results_tab import render_saved_runs
+from components.data_viewer import render_data_viewer_tab
 from components.about import render_about_tab
 
 # Global Page Configuration
@@ -58,14 +59,15 @@ def main():
     user_settings = sidebar.render_sidebar(config.SECTOR_OPTIONS, utils.describe_data_source())
     
     # Define primary application layout
-    tab_analysis, tab_results, tab_about = st.tabs(["Analysis", "Results", "About"])
+    tab_analysis, tab_results, tab_viewer, tab_about = st.tabs(["Analysis", "Results", "Data Viewer", "About"])
 
     with tab_analysis:
         # Configuration phase: Capture factors and directions
         selected_factor_names, factor_directions = render_factor_selection()
         
         # Step 1: Data Acquisition
-        if st.button("Load Market Data", type="primary", width="stretch"):
+        if st.button("Load Market Data", type="primary", use_container_width=True,
+                     disabled=not selected_factor_names):
             with st.spinner("Accessing cloud database..."):
                 utils.load_and_process_data(user_settings)
 
@@ -95,6 +97,10 @@ def main():
         else:
             st.info("Performance metrics will appear here after a successful analysis run.")
     
+    with tab_viewer:
+        # Raw data inspection and CSV export (reuses the data loaded in Analysis)
+        render_data_viewer_tab()
+
     with tab_about:
         # Documentation phase
         render_about_tab()

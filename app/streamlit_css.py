@@ -60,6 +60,21 @@ CSS_STYLE = """
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
+
+    /* Factor Selection: compact pill-style "add factor" buttons */
+    [class*="st-key-factor_add_"] button {
+        min-height: 0;
+        padding: 0.2rem 0.75rem;
+        border-radius: 999px;
+        font-weight: 400;
+        white-space: nowrap;
+    }
+    [class*="st-key-factor_add_"] button p {
+        font-size: 0.875rem;
+    }
+    [class*="st-key-factor_add_"] {
+        margin-bottom: -0.5rem;
+    }
     
     /* Navigation panel aesthetic (Grey with Cyan border) */
     [data-testid="stSidebar"] {
