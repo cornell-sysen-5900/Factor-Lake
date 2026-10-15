@@ -23,6 +23,8 @@ from app.data_viewer_filters import (
     csv_file_name,
     filter_raw_data,
     industry_column,
+    industry_options,
+    keep_valid_selections,
     raw_data_to_csv,
     rows_caption,
     year_options,
@@ -89,11 +91,19 @@ def _render_filters(raw) -> Dict[str, Any]:
         "Sectors", category_options(raw, SECTOR_COLUMN),
         key='dv_sectors', placeholder="All sectors"
     )
-    ind_col = industry_column(raw)
-    industries = st.multiselect(
-        "Industries (optional)", category_options(raw, ind_col),
-        key='dv_industries', placeholder="All industries"
-    ) if ind_col else []
+    industries = []
+    if industry_column(raw):
+        # Offer only industries in the chosen sectors, and drop chosen industries
+        # that a removed sector took away, so no selection is ever hidden.
+        options = industry_options(raw, sectors)
+        chosen = st.session_state.get('dv_industries', [])
+        kept = keep_valid_selections(chosen, options)
+        if kept != list(chosen):
+            st.session_state['dv_industries'] = kept
+        industries = st.multiselect(
+            "Industries (optional)", options,
+            key='dv_industries', placeholder="All industries"
+        )
     return {
         'years': (int(year_range[0]), int(year_range[1])),
         'sectors': tuple(sectors),

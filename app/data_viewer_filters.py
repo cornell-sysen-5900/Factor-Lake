@@ -35,6 +35,26 @@ def category_options(df: pd.DataFrame, column: Optional[str]) -> List[str]:
     return sorted(str(v) for v in df[column].dropna().unique())
 
 
+def industry_options(df: pd.DataFrame, sectors: Sequence[str] = ()) -> List[str]:
+    """
+    Sorted industries to offer: all of them when no sector is chosen, otherwise
+    only those that appear in the chosen sectors. [] if df has no industry column.
+    """
+    ind_col = industry_column(df)
+    if ind_col is None:
+        return []
+    industries = df[ind_col]
+    if sectors and SECTOR_COLUMN in df.columns:
+        industries = industries[df[SECTOR_COLUMN].isin(sectors)]
+    return sorted(str(v) for v in industries.dropna().unique())
+
+
+def keep_valid_selections(selected: Sequence[str], options: Sequence[str]) -> List[str]:
+    """The selections still offered in options, in their original order."""
+    allowed = set(options)
+    return [s for s in selected if s in allowed]
+
+
 def filter_raw_data(
     df: pd.DataFrame,
     years: Tuple[int, int],

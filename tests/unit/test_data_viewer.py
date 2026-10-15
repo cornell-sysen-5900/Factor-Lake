@@ -21,6 +21,8 @@ from app.data_viewer_filters import (
     csv_file_name,
     filter_raw_data,
     industry_column,
+    industry_options,
+    keep_valid_selections,
     raw_data_to_csv,
     rows_caption,
     year_options,
@@ -123,6 +125,46 @@ class TestFilterRawData:
 
     def test_csv_file_name(self):
         assert csv_file_name((2003, 2005)) == 'raw_data_2003_2005.csv'
+
+
+class TestIndustryOptions:
+    def test_all_industries_when_no_sector_is_chosen(self):
+        assert industry_options(_universe()) == [
+            'Biotechnology', 'Coal', 'Oil & Gas Production', 'Semiconductors', 'Software']
+
+    @pytest.mark.parametrize('sectors, expected', [
+        (['Technology'], ['Semiconductors', 'Software']),
+        (['Energy'], ['Coal', 'Oil & Gas Production']),
+        (['Health Care'], ['Biotechnology']),
+        (['Energy', 'Health Care'], ['Biotechnology', 'Coal', 'Oil & Gas Production']),
+    ])
+    def test_only_industries_in_the_chosen_sectors(self, sectors, expected):
+        assert industry_options(_universe(), sectors) == expected
+
+    def test_industry_column_with_space_in_name(self):
+        assert industry_options(_universe(industry_col='FactSet Industry'), ['Energy']) == [
+            'Coal', 'Oil & Gas Production']
+
+    def test_no_industry_column(self):
+        assert industry_options(_universe().drop(columns=['FactSet_Industry']), ['Energy']) == []
+
+    def test_raw_data_is_not_modified(self):
+        raw = _universe()
+        before = raw.copy()
+        industry_options(raw, ['Energy'])
+        pd.testing.assert_frame_equal(raw, before)
+
+
+class TestKeepValidSelections:
+    def test_drops_selections_no_longer_offered(self):
+        assert keep_valid_selections(['Software', 'Coal', 'Biotechnology'], ['Coal', 'Oil & Gas Production']) == ['Coal']
+
+    def test_keeps_order_and_everything_still_offered(self):
+        assert keep_valid_selections(['Software', 'Semiconductors'], ['Semiconductors', 'Software']) == [
+            'Software', 'Semiconductors']
+
+    def test_nothing_selected(self):
+        assert keep_valid_selections([], ['Coal']) == []
 
 
 # ---------------------------------------------------------------------------
@@ -315,3 +357,40 @@ def test_small_result_shows_every_row_and_csv_matches(at, deferred_downloads):
     exported = pd.read_csv(io.BytesIO(callable_()), float_precision='round_trip')
     assert len(exported) == 3 * 9
     pd.testing.assert_frame_equal(exported, viewer.dataframe[0].value, check_exact=True)
+
+
+def test_industry_options_follow_the_sector_selection(at):
+    _load_market_data(at)
+    assert at.multiselect(key='dv_industries').options == [
+        'Biotechnology', 'Coal', 'Oil & Gas Production', 'Semiconductors', 'Software']
+
+    at.multiselect(key='dv_sectors').set_value(['Energy']).run()
+    assert at.multiselect(key='dv_industries').options == ['Coal', 'Oil & Gas Production']
+
+    at.multiselect(key='dv_sectors').set_value([]).run()
+    assert len(at.multiselect(key='dv_industries').options) == 5
+
+
+def test_removing_a_sector_drops_its_selected_industries(at):
+    _load_market_data(at)
+    at.multiselect(key='dv_sectors').set_value(['Technology', 'Energy']).run()
+    at.multiselect(key='dv_industries').set_value(['Software', 'Coal']).run()
+
+    at.multiselect(key='dv_sectors').set_value(['Energy']).run()   # Technology removed
+
+    _assert_clean(at)
+    assert at.multiselect(key='dv_industries').value == ['Coal']
+    assert at.session_state['dv_industries'] == ['Coal']            # no hidden selection left
+    at.button(key='dv_load').click().run()
+    shown = _viewer_tab(at).dataframe[0].value
+    assert set(shown['FactSet_Industry']) == {'Coal'}
+
+
+def test_industries_still_in_the_sectors_are_kept(at):
+    _load_market_data(at)
+    at.multiselect(key='dv_industries').set_value(['Software', 'Coal']).run()   # no sector yet
+
+    at.multiselect(key='dv_sectors').set_value(['Technology']).run()
+
+    assert at.multiselect(key='dv_industries').value == ['Software']
+    assert at.session_state['dv_industries'] == ['Software']
