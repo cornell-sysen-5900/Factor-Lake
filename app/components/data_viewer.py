@@ -2,10 +2,11 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/components/data_viewer.py
 PURPOSE: Data Viewer tab: filter, view and export the market data loaded in the Analysis tab.
-VERSION: 1.0.0
+VERSION: 1.1.0
 """
 
 import gc
+from datetime import date
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -23,8 +24,8 @@ from app.viewer_data import (
 
 def clear_viewer_data() -> None:
     """
-    Drops the viewer table. Emptying the holder also releases the table from the
-    deferred CSV download, which Streamlit may keep registered until its next cleanup.
+    Drops the viewer table. Streamlit releases the CSV download that still refers to it
+    when it cleans up at the end of the same rerun.
     """
     holder = st.session_state.pop(VIEWER_STATE_KEY, None)
     if holder:
@@ -68,8 +69,12 @@ def render_data_viewer_tab() -> None:
     # New keys whenever the loaded data changes, so old selections never fall outside the new options
     suffix = abs(hash((len(data), first_day, last_day, tuple(sector_options), tuple(industry_options))))
 
-    picked = st.date_input("Date range", value=(first_day, last_day), min_value=first_day,
-                           max_value=last_day, key=f"viewer_dates_{suffix}", on_change=clear_viewer_data)
+    # Wide bounds: the browser silently ignores a typed date outside min/max (keeping the old
+    # range), so any date is accepted here and the filter simply clips to the data's dates.
+    picked = st.date_input("Date range", value=(first_day, last_day), min_value=date(1900, 1, 1),
+                           max_value=max(last_day, date.today()), key=f"viewer_dates_{suffix}",
+                           on_change=clear_viewer_data)
+    st.caption(f"Data available from {first_day.isoformat()} to {last_day.isoformat()}.")
     col1, col2 = st.columns(2)
     with col1:
         sectors = st.multiselect("Sector", sector_options, key=f"viewer_sectors_{suffix}",
@@ -90,7 +95,8 @@ def render_data_viewer_tab() -> None:
 
     if load and range_complete:
         clear_viewer_data()
-        holder = {'df': filter_market_data(data, picked[0], picked[1], sectors, industries), 'source': data}
+        holder = {'df': filter_market_data(data, picked[0], picked[1], sectors, industries), 'source': data,
+                  'start': picked[0], 'end': picked[1]}
         st.session_state[VIEWER_STATE_KEY] = holder
 
     holder = st.session_state.get(VIEWER_STATE_KEY)
@@ -101,13 +107,15 @@ def render_data_viewer_tab() -> None:
         st.info("No rows match these filters.")
         return
 
-    st.caption(f"{len(table):,} rows × {table.shape[1]} columns")
+    # The applied range is shown because the date box can display a range the browser never sent
+    start_txt, end_txt = holder['start'].isoformat(), holder['end'].isoformat()
+    st.caption(f"{len(table):,} rows × {table.shape[1]} columns · {start_txt} to {end_txt}")
     st.dataframe(table, hide_index=True, width="stretch")
-    start_txt, end_txt = picked[0].isoformat(), picked[1].isoformat()
     st.download_button(
         "Download CSV",
-        # Built only when clicked, from the same table shown above
-        data=lambda h=holder: to_csv_bytes(h['df']) if h else b'',
+        # Built only when clicked, from the same table shown above. It keeps its own reference so a
+        # click that lands while a Clear or filter change is rerunning still gets the full file.
+        data=lambda df=table: to_csv_bytes(df),
         file_name=f"factor_lake_data_{start_txt}_{end_txt}.csv",
         mime="text/csv",
         key="viewer_download",
