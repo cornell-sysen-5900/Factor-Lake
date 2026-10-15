@@ -383,7 +383,7 @@ def _render_cohort_analysis_section(run: Dict[str, Any]) -> None:
             value_returns=_build_wealth_series(results.get('value_benchmark_returns'), init_aum),
             growth_returns=_build_wealth_series(results.get('growth_benchmark_returns'), init_aum)
         )
-        st.pyplot(fig)
+        st.plotly_chart(fig, width="stretch")
 
 def _render_growth_plot(res: Dict[str, Any], settings: Dict[str, Any], factor_labels: List[str]) -> None:
     """
@@ -399,4 +399,4 @@ def _render_growth_plot(res: Dict[str, Any], settings: Dict[str, Any], factor_la
         gro_vals=_build_wealth_series(res.get('growth_benchmark_returns'), initial),
         factor_names=factor_labels
     )
-    st.pyplot(fig)
+    st.plotly_chart(fig, width="stretch")
