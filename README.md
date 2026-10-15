@@ -55,6 +55,7 @@ Then open http://localhost:8501
 - Performance metrics: CAGR, yearly returns, drawdown, Sharpe, Information Ratio, win rate
 - Ranked-stock table and top-vs-bottom cohort analysis
 - Saved runs: each backtest run is kept as its own tab in Results (newest first, last 5; cleared when the page is refreshed), shows the settings that produced it, and can be removed
+- Data Viewer tab: filter the loaded market data by date range, sector and industry, view it, and download it as CSV (no extra data downloads)
 
 ## Project Layout
 
@@ -65,7 +66,8 @@ Factor-Lake/
 │   ├── streamlit_utils.py  # Session state / orchestration helpers
 │   ├── streamlit_config.py # Factor and UI metadata
 │   ├── saved_runs.py       # Saved-run list helpers (Results tabs)
-│   └── components/         # Sidebar, factor selection, results, about
+│   ├── viewer_data.py      # Data Viewer filtering and CSV helpers
+│   └── components/         # Sidebar, factor selection, results, data viewer, about
 ├── src/                    # Library & core logic
 │   ├── backtest_engine.py
 │   ├── benchmarks.py

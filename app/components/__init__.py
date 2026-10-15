@@ -9,6 +9,7 @@ VERSION: 2.1.0
 # Direct submodule imports are preserved to maintain compatibility with existing logic.
 
 from . import about             # noqa: F401
+from . import data_viewer       # noqa: F401
 from . import factor_selection  # noqa: F401
 from . import results_tab       # noqa: F401
 from . import sidebar           # noqa: F401
