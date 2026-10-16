@@ -106,9 +106,14 @@ def browser_like_widget_states(monkeypatch):
     from streamlit.testing.v1.element_tree import ElementTree, get_widget_state
 
     def get_widget_states(self):
-        widget_state = self._runner.session_state._state._new_widget_state
-        # Widgets drawn by the last run: Streamlit drops the others' state when a run ends
-        drawn = widget_state.states
+        session = self._runner.session_state._state
+        # Widgets drawn by the last run: Streamlit drops the others' values when a run ends.
+        # A value lives in the widget state, or, when it was set through st.session_state
+        # (e.g. a seeded factor direction), in the new session state (by key) until the next
+        # run moves it to the old state, so check all three.
+        set_by_key = {wid for wid, key in session._key_id_mapper.id_key_mapping.items()
+                      if key in session._new_session_state}
+        drawn = set(session._new_widget_state.states) | set(session._old_state) | set_by_key
         states = WidgetStates()
         for node in self:
             if getattr(node, 'id', None) in drawn:
@@ -340,3 +345,64 @@ def test_rejected_run_stays_on_the_analysis_tab(at):
 
     assert at.session_state['main_tabs'] == 'Analysis'
     assert any('Select at least one factor' in w.value for w in at.warning)
+
+
+# ---------------------------------------------------------------------------
+# Only the open main tab is drawn: widget values must survive leaving a tab
+# ---------------------------------------------------------------------------
+
+def _away_and_back(at, tab):
+    _click_main_tab(at, 'About')
+    _click_main_tab(at, tab)
+
+
+def test_open_run_tab_survives_leaving_results(at):
+    _add_roe_and_load(at)
+    _run_analysis(at)
+    _run_analysis(at)
+    run_1 = 'Run 1: ROE using 9/30 Data'
+    _open_tab(at, run_1)
+
+    _away_and_back(at, 'Results')
+
+    _assert_clean(at)
+    assert at.session_state['saved_run_tabs'] == run_1
+    assert any(b.key == 'remove_run_1' for b in at.button)          # Run 1's content is drawn
+
+
+def test_a_new_run_still_opens_the_newest_tab(at):
+    _add_roe_and_load(at)
+    _run_analysis(at)
+    _run_analysis(at)
+    _open_tab(at, 'Run 1: ROE using 9/30 Data')                     # remembered...
+
+    _run_analysis(at)                                               # ...but a new run opens Run 3
+
+    assert at.session_state['saved_run_tabs'] == 'Run 3: ROE using 9/30 Data'
+
+
+def test_cohort_percentage_survives_leaving_results(at):
+    _add_roe_and_load(at)
+    _run_analysis(at)
+    at.slider(key='cohort_pct_1').set_value(25).run()
+
+    _away_and_back(at, 'Results')
+
+    _assert_clean(at)
+    assert at.slider(key='cohort_pct_1').value == 25
+    at.button(key='cohort_btn_1').click().run()                      # and it is the one used
+    assert at.session_state['saved_runs'][0]['cohort']['pct'] == 25
+
+
+def test_analysis_and_sidebar_settings_survive_leaving_the_tab(at):
+    # Already safe before: the sidebar is outside the tabs, and the factor picker
+    # re-seeds each direction control from its stored selection
+    _add_roe_and_load(at)
+    at.button_group(key='factor_dir_roe').set_value('Lower is better').run()
+    next(n for n in at.number_input if n.label == 'Initial AUM ($)').set_value(5000.0).run()
+
+    _away_and_back(at, 'Analysis')
+
+    _assert_clean(at)
+    assert at.button_group(key='factor_dir_roe').value == 'Lower is better'
+    assert next(n for n in at.number_input if n.label == 'Initial AUM ($)').value == 5000.0
