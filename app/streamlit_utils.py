@@ -146,28 +146,42 @@ def load_and_process_data(user_settings: Dict[str, Any]) -> None:
     
     Applies ESG restrictions, sector filters, and date constraints 
     to the raw dataset retrieved from the configured data source.
+
+    raw_data is shared by every session (st.cache_resource), so it is never
+    modified, and it is not copied whole: all filters form one row mask and only
+    the kept rows are copied. When nothing is filtered out, rdata shares
+    raw_data's columns, so treat rdata as read-only too.
     """
     try:
         if st.session_state.raw_data is None:
             st.session_state.raw_data = load_shared_universe(get_data_source())
 
-        df = st.session_state.raw_data.copy()
+        raw = st.session_state.raw_data
+
+        # Temporal Filtering
+        start_yr, end_yr = int(user_settings['start_year']), int(user_settings['end_year'])
+        keep = (raw['Year'] >= start_yr) & (raw['Year'] <= end_yr)
 
         # Sector Filtering
         if user_settings.get('selected_sectors'):
-            df = df[df['Scotts_Sector_5'].isin(user_settings['selected_sectors'])]
+            keep &= raw['Scotts_Sector_5'].isin(user_settings['selected_sectors'])
 
         # ESG Fossil Fuel Restrictions
         if user_settings.get('restrict_fossil_fuels'):
             excluded = {"integratedoil", "oilfieldservicesequipment", "oilgasproduction", "coal", "oilrefiningmarketing"}
-            industry_col = 'FactSet_Industry' if 'FactSet_Industry' in df.columns else 'FactSet Industry'
-            if industry_col in df.columns:
-                clean_ind = df[industry_col].str.lower().str.replace(r'[^a-z0-9]', '', regex=True)
-                df = df[~clean_ind.isin(excluded)]
+            industry_col = 'FactSet_Industry' if 'FactSet_Industry' in raw.columns else 'FactSet Industry'
+            if industry_col in raw.columns:
+                clean_ind = raw[industry_col].str.lower().str.replace(r'[^a-z0-9]', '', regex=True)
+                keep &= ~clean_ind.isin(excluded)
 
-        # Temporal Filtering
-        start_yr, end_yr = int(user_settings['start_year']), int(user_settings['end_year'])
-        df = df[(df['Year'] >= start_yr) & (df['Year'] <= end_yr)]
+        if keep.all():
+            # Nothing filtered out: share raw_data's columns instead of copying them. The
+            # shallow copy is still a new DataFrame, so adding or dropping columns on it
+            # never touches raw_data, and each load gives a new object (the Data Viewer
+            # uses that to notice reloaded data).
+            df = raw.copy(deep=False)
+        else:
+            df = raw[keep.to_numpy()]   # copies only the kept rows
 
         st.session_state.rdata = df
         st.session_state.loaded_filters = {
