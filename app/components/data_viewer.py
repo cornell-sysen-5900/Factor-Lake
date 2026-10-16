@@ -14,10 +14,14 @@ import streamlit as st
 
 from app.viewer_data import (
     DATE_COL,
+    DISPLAY_ROW_LIMIT,
     INDUSTRY_COL,
     SECTOR_COL,
     VIEWER_STATE_KEY,
     filter_market_data,
+    hidden_rows_caption,
+    industries_in_sectors,
+    keep_valid_selections,
     to_csv_bytes,
 )
 
@@ -66,7 +70,8 @@ def render_data_viewer_tab() -> None:
     first_day, last_day = dates.min().date(), dates.max().date()
     sector_options = _options(data, SECTOR_COL)
     industry_options = _options(data, INDUSTRY_COL)
-    # New keys whenever the loaded data changes, so old selections never fall outside the new options
+    # New keys whenever the loaded data changes, so old selections never fall outside the new options.
+    # Built from the full option lists, so narrowing the industries by sector keeps every key.
     suffix = abs(hash((len(data), first_day, last_day, tuple(sector_options), tuple(industry_options))))
 
     # Wide bounds: the browser silently ignores a typed date outside min/max (keeping the old
@@ -80,7 +85,14 @@ def render_data_viewer_tab() -> None:
         sectors = st.multiselect("Sector", sector_options, key=f"viewer_sectors_{suffix}",
                                  placeholder="All sectors", on_change=clear_viewer_data)
     with col2:
-        industries = st.multiselect("Industry", industry_options, key=f"viewer_industries_{suffix}",
+        # Only industries in the chosen sectors; drop chosen ones a removed sector took away
+        industries_key = f"viewer_industries_{suffix}"
+        industry_choices = industries_in_sectors(data, sectors)
+        chosen = st.session_state.get(industries_key, [])
+        kept = keep_valid_selections(chosen, industry_choices)
+        if kept != list(chosen):
+            st.session_state[industries_key] = kept
+        industries = st.multiselect("Industry", industry_choices, key=industries_key,
                                     placeholder="All industries", on_change=clear_viewer_data)
 
     range_complete = isinstance(picked, (tuple, list)) and len(picked) == 2
@@ -110,10 +122,14 @@ def render_data_viewer_tab() -> None:
     # The applied range is shown because the date box can display a range the browser never sent
     start_txt, end_txt = holder['start'].isoformat(), holder['end'].isoformat()
     st.caption(f"{len(table):,} rows × {table.shape[1]} columns · {start_txt} to {end_txt}")
-    st.dataframe(table, hide_index=True, width="stretch")
+    hidden_caption = hidden_rows_caption(len(table))
+    if hidden_caption:
+        st.caption(hidden_caption)
+    # Large tables are slow to send to the browser, so only the first rows are shown
+    st.dataframe(table.head(DISPLAY_ROW_LIMIT), hide_index=True, width="stretch")
     st.download_button(
         "Download CSV",
-        # Built only when clicked, from the same table shown above. It keeps its own reference so a
+        # Built only when clicked, from the full table (every filtered row). It keeps its own reference so a
         # click that lands while a Clear or filter change is rerunning still gets the full file.
         data=lambda df=table: to_csv_bytes(df),
         file_name=f"factor_lake_data_{start_txt}_{end_txt}.csv",

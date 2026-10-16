@@ -82,10 +82,61 @@ def _synthetic_universe() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _tab_bars(node):
+    """Every stateful st.tabs bar (one with a key) in an AppTest tree."""
+    for child in getattr(node, 'children', {}).values():
+        if child.type == 'tab_container' and child.proto.tab_container.id:
+            yield child
+        yield from _tab_bars(child)
+
+
+def browser_like_widget_states(monkeypatch):
+    """
+    Makes AppTest send the widget states a browser would send.
+
+    - Only widgets the last run drew. After st.rerun(), AppTest keeps the
+      interrupted run's elements in its tree: a finished analysis reruns into the
+      Results tab, leaving the Analysis tab's widgets behind although that run did
+      not draw them. Sending their states would make Streamlit treat them as new
+      (firing the factor "add" callbacks), and reading them raises KeyError.
+    - The open tab of every keyed st.tabs bar. AppTest does not report tab bars,
+      so without this each run would fall back to the first tab.
+    """
+    from streamlit.proto.WidgetStates_pb2 import WidgetStates
+    from streamlit.testing.v1.element_tree import ElementTree, get_widget_state
+
+    def get_widget_states(self):
+        session = self._runner.session_state._state
+        # Widgets drawn by the last run: Streamlit drops the others' values when a run ends.
+        # A value lives in the widget state, or, when it was set through st.session_state
+        # (e.g. a seeded factor direction), in the new session state (by key) until the next
+        # run moves it to the old state, so check all three.
+        set_by_key = {wid for wid, key in session._key_id_mapper.id_key_mapping.items()
+                      if key in session._new_session_state}
+        drawn = set(session._new_widget_state.states) | set(session._old_state) | set_by_key
+        states = WidgetStates()
+        for node in self:
+            if getattr(node, 'id', None) in drawn:
+                state = get_widget_state(node)
+                if state is not None:
+                    states.widgets.append(state)
+        for tab_bar in _tab_bars(self):
+            tab_id = tab_bar.proto.tab_container.id
+            tab_key = tab_id.split('-', 2)[2]          # element ids look like "$$ID-<hash>-<key>"
+            if tab_id in drawn and tab_key in self._runner.session_state:
+                tab_state = states.widgets.add()
+                tab_state.id = tab_id
+                tab_state.string_value = self._runner.session_state[tab_key]   # the open tab
+        return states
+
+    monkeypatch.setattr(ElementTree, 'get_widget_states', get_widget_states)
+
+
 @pytest.fixture
 def at(monkeypatch):
     # `streamlit run` puts app/ on sys.path; AppTest does not.
     monkeypatch.syspath_prepend(str(APP_DIR))
+    browser_like_widget_states(monkeypatch)
     app = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=60)
     app.session_state['raw_data'] = _synthetic_universe()
     app.run()
@@ -94,6 +145,31 @@ def at(monkeypatch):
 
 def _click(at, label):
     next(b for b in at.button if b.label == label).click().run()
+
+
+def _click_tab(at, key, label):
+    """
+    Opens a tab of the keyed st.tabs bar the way a user's click does, so its
+    on_change callback runs. AppTest cannot click tabs, so this sends the widget
+    state the browser sends for a tab click (the tab bar's id with the new label).
+    """
+    tab_bar = next(t for t in _tab_bars(at._tree) if t.proto.tab_container.id.endswith(f'-{key}'))
+    tab_id = tab_bar.proto.tab_container.id
+    states = at._tree.get_widget_states()
+    tab_state = next((w for w in states.widgets if w.id == tab_id), None) or states.widgets.add()
+    tab_state.id = tab_id
+    tab_state.string_value = label
+    at._tree._runner._run(states)
+
+
+def _click_main_tab(at, label):
+    _click_tab(at, 'main_tabs', label)
+
+
+def _run_analysis(at):
+    # The Run button is in the Analysis tab; a finished run opens Results
+    _click_main_tab(at, 'Analysis')
+    _click(at, RUN)
 
 
 def _add_factor(at, name):
@@ -117,9 +193,8 @@ def _run_tab_labels(at):
 
 
 def _open_tab(at, label):
-    # AppTest does not remember which stateful tab was selected, so set it
-    # before every run that needs a tab other than the newest.
-    at.session_state['saved_run_tabs'] = label
+    """Opens one saved run's tab in the Results tab."""
+    _click_tab(at, 'saved_run_tabs', label)
 
 
 def _metric(at, label):
@@ -132,9 +207,10 @@ def _captions(at):
 
 def test_each_run_is_saved_in_its_own_tab(at):
     _add_roe_and_load(at)
-    _click(at, RUN)
+    _run_analysis(at)
+    _click_main_tab(at, 'Analysis')
     _add_factor(at, 'ROA %')
-    _click(at, RUN)
+    _run_analysis(at)
 
     _assert_clean(at)
     runs = at.session_state['saved_runs']
@@ -152,12 +228,15 @@ def test_each_run_is_saved_in_its_own_tab(at):
 
 def test_saved_tab_ignores_later_sidebar_and_factor_changes(at):
     _add_roe_and_load(at)
-    _click(at, RUN)
+    _run_analysis(at)
+    _click_main_tab(at, 'Results')                    # redraw without the pre-rerun Analysis elements
     before = (_metric(at, 'Total Return'), _metric(at, 'CAGR'), _captions(at))
 
+    _click_main_tab(at, 'Analysis')
     next(n for n in at.number_input if n.label == 'Initial AUM ($)').set_value(5000.0)
     at.button_group(key='factor_dir_roe').set_value('Lower is better')
     at.run()
+    _click_main_tab(at, 'Results')
 
     _assert_clean(at)
     assert (_metric(at, 'Total Return'), _metric(at, 'CAGR'), _captions(at)) == before
@@ -166,13 +245,12 @@ def test_saved_tab_ignores_later_sidebar_and_factor_changes(at):
 
 def test_cohort_comparison_uses_the_runs_own_snapshot(at):
     _add_roe_and_load(at)
-    _click(at, RUN)                                   # Run 1: ROE, Higher is better
+    _run_analysis(at)                                   # Run 1: ROE, Higher is better
+    _click_main_tab(at, 'Analysis')
     at.button_group(key='factor_dir_roe').set_value('Lower is better').run()  # live direction now differs
-    _click(at, RUN)                                   # Run 2: ROE, Lower is better
+    _run_analysis(at)                                   # Run 2: ROE, Lower is better
 
     label_1 = 'Run 1: ROE using 9/30 Data'
-    _open_tab(at, label_1)
-    at.run()
     _open_tab(at, label_1)
     at.button(key='cohort_btn_1').click().run()
 
@@ -187,30 +265,29 @@ def test_cohort_comparison_uses_the_runs_own_snapshot(at):
     assert run_1['cohort']['bottom'] == list(exp_bot)
     assert len(at.table) == 1
 
-    at.run()                                          # newest tab (Run 2) open
+    _open_tab(at, 'Run 2: ROE using 9/30 Data')      # Run 2 has no comparison
     assert len(at.table) == 0
-    _open_tab(at, label_1)
-    at.run()                                          # back to Run 1: result still shown
+    _open_tab(at, label_1)                            # back to Run 1: result still shown
     assert len(at.table) == 1
 
 
 def test_invalid_or_failed_runs_are_not_saved(at, monkeypatch):
     _add_roe_and_load(at)
     at.button(key='factor_remove_roe').click().run()
-    _click(at, RUN)                                   # no factors selected
+    _run_analysis(at)                                   # no factors selected
     assert any('Select at least one factor' in w.value for w in at.warning)
 
     _add_factor(at, 'ROE using 9/30 Data')
     aum = next(n for n in at.number_input if n.label == 'Initial AUM ($)')
     aum.set_value(0.0).run()
-    _click(at, RUN)
+    _run_analysis(at)
     assert any('Initial AUM must be greater' in w.value for w in at.warning)
 
     aum = next(n for n in at.number_input if n.label == 'Initial AUM ($)')
     aum.set_value(1000.0).run()
     at.number_input(key='start_year_input').set_value(2023)
     at.number_input(key='end_year_input').set_value(2023).run()
-    _click(at, RUN)
+    _run_analysis(at)
     assert any('no yearly returns' in w.value for w in at.warning)
 
     def boom(*args, **kwargs):
@@ -218,7 +295,7 @@ def test_invalid_or_failed_runs_are_not_saved(at, monkeypatch):
     monkeypatch.setattr('src.backtest_engine.rebalance_portfolio', boom)
     at.number_input(key='start_year_input').set_value(2002)
     at.number_input(key='end_year_input').set_value(2024).run()
-    _click(at, RUN)
+    _run_analysis(at)
     assert any('Backtest Execution Error: engine failed' in e.value for e in at.error)
     assert not at.exception, [e.value for e in at.exception]
 
@@ -229,8 +306,8 @@ def test_invalid_or_failed_runs_are_not_saved(at, monkeypatch):
 
 def test_remove_run(at):
     _add_roe_and_load(at)
-    _click(at, RUN)
-    _click(at, RUN)
+    _run_analysis(at)
+    _run_analysis(at)
     assert _run_tab_labels(at) == ['Run 2: ROE using 9/30 Data', 'Run 1: ROE using 9/30 Data']
 
     at.button(key='remove_run_2').click().run()
@@ -243,5 +320,89 @@ def test_remove_run(at):
     assert at.session_state['saved_runs'] == []
     assert any('will appear here' in i.value for i in at.info)
 
-    _click(at, RUN)                                   # ids are never reused
+    _run_analysis(at)                                   # ids are never reused
     assert [r['id'] for r in at.session_state['saved_runs']] == [3]
+
+
+def test_finished_run_opens_the_results_tab(at):
+    _add_roe_and_load(at)
+    assert at.session_state['main_tabs'] == 'Analysis'
+
+    _run_analysis(at)
+
+    _assert_clean(at)
+    assert at.session_state['main_tabs'] == 'Results'
+    results = next(t for t in at.tabs if t.label == 'Results')
+    assert any('Saved as "Run 1: ROE using 9/30 Data"' in s.value for s in results.success)
+    assert _run_tab_labels(at) == ['Run 1: ROE using 9/30 Data']
+    assert not any('<script' in m.value for m in at.markdown)        # no JavaScript tab switching
+
+
+def test_rejected_run_stays_on_the_analysis_tab(at):
+    _add_roe_and_load(at)
+    at.button(key='factor_remove_roe').click().run()
+    _run_analysis(at)                                   # no factors selected
+
+    assert at.session_state['main_tabs'] == 'Analysis'
+    assert any('Select at least one factor' in w.value for w in at.warning)
+
+
+# ---------------------------------------------------------------------------
+# Only the open main tab is drawn: widget values must survive leaving a tab
+# ---------------------------------------------------------------------------
+
+def _away_and_back(at, tab):
+    _click_main_tab(at, 'About')
+    _click_main_tab(at, tab)
+
+
+def test_open_run_tab_survives_leaving_results(at):
+    _add_roe_and_load(at)
+    _run_analysis(at)
+    _run_analysis(at)
+    run_1 = 'Run 1: ROE using 9/30 Data'
+    _open_tab(at, run_1)
+
+    _away_and_back(at, 'Results')
+
+    _assert_clean(at)
+    assert at.session_state['saved_run_tabs'] == run_1
+    assert any(b.key == 'remove_run_1' for b in at.button)          # Run 1's content is drawn
+
+
+def test_a_new_run_still_opens_the_newest_tab(at):
+    _add_roe_and_load(at)
+    _run_analysis(at)
+    _run_analysis(at)
+    _open_tab(at, 'Run 1: ROE using 9/30 Data')                     # remembered...
+
+    _run_analysis(at)                                               # ...but a new run opens Run 3
+
+    assert at.session_state['saved_run_tabs'] == 'Run 3: ROE using 9/30 Data'
+
+
+def test_cohort_percentage_survives_leaving_results(at):
+    _add_roe_and_load(at)
+    _run_analysis(at)
+    at.slider(key='cohort_pct_1').set_value(25).run()
+
+    _away_and_back(at, 'Results')
+
+    _assert_clean(at)
+    assert at.slider(key='cohort_pct_1').value == 25
+    at.button(key='cohort_btn_1').click().run()                      # and it is the one used
+    assert at.session_state['saved_runs'][0]['cohort']['pct'] == 25
+
+
+def test_analysis_and_sidebar_settings_survive_leaving_the_tab(at):
+    # Already safe before: the sidebar is outside the tabs, and the factor picker
+    # re-seeds each direction control from its stored selection
+    _add_roe_and_load(at)
+    at.button_group(key='factor_dir_roe').set_value('Lower is better').run()
+    next(n for n in at.number_input if n.label == 'Initial AUM ($)').set_value(5000.0).run()
+
+    _away_and_back(at, 'Analysis')
+
+    _assert_clean(at)
+    assert at.button_group(key='factor_dir_roe').value == 'Lower is better'
+    assert next(n for n in at.number_input if n.label == 'Initial AUM ($)').value == 5000.0

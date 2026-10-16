@@ -17,23 +17,28 @@ import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 from app.viewer_data import (
+    DISPLAY_ROW_LIMIT,
     VIEWER_STATE_KEY,
     filter_market_data,
+    hidden_rows_caption,
+    industries_in_sectors,
+    keep_valid_selections,
     to_csv_bytes,
 )
 from src.s3_client import S3DataManager
+from tests.unit.test_saved_runs import _click_main_tab, browser_like_widget_states
 
 APP_DIR = Path(__file__).resolve().parents[2] / 'app'
 SECTORS = ['Technology', 'Healthcare', 'Energy']
 INDUSTRIES = {'Technology': 'Software', 'Healthcare': 'Biotech', 'Energy': 'Oil Gas Production'}
 
 
-def _universe() -> pd.DataFrame:
-    """12 tickers x 2002-2024 yearly snapshots across three sectors/industries."""
+def _universe(n_tickers: int = 12) -> pd.DataFrame:
+    """n_tickers (default 12) x 2002-2024 yearly snapshots across three sectors/industries."""
     rng = np.random.RandomState(1)
     rows = []
     for year in range(2002, 2025):
-        for i in range(12):
+        for i in range(n_tickers):
             sector = SECTORS[i % 3]
             rows.append({
                 'Ticker-Region': f'T{i:02d}-US',
@@ -87,6 +92,38 @@ def test_csv_round_trips_to_the_same_table():
     pd.testing.assert_frame_equal(back, table, check_dtype=False)
 
 
+def _sector_industry_frame() -> pd.DataFrame:
+    return pd.DataFrame({
+        'Scotts_Sector_5': ['Technology', 'Technology', 'Energy', 'Energy', 'Healthcare', None],
+        'FactSet_Industry': ['Software', 'Semiconductors', 'Coal', 'Oil Gas Production', 'Biotech', 'Unknown'],
+    })
+
+
+def test_all_industries_when_no_sector_is_chosen():
+    assert industries_in_sectors(_sector_industry_frame(), []) == [
+        'Biotech', 'Coal', 'Oil Gas Production', 'Semiconductors', 'Software', 'Unknown']
+
+
+@pytest.mark.parametrize('sectors, expected', [
+    (['Technology'], ['Semiconductors', 'Software']),
+    (['Energy'], ['Coal', 'Oil Gas Production']),
+    (['Energy', 'Healthcare'], ['Biotech', 'Coal', 'Oil Gas Production']),
+])
+def test_only_industries_in_the_chosen_sectors(sectors, expected):
+    assert industries_in_sectors(_sector_industry_frame(), sectors) == expected
+
+
+def test_industry_options_without_an_industry_column():
+    assert industries_in_sectors(_sector_industry_frame().drop(columns=['FactSet_Industry']), ['Energy']) == []
+
+
+def test_keep_valid_selections_drops_only_what_is_no_longer_offered():
+    assert keep_valid_selections(['Software', 'Coal', 'Biotech'], ['Coal', 'Oil Gas Production']) == ['Coal']
+    assert keep_valid_selections(['Software', 'Semiconductors'], ['Semiconductors', 'Software']) == [
+        'Software', 'Semiconductors']                                  # order kept
+    assert keep_valid_selections([], ['Coal']) == []
+
+
 # ---------------------------------------------------------------------------
 # AppTest: the real app
 # ---------------------------------------------------------------------------
@@ -95,6 +132,7 @@ def test_csv_round_trips_to_the_same_table():
 def at(monkeypatch):
     # `streamlit run` puts app/ on sys.path; AppTest does not.
     monkeypatch.syspath_prepend(str(APP_DIR))
+    browser_like_widget_states(monkeypatch)
     app = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=60)
     app.session_state['raw_data'] = _universe()
     app.run()
@@ -102,10 +140,19 @@ def at(monkeypatch):
 
 
 def _load_market_data(at):
+    """Loads market data in the Analysis tab, then opens the Data Viewer tab."""
     from app.streamlit_config import FACTOR_METADATA
     # Load Market Data stays disabled until at least one factor is added
     at.button(key=f"factor_add_{FACTOR_METADATA['ROE using 9/30 Data']['key']}").click().run()
     next(b for b in at.button if b.label == 'Load Market Data').click().run()
+    _click_main_tab(at, 'Data Viewer')
+
+
+def _reload_market_data(at):
+    """Clicks Load Market Data again (in the Analysis tab), then reopens the Data Viewer."""
+    _click_main_tab(at, 'Analysis')
+    next(b for b in at.button if b.label == 'Load Market Data').click().run()
+    _click_main_tab(at, 'Data Viewer')
 
 
 def _widget(collection, label):
@@ -130,6 +177,7 @@ def test_data_viewer_tab_sits_between_results_and_about(at):
 
 
 def test_viewer_asks_for_market_data_first(at):
+    _click_main_tab(at, 'Data Viewer')
     _assert_clean(at)
     assert any('Load market data in the Analysis tab first' in i.value for i in at.info)
     assert not any(b.key == 'viewer_load' for b in at.button)
@@ -191,15 +239,27 @@ def test_clear_frees_the_table(at):
 def test_reloading_market_data_clears_the_table(at):
     _load_market_data(at)
     _load_viewer(at)
-    next(b for b in at.button if b.label == 'Load Market Data').click().run()
+    _reload_market_data(at)
+    _assert_clean(at)
+    assert VIEWER_STATE_KEY not in at.session_state
+
+
+def test_new_market_data_clears_the_table_while_the_viewer_stays_open(at):
+    # Reloading means visiting Analysis, which already clears the viewer, so swap the
+    # data directly to check the viewer's own "data changed" guard
+    _load_market_data(at)
+    _load_viewer(at)
+    at.session_state['rdata'] = at.session_state['rdata'].copy()
+    at.run()
     _assert_clean(at)
     assert VIEWER_STATE_KEY not in at.session_state
 
 
 def test_no_rows_message(at):
     _load_market_data(at)
-    _widget(at.multiselect, 'Sector').set_value(['Energy']).run()
-    _widget(at.multiselect, 'Industry').set_value(['Software']).run()
+    # A sector/industry mismatch can no longer be picked (industries follow sectors),
+    # so use a date range before the data starts
+    _widget(at.date_input, 'Date range').set_value((date(1990, 1, 1), date(1995, 12, 31))).run()
     at.button(key='viewer_load').click().run()
     _assert_clean(at)
     assert any('No rows match' in i.value for i in at.info)
@@ -217,6 +277,7 @@ def test_viewer_makes_no_extra_data_source_requests(monkeypatch):
     monkeypatch.setattr(S3DataManager, '__init__', lambda self, *a, **k: None)
     monkeypatch.setattr(S3DataManager, 'fetch_all_data', counting_fetch)
     monkeypatch.syspath_prepend(str(APP_DIR))
+    browser_like_widget_states(monkeypatch)
     st.cache_resource.clear()
     try:
         at = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=60)
@@ -249,15 +310,37 @@ def downloads(monkeypatch):
     return captured
 
 
-def test_download_serves_exactly_the_table_on_screen(at, downloads):
+def test_download_has_every_row_and_starts_with_the_table_on_screen(at, downloads):
+    # The screen shows the first DISPLAY_ROW_LIMIT rows; the CSV has every filtered row
+    at.session_state['raw_data'] = _universe(n_tickers=60)     # 60 x 23 = 1,380 rows
     _load_market_data(at)
-    _load_viewer(at, date(2005, 9, 30), date(2012, 9, 30), ['Healthcare'])
+    _load_viewer(at)
     _assert_clean(at)
 
+    table = at.session_state[VIEWER_STATE_KEY]['df']
     payload = downloads[-1]()                       # the bytes the button would send
     shown = at.dataframe[0].value.reset_index(drop=True)
-    assert payload == to_csv_bytes(shown)
-    pd.testing.assert_frame_equal(pd.read_csv(io.BytesIO(payload)), shown, check_dtype=False)
+    exported = pd.read_csv(io.BytesIO(payload))
+    assert len(table) == 1380 and len(exported) == 1380 and len(shown) == DISPLAY_ROW_LIMIT
+    assert payload == to_csv_bytes(table)                       # every filtered row
+    assert list(exported.columns) == list(shown.columns)
+    pd.testing.assert_frame_equal(exported.head(DISPLAY_ROW_LIMIT), shown, check_dtype=False)
+    assert any(c.value == 'Showing 1,000 of 1,380 rows. Download CSV for all rows.' for c in at.caption)
+    assert any(c.value.startswith('1,380 rows × ') for c in at.caption)   # existing caption still counts all rows
+
+
+def test_small_table_is_shown_whole_without_the_hidden_rows_caption(at, downloads):
+    _load_market_data(at)
+    _load_viewer(at, date(2005, 9, 30), date(2012, 9, 30), ['Healthcare'])
+    shown = at.dataframe[0].value.reset_index(drop=True)
+    assert downloads[-1]() == to_csv_bytes(shown)
+    assert not any('Download CSV for all rows' in c.value for c in at.caption)
+
+
+def test_hidden_rows_caption():
+    assert hidden_rows_caption(DISPLAY_ROW_LIMIT) is None
+    assert hidden_rows_caption(24) is None
+    assert hidden_rows_caption(1380) == 'Showing 1,000 of 1,380 rows. Download CSV for all rows.'
 
 
 def test_download_clicked_during_a_clear_still_gets_the_whole_file(at, downloads):
@@ -301,8 +384,91 @@ def test_table_is_dropped_when_reloaded_data_is_empty(at):
 
     _widget(at.sidebar.checkbox, 'Enable Sector Filter').check().run()
     _widget(at.sidebar.multiselect, 'Include following sectors:').set_value(['Utilities']).run()  # no such rows
-    next(b for b in at.button if b.label == 'Load Market Data').click().run()
+    _reload_market_data(at)
 
     assert at.session_state['rdata'].empty
     assert VIEWER_STATE_KEY not in at.session_state
     assert any('Load market data in the Analysis tab first' in i.value for i in at.info)
+
+
+def test_industry_options_follow_the_sector_selection(at):
+    _load_market_data(at)
+    assert _widget(at.multiselect, 'Industry').options == ['Biotech', 'Oil Gas Production', 'Software']
+
+    _widget(at.multiselect, 'Sector').set_value(['Energy', 'Healthcare']).run()
+    assert _widget(at.multiselect, 'Industry').options == ['Biotech', 'Oil Gas Production']
+
+    _widget(at.multiselect, 'Sector').set_value([]).run()
+    assert len(_widget(at.multiselect, 'Industry').options) == 3
+
+
+def test_removing_a_sector_drops_its_selected_industries(at):
+    _load_market_data(at)
+    _widget(at.multiselect, 'Sector').set_value(['Technology', 'Energy']).run()
+    _widget(at.multiselect, 'Industry').set_value(['Software', 'Oil Gas Production']).run()
+
+    _widget(at.multiselect, 'Sector').set_value(['Energy']).run()   # Technology removed
+
+    _assert_clean(at)
+    industry = _widget(at.multiselect, 'Industry')
+    assert industry.value == ['Oil Gas Production']
+    assert at.session_state[industry.key] == ['Oil Gas Production']   # no hidden selection left
+    _load_viewer(at)
+    assert set(at.session_state[VIEWER_STATE_KEY]['df']['FactSet_Industry']) == {'Oil Gas Production'}
+
+
+def test_changing_sectors_keeps_the_date_range_and_sector_selections(at):
+    _load_market_data(at)
+    _widget(at.date_input, 'Date range').set_value((date(2005, 9, 30), date(2010, 9, 30))).run()
+    _widget(at.multiselect, 'Sector').set_value(['Technology']).run()
+    keys_before = (_widget(at.date_input, 'Date range').key, _widget(at.multiselect, 'Sector').key,
+                   _widget(at.multiselect, 'Industry').key)
+
+    _widget(at.multiselect, 'Sector').set_value(['Technology', 'Energy']).run()
+
+    _assert_clean(at)
+    assert (_widget(at.date_input, 'Date range').key, _widget(at.multiselect, 'Sector').key,
+            _widget(at.multiselect, 'Industry').key) == keys_before        # same widgets, not new ones
+    assert _widget(at.date_input, 'Date range').value == (date(2005, 9, 30), date(2010, 9, 30))
+    assert _widget(at.multiselect, 'Sector').value == ['Technology', 'Energy']
+
+
+@pytest.mark.parametrize('other_tab', ['Analysis', 'Results', 'About'])
+def test_leaving_the_viewer_clears_its_table(at, other_tab):
+    _load_market_data(at)
+    _load_viewer(at)
+    table_ref = weakref.ref(at.session_state[VIEWER_STATE_KEY]['df'])
+
+    _click_main_tab(at, other_tab)
+    gc.collect()
+
+    _assert_clean(at)
+    assert at.session_state['main_tabs'] == other_tab
+    assert VIEWER_STATE_KEY not in at.session_state
+    assert table_ref() is None                     # nothing keeps the filtered table in memory
+    assert len(at.dataframe) == 0                  # the viewer is not drawn at all
+
+    _click_main_tab(at, 'Data Viewer')             # coming back starts without a table
+    assert len(at.dataframe) == 0
+
+
+def test_staying_on_the_viewer_keeps_its_table(at):
+    _load_market_data(at)
+    _load_viewer(at, date(2010, 9, 30), date(2015, 9, 30), ['Technology'])
+    shown = at.dataframe[0].value
+
+    at.run()                                       # any rerun while the viewer is open
+    _click_main_tab(at, 'Data Viewer')             # clicking the open tab again
+
+    _assert_clean(at)
+    assert VIEWER_STATE_KEY in at.session_state
+    pd.testing.assert_frame_equal(at.dataframe[0].value, shown)
+
+
+def test_only_the_open_tab_is_drawn(at):
+    _load_market_data(at)                          # Data Viewer open
+    assert any(b.key == 'viewer_load' for b in at.button)
+    assert not any(b.label == 'Load Market Data' for b in at.button)    # Analysis not drawn
+
+    _click_main_tab(at, 'About')
+    assert not any(b.key == 'viewer_load' for b in at.button)

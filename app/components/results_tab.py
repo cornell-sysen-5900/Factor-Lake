@@ -20,6 +20,9 @@ from app.ranked_stocks import (
 )
 
 DIRECTION_LABELS = {'top': 'Higher is better', 'bottom': 'Lower is better'}
+RUN_TABS_KEY = "saved_run_tabs"
+# Copy of the open run tab that survives the Results tab being hidden
+OPEN_RUN_TAB_KEY = "saved_run_tabs_open"
 
 
 def _build_wealth_series(returns: Optional[List[float]], initial: float) -> Optional[List[float]]:
@@ -41,17 +44,28 @@ def render_saved_runs(saved_runs: List[Dict[str, Any]]) -> None:
     The tabs are stateful (key + on_change="rerun"), so only the open tab is
     rendered. When a run is added or removed the tab labels change, Streamlit
     treats the tab bar as a new widget and opens the first tab: the newest run.
+    The open run is kept while the Results tab is hidden (see below).
     """
     st.header("Portfolio Performance Results")
     st.caption(
         f"Each analysis run is saved as its own tab (newest first). Only the last "
         f"{MAX_SAVED_RUNS} runs are kept, and they are cleared when you refresh the page."
     )
+    labels = [run['label'] for run in saved_runs]
+    # Only the open main tab is rendered, and Streamlit drops the state of widgets that
+    # are not rendered, so restore the open run after the Results tab was hidden. Only for
+    # the same runs: after a run is added or removed the newest opens, as before.
+    remembered = st.session_state.get(OPEN_RUN_TAB_KEY)
+    if (RUN_TABS_KEY not in st.session_state and remembered
+            and remembered['labels'] == labels and remembered['open'] in labels):
+        st.session_state[RUN_TABS_KEY] = remembered['open']
     tabs = st.tabs(
-        [run['label'] for run in saved_runs],
-        key="saved_run_tabs",
+        labels,
+        key=RUN_TABS_KEY,
         on_change="rerun",
     )
+    open_label = next((label for tab, label in zip(tabs, labels) if tab.open), labels[0])
+    st.session_state[OPEN_RUN_TAB_KEY] = {'labels': labels, 'open': open_label}
     for tab, run in zip(tabs, saved_runs):
         if not tab.open:
             continue
@@ -346,11 +360,16 @@ def _render_cohort_analysis_section(run: Dict[str, Any]) -> None:
     with st.expander("Run Cohort Comparison", expanded=run.get('cohort') is not None):
         col1, col2 = st.columns(2)
         with col1:
+            # Keep a copy so the chosen percentage survives the tab being hidden
+            # (Streamlit drops the state of widgets that are not rendered)
+            saved_pct_key = f"cohort_pct_saved_{run_id}"
+            default_pct = run['cohort']['pct'] if run.get('cohort') else 10
             cohort_pct = st.slider(
                 "Cohort Percentage", 1, 50,
-                value=run['cohort']['pct'] if run.get('cohort') else 10,
+                value=st.session_state.get(saved_pct_key, default_pct),
                 key=f"cohort_pct_{run_id}",
             )
+            st.session_state[saved_pct_key] = cohort_pct
 
         if st.button("Generate Comparison", type="primary", key=f"cohort_btn_{run_id}"):
             res_top, res_bot = backtest_engine.run_cohort_comparison(
