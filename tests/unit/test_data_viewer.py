@@ -19,6 +19,8 @@ from streamlit.testing.v1 import AppTest
 from app.viewer_data import (
     VIEWER_STATE_KEY,
     filter_market_data,
+    industries_in_sectors,
+    keep_valid_selections,
     to_csv_bytes,
 )
 from src.s3_client import S3DataManager
@@ -85,6 +87,38 @@ def test_csv_round_trips_to_the_same_table():
     back = pd.read_csv(io.BytesIO(to_csv_bytes(table)))
     assert list(back.columns) == list(table.columns)
     pd.testing.assert_frame_equal(back, table, check_dtype=False)
+
+
+def _sector_industry_frame() -> pd.DataFrame:
+    return pd.DataFrame({
+        'Scotts_Sector_5': ['Technology', 'Technology', 'Energy', 'Energy', 'Healthcare', None],
+        'FactSet_Industry': ['Software', 'Semiconductors', 'Coal', 'Oil Gas Production', 'Biotech', 'Unknown'],
+    })
+
+
+def test_all_industries_when_no_sector_is_chosen():
+    assert industries_in_sectors(_sector_industry_frame(), []) == [
+        'Biotech', 'Coal', 'Oil Gas Production', 'Semiconductors', 'Software', 'Unknown']
+
+
+@pytest.mark.parametrize('sectors, expected', [
+    (['Technology'], ['Semiconductors', 'Software']),
+    (['Energy'], ['Coal', 'Oil Gas Production']),
+    (['Energy', 'Healthcare'], ['Biotech', 'Coal', 'Oil Gas Production']),
+])
+def test_only_industries_in_the_chosen_sectors(sectors, expected):
+    assert industries_in_sectors(_sector_industry_frame(), sectors) == expected
+
+
+def test_industry_options_without_an_industry_column():
+    assert industries_in_sectors(_sector_industry_frame().drop(columns=['FactSet_Industry']), ['Energy']) == []
+
+
+def test_keep_valid_selections_drops_only_what_is_no_longer_offered():
+    assert keep_valid_selections(['Software', 'Coal', 'Biotech'], ['Coal', 'Oil Gas Production']) == ['Coal']
+    assert keep_valid_selections(['Software', 'Semiconductors'], ['Semiconductors', 'Software']) == [
+        'Software', 'Semiconductors']                                  # order kept
+    assert keep_valid_selections([], ['Coal']) == []
 
 
 # ---------------------------------------------------------------------------
@@ -198,8 +232,9 @@ def test_reloading_market_data_clears_the_table(at):
 
 def test_no_rows_message(at):
     _load_market_data(at)
-    _widget(at.multiselect, 'Sector').set_value(['Energy']).run()
-    _widget(at.multiselect, 'Industry').set_value(['Software']).run()
+    # A sector/industry mismatch can no longer be picked (industries follow sectors),
+    # so use a date range before the data starts
+    _widget(at.date_input, 'Date range').set_value((date(1990, 1, 1), date(1995, 12, 31))).run()
     at.button(key='viewer_load').click().run()
     _assert_clean(at)
     assert any('No rows match' in i.value for i in at.info)
@@ -306,3 +341,45 @@ def test_table_is_dropped_when_reloaded_data_is_empty(at):
     assert at.session_state['rdata'].empty
     assert VIEWER_STATE_KEY not in at.session_state
     assert any('Load market data in the Analysis tab first' in i.value for i in at.info)
+
+
+def test_industry_options_follow_the_sector_selection(at):
+    _load_market_data(at)
+    assert _widget(at.multiselect, 'Industry').options == ['Biotech', 'Oil Gas Production', 'Software']
+
+    _widget(at.multiselect, 'Sector').set_value(['Energy', 'Healthcare']).run()
+    assert _widget(at.multiselect, 'Industry').options == ['Biotech', 'Oil Gas Production']
+
+    _widget(at.multiselect, 'Sector').set_value([]).run()
+    assert len(_widget(at.multiselect, 'Industry').options) == 3
+
+
+def test_removing_a_sector_drops_its_selected_industries(at):
+    _load_market_data(at)
+    _widget(at.multiselect, 'Sector').set_value(['Technology', 'Energy']).run()
+    _widget(at.multiselect, 'Industry').set_value(['Software', 'Oil Gas Production']).run()
+
+    _widget(at.multiselect, 'Sector').set_value(['Energy']).run()   # Technology removed
+
+    _assert_clean(at)
+    industry = _widget(at.multiselect, 'Industry')
+    assert industry.value == ['Oil Gas Production']
+    assert at.session_state[industry.key] == ['Oil Gas Production']   # no hidden selection left
+    _load_viewer(at)
+    assert set(at.session_state[VIEWER_STATE_KEY]['df']['FactSet_Industry']) == {'Oil Gas Production'}
+
+
+def test_changing_sectors_keeps_the_date_range_and_sector_selections(at):
+    _load_market_data(at)
+    _widget(at.date_input, 'Date range').set_value((date(2005, 9, 30), date(2010, 9, 30))).run()
+    _widget(at.multiselect, 'Sector').set_value(['Technology']).run()
+    keys_before = (_widget(at.date_input, 'Date range').key, _widget(at.multiselect, 'Sector').key,
+                   _widget(at.multiselect, 'Industry').key)
+
+    _widget(at.multiselect, 'Sector').set_value(['Technology', 'Energy']).run()
+
+    _assert_clean(at)
+    assert (_widget(at.date_input, 'Date range').key, _widget(at.multiselect, 'Sector').key,
+            _widget(at.multiselect, 'Industry').key) == keys_before        # same widgets, not new ones
+    assert _widget(at.date_input, 'Date range').value == (date(2005, 9, 30), date(2010, 9, 30))
+    assert _widget(at.multiselect, 'Sector').value == ['Technology', 'Energy']

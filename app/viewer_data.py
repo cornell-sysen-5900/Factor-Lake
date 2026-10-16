@@ -6,7 +6,7 @@ VERSION: 1.0.0
 """
 
 from datetime import date
-from typing import Sequence
+from typing import List, Sequence
 
 import pandas as pd
 
@@ -36,6 +36,25 @@ def filter_market_data(df: pd.DataFrame, start: date, end: date,
     leading = [c for c in LEADING_COLUMNS if c in df.columns]
     columns = leading + [c for c in df.columns if c not in leading]
     return df.loc[mask, columns].reset_index(drop=True)
+
+
+def industries_in_sectors(df: pd.DataFrame, sectors: Sequence[str]) -> List[str]:
+    """
+    Sorted industries to offer: all of them when no sector is chosen, otherwise only
+    those that appear in the chosen sectors. [] if df has no industry column.
+    """
+    if INDUSTRY_COL not in df.columns:
+        return []
+    industries = df[INDUSTRY_COL]
+    if sectors and SECTOR_COL in df.columns:
+        industries = industries[df[SECTOR_COL].isin(list(sectors))]
+    return sorted(str(v) for v in industries.dropna().unique())
+
+
+def keep_valid_selections(selected: Sequence[str], options: Sequence[str]) -> List[str]:
+    """The selections still offered in options, in their original order."""
+    allowed = set(options)
+    return [s for s in selected if s in allowed]
 
 
 def to_csv_bytes(df: pd.DataFrame) -> bytes:
