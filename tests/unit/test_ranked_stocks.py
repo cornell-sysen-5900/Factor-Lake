@@ -21,7 +21,7 @@ from app.ranked_stocks import (
     ranked_number_formats,
     ranked_table_to_csv,
 )
-from tests.unit.test_saved_runs import RUN, _add_factor, _assert_clean, _click, _open_tab, at  # noqa: F401
+from tests.unit.test_saved_runs import RUN, _add_factor, _assert_clean, _click, _open_tab, _run_analysis, at  # noqa: F401
 
 FACTORS = ['ROE_using_9-30_Data', 'ROA']
 DIRECTIONS = {'ROE_using_9-30_Data': 'top', 'ROA': 'bottom'}
@@ -252,7 +252,7 @@ def test_screen_rounds_but_downloaded_csv_is_unrounded(at, served_files):
 
 def test_saved_runs_have_independent_year_selectors(at, served_files):
     _run_two_factor_backtest(at)          # Run 1
-    _click(at, RUN)                       # Run 2, same factors
+    _run_analysis(at)                     # Run 2, same factors (back in the Analysis tab)
     run_1 = 'Run 1: ROE using 9/30 Data +1'
 
     _open_tab(at, run_1)

@@ -31,7 +31,7 @@ import streamlit_config as config
 import components.sidebar as sidebar
 from components.factor_selection import render_factor_selection
 from components.results_tab import render_saved_runs
-from components.data_viewer import render_data_viewer_tab
+from components.data_viewer import render_data_viewer_tab, clear_viewer_data
 from components.about import render_about_tab
 
 # Global Page Configuration
@@ -45,6 +45,18 @@ st.set_page_config(
 utils.initialize_environment()
 utils.initialize_session_state()
 css.inject_styles()
+
+MAIN_TABS = ["Analysis", "Results", "Data Viewer", "About"]
+MAIN_TABS_KEY = "main_tabs"
+# Set after a successful run: the confirmation to show once the Results tab opens
+RUN_COMPLETE_KEY = "run_complete_message"
+
+
+def _on_main_tab_change() -> None:
+    """on_change callback: leaving the Data Viewer releases the table it loaded."""
+    if st.session_state[MAIN_TABS_KEY] != "Data Viewer":
+        clear_viewer_data()
+
 
 def main():
     """
@@ -67,52 +79,62 @@ def main():
     # Render Global Sidebar and capture configuration
     user_settings = sidebar.render_sidebar(config.SECTOR_OPTIONS, utils.describe_data_source())
     
-    # Define primary application layout
-    tab_analysis, tab_results, tab_viewer, tab_about = st.tabs(["Analysis", "Results", "Data Viewer", "About"])
+    # A finished run opens the Results tab. The active tab can only be set
+    # before st.tabs is drawn, so the run requests it and reruns (see below).
+    if RUN_COMPLETE_KEY in st.session_state and st.session_state.get(MAIN_TABS_KEY) != "Results":
+        st.session_state[MAIN_TABS_KEY] = "Results"
 
-    with tab_analysis:
-        # Configuration phase: Capture factors and directions
-        selected_factor_names, factor_directions = render_factor_selection()
-        
-        # Step 1: Data Acquisition
-        if st.button("Load Market Data", type="primary", width="stretch",
-                     disabled=not selected_factor_names):
-            with st.spinner("Accessing cloud database..."):
-                utils.load_and_process_data(user_settings)
+    # Define primary application layout. Only the open tab is rendered.
+    tab_analysis, tab_results, tab_viewer, tab_about = st.tabs(
+        MAIN_TABS, key=MAIN_TABS_KEY, on_change=_on_main_tab_change
+    )
 
-        # Step 2: Execution
-        if st.session_state.get('data_loaded', False):
-            if st.button("Run Portfolio Analysis", type="primary", width="stretch"):
-                with st.spinner("Executing backtest simulation..."):
-                    run = utils.run_backtest_logic(
-                        user_settings, 
-                        selected_factor_names, 
-                        factor_directions
-                    )
-                
-                if run is not None:
-                    st.success(f"Analysis complete. Saved as \"{run['label']}\" in the Results tab.")
-                    # Trigger automatic tab switch to Results via JavaScript injection
-                    st.markdown("""
-                        <script>
-                        window.parent.document.querySelectorAll('button[data-baseweb="tab"]')[1].click();
-                        </script>
-                        """, unsafe_allow_html=True)
+    if tab_analysis.open:
+        with tab_analysis:
+            # Configuration phase: Capture factors and directions
+            selected_factor_names, factor_directions = render_factor_selection()
 
-    with tab_results:
-        # Performance Visualization phase
-        if st.session_state.get('saved_runs'):
-            render_saved_runs(st.session_state.saved_runs)
-        else:
-            st.info("Performance metrics will appear here after a successful analysis run.")
-    
-    with tab_viewer:
-        # Raw data inspection and CSV export (reuses the data loaded in Analysis)
-        render_data_viewer_tab()
+            # Step 1: Data Acquisition
+            if st.button("Load Market Data", type="primary", width="stretch",
+                         disabled=not selected_factor_names):
+                with st.spinner("Accessing cloud database..."):
+                    utils.load_and_process_data(user_settings)
 
-    with tab_about:
-        # Documentation phase
-        render_about_tab()
+            # Step 2: Execution
+            if st.session_state.get('data_loaded', False):
+                if st.button("Run Portfolio Analysis", type="primary", width="stretch"):
+                    with st.spinner("Executing backtest simulation..."):
+                        run = utils.run_backtest_logic(
+                            user_settings,
+                            selected_factor_names,
+                            factor_directions
+                        )
+
+                    if run is not None:
+                        st.session_state[RUN_COMPLETE_KEY] = (
+                            f"Analysis complete. Saved as \"{run['label']}\" in the Results tab."
+                        )
+                        st.rerun()
+
+    if tab_results.open:
+        with tab_results:
+            # Performance Visualization phase
+            if RUN_COMPLETE_KEY in st.session_state:
+                st.success(st.session_state.pop(RUN_COMPLETE_KEY))
+            if st.session_state.get('saved_runs'):
+                render_saved_runs(st.session_state.saved_runs)
+            else:
+                st.info("Performance metrics will appear here after a successful analysis run.")
+
+    if tab_viewer.open:
+        with tab_viewer:
+            # Raw data inspection and CSV export (reuses the data loaded in Analysis)
+            render_data_viewer_tab()
+
+    if tab_about.open:
+        with tab_about:
+            # Documentation phase
+            render_about_tab()
 
 if __name__ == "__main__":
     main()

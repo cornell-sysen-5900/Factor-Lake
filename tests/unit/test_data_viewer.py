@@ -24,6 +24,7 @@ from app.viewer_data import (
     to_csv_bytes,
 )
 from src.s3_client import S3DataManager
+from tests.unit.test_saved_runs import _click_main_tab, browser_like_widget_states
 
 APP_DIR = Path(__file__).resolve().parents[2] / 'app'
 SECTORS = ['Technology', 'Healthcare', 'Energy']
@@ -129,6 +130,7 @@ def test_keep_valid_selections_drops_only_what_is_no_longer_offered():
 def at(monkeypatch):
     # `streamlit run` puts app/ on sys.path; AppTest does not.
     monkeypatch.syspath_prepend(str(APP_DIR))
+    browser_like_widget_states(monkeypatch)
     app = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=60)
     app.session_state['raw_data'] = _universe()
     app.run()
@@ -136,10 +138,19 @@ def at(monkeypatch):
 
 
 def _load_market_data(at):
+    """Loads market data in the Analysis tab, then opens the Data Viewer tab."""
     from app.streamlit_config import FACTOR_METADATA
     # Load Market Data stays disabled until at least one factor is added
     at.button(key=f"factor_add_{FACTOR_METADATA['ROE using 9/30 Data']['key']}").click().run()
     next(b for b in at.button if b.label == 'Load Market Data').click().run()
+    _click_main_tab(at, 'Data Viewer')
+
+
+def _reload_market_data(at):
+    """Clicks Load Market Data again (in the Analysis tab), then reopens the Data Viewer."""
+    _click_main_tab(at, 'Analysis')
+    next(b for b in at.button if b.label == 'Load Market Data').click().run()
+    _click_main_tab(at, 'Data Viewer')
 
 
 def _widget(collection, label):
@@ -164,6 +175,7 @@ def test_data_viewer_tab_sits_between_results_and_about(at):
 
 
 def test_viewer_asks_for_market_data_first(at):
+    _click_main_tab(at, 'Data Viewer')
     _assert_clean(at)
     assert any('Load market data in the Analysis tab first' in i.value for i in at.info)
     assert not any(b.key == 'viewer_load' for b in at.button)
@@ -225,7 +237,18 @@ def test_clear_frees_the_table(at):
 def test_reloading_market_data_clears_the_table(at):
     _load_market_data(at)
     _load_viewer(at)
-    next(b for b in at.button if b.label == 'Load Market Data').click().run()
+    _reload_market_data(at)
+    _assert_clean(at)
+    assert VIEWER_STATE_KEY not in at.session_state
+
+
+def test_new_market_data_clears_the_table_while_the_viewer_stays_open(at):
+    # Reloading means visiting Analysis, which already clears the viewer, so swap the
+    # data directly to check the viewer's own "data changed" guard
+    _load_market_data(at)
+    _load_viewer(at)
+    at.session_state['rdata'] = at.session_state['rdata'].copy()
+    at.run()
     _assert_clean(at)
     assert VIEWER_STATE_KEY not in at.session_state
 
@@ -252,6 +275,7 @@ def test_viewer_makes_no_extra_data_source_requests(monkeypatch):
     monkeypatch.setattr(S3DataManager, '__init__', lambda self, *a, **k: None)
     monkeypatch.setattr(S3DataManager, 'fetch_all_data', counting_fetch)
     monkeypatch.syspath_prepend(str(APP_DIR))
+    browser_like_widget_states(monkeypatch)
     st.cache_resource.clear()
     try:
         at = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=60)
@@ -336,7 +360,7 @@ def test_table_is_dropped_when_reloaded_data_is_empty(at):
 
     _widget(at.sidebar.checkbox, 'Enable Sector Filter').check().run()
     _widget(at.sidebar.multiselect, 'Include following sectors:').set_value(['Utilities']).run()  # no such rows
-    next(b for b in at.button if b.label == 'Load Market Data').click().run()
+    _reload_market_data(at)
 
     assert at.session_state['rdata'].empty
     assert VIEWER_STATE_KEY not in at.session_state
@@ -383,3 +407,44 @@ def test_changing_sectors_keeps_the_date_range_and_sector_selections(at):
             _widget(at.multiselect, 'Industry').key) == keys_before        # same widgets, not new ones
     assert _widget(at.date_input, 'Date range').value == (date(2005, 9, 30), date(2010, 9, 30))
     assert _widget(at.multiselect, 'Sector').value == ['Technology', 'Energy']
+
+
+@pytest.mark.parametrize('other_tab', ['Analysis', 'Results', 'About'])
+def test_leaving_the_viewer_clears_its_table(at, other_tab):
+    _load_market_data(at)
+    _load_viewer(at)
+    table_ref = weakref.ref(at.session_state[VIEWER_STATE_KEY]['df'])
+
+    _click_main_tab(at, other_tab)
+    gc.collect()
+
+    _assert_clean(at)
+    assert at.session_state['main_tabs'] == other_tab
+    assert VIEWER_STATE_KEY not in at.session_state
+    assert table_ref() is None                     # nothing keeps the filtered table in memory
+    assert len(at.dataframe) == 0                  # the viewer is not drawn at all
+
+    _click_main_tab(at, 'Data Viewer')             # coming back starts without a table
+    assert len(at.dataframe) == 0
+
+
+def test_staying_on_the_viewer_keeps_its_table(at):
+    _load_market_data(at)
+    _load_viewer(at, date(2010, 9, 30), date(2015, 9, 30), ['Technology'])
+    shown = at.dataframe[0].value
+
+    at.run()                                       # any rerun while the viewer is open
+    _click_main_tab(at, 'Data Viewer')             # clicking the open tab again
+
+    _assert_clean(at)
+    assert VIEWER_STATE_KEY in at.session_state
+    pd.testing.assert_frame_equal(at.dataframe[0].value, shown)
+
+
+def test_only_the_open_tab_is_drawn(at):
+    _load_market_data(at)                          # Data Viewer open
+    assert any(b.key == 'viewer_load' for b in at.button)
+    assert not any(b.label == 'Load Market Data' for b in at.button)    # Analysis not drawn
+
+    _click_main_tab(at, 'About')
+    assert not any(b.key == 'viewer_load' for b in at.button)
