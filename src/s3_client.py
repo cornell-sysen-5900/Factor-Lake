@@ -9,7 +9,7 @@ import io
 import json
 import logging
 import os
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 import pandas as pd
 
@@ -90,27 +90,35 @@ class S3DataManager:
             lpm = pd.DataFrame()
         return attach_delisting_info(df, prepare_last_price_mapping(lpm))
 
-    def read_parquet(self, filename: str) -> pd.DataFrame:
-        """Downloads one Parquet data file into a DataFrame."""
-        return pd.read_parquet(io.BytesIO(self._read_bytes(filename)))
+    def read_parquet(self, filename: str, columns: Optional[List[str]] = None) -> pd.DataFrame:
+        """Downloads one Parquet data file into a DataFrame (only `columns`, if given)."""
+        return pd.read_parquet(io.BytesIO(self._read_bytes(filename)), columns=columns)
 
     def read_daily_manifest(self) -> Dict[str, Any]:
         """Returns the manifest of the published daily data (years, row counts, columns)."""
         return json.loads(self._read_bytes(DAILY_MANIFEST_FILE))
 
-    def read_daily_prices(self, years: Optional[Iterable[int]] = None) -> pd.DataFrame:
+    def read_daily_prices(self, years: Optional[Iterable[int]] = None,
+                          columns: Optional[List[str]] = None) -> pd.DataFrame:
         """
         Downloads the daily stock data for the given years (all published years by default).
-        Only years listed in the manifest are read. Raises S3DataError for unpublished years.
+        Pass `columns` to load only those: all of them for every year takes several GB in memory.
+        Only years listed in the manifest are read. Raises S3DataError for unpublished years
+        or unknown columns.
         """
-        published = sorted(int(y) for y in self.read_daily_manifest()['years'])
+        manifest = self.read_daily_manifest()
+        unknown = [c for c in columns or [] if c not in manifest.get('columns', {})]
+        if unknown:
+            raise S3DataError(f"Unknown daily data columns {unknown}. "
+                              f"Available: {list(manifest.get('columns', {}))}.")
+        published = sorted(int(y) for y in manifest['years'])
         wanted = published if years is None else sorted({int(y) for y in years})
         missing = [y for y in wanted if y not in published]
         if missing:
             raise S3DataError(f"No daily data published for {missing}. Published years: "
                               f"{published[0]}-{published[-1]}." if published else
                               "No daily data has been published.")
-        frames = [self.read_parquet(daily_year_file(y)) for y in wanted]
+        frames = [self.read_parquet(daily_year_file(y), columns=columns) for y in wanted]
         return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
     def _read_bytes(self, filename: str) -> bytes:

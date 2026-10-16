@@ -57,7 +57,7 @@ uv run python scripts/publish_data_to_s3.py --universe new_data.xlsx --delisting
 
 ## 4. Publish the daily stock data
 
-The daily CRSP prices for the Russell 2000 universe (`russell2000_cleaned.csv`, about 7.5 million rows) are published separately with `scripts/publish_daily_data_to_s3.py`. The app does not use them yet.
+The daily CRSP prices for the Russell 2000 universe (`russell2000_cleaned.csv`, about 7.8 million rows from 2008 to 2024) are published separately with `scripts/publish_daily_data_to_s3.py`. The app does not use them yet.
 
 1. Put `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (a key that can write to the bucket) in `.env`.
 2. Check the file first. This cleans it and writes the Parquet files locally without uploading:
@@ -72,17 +72,24 @@ uv run python scripts/publish_daily_data_to_s3.py path/to/russell2000_cleaned.cs
 uv run python scripts/publish_daily_data_to_s3.py path/to/russell2000_cleaned.csv
 ```
 
-   Add `--start-date 2010-01-01` to drop earlier rows. The data published on 2026-10-15 used this option: 6.57M rows, 5,117 securities, 2010-01-04 to 2024-12-31.
-4. It first checks that the AWS keys can write to the bucket (a few seconds), so a wrong key fails right away with a readable message. Expect about 1 minute and under 1 GB of memory for 7.5 million rows.
+   Add `--start-date 2010-01-01` to drop earlier rows. `daily_prices/_manifest.json` records what was published: date range, row counts, columns and the start date.
+4. It first checks that the AWS keys can write to the bucket (a few seconds), so a wrong key fails right away with a readable message. Expect about 2–3 minutes and about 1.3 GB of memory for the full file (7.8 million rows, 23 columns). `--chunk-rows 100000` lowers the memory a little.
 
 The cleaning matches the old daily loader and the yearly data:
 
-- Column names can be upper or lower case: `date`, `permno`, `ticker`, `prc`, `cfacpr`, `shrout`, `ret`, `vol`. Other columns are not published, and the script lists them.
-- Placeholders such as `--`, CRSP letter codes, and CRSP's numeric missing codes become missing values. That covers returns below -100% (-66, -77, -88, -99), negative volume, and shares outstanding of 0.
-- Rows without a date, a price or an identifier are dropped. A price of 0 counts as missing.
-- `prc` is made positive, because CRSP marks bid/ask midpoints with a negative price.
+- Column names can be upper or lower case. `date`, `prc` and `permno` (or `ticker`) are required. These CRSP columns are kept when present:
+  - Identifiers: `permno`, `permco`, `ticker`, `cusip`, `comnam`. `cusip` and `naics` stay text, so leading zeros are kept.
+  - Codes: `shrcd`, `exchcd`, `siccd`, `naics`, `dlstcd`.
+  - Prices: `prc`, `cfacpr`, `openprc`, `askhi`, `bidlo`, `bid`, `ask`.
+  - Other: `shrout`, `vol`, `ret`, `dlret`, `shares_held`.
+
+  Any other column is not published, and the script lists it.
+- Placeholders such as `--`, CRSP letter codes (for example `C` in `ret` or `Z` in `siccd`), and CRSP's numeric missing codes become missing values. That covers returns and delisting returns below -100% (-55, -66, -77, -88, -99), negative volume, and shares outstanding of 0.
+- Rows without a date, a price or an identifier are dropped. A price of 0 counts as missing, and so does 0 in `openprc`, `askhi`, `bidlo`, `bid` and `ask`.
+- `prc` is made positive, because CRSP marks bid/ask midpoints with a negative price. `askhi` and `bidlo` are made positive for the same reason.
 - `prc_adj` = `prc / cfacpr` (split-adjusted).
 - `mkt_cap` = `prc × shrout`, in $ thousands.
+- `ret_total` is `ret` with the delisting return added on each security's last trading day: `(1 + ret) × (1 + dlret) − 1`, or `dlret` alone when `ret` is missing that day. The delisting return comes from the security's latest row that has one. CRSP usually puts it on a final row with no price, which is dropped, so use `ret_total` (or `daily_last_prices.parquet`) rather than the `dlret` column. It is added only once, even when a file repeats `dlret` on every row. A delisting code or return dated before the security's last price is ignored, and so is one for a ticker that several securities share on its last day. Both are expected only in ticker-only files (reused tickers and share classes). The script warns about them, and the manifest counts them as `delistings_ignored`.
 - For duplicate `permno`/date rows, the first one is kept. If the file has no `permno` column, only exact copies are dropped, because share classes can share a ticker. The script reports how many ticker/date pairs still have more than one row.
 
 What ends up in S3:
@@ -90,10 +97,10 @@ What ends up in S3:
 | File | Contents |
 |---|---|
 | `factor-lake-data/daily_prices/year=YYYY/data.parquet` | One file per year, sorted by security and date |
-| `factor-lake-data/daily_last_prices.parquet` | Each security's last trading day and price. `ended_early` is set when its rows stop more than 7 days before the data ends. That is a delisting, or leaving the universe if the file only covers Russell 2000 membership periods |
+| `factor-lake-data/daily_last_prices.parquet` | Each security's last trading day and price, with its CRSP delisting code (`delist_code`) and return (`delist_ret`). `delisted` is true for codes 200 and above, false for code 100 (still active), and empty when the file has no code for the security. `ended_early` is set when its rows stop more than 7 days before the data ends |
 | `factor-lake-data/daily_prices/_manifest.json` | Years, row counts, columns and the cleaning summary. Uploaded last, so readers never see a half-published set |
 
-Read it in Python with `S3DataManager().read_daily_prices(years=[2020, 2021])`. Leave out `years` to load everything.
+Read it in Python with `S3DataManager().read_daily_prices(years=[2020, 2021], columns=['permno', 'date', 'prc_adj', 'ret_total'])`. Leave out `years` to load every year. Leave out `columns` to load every column, but that takes several GB of memory for all years, mostly for the text columns.
 
 Re-publishing replaces the yearly files in place and uploads the manifest last. If a re-publish is interrupted, run it again before using the data.
 
