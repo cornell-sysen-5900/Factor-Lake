@@ -17,8 +17,10 @@ import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 from app.viewer_data import (
+    DISPLAY_ROW_LIMIT,
     VIEWER_STATE_KEY,
     filter_market_data,
+    hidden_rows_caption,
     industries_in_sectors,
     keep_valid_selections,
     to_csv_bytes,
@@ -31,12 +33,12 @@ SECTORS = ['Technology', 'Healthcare', 'Energy']
 INDUSTRIES = {'Technology': 'Software', 'Healthcare': 'Biotech', 'Energy': 'Oil Gas Production'}
 
 
-def _universe() -> pd.DataFrame:
-    """12 tickers x 2002-2024 yearly snapshots across three sectors/industries."""
+def _universe(n_tickers: int = 12) -> pd.DataFrame:
+    """n_tickers (default 12) x 2002-2024 yearly snapshots across three sectors/industries."""
     rng = np.random.RandomState(1)
     rows = []
     for year in range(2002, 2025):
-        for i in range(12):
+        for i in range(n_tickers):
             sector = SECTORS[i % 3]
             rows.append({
                 'Ticker-Region': f'T{i:02d}-US',
@@ -308,15 +310,37 @@ def downloads(monkeypatch):
     return captured
 
 
-def test_download_serves_exactly_the_table_on_screen(at, downloads):
+def test_download_has_every_row_and_starts_with_the_table_on_screen(at, downloads):
+    # The screen shows the first DISPLAY_ROW_LIMIT rows; the CSV has every filtered row
+    at.session_state['raw_data'] = _universe(n_tickers=60)     # 60 x 23 = 1,380 rows
     _load_market_data(at)
-    _load_viewer(at, date(2005, 9, 30), date(2012, 9, 30), ['Healthcare'])
+    _load_viewer(at)
     _assert_clean(at)
 
+    table = at.session_state[VIEWER_STATE_KEY]['df']
     payload = downloads[-1]()                       # the bytes the button would send
     shown = at.dataframe[0].value.reset_index(drop=True)
-    assert payload == to_csv_bytes(shown)
-    pd.testing.assert_frame_equal(pd.read_csv(io.BytesIO(payload)), shown, check_dtype=False)
+    exported = pd.read_csv(io.BytesIO(payload))
+    assert len(table) == 1380 and len(exported) == 1380 and len(shown) == DISPLAY_ROW_LIMIT
+    assert payload == to_csv_bytes(table)                       # every filtered row
+    assert list(exported.columns) == list(shown.columns)
+    pd.testing.assert_frame_equal(exported.head(DISPLAY_ROW_LIMIT), shown, check_dtype=False)
+    assert any(c.value == 'Showing 1,000 of 1,380 rows. Download CSV for all rows.' for c in at.caption)
+    assert any(c.value.startswith('1,380 rows × ') for c in at.caption)   # existing caption still counts all rows
+
+
+def test_small_table_is_shown_whole_without_the_hidden_rows_caption(at, downloads):
+    _load_market_data(at)
+    _load_viewer(at, date(2005, 9, 30), date(2012, 9, 30), ['Healthcare'])
+    shown = at.dataframe[0].value.reset_index(drop=True)
+    assert downloads[-1]() == to_csv_bytes(shown)
+    assert not any('Download CSV for all rows' in c.value for c in at.caption)
+
+
+def test_hidden_rows_caption():
+    assert hidden_rows_caption(DISPLAY_ROW_LIMIT) is None
+    assert hidden_rows_caption(24) is None
+    assert hidden_rows_caption(1380) == 'Showing 1,000 of 1,380 rows. Download CSV for all rows.'
 
 
 def test_download_clicked_during_a_clear_still_gets_the_whole_file(at, downloads):

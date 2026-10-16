@@ -14,10 +14,12 @@ import streamlit as st
 
 from app.viewer_data import (
     DATE_COL,
+    DISPLAY_ROW_LIMIT,
     INDUSTRY_COL,
     SECTOR_COL,
     VIEWER_STATE_KEY,
     filter_market_data,
+    hidden_rows_caption,
     industries_in_sectors,
     keep_valid_selections,
     to_csv_bytes,
@@ -120,10 +122,14 @@ def render_data_viewer_tab() -> None:
     # The applied range is shown because the date box can display a range the browser never sent
     start_txt, end_txt = holder['start'].isoformat(), holder['end'].isoformat()
     st.caption(f"{len(table):,} rows × {table.shape[1]} columns · {start_txt} to {end_txt}")
-    st.dataframe(table, hide_index=True, width="stretch")
+    hidden_caption = hidden_rows_caption(len(table))
+    if hidden_caption:
+        st.caption(hidden_caption)
+    # Large tables are slow to send to the browser, so only the first rows are shown
+    st.dataframe(table.head(DISPLAY_ROW_LIMIT), hide_index=True, width="stretch")
     st.download_button(
         "Download CSV",
-        # Built only when clicked, from the same table shown above. It keeps its own reference so a
+        # Built only when clicked, from the full table (every filtered row). It keeps its own reference so a
         # click that lands while a Clear or filter change is rerunning still gets the full file.
         data=lambda df=table: to_csv_bytes(df),
         file_name=f"factor_lake_data_{start_txt}_{end_txt}.csv",
