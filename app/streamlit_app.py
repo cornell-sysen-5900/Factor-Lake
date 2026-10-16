@@ -5,6 +5,15 @@ PURPOSE: Main application entry point orchestrating UI components and analysis l
 VERSION: 3.6.0
 """
 
+import os
+
+# Use the system allocator for Arrow. st.dataframe converts every table it shows
+# to Arrow, and Arrow's default allocator (mimalloc) keeps that memory cached
+# after the table is gone, so clearing large tables (e.g. in the Data Viewer)
+# did not lower process memory. pyarrow reads this once, when it is first
+# imported, so it must be set before anything imports pandas or pyarrow.
+os.environ.setdefault('ARROW_DEFAULT_MEMORY_POOL', 'system')
+
 import sys
 from pathlib import Path
 
