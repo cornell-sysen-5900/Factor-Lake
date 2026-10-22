@@ -77,8 +77,10 @@ def main():
     )
     
     # Render Global Sidebar and capture configuration
-    user_settings = sidebar.render_sidebar(config.SECTOR_OPTIONS, utils.describe_data_source())
-    
+    user_settings = sidebar.render_sidebar(config.SECTOR_OPTIONS, utils.describe_data_source(),
+                                           utils.get_backtest_lambda_name())
+    use_lambda = utils.lambda_backtests_enabled(user_settings)
+
     # A finished run opens the Results tab. The active tab can only be set
     # before st.tabs is drawn, so the run requests it and reruns (see below).
     if RUN_COMPLETE_KEY in st.session_state and st.session_state.get(MAIN_TABS_KEY) != "Results":
@@ -94,16 +96,22 @@ def main():
             # Configuration phase: Capture factors and directions
             selected_factor_names, factor_directions = render_factor_selection()
 
-            # Step 1: Data Acquisition
-            if st.button("Load Market Data", type="primary", width="stretch",
-                         disabled=not selected_factor_names):
+            # Step 1: Data Acquisition (with Lambda backtests, only the Data Viewer needs it)
+            if use_lambda:
+                st.caption("Backtests run in AWS Lambda, which reads the market data from S3. "
+                           "Load Market Data is only needed for the Data Viewer.")
+            if st.button("Load Market Data", type="secondary" if use_lambda else "primary",
+                         width="stretch", disabled=not selected_factor_names):
                 with st.spinner("Accessing cloud database..."):
                     utils.load_and_process_data(user_settings)
 
             # Step 2: Execution
-            if st.session_state.get('data_loaded', False):
-                if st.button("Run Portfolio Analysis", type="primary", width="stretch"):
-                    with st.spinner("Executing backtest simulation..."):
+            if use_lambda or st.session_state.get('data_loaded', False):
+                if st.button("Run Portfolio Analysis", type="primary", width="stretch",
+                             disabled=not selected_factor_names):
+                    spinner = ("Running the backtest in AWS Lambda..." if use_lambda
+                               else "Executing backtest simulation...")
+                    with st.spinner(spinner):
                         run = utils.run_backtest_logic(
                             user_settings,
                             selected_factor_names,
@@ -111,9 +119,10 @@ def main():
                         )
 
                     if run is not None:
-                        st.session_state[RUN_COMPLETE_KEY] = (
-                            f"Analysis complete. Saved as \"{run['label']}\" in the Results tab."
-                        )
+                        message = f"Analysis complete. Saved as \"{run['label']}\" in the Results tab."
+                        if run.get('compute'):
+                            message += f" Result {utils.describe_compute(run['compute'])}."
+                        st.session_state[RUN_COMPLETE_KEY] = message
                         st.rerun()
 
     if tab_results.open:

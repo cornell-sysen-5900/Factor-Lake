@@ -18,6 +18,8 @@ from typing import Dict, Any, List, Optional
 DATA_SOURCES = ('s3', 'supabase')
 # How long the shared copy of the market data is reused before it is downloaded again
 DATA_CACHE_TTL = timedelta(hours=6)
+# Name of the backtest Lambda; when set, backtests run in AWS Lambda (see lambda_backtests_enabled)
+BACKTEST_LAMBDA_ENV = 'FACTOR_LAKE_BACKTEST_LAMBDA'
 
 def initialize_environment() -> None:
     """
@@ -152,46 +154,90 @@ def load_and_process_data(user_settings: Dict[str, Any]) -> None:
     the kept rows are copied. When nothing is filtered out, rdata shares
     raw_data's columns, so treat rdata as read-only too.
     """
+    from src.universe_selection import select_universe
     try:
         if st.session_state.raw_data is None:
             st.session_state.raw_data = load_shared_universe(get_data_source())
 
-        raw = st.session_state.raw_data
-
-        # Temporal Filtering
-        start_yr, end_yr = int(user_settings['start_year']), int(user_settings['end_year'])
-        keep = (raw['Year'] >= start_yr) & (raw['Year'] <= end_yr)
-
-        # Sector Filtering
-        if user_settings.get('selected_sectors'):
-            keep &= raw['Scotts_Sector_5'].isin(user_settings['selected_sectors'])
-
-        # ESG Fossil Fuel Restrictions
-        if user_settings.get('restrict_fossil_fuels'):
-            excluded = {"integratedoil", "oilfieldservicesequipment", "oilgasproduction", "coal", "oilrefiningmarketing"}
-            industry_col = 'FactSet_Industry' if 'FactSet_Industry' in raw.columns else 'FactSet Industry'
-            if industry_col in raw.columns:
-                clean_ind = raw[industry_col].str.lower().str.replace(r'[^a-z0-9]', '', regex=True)
-                keep &= ~clean_ind.isin(excluded)
-
-        if keep.all():
-            # Nothing filtered out: share raw_data's columns instead of copying them. The
-            # shallow copy is still a new DataFrame, so adding or dropping columns on it
-            # never touches raw_data, and each load gives a new object (the Data Viewer
-            # uses that to notice reloaded data).
-            df = raw.copy(deep=False)
-        else:
-            df = raw[keep.to_numpy()]   # copies only the kept rows
+        # Year, sector and ESG fossil fuel filters (the backtest Lambda applies the same ones)
+        df = select_universe(
+            st.session_state.raw_data,
+            int(user_settings['start_year']), int(user_settings['end_year']),
+            selected_sectors=user_settings.get('selected_sectors'),
+            restrict_fossil_fuels=bool(user_settings.get('restrict_fossil_fuels')),
+        )
 
         st.session_state.rdata = df
-        st.session_state.loaded_filters = {
-            'restrict_fossil_fuels': bool(user_settings.get('restrict_fossil_fuels')),
-            'selected_sectors': list(user_settings.get('selected_sectors') or []),
-        }
+        st.session_state.loaded_filters = _universe_filters(user_settings)
         st.session_state.data_loaded = True
         st.success(f"Universe Refined: {len(df):,} records prepared.")
     except Exception as e:
         st.error(f"Data Orchestration Error: {str(e)}")
+
+def _universe_filters(user_settings: Dict[str, Any]) -> Dict[str, Any]:
+    """The sidebar's universe filters, as shown in the Results tab captions."""
+    return {
+        'restrict_fossil_fuels': bool(user_settings.get('restrict_fossil_fuels')),
+        'selected_sectors': list(user_settings.get('selected_sectors') or []),
+    }
+
+def get_backtest_lambda_name() -> str:
+    """The backtest Lambda's name (FACTOR_LAKE_BACKTEST_LAMBDA), or '' when none is configured."""
+    return os.environ.get(BACKTEST_LAMBDA_ENV, '').strip()
+
+def lambda_backtests_enabled(user_settings: Dict[str, Any]) -> bool:
+    """
+    True when backtests run in AWS Lambda: a Lambda is configured and the sidebar's
+    "Run backtests in AWS Lambda" switch is on. The app then never downloads the
+    market data for a backtest; Lambda reads it from S3 instead.
+    """
+    return bool(get_backtest_lambda_name()) and bool(user_settings.get('use_lambda', True))
+
+@st.cache_resource(show_spinner=False)
+def get_lambda_client(function_name: str):
+    """One Lambda client shared by every session."""
+    from src.lambda_client import BacktestLambdaClient
+    return BacktestLambdaClient(function_name)
+
+def describe_compute(info: Optional[Dict[str, Any]]) -> str:
+    """One line on where a result came from, e.g. "computed in AWS Lambda in 8.2 s"."""
+    if not info:
+        return "computed in this app"
+    if info.get('cached'):
+        text = f"returned from the AWS Lambda result cache in {info['round_trip_seconds']:.1f} s"
+        if info.get('computed_at'):
+            text += f" (first computed {info['computed_at'].replace('T', ' ').rstrip('Z')} UTC)"
+    else:
+        text = (f"computed in AWS Lambda in {info['round_trip_seconds']:.1f} s "
+                f"(backtest {info.get('compute_seconds') or 0:.1f} s)")
+    if info.get('delivery') == 's3_link':
+        text += ", downloaded from an S3 link"
+    return text
+
+def run_cohort(run: Dict[str, Any], cohort_pct: float):
+    """
+    Top vs bottom cohort portfolio values for a saved run, computed where the run
+    was: in Lambda for Lambda runs (run['data'] is None), else locally on the run's data.
+
+    Returns:
+        (top values, bottom values, compute info or None for local runs)
+    """
+    from src.backtest_engine import run_cohort_comparison
+    if run.get('data') is not None:
+        top, bottom = run_cohort_comparison(
+            data=run['data'],
+            selected_factors=run['factors'],
+            factor_directions=run['factor_directions'],
+            cohort_pct=cohort_pct,
+            user_settings=run['settings'],
+        )
+        return list(top), list(bottom), None
+
+    from src.backtest_jobs import build_job
+    job = build_job('cohort', run['factors'], run['factor_directions'], run['settings'],
+                    factor_labels=dict(zip(run['factors'], run['factor_labels'])), cohort_pct=cohort_pct)
+    result, info = get_lambda_client(run['compute']['function_name']).run(job)
+    return result['top'], result['bottom'], info
 
 def run_backtest_logic(user_settings: Dict[str, Any], 
                        factor_names: List[str], 
@@ -204,10 +250,15 @@ def run_backtest_logic(user_settings: Dict[str, Any],
     directions, settings and data it used) as the newest entry in
     st.session_state.saved_runs.
 
+    With Lambda backtests on (lambda_backtests_enabled), the inputs are sent to the
+    backtest Lambda instead, which reads the data from S3; the run then keeps no data
+    (run['data'] is None) and run['compute'] says how the Lambda produced the result.
+
     Returns:
         The saved run, or None if the run was rejected or failed (nothing is saved).
     """
     from src.backtest_engine import rebalance_portfolio
+    from src.backtest_jobs import build_job
     from app.streamlit_config import FACTOR_METADATA, MAX_SAVED_RUNS
     from app.saved_runs import add_saved_run, build_run_label
 
@@ -226,23 +277,32 @@ def run_backtest_logic(user_settings: Dict[str, Any],
             FACTOR_METADATA[f]['column']: factor_dirs.get(f, 'top')
             for f in factor_labels
         }
-        data = st.session_state.rdata
+        column_labels = {FACTOR_METADATA[f]['column']: f for f in factor_labels}
 
-        # Portfolio simulation execution
-        results = rebalance_portfolio(
-            data,
-            internal_factor_cols,
-            factor_directions=internal_directions,
-            start_year=int(user_settings['start_year']),
-            end_year=int(user_settings['end_year']),
-            initial_aum=user_settings['initial_aum'],
-            benchmark_index=user_settings.get('benchmark_index', 1),
-            top_pct=user_settings.get('top_pct', 10.0),
-            use_market_cap_weight=user_settings.get('use_market_cap_weight', False),
-            delisting_strategy=user_settings.get('delisting_strategy', 'zero_return'),
-            factor_combination=user_settings.get('factor_combination', 'mixing'),
-            factor_labels={FACTOR_METADATA[f]['column']: f for f in factor_labels}
-        )
+        if lambda_backtests_enabled(user_settings):
+            # AWS Lambda reads the data from S3, filters it like Load Market Data and runs the same engine
+            job = build_job('backtest', internal_factor_cols, internal_directions, user_settings,
+                            factor_labels=column_labels)
+            results, compute = get_lambda_client(get_backtest_lambda_name()).run(job)
+            data, universe = None, _universe_filters(user_settings)
+        else:
+            data, compute = st.session_state.rdata, None
+            universe = dict(st.session_state.get('loaded_filters') or {})
+            # Portfolio simulation execution
+            results = rebalance_portfolio(
+                data,
+                internal_factor_cols,
+                factor_directions=internal_directions,
+                start_year=int(user_settings['start_year']),
+                end_year=int(user_settings['end_year']),
+                initial_aum=user_settings['initial_aum'],
+                benchmark_index=user_settings.get('benchmark_index', 1),
+                top_pct=user_settings.get('top_pct', 10.0),
+                use_market_cap_weight=user_settings.get('use_market_cap_weight', False),
+                delisting_strategy=user_settings.get('delisting_strategy', 'zero_return'),
+                factor_combination=user_settings.get('factor_combination', 'mixing'),
+                factor_labels=column_labels
+            )
     except Exception as e:
         st.error(f"Backtest Execution Error: {str(e)}")
         return None
@@ -263,9 +323,10 @@ def run_backtest_logic(user_settings: Dict[str, Any],
         'factors': internal_factor_cols,
         'factor_directions': internal_directions,
         'settings': dict(user_settings),
-        'universe': dict(st.session_state.get('loaded_filters') or {}),
+        'universe': universe,
         'data': data,
         'results': results,
+        'compute': compute,
         'cohort': None,
     }
     st.session_state.next_run_id = run_id + 1

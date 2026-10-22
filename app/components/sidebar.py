@@ -8,22 +8,40 @@ VERSION: 2.6.0
 import streamlit as st
 from typing import Dict, Any, List
 
-def render_sidebar(sector_options: List[str], data_source_label: str) -> Dict[str, Any]:
+def render_sidebar(sector_options: List[str], data_source_label: str,
+                   backtest_lambda: str = '') -> Dict[str, Any]:
     """
     Constructs the application sidebar to capture user configuration settings.
-    
-    This interface manages global constraints, including date ranges, initial 
+
+    This interface manages global constraints, including date ranges, initial
     capitalization, sector exposures, and weighting methodologies.
-    
+
+    backtest_lambda is the configured backtest Lambda's name ('' for none); when
+    set, a switch chooses whether backtests run there or in the app.
+
     Returns:
         Dict[str, Any]: Standardized dictionary of user-defined parameters.
     """
     with st.sidebar:
         st.header("Configuration")
-        
+
         # Data Source Information
         st.subheader("Data Source")
         st.caption(f"Primary Source: {data_source_label}")
+
+        # Where backtests run
+        use_lambda = False
+        if backtest_lambda:
+            use_lambda = st.toggle(
+                "Run backtests in AWS Lambda",
+                value=True,
+                key="use_lambda_input",
+                help="On: the app sends your settings to AWS Lambda, which reads the market data "
+                     "from S3, runs the backtest and caches the result. Off: the app loads the data "
+                     "and runs the backtest itself."
+            )
+            st.caption(f"Lambda function: `{backtest_lambda}`" if use_lambda
+                       else "Backtests run in this app (load the market data first).")
 
         st.divider()
         
@@ -155,5 +173,6 @@ def render_sidebar(sector_options: List[str], data_source_label: str) -> Dict[st
         "start_year": start_year,
         "end_year": end_year,
         "initial_aum": initial_aum,
-        "delisting_strategy": delisting_strategy_key
+        "delisting_strategy": delisting_strategy_key,
+        "use_lambda": use_lambda
     }

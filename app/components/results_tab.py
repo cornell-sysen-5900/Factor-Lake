@@ -12,8 +12,8 @@ from typing import Dict, Any, List, Tuple, Optional
 
 from Visualizations.portfolio_growth_plot import plot_portfolio_growth
 from Visualizations.top_bottom_portfolio_plot import plot_top_bottom_percent
-import src.backtest_engine as backtest_engine
 from app.streamlit_config import MAX_SAVED_RUNS
+from app.streamlit_utils import describe_compute, run_cohort
 from app.saved_runs import remove_saved_run
 from app.holdings_table import (
     FACTOR_COMBINATION_LABELS, build_holdings_display_table, default_holdings_year,
@@ -344,6 +344,11 @@ def _render_header_captions(run: Dict[str, Any]) -> None:
     st.caption(f"**Factor Combination:** {combination_descriptions.get(combination, combination_descriptions['mixing'])}")
     st.caption(f"**Weighting:** {weighting_str}")
     st.caption(f"**Delisting Strategy:** {delisting_str}")
+    compute = run.get('compute')
+    if compute:
+        how = describe_compute(compute)
+        st.caption(f"**Computed:** {how[:1].upper() + how[1:]} | "
+                   f"**Result ID:** `{(compute.get('hash') or '')[:12]}`")
 
 def _render_summary_metrics(res: Dict[str, Any], settings: Dict[str, Any]) -> None:
     """
@@ -369,7 +374,8 @@ def _render_cohort_analysis_section(run: Dict[str, Any]) -> None:
     """
     Runs and shows a comparison between the top and bottom factor cohorts.
 
-    Uses the run's own data, factor columns, directions and settings. The
+    Uses the run's own data, factor columns, directions and settings (in AWS
+    Lambda for Lambda runs, see run_cohort). The
     result is stored on the run, so it is still shown after reruns and tab
     switches. Widget keys include the run id so every run has its own controls.
     """
@@ -392,19 +398,20 @@ def _render_cohort_analysis_section(run: Dict[str, Any]) -> None:
             st.session_state[saved_pct_key] = cohort_pct
 
         if st.button("Generate Comparison", type="primary", key=f"cohort_btn_{run_id}"):
-            res_top, res_bot = backtest_engine.run_cohort_comparison(
-                data=run['data'],
-                selected_factors=run['factors'],
-                factor_directions=run['factor_directions'],
-                cohort_pct=cohort_pct,
-                user_settings=settings
-            )
-            run['cohort'] = {'pct': cohort_pct, 'top': list(res_top), 'bottom': list(res_bot)}
+            spinner = "Running the comparison in AWS Lambda..." if run.get('data') is None else "Running the comparison..."
+            try:
+                with st.spinner(spinner):
+                    res_top, res_bot, compute = run_cohort(run, cohort_pct)
+                run['cohort'] = {'pct': cohort_pct, 'top': res_top, 'bottom': res_bot, 'compute': compute}
+            except Exception as e:
+                st.error(f"Cohort Comparison Error: {str(e)}")
 
         cohort = run.get('cohort')
         if not cohort:
             return
         res_top, res_bot = cohort['top'], cohort['bottom']
+        if cohort.get('compute'):
+            st.caption(f"Comparison {describe_compute(cohort['compute'])}.")
 
         # --- THE 4 STATS BLOCK ---
         st.write(f"### Cohort Performance Summary (top vs bottom {cohort['pct']}%)")
