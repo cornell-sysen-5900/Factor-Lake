@@ -383,7 +383,11 @@ def _render_cohort_analysis_section(run: Dict[str, Any]) -> None:
     settings = run['settings']
     run_id = run['id']
     st.subheader("Top vs Bottom Cohort Analysis")
-    with st.expander("Run Cohort Comparison", expanded=run.get('cohort') is not None):
+    # The key makes the browser remember that the user opened the expander. Without
+    # one it follows `expanded`, which is still False in the run that computes the
+    # comparison, so the result appeared inside a collapsed expander.
+    with st.expander("Run Cohort Comparison", expanded=run.get('cohort') is not None,
+                     key=f"cohort_expander_{run_id}"):
         col1, col2 = st.columns(2)
         with col1:
             # Keep a copy so the chosen percentage survives the tab being hidden
