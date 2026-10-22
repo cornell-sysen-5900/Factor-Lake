@@ -59,7 +59,7 @@ def load_saved_analysis(text: Optional[str], manager: Optional[S3DataManager] = 
         # Without s3:ListBucket, S3 answers AccessDenied instead of NoSuchKey for a missing object
         if code in ('NoSuchKey', '404', 'NotFound', 'AccessDenied', '403'):
             raise SavedAnalysisError(
-                f"No saved analysis has the ID {analysis_id[:12]}…. Check that the whole ID was copied. "
+                f"No saved analysis has the ID {analysis_id[:8]}…{analysis_id[-4:]}. Check that the whole ID was copied. "
                 f"Saved analyses are deleted after {RESULT_RETENTION_DAYS} days, so an older one has expired; "
                 f"run it again to get a new ID."
             ) from e

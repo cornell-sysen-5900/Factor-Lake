@@ -66,7 +66,7 @@ def test_text_that_is_not_an_id_is_explained(text, message):
 @pytest.mark.parametrize('code', ['NoSuchKey', 'AccessDenied'])   # AccessDenied: keys without s3:ListBucket
 def test_missing_or_expired_id_is_explained(manager, s3, code):
     s3.can_list = code == 'NoSuchKey'
-    with pytest.raises(SavedAnalysisError, match=r'No saved analysis has the ID ffffffffffff.*deleted after 90 days'):
+    with pytest.raises(SavedAnalysisError, match=r'No saved analysis has the ID ffffffff…ffff\. .*deleted after 90 days'):
         load_saved_analysis(MISSING_ID, manager)
 
 
