@@ -64,6 +64,16 @@ Factor Lake lets you choose a group of stock-selection factors, rank stocks by t
 4. Click Remove this run to delete a tab you no longer need.
 5. Only the last 5 runs are kept, and all saved runs are cleared when you refresh the page, so record your numbers.
 
+### Share an analysis or open it later
+
+When backtests run in AWS Lambda, every analysis is saved for 90 days under an **analysis ID**.
+
+1. The ID is shown in the captions at the top of each run's tab. Click the copy button on the right of the ID.
+2. To open an analysis (yours or a colleague's), go to **Results → Open a saved analysis**, paste the ID and click **Open analysis**. It opens as a new tab, labelled "(opened)", with the original results, factors and settings. It loads from S3 and does not rerun the backtest.
+3. **This session's analyses** in the Results tab lists every analysis you ran or opened since the page was loaded, with its ID, including runs no longer shown as tabs. It never shows other people's analyses.
+4. Runs computed in the app (with the Lambda switch off) are not saved, so they have no ID.
+5. An ID that is mistyped, or older than 90 days, shows an error saying no saved analysis has that ID.
+
 ## 8. Read the results in order
 
 1. Pick the run tab you want and check its captions.
