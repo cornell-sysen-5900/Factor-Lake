@@ -47,14 +47,33 @@ utils.initialize_session_state()
 css.inject_styles()
 
 MAIN_TABS = ["Analysis", "Results", "Data Viewer", "About"]
+# The open main tab (a plain session value, updated on every run)
 MAIN_TABS_KEY = "main_tabs"
+# Widget key of the main tab bar, plus a version that changes each time the app opens a
+# tab itself. The browser keeps the tab the user last clicked and sends it on every rerun;
+# it does not follow a tab opened from Python. Under the same key, the first click after
+# a run that opened Results would rerun on the last clicked tab (and be lost there).
+# A new key is a new tab bar, with no clicked tab yet.
+MAIN_TABS_WIDGET_KEY = "main_tabs_bar"
+MAIN_TABS_VERSION_KEY = "main_tabs_bar_version"
 # Set after a successful run: the confirmation to show once the Results tab opens
 RUN_COMPLETE_KEY = "run_complete_message"
 
 
+def _main_tabs_widget_key() -> str:
+    """The current widget key of the main tab bar (see MAIN_TABS_WIDGET_KEY)."""
+    return f"{MAIN_TABS_WIDGET_KEY}_{st.session_state.get(MAIN_TABS_VERSION_KEY, 0)}"
+
+
+def _open_main_tab(label: str) -> None:
+    """Opens a main tab from Python. Call before the tab bar is drawn."""
+    st.session_state[MAIN_TABS_VERSION_KEY] = st.session_state.get(MAIN_TABS_VERSION_KEY, 0) + 1
+    st.session_state[_main_tabs_widget_key()] = label
+
+
 def _on_main_tab_change() -> None:
     """on_change callback: leaving the Data Viewer releases the table it loaded."""
-    if st.session_state[MAIN_TABS_KEY] != "Data Viewer":
+    if st.session_state[_main_tabs_widget_key()] != "Data Viewer":
         clear_viewer_data()
 
 
@@ -82,12 +101,12 @@ def main():
     # A finished run opens the Results tab. The active tab can only be set
     # before st.tabs is drawn, so the run requests it and reruns (see below).
     if RUN_COMPLETE_KEY in st.session_state and st.session_state.get(MAIN_TABS_KEY) != "Results":
-        st.session_state[MAIN_TABS_KEY] = "Results"
+        _open_main_tab("Results")
 
     # Define primary application layout. Only the open tab is rendered.
-    tab_analysis, tab_results, tab_viewer, tab_about = st.tabs(
-        MAIN_TABS, key=MAIN_TABS_KEY, on_change=_on_main_tab_change
-    )
+    main_tabs = st.tabs(MAIN_TABS, key=_main_tabs_widget_key(), on_change=_on_main_tab_change)
+    tab_analysis, tab_results, tab_viewer, tab_about = main_tabs
+    st.session_state[MAIN_TABS_KEY] = next(label for tab, label in zip(main_tabs, MAIN_TABS) if tab.open)
 
     if tab_analysis.open:
         with tab_analysis:

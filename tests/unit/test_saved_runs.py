@@ -99,11 +99,17 @@ def browser_like_widget_states(monkeypatch):
       Results tab, leaving the Analysis tab's widgets behind although that run did
       not draw them. Sending their states would make Streamlit treat them as new
       (firing the factor "add" callbacks), and reading them raises KeyError.
-    - The open tab of every keyed st.tabs bar. AppTest does not report tab bars,
-      so without this each run would fall back to the first tab.
+    - For every keyed st.tabs bar the user clicked, the tab last clicked in it
+      (see _click_tab). Like the real browser, this value does not follow tab
+      switches made from Python (setting st.session_state[key]): the browser
+      shows the new tab but keeps sending the last clicked one until the user
+      clicks again. For a bar never clicked, the open tab (the browser sends
+      nothing and Streamlit keeps the value; AppTest needs it sent).
     """
     from streamlit.proto.WidgetStates_pb2 import WidgetStates
     from streamlit.testing.v1.element_tree import ElementTree, get_widget_state
+
+    monkeypatch.setattr(ElementTree, 'clicked_tabs', {}, raising=False)   # tab bar id -> last clicked label
 
     def get_widget_states(self):
         session = self._runner.session_state._state
@@ -123,10 +129,17 @@ def browser_like_widget_states(monkeypatch):
         for tab_bar in _tab_bars(self):
             tab_id = tab_bar.proto.tab_container.id
             tab_key = tab_id.split('-', 2)[2]          # element ids look like "$$ID-<hash>-<key>"
-            if tab_id in drawn and tab_key in self._runner.session_state:
-                tab_state = states.widgets.add()
-                tab_state.id = tab_id
-                tab_state.string_value = self._runner.session_state[tab_key]   # the open tab
+            if tab_id not in drawn:
+                continue
+            if tab_id in ElementTree.clicked_tabs:
+                label = ElementTree.clicked_tabs[tab_id]
+            elif tab_key in self._runner.session_state:
+                label = self._runner.session_state[tab_key]
+            else:
+                continue
+            tab_state = states.widgets.add()
+            tab_state.id = tab_id
+            tab_state.string_value = label
         return states
 
     monkeypatch.setattr(ElementTree, 'get_widget_states', get_widget_states)
@@ -155,15 +168,20 @@ def _click_tab(at, key, label):
     """
     tab_bar = next(t for t in _tab_bars(at._tree) if t.proto.tab_container.id.endswith(f'-{key}'))
     tab_id = tab_bar.proto.tab_container.id
-    states = at._tree.get_widget_states()
-    tab_state = next((w for w in states.widgets if w.id == tab_id), None) or states.widgets.add()
-    tab_state.id = tab_id
-    tab_state.string_value = label
-    at._tree._runner._run(states)
+    type(at._tree).clicked_tabs[tab_id] = label        # the browser remembers the clicked tab
+    at._tree._runner._run(at._tree.get_widget_states())
+
+
+def _main_tab_bar_key(at):
+    """Widget key of the main tab bar (Analysis, Results, ...), found by its tab labels."""
+    for tab_bar in _tab_bars(at._tree):
+        if any(getattr(tab, 'label', None) == 'Data Viewer' for tab in tab_bar.children.values()):
+            return tab_bar.proto.tab_container.id.split('-', 2)[2]   # ids look like "$$ID-<hash>-<key>"
+    raise AssertionError("main tab bar not found")
 
 
 def _click_main_tab(at, label):
-    _click_tab(at, 'main_tabs', label)
+    _click_tab(at, _main_tab_bar_key(at), label)
 
 
 def _run_analysis(at):
@@ -336,6 +354,29 @@ def test_finished_run_opens_the_results_tab(at):
     assert any('Saved as "Run 1: ROE using 9/30 Data"' in s.value for s in results.success)
     assert _run_tab_labels(at) == ['Run 1: ROE using 9/30 Data']
     assert not any('<script' in m.value for m in at.markdown)        # no JavaScript tab switching
+
+
+def test_first_click_after_a_run_is_not_lost(at):
+    """
+    Regression: after a run opened the Results tab, the browser still sent the main
+    tab the user last clicked (Analysis), so the next click (here Generate Comparison)
+    reran the app on the Analysis tab and the click was lost.
+    """
+    _add_roe_and_load(at)
+    _run_analysis(at)                                   # clicks Analysis, runs; Results opens
+    at.button(key='cohort_btn_1').click().run()
+
+    _assert_clean(at)
+    assert at.session_state['main_tabs'] == 'Results'
+    assert at.session_state['saved_runs'][0]['cohort'] is not None
+    assert len(at.table) == 1                           # the comparison is shown
+
+    _click_main_tab(at, 'Analysis')                     # the user's own clicks still work
+    assert at.session_state['main_tabs'] == 'Analysis'
+    _run_analysis(at)                                   # and a second run opens Results again
+    at.button(key='cohort_btn_2').click().run()
+    assert at.session_state['main_tabs'] == 'Results'
+    assert next(r for r in at.session_state['saved_runs'] if r['id'] == 2)['cohort'] is not None
 
 
 def test_rejected_run_stays_on_the_analysis_tab(at):
