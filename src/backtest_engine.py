@@ -8,7 +8,6 @@ VERSION: 2.5.0
 import numpy as np
 import pandas as pd
 import math
-import streamlit as st
 from typing import Dict, List, Any, Tuple, Optional  # Added Tuple and Optional
 
 from .factor_utils import normalize_series
@@ -242,7 +241,11 @@ def _build_holdings_rows(portfolios: List[Portfolio], positions: List[Dict[str, 
     factor_cols = {f: _resolve_factor_column(df_year, f) for f in factors}
 
     rows = []
-    for ticker, held in sorted(by_ticker.items(), key=lambda kv: (kv[1]['rank'], -kv[1]['score'], kv[0])):
+    # Scores are compared to 10 decimals: the top stocks of different Mixing sleeves often tie
+    # exactly in theory, and float rounding (which differs between machines, e.g. a Mac and
+    # AWS Lambda) must not decide their order. True ties fall through to the ticker.
+    for ticker, held in sorted(by_ticker.items(),
+                               key=lambda kv: (kv[1]['rank'], -round(kv[1]['score'], 10), kv[0])):
         row: Dict[str, Any] = {'Rank': held['rank'], 'Ticker': ticker}
         if 'Security_Name' in df_year.columns:
             row['Name'] = df_year.loc[ticker, 'Security_Name']
@@ -272,8 +275,12 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
                         use_market_cap_weight: bool = False,
                         delisting_strategy: str = 'zero_return',
                         factor_combination: str = 'mixing',
-                        factor_labels: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+                        factor_labels: Optional[Dict[str, str]] = None,
+                        exclude_fossil: bool = False,
+                        selected_sectors: Optional[List[str]] = None) -> Dict[str, Any]:
     """Executes simulation using a filtered working copy of the master data.
+
+    Takes no Streamlit state, so the same code runs in the app and in AWS Lambda.
 
     Args:
         delisting_strategy: 'zero_return', 'hold_cash', or 'reinvest'.
@@ -284,6 +291,9 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
             composite_scores.
         factor_labels: factor column -> display label, used for the factor
             columns and Picked By in the holdings table (default: column names).
+        exclude_fossil, selected_sectors: extra on-the-fly filters. The app and the
+            Lambda filter the data first (src/universe_selection.py), so they leave
+            these at their defaults.
 
     Returns:
         The metrics from compute_comprehensive_metrics, plus 'holdings_by_year':
@@ -295,10 +305,7 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
     factor_labels = factor_labels or {}
 
     # ON-THE-FLY FILTERING: Apply constraints to a copy
-    exclude_fossil = st.session_state.get('exclude_fossil_fuels', False)
-    selected_sectors = st.session_state.get('selected_sectors', [])
-
-    working_data = filter_universe(data, exclude_fossil, selected_sectors)
+    working_data = filter_universe(data, exclude_fossil, selected_sectors or [])
 
     aum = initial_aum
     portfolio_values = [aum]

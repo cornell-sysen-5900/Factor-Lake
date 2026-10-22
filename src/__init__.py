@@ -16,4 +16,5 @@ from . import factor_registry      # noqa: F401
 from . import factors_doc          # noqa: F401
 from . import factor_utils         # noqa: F401
 from . import performance_metrics  # noqa: F401
-from . import supabase_client      # noqa: F401
+# supabase_client is not imported here: it needs the supabase package, which the
+# backtest Lambda does not ship. Import it directly (from src.supabase_client import ...).
