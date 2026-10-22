@@ -120,6 +120,8 @@ def test_backtest_results_match_the_old_data(monkeypatch, name):
         benchmark_index=s.get('benchmark_index', 1), top_pct=s.get('top_pct', 10.0),
         use_market_cap_weight=s.get('use_market_cap_weight', False),
         delisting_strategy=s.get('delisting_strategy', 'zero_return'),
+        factor_combination=s.get('factor_combination', 'mixing'),
+        factor_labels=dict(zip(run['factors'], run['factor_labels'])),
     )
     for key, value in expected.items():
         assert repr(run['results'][key]) == repr(value), key

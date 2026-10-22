@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/components/sidebar.py
 PURPOSE: Configuration interface for global backtest parameters and ESG filters.
-VERSION: 2.5.0
+VERSION: 2.6.0
 """
 
 import streamlit as st
@@ -49,6 +49,24 @@ def render_sidebar(sector_options: List[str], data_source_label: str) -> Dict[st
         
         if use_market_cap_weight:
             st.info("Portfolio will be weighted by market capitalization, aligning with the Russell 2000 methodology.")
+
+        st.divider()
+
+        # Factor Combination
+        st.subheader("Factor Combination")
+        combination_method = st.radio(
+            "Combine factors",
+            options=["Mixing", "Integrating"],
+            index=0,
+            help=(
+                "Mixing: each factor buys its own top stocks with an equal share of the money; "
+                "a stock picked by two factors is held twice. "
+                "Integrating: stocks are ranked by their average score across all factors and "
+                "the top ones are bought once each; stocks missing any factor are left out."
+            ),
+            key="factor_combination_input"
+        )
+        factor_combination = combination_method.lower()
 
         st.divider()
 
@@ -131,6 +149,7 @@ def render_sidebar(sector_options: List[str], data_source_label: str) -> Dict[st
     return {
         "restrict_fossil_fuels": restrict_fossil_fuels,
         "use_market_cap_weight": use_market_cap_weight,
+        "factor_combination": factor_combination,
         "selected_sectors": selected_sectors if sector_filter_enabled else None,
         "sector_filter_enabled": sector_filter_enabled,
         "start_year": start_year,
