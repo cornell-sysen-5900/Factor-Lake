@@ -367,6 +367,13 @@ class SkewedLambda(FakeLambda):
         return {'StatusCode': 200, 'Payload': io.BytesIO(json.dumps(response).encode())}
 
 
+def test_check_script_uses_new_inputs_each_run():
+    from scripts.check_backtest_lambda import sample_jobs
+    first, second = sample_jobs(unique=True), sample_jobs(unique=True)
+    assert all(a['initial_aum'] != b['initial_aum'] for a, b in zip(first, second))
+    assert sample_jobs(unique=False) == sample_jobs(unique=False)
+
+
 @pytest.mark.parametrize('lambda_class, exit_code', [(FakeLambda, 0), (SkewedLambda, 1)])
 def test_check_script_compares_lambda_with_local(monkeypatch, manager, capsys, lambda_class, exit_code):
     import scripts.check_backtest_lambda as check

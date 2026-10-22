@@ -18,6 +18,7 @@ cohort comparison) it:
 import argparse
 import math
 import os
+import secrets
 import sys
 import time
 from pathlib import Path
@@ -38,7 +39,8 @@ BASE = {'start_year': 2008, 'end_year': 2024, 'initial_aum': 1_000_000.0, 'use_m
 
 def sample_jobs(unique: bool) -> List[dict]:
     """The checked backtests. unique=True changes the AUM so nothing comes from an earlier run's cache."""
-    aum = BASE['initial_aum'] + (time.time_ns() % 1000 if unique else 0)
+    # Random cents (up to $10,000): a clock-based offset repeated on clocks with coarse ticks
+    aum = BASE['initial_aum'] + (secrets.randbelow(1_000_000) / 100 if unique else 0)
     two = ['ROE_using_9-30_Data', 'ROA']
     three = two + ['6-Mo_Momentum']
     tops = {f: 'top' for f in three}
