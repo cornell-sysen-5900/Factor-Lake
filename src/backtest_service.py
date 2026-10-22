@@ -150,18 +150,28 @@ class BacktestService:
         return self._universe[1]
 
     def _read_cached(self, filename: str) -> Optional[Tuple[bytes, Dict[str, str]]]:
-        """(body, metadata) of a saved result, or None when there is none."""
+        """
+        (body, metadata) of a saved result, or None when there is none.
+
+        Without s3:ListBucket (e.g. the class's shared Lambda role), S3 answers AccessDenied
+        instead of NoSuchKey for a result that is not saved yet, so that counts as "not
+        saved" too. A real permission problem still surfaces when the result is saved.
+        """
         try:
             response = self.manager.client.get_object(Bucket=self.manager.bucket,
                                                       Key=self.manager.object_key(filename))
             return response['Body'].read(), response.get('Metadata') or {}
         except Exception as e:
-            if _is_missing(e):
+            if _is_missing(e) or _error_code(e) in ('AccessDenied', '403'):
                 return None
             raise
 
 
+def _error_code(error: Exception) -> str:
+    """The AWS error code of a botocore ClientError ('' for other errors)."""
+    return str(getattr(error, 'response', {}).get('Error', {}).get('Code', ''))
+
+
 def _is_missing(error: Exception) -> bool:
     """True when an S3 error means the object does not exist."""
-    code = str(getattr(error, 'response', {}).get('Error', {}).get('Code', ''))
-    return code in ('NoSuchKey', '404', 'NotFound')
+    return _error_code(error) in ('NoSuchKey', '404', 'NotFound')

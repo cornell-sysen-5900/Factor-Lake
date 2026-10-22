@@ -44,15 +44,19 @@ LABELS = {'ROE_using_9-30_Data': 'ROE using 9/30 Data', 'ROA': 'ROA', '6-Mo_Mome
 # ---------------------------------------------------------------------------
 
 class FakeS3:
-    """The S3 calls the service makes, on an in-memory store."""
+    """
+    The S3 calls the service makes, on an in-memory store. can_list=False behaves like
+    a role without s3:ListBucket: missing objects give AccessDenied instead of NoSuchKey.
+    """
 
-    def __init__(self):
+    def __init__(self, can_list=True):
         self.objects = {}   # key -> (body, metadata)
         self.puts = []
+        self.can_list = can_list
 
     def get_object(self, Bucket, Key):
         if Key not in self.objects:
-            raise ClientError({'Error': {'Code': 'NoSuchKey'}}, 'GetObject')
+            raise ClientError({'Error': {'Code': 'NoSuchKey' if self.can_list else 'AccessDenied'}}, 'GetObject')
         body, metadata = self.objects[Key]
         return {'Body': io.BytesIO(body), 'Metadata': dict(metadata)}
 
@@ -232,6 +236,22 @@ def test_first_run_computes_and_saves_then_repeats_come_from_the_cache(service, 
     assert second['computed_at'] == first['computed_at']
     assert second['result'] == first['result']
     assert s3.puts == [saved_key]                          # nothing new written
+
+
+def test_cache_works_for_a_role_without_list_bucket(s3, monkeypatch):
+    s3.can_list = False                                    # like the class's Sysen5900LambdaExecRole
+    service = BacktestService(S3DataManager(bucket=BUCKET, prefix=PREFIX, client=s3))
+    first = service.run(_job())
+    assert first['cached'] is False and len(s3.puts) == 1
+    monkeypatch.setattr(backtest_service, 'run_job', lambda *a: pytest.fail("the backtest ran again"))
+    assert service.run(_job())['cached'] is True
+
+
+def test_other_cache_read_errors_are_not_hidden(service, s3, monkeypatch):
+    def broken_get(Bucket, Key):
+        raise ClientError({'Error': {'Code': 'SlowDown'}}, 'GetObject')
+    monkeypatch.setattr(s3, 'get_object', broken_get)
+    assert service.handle_event(_job())['error_type'] == 'ClientError'
 
 
 def test_a_new_lambda_container_reuses_results_saved_by_another(manager):
