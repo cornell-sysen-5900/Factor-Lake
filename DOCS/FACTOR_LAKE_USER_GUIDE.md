@@ -25,10 +25,14 @@ Factor Lake lets you choose a group of stock-selection factors, rank stocks by t
 
 1. Decide whether to restrict fossil fuel companies.
 2. Choose equal weight or market cap weight.
-3. Turn on sector filtering only if you need it.
-4. Set the start and end years.
-5. Set the initial investment amount.
-6. Pick the delisting strategy you want to test.
+3. Choose how multiple factors are combined:
+   - Mixing (default): each factor buys its own top stocks with an equal share of the money. A stock picked by two factors is held twice.
+   - Integrating: stocks are ranked by their average score across all the factors and the top ones are bought once each. Stocks missing any selected factor are left out.
+   With one factor, both give the same portfolio.
+4. Turn on sector filtering only if you need it.
+5. Set the start and end years.
+6. Set the initial investment amount.
+7. Pick the delisting strategy you want to test.
 
 ## 5. Choose factors and directions
 
@@ -55,7 +59,7 @@ Factor Lake lets you choose a group of stock-selection factors, rank stocks by t
 ### Saved runs
 
 1. Every successful run is saved as its own tab in Results, newest first.
-2. The captions at the top of each tab show the factors and directions, period, initial AUM, universe, weighting, and delisting strategy that run used.
+2. The captions at the top of each tab show the factors and directions, period, initial AUM, universe, factor combination method, weighting, and delisting strategy that run used.
 3. Saved tabs do not change when you edit the sidebar or factors afterwards. Run the analysis again to create a new tab.
 4. Click Remove this run to delete a tab you no longer need.
 5. Only the last 5 runs are kept, and all saved runs are cleared when you refresh the page, so record your numbers.
@@ -64,7 +68,7 @@ Factor Lake lets you choose a group of stock-selection factors, rank stocks by t
 
 1. Pick the run tab you want and check its captions.
 2. Start with Performance Summary.
-3. Check the Ranked Stocks table.
+3. Check the Holdings and Ranks table. Pick a rebalance year to see every stock the backtest bought that year: its rank, score, factor values, weight, shares, buy price, dollar value, period return, contribution and whether it was delisted. Mixing runs also show which factors picked each stock. The contributions add up to the portfolio return shown above the table. Download CSV exports the full table.
 4. Review Portfolio Growth Over Time.
 5. Review Year-by-Year Performance.
 6. Review Top vs Bottom Cohort Analysis. It uses the settings of the run tab it is in.

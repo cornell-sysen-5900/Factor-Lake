@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/components/results_tab.py
 PURPOSE: Visualization of results with strict adherence to original metrics and formatting.
-VERSION: 3.7.0
+VERSION: 3.8.0
 """
 
 import streamlit as st
@@ -15,8 +15,9 @@ from Visualizations.top_bottom_portfolio_plot import plot_top_bottom_percent
 import src.backtest_engine as backtest_engine
 from app.streamlit_config import MAX_SAVED_RUNS
 from app.saved_runs import remove_saved_run
-from app.ranked_stocks import (
-    build_ranked_display_table, default_ranked_year, ranked_number_formats, ranked_table_to_csv
+from app.holdings_table import (
+    FACTOR_COMBINATION_LABELS, build_holdings_display_table, default_holdings_year,
+    holdings_number_formats, holdings_period_return, holdings_table_to_csv
 )
 
 DIRECTION_LABELS = {'top': 'Higher is better', 'bottom': 'Lower is better'}
@@ -112,9 +113,9 @@ def render_results_tab(run: Dict[str, Any]) -> None:
         st.caption(f"**Delisted positions encountered:** {total_delisted}")
     st.divider()
 
-    # 3. Main Growth Plot
-    st.subheader("Ranked Stocks (Best to Worst)")
-    _render_ranked_stocks_table(run)
+    # 3. Holdings the backtest bought each year
+    st.subheader("Holdings and Ranks")
+    _render_holdings_table(run)
     st.divider()
 
     # 4. Main Growth Plot
@@ -142,16 +143,17 @@ def render_results_tab(run: Dict[str, Any]) -> None:
     st.divider()
 
 
-def _render_ranked_stocks_table(run: Dict[str, Any]) -> None:
+def _render_holdings_table(run: Dict[str, Any]) -> None:
     """
-    Displays the selected top cohort ranked by composite multi-factor score,
-    for the rebalance year chosen in the year selector, with a CSV download.
+    Displays every stock the backtest held for the rebalance year chosen in
+    the year selector (from results['holdings_by_year']), with a CSV download.
     """
-    ranked_by_year = run['results'].get('ranked_stocks_by_year') or {}
-    years = sorted(ranked_by_year)
+    results = run['results']
+    holdings_by_year = results.get('holdings_by_year') or {}
+    years = sorted(holdings_by_year)
 
     if not years:
-        st.info("No ranked stocks are available for the selected factors and date range.")
+        st.info("No holdings are available for the selected factors and date range.")
         return
 
     # Only the open run tab is rendered, and Streamlit drops the state of widgets
@@ -159,26 +161,38 @@ def _render_ranked_stocks_table(run: Dict[str, Any]) -> None:
     saved_key = f"ranked_year_saved_{run['id']}"
     saved_year = st.session_state.get(saved_key)
     year = st.selectbox(
-        "Ranking year",
+        "Rebalance year",
         options=years,
-        index=years.index(saved_year if saved_year in years else default_ranked_year(years)),
+        index=years.index(saved_year if saved_year in years else default_holdings_year(years)),
         key=f"ranked_year_{run['id']}",
     )
     st.session_state[saved_key] = year
 
-    ranked_df = build_ranked_display_table(ranked_by_year[year], run['factor_labels'])
+    rows = holdings_by_year[year]
+    method = FACTOR_COMBINATION_LABELS.get(results.get('factor_combination', 'mixing'), 'Mixing')
+    period_return = holdings_period_return(results, year)
+    return_str = f"{period_return:.2f}%" if period_return is not None else "n/a"
+    st.caption(
+        f"**Method:** {method} | **Holdings:** {len(rows)} | "
+        f"**Portfolio return ({year} to {year + 1}):** {return_str}"
+    )
+    if not rows:
+        st.info("The backtest held no stocks this year.")
+        return
+
+    holdings_df = build_holdings_display_table(rows, run['factor_labels'])
     # Round on screen only; the data (and the CSV) keep full precision
     column_config = {
         col: st.column_config.NumberColumn(format=fmt)
-        for col, fmt in ranked_number_formats(run['factor_labels']).items()
-        if col in ranked_df.columns
+        for col, fmt in holdings_number_formats(run['factor_labels']).items()
+        if col in holdings_df.columns
     }
-    st.dataframe(ranked_df, width="stretch", hide_index=True, column_config=column_config)
+    st.dataframe(holdings_df, width="stretch", hide_index=True, column_config=column_config)
 
     st.download_button(
         "Download CSV",
-        data=ranked_table_to_csv(ranked_df),
-        file_name=f"ranked_stocks_{year}.csv",
+        data=holdings_table_to_csv(holdings_df),
+        file_name=f"holdings_{year}.csv",
         mime="text/csv",
         key=f"ranked_csv_{run['id']}",
         on_click="ignore",
@@ -322,6 +336,12 @@ def _render_header_captions(run: Dict[str, Any]) -> None:
         sectors_str = ", ".join(sectors) if sectors else "All sectors"
         fossil_str = "excluded" if universe.get('restrict_fossil_fuels') else "included"
         st.caption(f"**Universe:** {sectors_str} | Fossil fuels {fossil_str}")
+    combination = settings.get('factor_combination', 'mixing')
+    combination_descriptions = {
+        'mixing': "Mixing (one sleeve per factor)",
+        'integrating': "Integrating (top stocks by composite score)",
+    }
+    st.caption(f"**Factor Combination:** {combination_descriptions.get(combination, combination_descriptions['mixing'])}")
     st.caption(f"**Weighting:** {weighting_str}")
     st.caption(f"**Delisting Strategy:** {delisting_str}")
 

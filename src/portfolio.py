@@ -23,6 +23,9 @@ class Portfolio:
         """
         self.name = name
         self.investments = investments if investments is not None else []
+        # Selection scores of the stocks chosen for this portfolio, best first
+        # (set by the backtest engine; None when the portfolio was built by hand)
+        self.scores: Optional[pd.Series] = None
 
     def add_investment(self, ticker: str, n_shares: float) -> None:
         """
