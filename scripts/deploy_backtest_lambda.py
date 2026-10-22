@@ -104,6 +104,21 @@ def merge_lifecycle_rules(existing: List[Dict[str, Any]], prefix: str, days: int
     return [rule for rule in existing if rule.get('ID') != LIFECYCLE_RULE_ID] + [ours]
 
 
+def role_setup_instructions(role_name: str, bucket: str, prefix: str) -> str:
+    """What an AWS admin needs to create when the deploying keys have no IAM access."""
+    return (
+        f"Please create an IAM role named {role_name} for AWS Lambda:\n\n"
+        f"1. Trust policy (who may use the role):\n{json.dumps(TRUST_POLICY, indent=2)}\n\n"
+        f"2. Attach the AWS managed policy {BASIC_EXECUTION_POLICY} (CloudWatch logs).\n\n"
+        f"3. Add this inline policy (S3 access):\n{json.dumps(role_policy(bucket, prefix), indent=2)}\n\n"
+        f"4. Allow the deploying user iam:PassRole on the role, plus lambda:CreateFunction, "
+        f"lambda:UpdateFunctionCode, lambda:UpdateFunctionConfiguration, lambda:GetFunction, "
+        f"lambda:InvokeFunction, lambda:ListLayerVersions and s3:GetLifecycleConfiguration / "
+        f"s3:PutLifecycleConfiguration on {bucket}.\n\n"
+        f"Then deploy with: uv run python scripts/deploy_backtest_lambda.py --role-arn <the role's ARN>"
+    )
+
+
 def ensure_role(iam, role_name: str, bucket: str, prefix: str) -> str:
     """Creates the Lambda's role if needed, sets its permissions, and returns its ARN."""
     from botocore.exceptions import ClientError
@@ -199,8 +214,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument('--timeout', type=int, default=600, help="Seconds (default 600)")
     parser.add_argument('--layer-arn', help="pandas layer version ARN (default: newest AWSSDKPandas-Python312)")
     parser.add_argument('--package-only', type=Path, metavar='ZIP', help="Only write the code package here")
+    parser.add_argument('--role-arn', help="Use this existing role and make no IAM calls (for keys without IAM access)")
+    parser.add_argument('--print-role-policy', action='store_true',
+                        help="Print the role an AWS admin needs to create, and exit")
     args = parser.parse_args(argv)
     prefix = args.prefix.strip('/')
+
+    if args.print_role_policy:
+        print(role_setup_instructions(args.role_name, args.bucket, prefix))
+        return 0
 
     package = build_package()
     logger.info(f"Code package: {len(package) / 1024:.0f} KB")
@@ -214,11 +236,23 @@ def main(argv: Optional[List[str]] = None) -> int:
     load_dotenv(PROJECT_ROOT / '.env')
     import boto3
 
-    iam = boto3.client('iam')
     lam = boto3.client('lambda', region_name=args.region)
     s3 = boto3.client('s3', region_name=args.region)
 
-    role_arn = ensure_role(iam, args.role_name, args.bucket, prefix)
+    if args.role_arn:
+        role_arn = args.role_arn
+        logger.info(f"Using IAM role {role_arn} (no IAM calls)")
+    else:
+        from botocore.exceptions import ClientError
+        try:
+            role_arn = ensure_role(boto3.client('iam'), args.role_name, args.bucket, prefix)
+        except ClientError as e:
+            if e.response['Error']['Code'] not in ('AccessDenied', 'AccessDeniedException'):
+                raise
+            logger.error("These AWS keys may not use IAM, so the script cannot create the Lambda's role.\n"
+                         "Ask an AWS admin to create it (run with --print-role-policy for what to send them),\n"
+                         "then deploy with --role-arn <the role's ARN>.")
+            return 1
     layer_arn = resolve_layer(lam, args.region, args.layer_arn)
     logger.info(f"pandas layer: {layer_arn}")
     deploy_function(lam, args.function_name, role_arn, package, layer_arn, args.memory, args.timeout,

@@ -35,6 +35,8 @@ It is safe to run again: it creates what is missing and updates the rest. It set
 | Lambda `factor-lake-backtest` | Python 3.12, 3008 MB, 10-minute timeout; pandas, numpy and pyarrow come from AWS's public [AWS SDK for pandas layer](https://aws-sdk-pandas.readthedocs.io/en/stable/layers.html), so the upload is only this project's code (about 30 KB) |
 | S3 lifecycle rule `factor-lake-expire-backtest-results` | Deletes `factor-lake-data/backtest-results/` objects after 90 days. Other rules on the bucket are kept |
 
+**Keys without IAM access** (such as the class `Sysen5900Student` user, which is denied all IAM actions) cannot create the role. Run `uv run python scripts/deploy_backtest_lambda.py --print-role-policy` and send the output to an AWS admin. Once they have created the role, deploy with `--role-arn <the role's ARN>`; the script then makes no IAM calls.
+
 It finishes by pinging the function. Options: `--memory`, `--timeout`, `--function-name`, `--layer-arn` (if the newest layer version cannot be looked up), `--package-only out.zip` (build the zip without deploying).
 
 ## 3. Turn it on in the app

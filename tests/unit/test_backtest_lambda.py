@@ -354,6 +354,27 @@ def test_lifecycle_rule_is_added_without_dropping_other_rules():
                         'Status': 'Enabled', 'Expiration': {'Days': 90}}
 
 
+def test_role_instructions_for_an_admin_include_both_policies(capsys):
+    from scripts.deploy_backtest_lambda import BASIC_EXECUTION_POLICY, main
+    assert main(['--print-role-policy', '--bucket', BUCKET, '--prefix', PREFIX]) == 0
+    out = capsys.readouterr().out
+    assert 'lambda.amazonaws.com' in out and BASIC_EXECUTION_POLICY in out
+    assert f'arn:aws:s3:::{BUCKET}/{PREFIX}/backtest-results/*' in out and '--role-arn' in out
+
+
+def test_deploy_without_iam_access_explains_the_admin_step(monkeypatch, caplog):
+    import boto3
+    from scripts.deploy_backtest_lambda import main
+
+    class DeniedIam:
+        def get_role(self, **kwargs):
+            raise ClientError({'Error': {'Code': 'AccessDenied', 'Message': 'explicit deny'}}, 'GetRole')
+
+    monkeypatch.setattr(boto3, 'client', lambda service, **kwargs: DeniedIam() if service == 'iam' else object())
+    assert main([]) == 1
+    assert '--print-role-policy' in caplog.text and '--role-arn' in caplog.text
+
+
 def test_lambda_package_has_the_engine_but_not_supabase():
     import zipfile
     from scripts.deploy_backtest_lambda import build_package
