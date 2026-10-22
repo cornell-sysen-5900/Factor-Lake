@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: src/backtest_engine.py
 PURPOSE: Backtesting engine with integrated on-the-fly filtering.
-VERSION: 2.5.0
+VERSION: 2.5.1
 """
 
 import numpy as np
@@ -288,7 +288,8 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
     Returns:
         The metrics from compute_comprehensive_metrics, plus 'holdings_by_year':
         {rebalance year: holdings rows (see _build_holdings_rows)} for every
-        year whose return is in the results.
+        year that produced a return. Years with no data are skipped and left out
+        of 'years', the benchmarks and the metrics.
     """
     if factor_combination not in FACTOR_COMBINATIONS:
         raise ValueError(f"factor_combination must be one of {FACTOR_COMBINATIONS}, not '{factor_combination}'.")
@@ -304,7 +305,8 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
     portfolio_values = [aum]
     portfolio_returns = []
     total_delisted = 0
-    # Rebalance year of each entry in portfolio_returns, and what was held that year
+    # Rebalance year of each entry in portfolio_returns (years without data are
+    # skipped), and what was held that year
     return_years = []
     holdings_by_year = {}
 
@@ -348,24 +350,28 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
         aum *= (1 + year_ret)
         portfolio_values.append(aum)
 
-    # Benchmarks
-    rf_rates = np.array(get_benchmark_list(4, start_year, end_year))
-    bench_rets = np.array(get_benchmark_list(benchmark_index, start_year + 1, end_year + 1)) / 100.0
-    growth_rets = np.array(get_benchmark_list(2, start_year + 1, end_year + 1)) / 100.0
-    value_rets = np.array(get_benchmark_list(3, start_year + 1, end_year + 1)) / 100.0
-
-    min_len = min(len(portfolio_returns), len(bench_rets), len(growth_rets), len(value_rets))
+    # Benchmarks, matched to the years that produced a return (skipped years have none):
+    # the return from rebalance year y is compared with each index's return for year y + 1.
+    rf_rates = np.array(_benchmark_for_years(4, return_years))
+    bench_rets = np.array(_benchmark_for_years(benchmark_index, [y + 1 for y in return_years])) / 100.0
+    growth_rets = np.array(_benchmark_for_years(2, [y + 1 for y in return_years])) / 100.0
+    value_rets = np.array(_benchmark_for_years(3, [y + 1 for y in return_years])) / 100.0
 
     results = compute_comprehensive_metrics(
-        np.array(portfolio_returns[:min_len]), bench_rets[:min_len],
-        growth_rets[:min_len], value_rets[:min_len], rf_rates[:min_len],
-        portfolio_values[:min_len + 1], start_year, start_year + min_len
+        np.array(portfolio_returns), bench_rets, growth_rets, value_rets, rf_rates,
+        portfolio_values, start_year, start_year + len(return_years),
+        return_years=return_years
     )
     results['delisting_strategy'] = delisting_strategy
     results['total_delisted_positions'] = total_delisted
     results['factor_combination'] = factor_combination
-    results['holdings_by_year'] = {yr: holdings_by_year[yr] for yr in return_years[:min_len]}
+    results['holdings_by_year'] = holdings_by_year
     return results
+
+
+def _benchmark_for_years(index: int, years: List[int]) -> List[float]:
+    """get_benchmark_list values for exactly these years, in order."""
+    return [get_benchmark_list(index, year, year + 1)[0] for year in years]
 
 def _calculate_annual_return(portfolios: List[Portfolio], df_year: pd.DataFrame,
                              delisting_strategy: str = 'zero_return',
