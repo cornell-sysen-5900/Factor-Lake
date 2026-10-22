@@ -241,7 +241,11 @@ def _build_holdings_rows(portfolios: List[Portfolio], positions: List[Dict[str, 
     factor_cols = {f: _resolve_factor_column(df_year, f) for f in factors}
 
     rows = []
-    for ticker, held in sorted(by_ticker.items(), key=lambda kv: (kv[1]['rank'], -kv[1]['score'], kv[0])):
+    # Scores are compared to 10 decimals: the top stocks of different Mixing sleeves often tie
+    # exactly in theory, and float rounding (which differs between machines, e.g. a Mac and
+    # AWS Lambda) must not decide their order. True ties fall through to the ticker.
+    for ticker, held in sorted(by_ticker.items(),
+                               key=lambda kv: (kv[1]['rank'], -round(kv[1]['score'], 10), kv[0])):
         row: Dict[str, Any] = {'Rank': held['rank'], 'Ticker': ticker}
         if 'Security_Name' in df_year.columns:
             row['Name'] = df_year.loc[ticker, 'Security_Name']

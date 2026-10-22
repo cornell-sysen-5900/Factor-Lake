@@ -203,6 +203,26 @@ def test_results_survive_the_json_round_trip(manager):
     assert all(isinstance(year, int) for year in decoded['holdings_by_year'])
 
 
+def test_tied_holdings_are_ordered_by_ticker_whatever_the_float_noise():
+    """Seen on AWS: Mixing sleeve leaders tie in score, and the last float bit differs by machine."""
+    import src.backtest_engine as engine
+    from src.portfolio import Portfolio
+    df = pd.DataFrame({'Ending_Price': [10.0, 20.0], 'Next-Years_Return': [5.0, 7.0], 'A': [1.0, 2.0],
+                       'B': [3.0, 4.0]}, index=pd.Index(['VGR', 'USNA'], name='Ticker'))
+    orders = []
+    for noise in (1e-15, -1e-15):                          # VGR's score a hair above, then below, USNA's
+        sleeves = [Portfolio('A'), Portfolio('B')]
+        sleeves[0].scores = pd.Series({'VGR': 2.7646355838833925 + noise})
+        sleeves[1].scores = pd.Series({'USNA': 2.7646355838833925})
+        positions = [{'sleeve': 0, 'ticker': 'VGR', 'shares': 1.0, 'price': 10.0, 'value': 10.0,
+                      'return': 0.05, 'delisted': False},
+                     {'sleeve': 1, 'ticker': 'USNA', 'shares': 1.0, 'price': 20.0, 'value': 20.0,
+                      'return': 0.07, 'delisted': False}]
+        rows = engine._build_holdings_rows(sleeves, positions, df, ['A', 'B'], 'mixing', {})
+        orders.append([r['Ticker'] for r in rows])
+    assert orders == [['USNA', 'VGR'], ['USNA', 'VGR']]
+
+
 def test_run_job_matches_the_app_filtering_and_engine(manager):
     raw = manager.fetch_all_data()
     job = _job(restrict_fossil_fuels=True, selected_sectors=['Energy', 'Technology', 'Financials'],
