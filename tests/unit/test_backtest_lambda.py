@@ -374,7 +374,32 @@ def test_check_script_uses_new_inputs_each_run():
     assert sample_jobs(unique=False) == sample_jobs(unique=False)
 
 
-@pytest.mark.parametrize('lambda_class, exit_code', [(FakeLambda, 0), (SkewedLambda, 1)])
+class ReorderedLambda(FakeLambda):
+    """A Lambda that lists each year's holdings in reverse with new Rank numbers (like tied stocks on Linux)."""
+
+    def invoke(self, FunctionName, InvocationType, Payload):
+        response = json.loads(super().invoke(FunctionName, InvocationType, Payload)['Payload'].read())
+        for rows in response.get('result', {}).get('holdings_by_year', {}).values():
+            rows.reverse()
+            for rank, row in enumerate(rows, 1):
+                row['Rank'] = rank
+        return {'StatusCode': 200, 'Payload': io.BytesIO(json.dumps(response).encode())}
+
+
+class OtherStockLambda(FakeLambda):
+    """A Lambda that holds a different stock in one year."""
+
+    def invoke(self, FunctionName, InvocationType, Payload):
+        response = json.loads(super().invoke(FunctionName, InvocationType, Payload)['Payload'].read())
+        holdings = response.get('result', {}).get('holdings_by_year')
+        if holdings:
+            next(iter(holdings.values()))[0]['Ticker'] = 'ZZZZ'
+        return {'StatusCode': 200, 'Payload': io.BytesIO(json.dumps(response).encode())}
+
+
+@pytest.mark.parametrize('lambda_class, exit_code', [
+    (FakeLambda, 0), (SkewedLambda, 1), (ReorderedLambda, 0), (OtherStockLambda, 1),
+])
 def test_check_script_compares_lambda_with_local(monkeypatch, manager, capsys, lambda_class, exit_code):
     import scripts.check_backtest_lambda as check
     fake = lambda_class(BacktestService(manager))

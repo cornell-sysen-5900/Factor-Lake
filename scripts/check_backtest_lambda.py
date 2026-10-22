@@ -13,6 +13,13 @@ cohort comparison) it:
 2. runs it in Lambda and compares every number (relative difference at most 1e-9:
    Lambda runs the same library versions on Linux x86, so the last binary digit can differ);
 3. runs it in Lambda again and checks the result came from the cache, unchanged.
+
+Holdings are compared stock by stock, without Rank and Score (see comparable).
+Stocks whose scores tie exactly (winsorizing gives the top 1% of each factor the
+same score) are sorted in an order that depends on the machine. That changes
+their row order and Rank, and for a stock bought by several Mixing sleeves which
+sleeve's Rank and Score the table shows. Which stocks are held, their shares,
+prices, weights, returns and contributions must still match.
 """
 
 import argparse
@@ -32,6 +39,8 @@ from src.lambda_client import DEFAULT_FUNCTION_NAME, BacktestLambdaClient  # noq
 from src.s3_client import S3DataManager  # noqa: E402
 
 TOLERANCE = 1e-9
+# Holdings columns that depend on the order of exactly tied stocks (see comparable)
+TIE_ORDER_COLUMNS = ('Rank', 'Score')
 LABELS = {'ROE_using_9-30_Data': 'ROE using 9/30 Data', 'ROA': 'ROA %', '6-Mo_Momentum': '6-Mo Momentum %'}
 BASE = {'start_year': 2008, 'end_year': 2024, 'initial_aum': 1_000_000.0, 'use_market_cap_weight': False,
         'restrict_fossil_fuels': False, 'selected_sectors': None}
@@ -55,6 +64,20 @@ def sample_jobs(unique: bool) -> List[dict]:
         build_job('cohort', two, tops, dict(BASE, initial_aum=aum, factor_combination='integrating',
                                              delisting_strategy='zero_return'), LABELS, cohort_pct=20),
     ]
+
+
+def comparable(result: dict) -> dict:
+    """
+    The result with each year's holdings keyed by ticker and without Rank and Score,
+    so the comparison does not depend on the order of exactly tied stocks (see the
+    module docstring).
+    """
+    if 'holdings_by_year' not in result:
+        return result
+    holdings = {year: {row['Ticker']: {k: v for k, v in row.items() if k not in TIE_ORDER_COLUMNS}
+                       for row in rows}
+                for year, rows in result['holdings_by_year'].items()}
+    return dict(result, holdings_by_year=holdings)
 
 
 def max_difference(a: Any, b: Any, path: str = '') -> Tuple[float, str]:
@@ -101,7 +124,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         remote, first = client.run(job)
         print(f"  lambda: {first['round_trip_seconds']:6.2f} s  cached={first['cached']}  "
               f"{first['delivery']}  {first['size_bytes'] / 1e6:.2f} MB  result {first['hash'][:12]}")
-        diff, where = max_difference(local, remote)
+        diff, where = max_difference(comparable(local), comparable(remote))
         match = diff <= TOLERANCE
         print(f"  match:  {'yes' if match else 'NO'} (largest relative difference {diff:.1e}"
               f"{'' if match else ' at ' + where})")
