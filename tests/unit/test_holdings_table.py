@@ -283,9 +283,8 @@ def test_delisted_row_return_includes_what_its_capital_earned_after_delisting():
 def test_holdings_years_follow_the_rebalance_years_kept(universe):
     gap = universe[universe['Year'] != 2013]          # no data for 2013: no return, no holdings
     res = _run(gap, 'integrating')
-    assert list(res['holdings_by_year']) == [2010, 2011, 2012, 2014, 2015]
+    assert list(res['holdings_by_year']) == [2010, 2011, 2012, 2014, 2015] == res['years'][:-1]
     assert len(res['holdings_by_year']) == len(res['yearly_returns'])
-    # 2014's return is the 4th entry, although results['years'] labels it 2013
     assert holdings_period_return(res, 2014) == res['yearly_returns'][3]
     assert sum(r['Contribution %'] for r in res['holdings_by_year'][2014]) == pytest.approx(res['yearly_returns'][3])
 

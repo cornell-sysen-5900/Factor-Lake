@@ -2,18 +2,29 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: src/performance_metrics.py
 PURPOSE: Mathematical core with comprehensive index coverage.
-VERSION: 1.2.0
+VERSION: 1.3.0
 """
 
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 def compute_comprehensive_metrics(p_ret: np.ndarray, b_ret: np.ndarray, g_ret: np.ndarray,
                                  v_ret: np.ndarray, rf: np.ndarray,
-                                 p_vals: List[float], start: int, end: int) -> Dict[str, Any]:
-    """Calculates risk/return metrics across all benchmarks."""
-    
+                                 p_vals: List[float], start: int, end: int,
+                                 return_years: Optional[List[int]] = None) -> Dict[str, Any]:
+    """Calculates risk/return metrics across all benchmarks.
+
+    return_years is the rebalance year of each return. When given, it labels
+    the returns (and 'years' ends one year after the last of them), so years
+    the backtest skipped are left out; otherwise the returns are labelled
+    start, start + 1, ... and 'years' is start..end.
+    """
+    if return_years:
+        years = [int(y) for y in return_years] + [int(return_years[-1]) + 1]
+    else:
+        years = list(range(int(start), int(end) + 1))
+
     # Excess Returns
     excess_p, excess_b = p_ret - rf, b_ret - rf
     excess_g, excess_v = g_ret - rf, v_ret - rf
@@ -48,7 +59,7 @@ def compute_comprehensive_metrics(p_ret: np.ndarray, b_ret: np.ndarray, g_ret: n
     comparisons = []
     for i in range(len(p_ret)):
         comparisons.append({
-            'year': int(start + i),
+            'year': years[i],
             'p_ret': p_ret[i] * 100,
             'b_ret': b_ret[i] * 100,
             'b_win': bool(p_ret[i] > b_ret[i]),
@@ -65,7 +76,7 @@ def compute_comprehensive_metrics(p_ret: np.ndarray, b_ret: np.ndarray, g_ret: n
         'benchmark_returns': (b_ret * 100).tolist(),
         'growth_benchmark_returns': (g_ret * 100).tolist(),
         'value_benchmark_returns': (v_ret * 100).tolist(),
-        'years': list(range(int(start), int(end) + 1)),
+        'years': years,
         'portfolio_beta': get_beta(excess_p, excess_b),
         'portfolio_beta_growth': get_beta(excess_p, excess_g),
         'portfolio_beta_value': get_beta(excess_p, excess_v),
