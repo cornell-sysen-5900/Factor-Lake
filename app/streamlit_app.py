@@ -30,7 +30,7 @@ import streamlit_config as config
 
 import components.sidebar as sidebar
 from components.factor_selection import render_factor_selection
-from components.results_tab import render_saved_runs
+from components.results_tab import render_analysis_history, render_open_saved_analysis, render_saved_runs
 from components.data_viewer import render_data_viewer_tab, clear_viewer_data
 from components.about import render_about_tab
 
@@ -149,6 +149,9 @@ def main():
             # Performance Visualization phase
             if RUN_COMPLETE_KEY in st.session_state:
                 st.success(st.session_state.pop(RUN_COMPLETE_KEY))
+            # Open a saved analysis by its ID (it becomes the newest run tab), and this session's history
+            render_open_saved_analysis(has_runs=bool(st.session_state.get('saved_runs')))
+            render_analysis_history(st.session_state.get('analysis_history', []))
             if st.session_state.get('saved_runs'):
                 render_saved_runs(st.session_state.saved_runs)
             else:

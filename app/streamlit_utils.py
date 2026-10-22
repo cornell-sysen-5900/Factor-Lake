@@ -95,7 +95,9 @@ def initialize_session_state() -> None:
         'rdata': None,
         'loaded_filters': None,
         'saved_runs': [],
-        'next_run_id': 1
+        'next_run_id': 1,
+        # Every analysis run or opened in this session (see add_to_history), oldest first
+        'analysis_history': [],
     }
     for key, default_value in default_state.items():
         if key not in st.session_state:
@@ -203,6 +205,11 @@ def describe_compute(info: Optional[Dict[str, Any]]) -> str:
     """One line on where a result came from, e.g. "computed in AWS Lambda in 8.2 s"."""
     if not info:
         return "computed in this app"
+    if info.get('opened'):
+        text = "opened from a saved analysis"
+        if info.get('computed_at'):
+            text += f" (first computed {info['computed_at'].replace('T', ' ').rstrip('Z')} UTC)"
+        return text
     if info.get('cached'):
         text = f"returned from the AWS Lambda result cache in {info['round_trip_seconds']:.1f} s"
         if info.get('computed_at'):
@@ -234,9 +241,13 @@ def run_cohort(run: Dict[str, Any], cohort_pct: float):
         return list(top), list(bottom), None
 
     from src.backtest_jobs import build_job
+    function_name = run['compute'].get('function_name') or get_backtest_lambda_name()
+    if not function_name:
+        raise RuntimeError("Cohort comparisons for an opened analysis run in AWS Lambda, "
+                           f"and no Lambda is configured ({BACKTEST_LAMBDA_ENV}).")
     job = build_job('cohort', run['factors'], run['factor_directions'], run['settings'],
                     factor_labels=dict(zip(run['factors'], run['factor_labels'])), cohort_pct=cohort_pct)
-    result, info = get_lambda_client(run['compute']['function_name']).run(job)
+    result, info = get_lambda_client(function_name).run(job)
     return result['top'], result['bottom'], info
 
 def run_backtest_logic(user_settings: Dict[str, Any], 
@@ -333,4 +344,64 @@ def run_backtest_logic(user_settings: Dict[str, Any],
     st.session_state.saved_runs = add_saved_run(
         st.session_state.saved_runs, run, MAX_SAVED_RUNS
     )
+    add_to_history(run)
     return run
+
+def add_to_history(run: Dict[str, Any]) -> None:
+    """
+    Records a run in this session's history (st.session_state.analysis_history). It
+    lives only in the session, so it lists only this user's own runs, including ones
+    no longer shown as Results tabs (only the last MAX_SAVED_RUNS are kept there).
+    """
+    from datetime import datetime
+    compute = run.get('compute') or {}
+    st.session_state.analysis_history = st.session_state.get('analysis_history', []) + [{
+        'label': run['label'],
+        'analysis_id': compute.get('hash'),
+        'how': 'opened' if compute.get('opened') else 'computed in Lambda' if compute else 'computed in this app',
+        'time': datetime.now().strftime('%H:%M:%S'),
+    }]
+
+def open_saved_analysis(text: str) -> Dict[str, Any]:
+    """
+    Opens a saved analysis by its ID as a new Results tab, with the same results,
+    factors and settings as the original run, and adds it to the session history.
+
+    Raises:
+        SavedAnalysisError: with a message for the user (not an ID, expired, ...).
+    """
+    from src.saved_analyses import load_saved_analysis
+    from app.streamlit_config import MAX_SAVED_RUNS
+    from app.saved_runs import add_saved_run, build_run_label
+
+    saved = load_saved_analysis(text, get_results_store())
+    job = saved['job']
+    factor_labels = [job['factor_labels'].get(f, f) for f in job['factors']]
+    run_id = st.session_state.next_run_id
+    run = {
+        'id': run_id,
+        'label': f"{build_run_label(run_id, factor_labels)} (opened)",
+        'factor_labels': factor_labels,
+        'factors': list(job['factors']),
+        'factor_directions': dict(job['factor_directions']),
+        'settings': {k: job[k] for k in (
+            'start_year', 'end_year', 'initial_aum', 'benchmark_index', 'top_pct', 'use_market_cap_weight',
+            'delisting_strategy', 'factor_combination', 'restrict_fossil_fuels', 'selected_sectors')},
+        'universe': {'restrict_fossil_fuels': job['restrict_fossil_fuels'],
+                     'selected_sectors': list(job['selected_sectors'])},
+        'data': None,
+        'results': saved['result'],
+        'compute': {'hash': saved['id'], 'opened': True, 'cached': True,
+                    'computed_at': saved['computed_at'], 'function_name': get_backtest_lambda_name()},
+        'cohort': None,
+    }
+    st.session_state.next_run_id = run_id + 1
+    st.session_state.saved_runs = add_saved_run(st.session_state.saved_runs, run, MAX_SAVED_RUNS)
+    add_to_history(run)
+    return run
+
+@st.cache_resource(show_spinner=False)
+def get_results_store():
+    """The S3 location saved analyses are read from (the market data's bucket and prefix)."""
+    from src.s3_client import S3DataManager
+    return S3DataManager()

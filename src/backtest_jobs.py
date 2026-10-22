@@ -15,7 +15,7 @@ import json
 import math
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -24,6 +24,8 @@ from .backtest_engine import FACTOR_COMBINATIONS, rebalance_portfolio, run_cohor
 from .universe_selection import select_universe
 
 JOB_KINDS = ('backtest', 'cohort')
+# Version of the saved-analysis format (see encode_saved)
+SAVED_FORMAT = 2
 DELISTING_STRATEGIES = ('zero_return', 'hold_cash', 'reinvest')
 # Every key of a job (see build_job)
 JOB_FIELDS = ('kind', 'factors', 'factor_directions', 'factor_labels', 'start_year', 'end_year',
@@ -179,6 +181,27 @@ def encode_result(result: Dict[str, Any]) -> bytes:
     the same numbers.
     """
     return json.dumps(result, default=_to_json_value, allow_nan=True, separators=(',', ':')).encode()
+
+
+def encode_saved(job: Dict[str, Any], result: Dict[str, Any]) -> bytes:
+    """
+    A saved analysis, as stored in S3 under its hash: the job and its result, so the
+    analysis can be shown again (with its factors and settings) from the hash alone.
+    """
+    return json.dumps({'format': SAVED_FORMAT, 'job': job, 'result': result},
+                      default=_to_json_value, allow_nan=True, separators=(',', ':')).encode()
+
+
+def decode_saved(payload: Any) -> Tuple[Optional[Dict[str, Any]], Any]:
+    """
+    (job, result JSON) of a saved analysis. Results saved before jobs were stored
+    with them come back as (None, result JSON). Pass the result to decode_result.
+    """
+    if isinstance(payload, (bytes, str)):
+        payload = json.loads(payload)
+    if isinstance(payload, dict) and payload.get('format') == SAVED_FORMAT and 'result' in payload:
+        return payload.get('job'), payload['result']
+    return None, payload
 
 
 def decode_result(kind: str, payload: Any) -> Dict[str, Any]:

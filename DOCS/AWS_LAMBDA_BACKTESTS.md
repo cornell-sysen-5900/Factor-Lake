@@ -79,7 +79,24 @@ Before the call: deploy (section 2), add `FACTOR_LAKE_BACKTEST_LAMBDA` to `.env`
 6. **Cohort comparison.** In a Lambda run's tab, open **Run Cohort Comparison** and click **Generate Comparison**: the caption says it ran in Lambda.
 7. **Where results live.** In the AWS console: S3 → `sysen-5900-factor-lake` → `factor-lake-data/backtest-results/` shows one JSON file per result hash. Management → Lifecycle rules shows the 90-day expiry (in the class account an admin has to add it; see section 2). Lambda → `factor-lake-backtest` (`sysen5900-factor-lake-backtest` in the class account) → Monitor shows the invocations, and its CloudWatch logs show "Computed ..." and "Cache hit ..." lines.
 
-## 6. Troubleshoot
+## 6. Share an analysis by its ID
+
+The hash a result is saved under doubles as its **analysis ID**. Each saved file holds the job (factors, directions, settings) next to the result, so the ID alone is enough to show the analysis again. The app reads it straight from S3 (`src/saved_analyses.py`), without calling the Lambda, so opening never reruns a backtest.
+
+- Each Lambda run's tab shows the full ID with a copy button.
+- **Results → Open a saved analysis** opens an ID as a new tab with the original results and settings.
+- **This session's analyses** lists only the runs of the current browser session. Nothing is listed from S3, so nobody sees other people's analyses unless they're given an ID.
+- Errors: text that isn't a 64-character ID, an ID with no saved analysis (mistyped, or deleted by the 90-day rule), a result saved before sharing existed, or a cohort comparison's ID.
+
+Demo (about 2 minutes, after the steps in section 5):
+
+1. In a run's tab, copy its **Analysis ID**.
+2. Open the app in a second browser window (a private window works) to stand in for a colleague. Its **Results** tab shows **Open a saved analysis** and no runs.
+3. Paste the ID and click **Open analysis**. The same final value, CAGR, holdings and charts appear in a tab labelled "(opened)", with "Opened from a saved analysis (first computed …)". Generate Comparison also works there.
+4. Paste a wrong ID (for example drop the last character, or change one character) to show the errors: "is not an analysis ID" and "No saved analysis has the ID … deleted after 90 days".
+5. Back in the first window, **This session's analyses** lists your runs with their IDs. The second window lists only the analysis it opened.
+
+## 7. Troubleshoot
 
 | Message | Fix |
 |---|---|
@@ -89,6 +106,6 @@ Before the call: deploy (section 2), add `FACTOR_LAKE_BACKTEST_LAMBDA` to `.env`
 | `... Runtime.OutOfMemory` | Raise `--memory` and redeploy |
 | `The backtest Lambda could not run this backtest: ...` | The backtest itself failed; the message is the engine's error |
 
-## 7. Cost
+## 8. Cost
 
 Each uncached backtest is one Lambda invocation of a few seconds. A cold start adds the time to download the 8 MB market data file. Cached repeats take well under a second, and saved results are small JSON files deleted after 90 days. Class use stays far inside the Lambda and S3 free tiers.

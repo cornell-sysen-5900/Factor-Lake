@@ -13,7 +13,8 @@ from typing import Dict, Any, List, Tuple, Optional
 from Visualizations.portfolio_growth_plot import plot_portfolio_growth
 from Visualizations.top_bottom_portfolio_plot import plot_top_bottom_percent
 from app.streamlit_config import MAX_SAVED_RUNS
-from app.streamlit_utils import describe_compute, run_cohort
+from app.streamlit_utils import describe_compute, get_backtest_lambda_name, open_saved_analysis, run_cohort
+from src.saved_analyses import SavedAnalysisError
 from app.saved_runs import remove_saved_run
 from app.holdings_table import (
     FACTOR_COMBINATION_LABELS, build_holdings_display_table, default_holdings_year,
@@ -347,8 +348,53 @@ def _render_header_captions(run: Dict[str, Any]) -> None:
     compute = run.get('compute')
     if compute:
         how = describe_compute(compute)
-        st.caption(f"**Computed:** {how[:1].upper() + how[1:]} | "
-                   f"**Result ID:** `{(compute.get('hash') or '')[:12]}`")
+        st.caption(f"**Computed:** {how[:1].upper() + how[1:]}")
+    _render_analysis_id(compute)
+
+
+def _render_analysis_id(compute: Optional[Dict[str, Any]]) -> None:
+    """The run's analysis ID, with a copy button (st.code's), to reopen or share it."""
+    analysis_id = (compute or {}).get('hash')
+    if analysis_id:
+        st.caption("**Analysis ID:** copy it (button on the right) to open this analysis again "
+                   "or share it, under Open a saved analysis.")
+        st.code(analysis_id, language=None)
+    elif get_backtest_lambda_name():
+        st.caption("**Analysis ID:** none. This run was computed in the app, so it was not saved. "
+                   "Turn on **Run backtests in AWS Lambda** to get an ID you can share.")
+
+
+def render_open_saved_analysis(has_runs: bool) -> None:
+    """
+    The "Open a saved analysis" box: loads a saved analysis by its ID as a new Results
+    tab (newest first, so it opens), or shows why it cannot be opened.
+    """
+    with st.expander("Open a saved analysis", expanded=not has_runs, key="open_analysis_expander"):
+        st.caption("Paste an analysis ID from your history or from a colleague to see that analysis "
+                   "with its original results, factors and settings.")
+        analysis_id = st.text_input("Analysis ID", key="open_analysis_id",
+                                    placeholder="64-character analysis ID")
+        if st.button("Open analysis", key="open_analysis_btn"):
+            try:
+                with st.spinner("Loading the saved analysis from S3..."):
+                    run = open_saved_analysis(analysis_id)
+                st.success(f"Opened as \"{run['label']}\".")
+            except SavedAnalysisError as e:
+                st.error(str(e))
+
+
+def render_analysis_history(history: List[Dict[str, Any]]) -> None:
+    """This session's analyses, newest first, with their IDs (only this session's: nothing is listed from S3)."""
+    if not history:
+        return
+    with st.expander(f"This session's analyses ({len(history)})", key="analysis_history_expander"):
+        st.caption("Only analyses run or opened in this browser session. Copy an ID to reopen or share it.")
+        for entry in reversed(history):
+            st.markdown(f"**{entry['label']}** · {entry['how']} at {entry['time']}")
+            if entry.get('analysis_id'):
+                st.code(entry['analysis_id'], language=None)
+            else:
+                st.caption("Not saved (computed in this app), so it has no ID.")
 
 def _render_summary_metrics(res: Dict[str, Any], settings: Dict[str, Any]) -> None:
     """

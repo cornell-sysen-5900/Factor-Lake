@@ -11,7 +11,7 @@ import time
 import urllib.request
 from typing import Any, Dict, Optional, Tuple
 
-from .backtest_jobs import decode_result
+from .backtest_jobs import decode_result, decode_saved
 
 DEFAULT_FUNCTION_NAME = 'factor-lake-backtest'
 # A cold Lambda downloads the market data before it runs; allow up to the Lambda's own limit
@@ -66,7 +66,7 @@ class BacktestLambdaClient:
         if 'result' in payload:
             result, delivery = payload['result'], 'inline'
         else:
-            result, delivery = _download(payload['result_url']), 's3_link'
+            result, delivery = decode_saved(_download(payload['result_url']))[1], 's3_link'
 
         info = {k: payload.get(k) for k in ('hash', 'cached', 'computed_at', 'compute_seconds', 'size_bytes')}
         info.update(function_name=self.function_name, delivery=delivery,

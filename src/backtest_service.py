@@ -14,7 +14,6 @@ For each job (see src/backtest_jobs.py) the service:
    for a Lambda response (6 MB).
 """
 
-import json
 import logging
 import time
 from datetime import datetime, timezone
@@ -22,7 +21,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
 
-from .backtest_jobs import code_version, describe_job, encode_result, job_hash, run_job, validate_job
+from .backtest_jobs import code_version, decode_saved, describe_job, encode_saved, job_hash, run_job, validate_job
 from .data_standardization import validate_universe
 from .s3_client import DELISTING_FILE, UNIVERSE_FILE, S3DataManager
 
@@ -95,7 +94,7 @@ class BacktestService:
                 'computed_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
                 'compute_seconds': f"{time.perf_counter() - started:.3f}",
             }
-            body = encode_result(result)
+            body = encode_saved(job, result)   # with its job, so the hash alone can reopen it
             self.manager.client.put_object(
                 Bucket=self.manager.bucket, Key=self.manager.object_key(filename), Body=body,
                 ContentType='application/json', Metadata=info,
@@ -113,8 +112,8 @@ class BacktestService:
             'size_bytes': len(body),
         }
         if len(body) <= self.inline_limit:
-            response['result'] = json.loads(body)
-        else:
+            response['result'] = decode_saved(body)[1]
+        else:   # the link is to the saved analysis; the client takes the result out of it
             response['result_url'] = self.manager.client.generate_presigned_url(
                 'get_object',
                 Params={'Bucket': self.manager.bucket, 'Key': self.manager.object_key(filename)},
