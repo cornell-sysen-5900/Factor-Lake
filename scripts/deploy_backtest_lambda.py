@@ -2,32 +2,41 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: scripts/deploy_backtest_lambda.py
 PURPOSE: Creates or updates the backtest Lambda, its IAM role and the 90-day result expiry rule.
-VERSION: 1.0.0
+VERSION: 1.1.0
 
 Usage (from the project root, with AWS keys in .env or the environment):
     uv run python scripts/deploy_backtest_lambda.py              # deploy, then ping the function
+    uv run python scripts/deploy_backtest_lambda.py --role-arn <arn>   # keys without IAM access
     uv run python scripts/deploy_backtest_lambda.py --package-only build/backtest_lambda.zip
 
 It is safe to run again: it updates what exists and creates what is missing.
 
 What it sets up:
-- IAM role factor-lake-backtest-lambda: read the data under the S3 prefix, write
-  results under <prefix>/backtest-results/, and write CloudWatch logs.
-- Lambda factor-lake-backtest (Python 3.12) running aws_lambda/backtest_handler.py,
-  with pandas, numpy and pyarrow from the AWS SDK for pandas layer, so the upload is
-  only this project's code.
+- IAM role factor-lake-backtest-lambda (unless --role-arn names an existing one): read
+  the data under the S3 prefix, write results under <prefix>/backtest-results/, and
+  write CloudWatch logs.
+- Lambda factor-lake-backtest (Python 3.12) running aws_lambda/backtest_handler.py.
+  pandas, numpy and pyarrow are bundled in the package at the versions this
+  environment runs, so Lambda computes with the same libraries as the app (and no
+  Lambda layer permission is needed). The package is too big for a direct upload,
+  so it goes to S3 first.
 - An S3 lifecycle rule deleting saved results after 90 days. Other lifecycle rules
   on the bucket are kept.
 """
 
 import argparse
+import hashlib
 import io
 import json
 import logging
 import os
+import shutil
+import subprocess  # nosec B404 - runs uv with fixed arguments to fetch the Lambda's libraries
 import sys
+import tempfile
 import time
 import zipfile
+from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -44,13 +53,25 @@ logger = logging.getLogger(__name__)
 ROLE_NAME = 'factor-lake-backtest-lambda'
 RUNTIME = 'python3.12'
 HANDLER = 'aws_lambda.backtest_handler.handler'
-# AWS SDK for pandas: AWS's public layer with pandas, numpy and pyarrow (https://aws-sdk-pandas.readthedocs.io)
-PANDAS_LAYER = 'arn:aws:lambda:{region}:336392948345:layer:AWSSDKPandas-Python312'
 LIFECYCLE_RULE_ID = 'factor-lake-expire-backtest-results'
 BASIC_EXECUTION_POLICY = 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
 # Source the Lambda needs; supabase_client is left out (the supabase package is not in the Lambda)
 PACKAGE_DIRS = ('src', 'aws_lambda')
 EXCLUDED_FILES = {'src/supabase_client.py'}
+# Libraries bundled into the package (boto3 is part of the Lambda runtime)
+BUNDLED_LIBRARIES = ('pandas', 'numpy', 'pyarrow')
+# Lambda's Python 3.12 runs on Amazon Linux 2023 (glibc 2.34)
+LAMBDA_PLATFORM = 'x86_64-manylinux_2_28'
+# Parts of the libraries the backtest never loads, removed to stay under Lambda's 250 MB limit.
+# pyarrow's Flight RPC libraries are not needed by any Parquet module (its Substrait library is,
+# so it stays); the rest are test suites, C/C++ headers and Cython sources.
+PRUNED_PATHS = ('pyarrow/libarrow_flight.so*', 'pyarrow/libarrow_python_flight.so*', 'pyarrow/_flight.*',
+                'pyarrow/include', 'pyarrow/tests', 'pyarrow/_pyarrow_cpp_tests.*',
+                'pandas/tests', 'numpy/tests', 'numpy/*/tests')
+PRUNED_SUFFIXES = ('.pyx', '.pxd', '.pxi', '.h', '.hpp', '.cc', '.cpp')
+LAMBDA_UNZIPPED_LIMIT = 250 * 1024 * 1024
+# Where the package is uploaded before Lambda is pointed at it
+PACKAGE_DIR = '_deploy'
 
 TRUST_POLICY = {
     'Version': '2012-10-17',
@@ -58,15 +79,49 @@ TRUST_POLICY = {
 }
 
 
-def build_package() -> bytes:
-    """Zips the Python files the Lambda runs (src/ and aws_lambda/)."""
+def install_libraries(target: Path) -> None:
+    """Installs Linux builds of the bundled libraries, at this environment's versions, into target."""
+    pins = [f"{name}=={version(name)}" for name in BUNDLED_LIBRARIES]
+    logger.info(f"Fetching {', '.join(pins)} for {LAMBDA_PLATFORM} / {RUNTIME}")
+    subprocess.run(  # nosec B603 - fixed command, versions come from installed package metadata
+        [shutil.which('uv') or 'uv', 'pip', 'install', '--quiet', '--target', str(target),
+         '--python-platform', LAMBDA_PLATFORM, '--python-version', RUNTIME.removeprefix('python'),
+         '--only-binary', ':all:', *pins],
+        check=True,
+    )
+    prune_libraries(target)
+
+
+def prune_libraries(target: Path) -> None:
+    """Deletes the library parts listed in PRUNED_PATHS / PRUNED_SUFFIXES."""
+    for pattern in PRUNED_PATHS:
+        for path in target.glob(pattern):
+            shutil.rmtree(path) if path.is_dir() else path.unlink()
+    for path in list(target.rglob('*')):
+        if path.is_file() and (path.suffix in PRUNED_SUFFIXES or '__pycache__' in path.parts):
+            path.unlink()
+
+
+def build_package(libraries: Optional[Path] = None) -> bytes:
+    """Zips the Python files the Lambda runs (src/ and aws_lambda/), plus the libraries in `libraries`."""
     buffer = io.BytesIO()
+    unzipped = 0
     with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
         for folder in PACKAGE_DIRS:
             for path in sorted((PROJECT_ROOT / folder).glob('*.py')):
                 name = path.relative_to(PROJECT_ROOT).as_posix()
                 if name not in EXCLUDED_FILES:
                     zf.write(path, name)
+                    unzipped += path.stat().st_size
+        if libraries is not None:
+            for path in sorted(libraries.rglob('*')):
+                if path.is_file():
+                    zf.write(path, path.relative_to(libraries).as_posix())
+                    unzipped += path.stat().st_size
+    if unzipped > LAMBDA_UNZIPPED_LIMIT:
+        raise SystemExit(f"The package is {unzipped / 1e6:.0f} MB unzipped; Lambda allows 250 MB. "
+                         f"Add more unused library parts to PRUNED_PATHS.")
+    logger.info(f"Package: {len(buffer.getvalue()) / 1e6:.1f} MB zipped, {unzipped / 1e6:.0f} MB unzipped")
     return buffer.getvalue()
 
 
@@ -113,8 +168,7 @@ def role_setup_instructions(role_name: str, bucket: str, prefix: str) -> str:
         f"3. Add this inline policy (S3 access):\n{json.dumps(role_policy(bucket, prefix), indent=2)}\n\n"
         f"4. Allow the deploying user iam:PassRole on the role, plus lambda:CreateFunction, "
         f"lambda:UpdateFunctionCode, lambda:UpdateFunctionConfiguration, lambda:GetFunction, "
-        f"lambda:InvokeFunction, lambda:ListLayerVersions and s3:GetLifecycleConfiguration / "
-        f"s3:PutLifecycleConfiguration on {bucket}.\n\n"
+        f"lambda:InvokeFunction and s3:GetLifecycleConfiguration / s3:PutLifecycleConfiguration on {bucket}.\n\n"
         f"Then deploy with: uv run python scripts/deploy_backtest_lambda.py --role-arn <the role's ARN>"
     )
 
@@ -137,26 +191,19 @@ def ensure_role(iam, role_name: str, bucket: str, prefix: str) -> str:
     return arn
 
 
-def resolve_layer(lam, region: str, layer_arn: Optional[str]) -> str:
-    """The pandas layer version to use: --layer-arn, else the newest published version."""
-    if layer_arn:
-        return layer_arn
-    base = PANDAS_LAYER.format(region=region)
-    try:
-        versions = lam.list_layer_versions(LayerName=base, CompatibleRuntime=RUNTIME)['LayerVersions']
-    except Exception as e:
-        raise SystemExit(f"Could not look up {base} ({e}). Pass --layer-arn with a version from "
-                         f"https://aws-sdk-pandas.readthedocs.io/en/stable/layers.html") from e
-    if not versions:
-        raise SystemExit(f"No versions of {base} found; pass --layer-arn.")
-    return max(versions, key=lambda v: v['Version'])['LayerVersionArn']
+def upload_package(s3, bucket: str, prefix: str, package: bytes) -> str:
+    """Uploads the package to S3 (named by its hash) and returns its key."""
+    key = f"{prefix}/{PACKAGE_DIR}/backtest-lambda-{hashlib.sha256(package).hexdigest()[:16]}.zip"
+    s3.upload_fileobj(io.BytesIO(package), bucket, key)
+    logger.info(f"Uploaded the package to s3://{bucket}/{key}")
+    return key
 
 
-def deploy_function(lam, name: str, role_arn: str, package: bytes, layer_arn: str,
+def deploy_function(lam, name: str, role_arn: str, code: Dict[str, str],
                     memory: int, timeout: int, environment: Dict[str, str]) -> None:
-    """Creates the function, or updates its code and settings when it exists."""
+    """Creates the function, or updates its code and settings when it exists. code: S3Bucket and S3Key."""
     from botocore.exceptions import ClientError
-    config = dict(Role=role_arn, Handler=HANDLER, Runtime=RUNTIME, Layers=[layer_arn],
+    config = dict(Role=role_arn, Handler=HANDLER, Runtime=RUNTIME, Layers=[],
                   MemorySize=memory, Timeout=timeout, Environment={'Variables': environment},
                   Description='Factor-Lake backtests: reads market data from S3, caches results in S3')
     try:
@@ -168,7 +215,7 @@ def deploy_function(lam, name: str, role_arn: str, package: bytes, layer_arn: st
         exists = False
 
     if exists:
-        lam.update_function_code(FunctionName=name, ZipFile=package)
+        lam.update_function_code(FunctionName=name, **code)
         lam.get_waiter('function_updated_v2').wait(FunctionName=name)
         lam.update_function_configuration(FunctionName=name, **config)
         lam.get_waiter('function_updated_v2').wait(FunctionName=name)
@@ -178,7 +225,7 @@ def deploy_function(lam, name: str, role_arn: str, package: bytes, layer_arn: st
     # A new role takes a few seconds before Lambda can use it
     for attempt in range(10):
         try:
-            lam.create_function(FunctionName=name, Code={'ZipFile': package}, **config)
+            lam.create_function(FunctionName=name, Code=code, **config)
             break
         except ClientError as e:
             if 'cannot be assumed' not in str(e) or attempt == 9:
@@ -188,19 +235,31 @@ def deploy_function(lam, name: str, role_arn: str, package: bytes, layer_arn: st
     logger.info(f"Created Lambda {name}")
 
 
-def set_result_expiry(s3, bucket: str, prefix: str, days: int) -> None:
-    """Adds (or updates) the rule deleting saved results after `days` days, keeping other rules."""
+def set_result_expiry(s3, bucket: str, prefix: str, days: int) -> bool:
+    """
+    Adds (or updates) the rule deleting saved results after `days` days, keeping other
+    rules. Returns False (with instructions) when these keys may not change lifecycle rules.
+    """
     from botocore.exceptions import ClientError
     try:
-        existing = s3.get_bucket_lifecycle_configuration(Bucket=bucket)['Rules']
+        try:
+            existing = s3.get_bucket_lifecycle_configuration(Bucket=bucket)['Rules']
+        except ClientError as e:
+            if e.response['Error']['Code'] != 'NoSuchLifecycleConfiguration':
+                raise
+            existing = []
+        rules = merge_lifecycle_rules(existing, prefix, days)
+        s3.put_bucket_lifecycle_configuration(Bucket=bucket, LifecycleConfiguration={'Rules': rules})
     except ClientError as e:
-        if e.response['Error']['Code'] != 'NoSuchLifecycleConfiguration':
+        if e.response['Error']['Code'] not in ('AccessDenied', 'AccessDeniedException'):
             raise
-        existing = []
-    rules = merge_lifecycle_rules(existing, prefix, days)
-    s3.put_bucket_lifecycle_configuration(Bucket=bucket, LifecycleConfiguration={'Rules': rules})
+        logger.warning(f"These keys may not change the bucket's lifecycle rules, so saved results will not "
+                       f"expire yet. Ask an AWS admin to add an S3 lifecycle rule on s3://{bucket}: prefix "
+                       f"'{prefix}/{RESULTS_DIR}/', expire current versions after {days} days.")
+        return False
     logger.info(f"s3://{bucket}/{prefix}/{RESULTS_DIR}/ results now expire after {days} days "
                 f"({len(rules) - 1} other lifecycle rule(s) kept)")
+    return True
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -212,7 +271,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument('--prefix', default=os.environ.get('FACTOR_LAKE_S3_PREFIX', DEFAULT_PREFIX))
     parser.add_argument('--memory', type=int, default=3008, help="MB (default 3008)")
     parser.add_argument('--timeout', type=int, default=600, help="Seconds (default 600)")
-    parser.add_argument('--layer-arn', help="pandas layer version ARN (default: newest AWSSDKPandas-Python312)")
     parser.add_argument('--package-only', type=Path, metavar='ZIP', help="Only write the code package here")
     parser.add_argument('--role-arn', help="Use this existing role and make no IAM calls (for keys without IAM access)")
     parser.add_argument('--print-role-policy', action='store_true',
@@ -224,8 +282,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(role_setup_instructions(args.role_name, args.bucket, prefix))
         return 0
 
-    package = build_package()
-    logger.info(f"Code package: {len(package) / 1024:.0f} KB")
+    with tempfile.TemporaryDirectory(prefix='factor_lake_lambda_') as tmp:
+        install_libraries(Path(tmp))
+        package = build_package(Path(tmp))
     if args.package_only:
         args.package_only.parent.mkdir(parents=True, exist_ok=True)
         args.package_only.write_bytes(package)
@@ -253,11 +312,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                          "Ask an AWS admin to create it (run with --print-role-policy for what to send them),\n"
                          "then deploy with --role-arn <the role's ARN>.")
             return 1
-    layer_arn = resolve_layer(lam, args.region, args.layer_arn)
-    logger.info(f"pandas layer: {layer_arn}")
-    deploy_function(lam, args.function_name, role_arn, package, layer_arn, args.memory, args.timeout,
+
+    key = upload_package(s3, args.bucket, prefix, package)
+    deploy_function(lam, args.function_name, role_arn, {'S3Bucket': args.bucket, 'S3Key': key},
+                    args.memory, args.timeout,
                     {'FACTOR_LAKE_S3_BUCKET': args.bucket, 'FACTOR_LAKE_S3_PREFIX': prefix})
-    set_result_expiry(s3, args.bucket, prefix, RESULT_RETENTION_DAYS)
+    expiry_set = set_result_expiry(s3, args.bucket, prefix, RESULT_RETENTION_DAYS)
 
     response = lam.invoke(FunctionName=args.function_name, Payload=json.dumps({'action': 'ping'}).encode())
     reply = json.loads(response['Payload'].read())
@@ -265,7 +325,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         logger.error(f"Ping failed: {reply}")
         return 1
     logger.info(f"Ping OK (backtest code version {reply['code_version']}). "
-                f"Set FACTOR_LAKE_BACKTEST_LAMBDA={args.function_name} for the app.")
+                f"Set FACTOR_LAKE_BACKTEST_LAMBDA={args.function_name} for the app."
+                + ("" if expiry_set else " (Result expiry still needs an admin, see the warning above.)"))
     return 0
 
 

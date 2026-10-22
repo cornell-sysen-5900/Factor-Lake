@@ -364,15 +364,40 @@ def test_role_instructions_for_an_admin_include_both_policies(capsys):
 
 def test_deploy_without_iam_access_explains_the_admin_step(monkeypatch, caplog):
     import boto3
-    from scripts.deploy_backtest_lambda import main
+    import scripts.deploy_backtest_lambda as deploy
 
     class DeniedIam:
         def get_role(self, **kwargs):
             raise ClientError({'Error': {'Code': 'AccessDenied', 'Message': 'explicit deny'}}, 'GetRole')
 
+    monkeypatch.setattr(deploy, 'install_libraries', lambda target: None)   # no download in tests
     monkeypatch.setattr(boto3, 'client', lambda service, **kwargs: DeniedIam() if service == 'iam' else object())
-    assert main([]) == 1
+    assert deploy.main([]) == 1
     assert '--print-role-policy' in caplog.text and '--role-arn' in caplog.text
+
+
+def test_unused_library_parts_are_pruned(tmp_path):
+    from scripts.deploy_backtest_lambda import prune_libraries
+    keep = ['pyarrow/libarrow.so.2400', 'pyarrow/libarrow_substrait.so.2400', 'pyarrow/libparquet.so.2400',
+            'pyarrow/parquet/core.py', 'pandas/core/frame.py', 'numpy/_core/multiarray.py']
+    drop = ['pyarrow/libarrow_flight.so.2400', 'pyarrow/libarrow_python_flight.so',
+            'pyarrow/_flight.cpython-312-x86_64-linux-gnu.so', 'pyarrow/include/arrow/api.h',
+            'pyarrow/tests/test_io.py', 'pandas/tests/test_x.py', 'numpy/_core/tests/test_y.py',
+            'pyarrow/lib.pyx', 'pandas/_libs/lib.pxd', 'pandas/__pycache__/x.cpython-312.pyc']
+    for name in keep + drop:
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / name).write_bytes(b'x')
+    prune_libraries(tmp_path)
+    assert all((tmp_path / name).exists() for name in keep)
+    assert not any((tmp_path / name).exists() for name in drop)
+
+
+def test_package_over_the_lambda_limit_is_refused(tmp_path, monkeypatch):
+    import scripts.deploy_backtest_lambda as deploy
+    (tmp_path / 'big.so').write_bytes(b'0' * 2048)
+    monkeypatch.setattr(deploy, 'LAMBDA_UNZIPPED_LIMIT', 1024)
+    with pytest.raises(SystemExit, match='250 MB'):
+        deploy.build_package(tmp_path)
 
 
 def test_lambda_package_has_the_engine_but_not_supabase():

@@ -11,12 +11,13 @@ For a few sample backtests (both factor combinations, every delisting strategy, 
 cohort comparison) it:
 1. runs the backtest locally on the S3 data, exactly as the app does without Lambda;
 2. runs it in Lambda and compares every number (relative difference at most 1e-9:
-   Lambda runs on Linux with AWS's pandas build, so the last binary digit can differ);
+   Lambda runs the same library versions on Linux x86, so the last binary digit can differ);
 3. runs it in Lambda again and checks the result came from the cache, unchanged.
 """
 
 import argparse
 import math
+import os
 import sys
 import time
 from pathlib import Path
@@ -75,7 +76,7 @@ def max_difference(a: Any, b: Any, path: str = '') -> Tuple[float, str]:
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Compare the backtest Lambda with local backtests.")
-    parser.add_argument('--function-name', default=DEFAULT_FUNCTION_NAME)
+    parser.add_argument('--function-name', help="Default: FACTOR_LAKE_BACKTEST_LAMBDA (.env), else factor-lake-backtest")
     parser.add_argument('--reuse-cache', action='store_true',
                         help="Use the same inputs every time (the first Lambda call may then be a cache hit)")
     args = parser.parse_args(argv)
@@ -83,9 +84,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     from dotenv import load_dotenv
     load_dotenv(PROJECT_ROOT / '.env')
 
-    print("Loading the market data from S3 for the local runs...")
+    function_name = args.function_name or os.environ.get('FACTOR_LAKE_BACKTEST_LAMBDA') or DEFAULT_FUNCTION_NAME
+    print(f"Checking Lambda {function_name}. Loading the market data from S3 for the local runs...")
     universe = S3DataManager().fetch_all_data()
-    client = BacktestLambdaClient(args.function_name)
+    client = BacktestLambdaClient(function_name)
     failures = 0
 
     for job in sample_jobs(unique=not args.reuse_cache):

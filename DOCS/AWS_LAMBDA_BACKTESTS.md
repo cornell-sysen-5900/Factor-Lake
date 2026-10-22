@@ -32,12 +32,18 @@ It is safe to run again: it creates what is missing and updates the rest. It set
 | Resource | Details |
 |---|---|
 | IAM role `factor-lake-backtest-lambda` | Read `factor-lake-data/*`, write `factor-lake-data/backtest-results/*`, CloudWatch logs |
-| Lambda `factor-lake-backtest` | Python 3.12, 3008 MB, 10-minute timeout; pandas, numpy and pyarrow come from AWS's public [AWS SDK for pandas layer](https://aws-sdk-pandas.readthedocs.io/en/stable/layers.html), so the upload is only this project's code (about 30 KB) |
+| Lambda `factor-lake-backtest` | Python 3.12, 3008 MB, 10-minute timeout. pandas, numpy and pyarrow are bundled in the package at the versions your environment runs (Linux builds fetched with `uv`; unused parts such as test suites and pyarrow's Flight libraries removed), so Lambda computes with the same libraries as the app and needs no Lambda layer. The package (about 62 MB zipped, 199 MB unzipped; Lambda allows 250 MB) is uploaded to `factor-lake-data/_deploy/` first, because direct uploads are limited to 50 MB |
 | S3 lifecycle rule `factor-lake-expire-backtest-results` | Deletes `factor-lake-data/backtest-results/` objects after 90 days. Other rules on the bucket are kept |
 
-**Keys without IAM access** (such as the class `Sysen5900Student` user, which is denied all IAM actions) cannot create the role. Run `uv run python scripts/deploy_backtest_lambda.py --print-role-policy` and send the output to an AWS admin. Once they have created the role, deploy with `--role-arn <the role's ARN>`; the script then makes no IAM calls.
+**Keys without IAM access** (such as the class `Sysen5900Student` user, which is denied all IAM actions) cannot create the role. Deploy with an existing role instead: `--role-arn <the role's ARN>` (the script then makes no IAM calls). In the class account that is the course's Lambda role:
 
-It finishes by pinging the function. Options: `--memory`, `--timeout`, `--function-name`, `--layer-arn` (if the newest layer version cannot be looked up), `--package-only out.zip` (build the zip without deploying).
+```bash
+uv run python scripts/deploy_backtest_lambda.py --role-arn arn:aws:iam::620832638024:role/Sysen5900LambdaExecRole --function-name sysen5900-factor-lake-backtest
+```
+
+Without a usable role, run `uv run python scripts/deploy_backtest_lambda.py --print-role-policy` and send the output to an AWS admin. If the keys may not change the bucket's lifecycle rules, the deploy still finishes and says what to ask an admin for.
+
+It finishes by pinging the function. Options: `--memory`, `--timeout`, `--function-name`, `--role-arn`, `--package-only out.zip` (build the zip without deploying).
 
 ## 3. Turn it on in the app
 
@@ -55,7 +61,7 @@ The app's AWS key also needs `lambda:InvokeFunction` on that function. When the 
 uv run python scripts/check_backtest_lambda.py
 ```
 
-For four sample backtests (Mixing and Integrating, every delisting strategy, equal and market cap weighting, the fossil fuel filter and a cohort comparison), it runs each one locally on the S3 data, then in Lambda, and compares every number. It then runs each one in Lambda again and checks that it came from the cache, unchanged. It uses new inputs each time, so the first Lambda call always computes. The Lambda runs on Linux with AWS's pandas build, so numbers may differ in the last binary digit. The check allows a relative difference of 1e-9 and prints the largest difference it found.
+For four sample backtests (Mixing and Integrating, every delisting strategy, equal and market cap weighting, the fossil fuel filter and a cohort comparison), it runs each one locally on the S3 data, then in Lambda, and compares every number. It then runs each one in Lambda again and checks that it came from the cache, unchanged. It uses new inputs each time, so the first Lambda call always computes. The Lambda uses the same library versions but runs on Linux x86, so numbers may differ in the last binary digit. The check allows a relative difference of 1e-9 and prints the largest difference it found.
 
 The unit tests (`tests/unit/test_backtest_lambda.py`) run the same Lambda code against a fake S3 and drive the real app, checking that a Lambda run equals a local run for both factor combinations, each delisting strategy and the cohort comparison, and that a repeated run is served from the cache.
 
