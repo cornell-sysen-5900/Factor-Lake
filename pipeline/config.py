@@ -74,7 +74,7 @@ class RawFile:
 _FF_COLS = ("mktrf", "smb", "hml", "rmw", "cma", "rf", "umd")
 IBES_MEASURES = {"EPS": "earnings per share", "CPS": "cash flow per share", "DPS": "dividends per share",
                  "EBT": "EBITDA", "SAL": "sales", "CPX": "capital expenditure", "EBI": "EBIT"}
-IBES_FPI = {"0": "long-term growth", "1": "FY1", "2": "FY2", "3": "FY3", "4": "FY4"}
+IBES_FPI = {"0": "long-term growth", "1": "FY1", "2": "FY2", "3": "FY3"}     # FY4 not used (decision 2026-10-25)
 FRED_SERIES = {"DGS10": "ust_10y", "DGS3MO": "tbill_3m", "DBAA": "moodys_baa", "DAAA": "moodys_aaa"}
 INDEX_TICS = {"I0124": "r2000", "I0120": "r2000_growth", "I0122": "r2000_value"}
 ETF_PERMNOS = {88222: "iwm", 88399: "iwn", 88401: "iwo"}
