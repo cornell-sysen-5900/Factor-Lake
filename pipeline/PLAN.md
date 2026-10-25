@@ -1,8 +1,34 @@
-# WRDS pipeline plan (phase 1, for review)
+# WRDS pipeline plan
 
-This is the plan for stages s01 to s08. No cleaning code is written yet. The first review's answers are in
-[Decisions](#decisions-2026-10-25) and are written into the stage rules below. What is still open is in
-[Open questions](#open-questions).
+The plan for stages s01 to s08. s00, s01 and s02 are implemented (phase 2a); s03 to s08 are not written yet.
+[Final outputs](#final-outputs) is what the pipeline must deliver; every stage builds toward it. The review
+answers are in [Decisions](#decisions) and are written into the stage rules below.
+
+## Final outputs
+
+s08_export writes these files to `processed/final/` (s08's stage folder; Parquet, pyarrow, zstd). Every factor
+and multiple is a raw value; the app z-scores or ranks at each rebalance.
+
+| file | one row per | key columns | built in | used by |
+|---|---|---|---|---|
+| **Factors** | | | | |
+| factor_panel_monthly.parquet | index member, month end (point in time) | date, permno, ticker, security_name, gsector, gind, gsubind, sector_name, mkt_cap_musd, company_mkt_cap_musd, all fundamental factors (f_*), price factors (mom_1m, mom_6m, mom_12m, mom_12_1, vol_*), analyst factors (f_forward_ep, f_eps_revision, f_eps_dispersion, f_analyst_surprise, f_forward_sales_yield, f_forward_ebitda_ev, f_cash_flow_yield, f_fy2_ep, f_ltg), beta_252d, beta_60m, ret_next_1m | s07 | factor selection and backtest ranking, sector filter (gsector), Data Viewer |
+| universe_periods.parquet | stock, membership period | permno, index_effective, index_through, first_known, n_snapshots, ticker, security_name, excluded_non_member | s01, finalized in s07 | universe selection, Data Viewer |
+| **Prices and returns** | | | | |
+| returns_monthly.parquet | stock, month, for every permno in permno_list.txt, also after it leaves the index | month_end, permno, ret_m (includes delisting returns), delisted_in_month, delist_ret_filled, trading_days | s02 | backtest holding returns, delisting handling |
+| prices_daily/year=YYYY/data.parquet | stock, trading day | date, permno, ticker, prc, prc_adj, cfacpr, ret, vol, shrout, mkt_cap, mkt_cap_musd, is_delisting_row | s02 | daily data loader (`src/s3_client.py`), sub-annual rebalancing, Data Viewer |
+| **Market** | | | | |
+| market_daily.parquet, market_monthly.parquet | trading day / month | r2000_price_ret, r2000_growth_price_ret, r2000_value_price_ret, iwm_total_ret, iwo_total_ret, iwn_total_ret, mktrf, smb, hml, rmw, cma, umd, rf, ust_10y, tbill_3m, moodys_baa, moodys_aaa (decimals), yields_filled | s06 | benchmarks, performance metrics (risk-free rate), betas, DCF discount rates |
+| **Relative value** | | | | |
+| rv_multiples_monthly.parquet | index member, month end | date, permno, gind, prc, mkt_cap_musd, ev_musd, pe_ttm, pb, ps, ev_ebitda, ev_ebit, ev_sales, fcf_yield, dividend_yield, pe_fy1, pe_fy2, ev_ebitda_fy1, ev_sales_fy1, ltg, peg, and `<multiple>_pct_gind` (percentile rank within the GICS industry that month) | s07 | RV screen |
+| rv_peer_stats_monthly.parquet | gind, month end | date, gind, gind_name, n_peers, `<multiple>_p25`, `<multiple>_p50`, `<multiple>_p75` | s07 | RV peer comparison |
+| **DCF** | | | | |
+| dcf_inputs_annual.parquet | company, fiscal year | permno, gvkey, fyear, period_end, report_date (Q4 rdq rule), revenue, ebitda, ebit, da, capex, d_nwc, tax_rate, interest_expense, interest_source, total_debt, cash, net_debt, diluted_shares, fcff | s04 | DCF valuation |
+| estimates_consensus.parquet | permno, statpers, measure, fpi | permno, ibes_ticker, statpers, measure (EPS, SAL, EBT, EBI, CPX, CPS, DPS), fpi (0-3), fpedats, numest, numup, numdown, meanest, medest, stdev (USD only) | s05 | DCF forecasts, forward multiples |
+| **Reference** | | | | |
+| fundamentals_quarterly.parquet | permno, fiscal quarter | full quarterly statements, building blocks and the quarter-end factors | s03 | Data Viewer, factor research |
+| security_master.parquet | permno | permno, permco, gvkey, ibes_ticker, ticker, security_name (latest), gsector, gsector_name, ggroup, gind, gind_name, gsubind, siccd, first_date, last_date | s07 | ticker and name lookup, holdings table |
+| manifest.json, DATA_DICTIONARY.md | - | data_version, source sha256s, per-file rows, dates, columns, units, known gaps; every column with meaning, unit and source | s08 | data loading checks, documentation |
 
 **Sources.** `archive/WRDS_Cleaning.ipynb` (code, markdown and printed outputs of its last run, 2026-10-22) and
 the s00 inventory of `raw/` (2026-10-25). `archive/data_audit/report.md` is **not in the data folder**, so the
@@ -23,7 +49,9 @@ cite them. "Last run" numbers are the notebook's; they become the expected value
 - **Text ids:** CUSIPs, tickers and gvkeys are read as text with `keep_default_na=False`, because `NA` is a real
   IBES ticker.
 
-## Decisions (2026-10-25)
+## Decisions
+
+Decisions 1-10 are from the first review, 11-15 from the second (both 2026-10-25).
 
 | # | decision | where |
 |---|---|---|
@@ -37,6 +65,11 @@ cite them. "Last run" numbers are the notebook's; they become the expected value
 | 8 | The empty folders in the data folder (`cleaned/`, `parquests/`, `scripts/`) are deleted by hand; the pipeline never touches them. | - |
 | 9 | Delisting rows (DlyDelFlg = Y) never provide a month-end price or market cap. Those come from the last real trading day; the delisting row only contributes its return. | s02 rule 8 |
 | 10 | Annual report date = the rdq of the matching quarterly Q4 row (same gvkey and fiscal year), otherwise datadate + 90 days. | s04 rule 2 |
+| 11 | Non-member stocks from mergers: a stock-snapshot is excluded from the universe if (a) its month-end market cap is more than 3x the largest among the other stocks in that snapshot, or (b) the stock appears in 3 or fewer snapshots in total, all with weight 0.00%. Their data is kept; they are only excluded from the universe, and listed in processed/s01_membership/excluded_non_members.parquet and the s01 summary. | s01 rule 6 |
+| 12 | Missing share classes: s07 compares the company market cap from our permnos with all permnos sharing a permco, by year, and flags a gap above 1% of total universe market cap in any year. No new pull now. | s07 checks |
+| 13 | Interest expense is never filled with 0. The DCF uses annual xint, else xintd; where both are missing, the cost of debt falls back to the FRED Baa yield. | s03, s04 rule 6 |
+| 14 | Prices below $0.01: price-based ratios are missing for those rows, and the rows are counted. | s03 rule 5, s07 rule 5 |
+| 15 | IBES forward E/P uses the price on the same restated basis as the estimate; its 0.1% and 99.9% values are reported as a check. | s05 rule 8 |
 
 ## What s00 found in raw/
 
@@ -76,22 +109,24 @@ Fama-French 2026-08-31, index levels 2026-10-21, FRED 2026-10-22.
 - **Non-index stocks in the holdings.** IWM held Royal Bank of Canada on 2008-02-29 (1 line) and Exxon Mobil on
   2023-11-30 and 2023-12-31, probably shares received in stock-for-stock acquisitions of index members. They
   are real holdings lines, so they are in permno_list.txt and their full CRSP, Compustat and IBES histories were
-  pulled. RBC is 87 of the 402 CAD rows (total assets up to $2.5 trillion). See open question 1.
+  pulled. RBC is 87 of the 402 CAD rows (total assets up to $2.5 trillion). Handled by decision 11.
 
 ---
 
 ## s01_membership
 
-**Inputs:** `raw/iwm_holdings_raw.csv`, `raw/query_inputs/permno_list.txt` (only to compare).
+**Inputs:** `raw/iwm_holdings_raw.csv`, `raw/r2000_price_crsp_ciz.csv` (permno, date, flag, price, shares only,
+for rule 6), `raw/query_inputs/permno_list.txt` (only to compare).
 
 **Outputs** (`processed/s01_membership/`):
 
 | file | one row per | columns |
 |---|---|---|
-| snapshots.parquet | report_dt, permno | report_dt, eff_dt, permno, weight, ticker, security_name, cusip, n_lines, permno_from_cusip |
-| periods.parquet | membership period | permno, index_effective, index_through, first_known, n_snapshots, ticker, security_name |
+| snapshots.parquet | report_dt, permno | report_dt, eff_dt, permno, weight, ticker, security_name, cusip, n_lines, permno_from_cusip, mkt_cap_musd, max_other_mkt_cap_musd, n_snapshots_total, exclusion_rule, in_universe |
+| periods.parquet | membership period | permno, index_effective, index_through, first_known, n_snapshots, n_excluded, excluded_non_member, ticker, security_name |
+| excluded_non_members.parquet | excluded stock-snapshot | report_dt, permno, ticker, security_name, mkt_cap_musd, max_other_mkt_cap_musd, weight, n_snapshots_total, rule (`a`, `b` or `a+b`) |
 | known_gaps.parquet, known_gaps.md | security without a permno | cusip, security_name, ticker, first, last, snapshots, max_weight |
-| permno_list.txt | permno | the upload list for queries 2, 3, 6, 9, 11 |
+| permno_list.txt | permno | the upload list for queries 2, 3, 6, 9, 11 (every snapshot permno, excluded ones too, since their data is kept) |
 
 **Rules** (ported):
 1. A holdings line without a permno gets the permno of the same CUSIP on other report dates (the most common one)
@@ -100,26 +135,45 @@ Fama-French 2026-08-31, index levels 2026-10-21, FRED 2026-10-22.
    (cash, futures, swaps, rights, CVRs, notes, ...; the regex is ported unchanged into config) are the known gaps.
    No extra WRDS pull (A8). Last run: 72 securities.
 3. One row per stock per snapshot: share-class lines are summed (`weight` = sum of percent_tna), `eff_dt` = the
-   earliest line. **Change:** ticker, security_name and cusip come from the line with the largest weight instead of
-   the last line in file order, so the result does not depend on row order.
+   earliest line. **Change:** ticker, security_name and cusip come from the line with the largest weight, then the
+   most shares, instead of the last line in file order, so the result does not depend on row order. (Equal weights
+   happen when a SPAC and its new name are both listed, e.g. V G Acquisition / 23andMe on 2022-08-31; the share
+   tie-break picks the new name, as the notebook did.)
 4. Membership periods: a stock missing from 2 or more consecutive snapshots starts a new period; one missing
    snapshot is bridged (A7). `index_effective` and `index_through` are report_dt values; `first_known` = the
    period's first eff_dt, when that report became public (A5).
 5. permno_list.txt = every permno in the snapshots, sorted. It is written to processed/ only; you copy it to
    raw/query_inputs/ before the permno-based queries (decision 7; the pipeline never writes raw/).
+6. **Non-member stocks from mergers** (decision 11). A stock-snapshot gets `in_universe` = False if
+   (a) its month-end market cap is more than 3x the largest market cap among the other stocks in that snapshot, or
+   (b) the stock is in 3 or fewer snapshots in total and its weight is 0.00% in all of them (weight rounded to 2
+   decimals, as IWM reports it). The data of these stocks is kept everywhere; only the universe drops them.
+   - **Where rule (a) runs.** The month-end market cap is s02's: the last real trading day of the report_dt's
+     month (DlyDelFlg = N), |DlyPrc| x ShrOut. s01 cannot read s02's output, because s01 must run first: its
+     permno_list.txt is the upload list for the CIZ query that s02 cleans. So s01 reads the four needed CIZ
+     columns from raw/ and calls the same function s02 uses (`s02_prices.month_end_market_caps`), so both stages
+     give identical market caps. During a refresh, the first s01 run (before query 2 is re-pulled) cannot price
+     new stocks. Those snapshots are counted (WARN), and the `--stage all` run after the pull applies the rule
+     fully.
+   - Rule (a) compares each stock with the others in the same snapshot, so only a snapshot's largest stock can
+     trip it. A stock without a CIZ market cap is never excluded by rule (a).
+   - `periods.parquet` keeps the excluded stocks' periods with `excluded_non_member` = True when every snapshot of
+     the period is excluded; s07 builds the final universe_periods from the in-universe snapshots.
 
 **Checks:** no duplicate (report_dt, permno) (FAIL); eff_dt >= report_dt (FAIL); no CUSIP maps to two permnos
-(WARN, list them); stocks per snapshot 1,800-2,150 (WARN; last run 1,831-2,108); weight sum per snapshot 90-110%
-(WARN; 2014-09-30 is 108%, 2014-10-31 93.5%, known); missing months are exactly 2009-04, 2009-05, 2009-06 (WARN
-on any new one); stocks missing from a snapshot but in both neighbours, max (WARN above 20; last run 14);
-permno_list.txt equals raw/query_inputs/permno_list.txt (WARN: the permno-based queries must be rerun); stocks in
-only one or two snapshots with a weight below 0.01% (WARN, list them: candidates for merger-consideration
-holdings such as RBC and Exxon). Last run:
-218 snapshots, 428,354 rows, 5,918 permnos, 7,576 periods.
+(WARN, list them); in-universe stocks per snapshot 1,800-2,150 (WARN; last run 1,831-2,108); weight sum per
+snapshot 90-110% (WARN; 2014-09-30 is 108%, 2014-10-31 93.5%, known); missing months are exactly 2009-04, 2009-05,
+2009-06 (WARN on any new one); stocks missing from a snapshot but in both neighbours, max (WARN above 20; last run
+14); permno_list.txt equals raw/query_inputs/permno_list.txt (WARN: the permno-based queries must be rerun);
+snapshot stocks without a CIZ market cap (WARN if more than 1%); excluded stock-snapshots listed in the summary
+(name, ticker, dates, market cap, weight, rule); counts within 2% of the last run (WARN). Last run: 218
+snapshots, 428,354 rows, 5,918 permnos, 7,576 periods.
 
 **Tests:** CUSIP fill (including a CUSIP with no permno anywhere -> gap); non-stock names are not gaps; share
 classes summed; ticker from the largest line regardless of row order; a one-snapshot absence is bridged and a
-two-snapshot absence splits the period; first_known = min eff_dt of the period; reruns give identical files.
+two-snapshot absence splits the period; first_known = min eff_dt of the period; rule (a) excludes a stock at
+3.1x the next largest but not at 2.9x; rule (b) excludes a stock in 3 zero-weight snapshots but not one with 4,
+or with one non-zero weight; reruns give identical files.
 
 ## s02_prices
 
@@ -131,9 +185,9 @@ delreasontype, dlyprc, dlyret, dlyvol, shrout, dlyopen, dlyhigh, dlylow, dlycumf
 | file | one row per | columns |
 |---|---|---|
 | daily/year=YYYY/data.parquet | permno, trading day | date, permno, permco, ticker, siccd, prc, prc_adj, cfacpr, shrout, mkt_cap, mkt_cap_musd, ret, vol, is_delisting_row, delist_ret_filled, mom_1m, mom_6m, mom_12m, vol_gk_{1m,3m,6m,12m}, vol_close_{1m,3m,6m,12m} |
-| monthly.parquet | permno, month | month_end, permno, permco, ticker, siccd, last_trade_date, prc, shrout, mkt_cap_musd, mom_*, vol_*, ret_m, trading_days, delisted_in_month, delist_ret_filled |
+| monthly.parquet | permno, month | month_end, permno, permco, ticker, siccd, last_trade_date, prc, shrout, mkt_cap_musd, mom_*, vol_*, ret_m, trading_days, delisted_in_month, delist_ret_filled (s08 exports returns_monthly from it) |
 | calendar.parquet | month | month, month_end, trading_days |
-| delistings.parquet | delisting | permno, delisting_date, flagged_row_date, delactiontype, delreasontype, delpaymenttype, delret, delret_used |
+| delistings.parquet | delisting | permno, delisting_date, flagged_row_date, flagged_row_prc, delactiontype, delreasontype, delpaymenttype, delret, delret_used |
 
 **Rules** (ported):
 1. Read the needed columns with pyarrow (about 2 GB in memory). Rolling windows run per permno, so the stage
@@ -141,7 +195,9 @@ delreasontype, dlyprc, dlyret, dlyvol, shrout, dlyopen, dlyhigh, dlylow, dlycumf
 2. Drop exact duplicate rows (B2; last run 1,801, 439 of them flag rows). If two rows share permno and date but
    differ, FAIL (none today).
 3. `prc` = |DlyPrc| (negative = bid/ask midpoint); 0 = missing. `ret` < -1 = missing code. `vol` < 0 and
-   `shrout` <= 0 = missing. `mkt_cap` = prc x shrout ($ thousands), `prc_adj` = prc / cfacpr.
+   `shrout` <= 0 = missing. `mkt_cap` = prc x shrout ($ thousands), `prc_adj` = prc / cfacpr. On delisting rows
+   prc, prc_adj and mkt_cap are set missing in the daily file too (decision 9), so no reader can take a price from
+   them; the 774 post-delisting prices CIZ gives are kept in delistings.parquet as `flagged_row_prc`.
 4. **Delisting returns (G2):** the flagged row (DlyDelFlg = Y, the day after the last trade, always the permno's
    last row) already holds the delisting return in DlyRet. It is never added again. If it is missing, fill -30%
    when delactiontype = GDR, else 0% (`config.DELISTING_FILL`); last run 49 fills (36 at -30%, 13 at 0%).
@@ -160,7 +216,8 @@ delreasontype, dlyprc, dlyret, dlyvol, shrout, dlyopen, dlyhigh, dlylow, dlycumf
 
 **Checks:** unique (permno, date) after dedup (FAIL); duplicate count vs last run (WARN); one flag row per
 delisted permno, and it is the permno's last row (FAIL); flag rows = delistings.csv rows (FAIL); every delisting
-falls in exactly one month (FAIL); fills = blank delret in delistings.csv (FAIL); ret_m equals the compounded daily
+falls in exactly one month (FAIL); fills = blank delret in delistings.csv (FAIL); the flag row's return equals
+delistings.csv delret where both exist (WARN below 99%); ret_m equals the compounded daily
 returns for 25 random permnos (FAIL); no month-end prc or mkt_cap taken from a delisting row (FAIL); daily returns
 above +1000% or prices above $100,000 (WARN, list);
 permnos vs permno_list.txt (WARN; today 79728 has no CIZ rows); no gaps in the calendar (FAIL).
@@ -221,6 +278,10 @@ month, including a flag row that carries a price; flag row alone in the next mon
    end), and mkt_cap_qe_musd. Ratios within the statements (ROA, ROE, margins, growth, leverage, current ratio,
    accruals, SUE) are kept. The amounts stay in their own currency, so s07 also leaves the price-based ratios
    missing for these rows.
+6. **Prices below $0.01** (decision 14): rows with prccq < 0.01 (24 today) get the same treatment as non-USD rows:
+   price-based ratios missing, counted in the summary.
+7. **Interest is never filled with 0** (decision 13): interest_ttm is missing when any of the 4 xintq values is
+   missing.
 
 **Checks:** unique (permno, fyearq, fqtr) (FAIL); report_date >= period_end (WARN with count); rdq proxy share
 (WARN above 2%); non-USD rows counted, and no price-based ratio on a non-USD row (FAIL); negative saleq and dpq,
@@ -255,6 +316,13 @@ fcf, tax_rate, epsfx_adj = epsfx / ajex, growth of sale, ebit, capex vs the prev
 4. No TTM: each row is a fiscal year. dp missing stays missing (5% of rows); EBITDA uses oibdp as reported.
 5. **Own table** (decision 6): fundamentals_a is not merged into the monthly panel. DCF code joins it by permno
    with report_date <= the valuation date.
+6. **Interest expense** (decision 13): `interest_expense` = xint, else xintd; never 0-filled.
+   `interest_source` = `xint` / `xintd` / `missing`. Where it is missing, the DCF's cost of debt falls back to the
+   FRED Baa yield (moodys_baa in market_monthly) at the valuation date.
+7. **dcf_inputs_annual** (the final file) is the DCF subset of fundamentals_a: revenue (sale), ebitda (oibdp),
+   ebit (oiadp), da (dp), capex (capx), d_nwc, tax_rate, interest_expense, interest_source, total_debt, cash (che),
+   net_debt, diluted_shares (cshfd), and historical fcff = ebit x (1 - tax_rate) + da - capex - d_nwc (missing if
+   any part is missing).
 
 **Checks:** unique key (FAIL); report_date >= period_end (WARN); share of proxy report dates (WARN above 10%);
 annual sale and oiadp vs the sum of the 4 quarters in s03 within 1% for at least 95% of matched rows (WARN);
@@ -300,7 +368,9 @@ cfacpr).
    Values beyond ±100% (4,360 rows) are kept and counted.
 7. **Suspect totals:** a SAL, EBT, EBI or CPX mean estimate more than 100 times the median of the same ticker,
    measure and FPI is set to NaN and flagged `suspect_total` (the 3 Air Transport Services SAL rows of 2023).
-8. Factors at statpers (EPS FY1, ported): f_forward_ep = meanest / price_ibes_basis; f_eps_revision = (numup -
+8. Factors at statpers (EPS FY1, ported). **f_forward_ep uses the price on the same restated basis as the estimate**
+   (decision 15): f_forward_ep = meanest / price_ibes_basis; its 0.1% and 99.9% values are reported in the
+   summary as a check. f_eps_revision = (numup -
    numdown) / numest; f_eps_dispersion = stdev / |meanest| (NaN if meanest = 0); f_analyst_surprise = (actual -
    last consensus before the announcement) / price at that consensus, from the latest announcement on or before
    statpers, never an older one as fallback, later fiscal year wins on the same day. Added: f_ltg = EPS FPI 0
@@ -328,12 +398,13 @@ NaN and flagged.
 
 | file | one row per | columns |
 |---|---|---|
-| rates_daily.parquet | FRED date | date, ust_10y, tbill_3m, moodys_baa, moodys_aaa |
+| rates_daily.parquet | FRED date | date, ust_10y, tbill_3m, moodys_baa, moodys_aaa, yields_filled |
 | rates_monthly.parquet | month | month, month_end, the same 4 (last value on or before month_end, at most 7 days old) |
 | benchmarks_daily.parquet | date | date, r2000_price_ret, r2000_growth_price_ret, r2000_value_price_ret, iwm_total_ret, iwn_total_ret, iwo_total_ret, mktrf, smb, hml, rmw, cma, umd, rf |
 | benchmarks_monthly.parquet | month | month, month_end, the same columns |
 
-**Rules:** FRED percent / 100, blank days stay NaN (never filled in the daily table). Fama-French are already
+**Rules:** FRED percent / 100. Holidays (blank FRED days) are forward-filled from the previous value, and
+`yields_filled` = True marks those days, so market_daily has a yield on every row. Fama-French are already
 decimals. Index levels: drop 2012-10-29 and 2012-10-30 (Hurricane Sandy, no CRSP rows), price return from
 consecutive levels; monthly = last level on or before month_end. ETF monthly returns compound the daily returns.
 Monthly Fama-French = the published monthly factors matched by month (dateff). The first month (no prior level) is
@@ -348,8 +419,9 @@ matched by month when dateff is not the CRSP month end.
 
 ## s07_panel
 
-**Inputs:** s01 snapshots, s02 monthly + calendar + daily cfacpr, s03 fundamentals_q, s05 factors and consensus.
-Not s04: the annual statements stay their own table (decision 6).
+**Inputs:** s01 snapshots and periods, s02 monthly + calendar + daily (cfacpr, ret), s03 fundamentals_q, s05
+factors and consensus, s06 market_daily and market_monthly (Fama-French market for betas). Not s04: the annual
+statements stay their own table (decision 6).
 
 **Outputs** (`processed/s07_panel/`):
 - **panel.parquet**, one row per index stock per month_end: date, permno, permco, ticker, security_name, sector
@@ -360,15 +432,21 @@ Not s04: the annual statements stay their own table (decision 6).
   the RV building blocks used by the app (book_equity, sale_ttm, ebitda_ttm, ebit_ttm, net_debt, ev_claims,
   fcf_ttm, epsfx_ttm_adj), ibes_statpers, numest, f_forward_ep, f_eps_revision, f_eps_dispersion,
   f_analyst_surprise, surprise_anndats, the new analyst yields f_forward_sales_yield, f_forward_ebitda_ev,
-  f_cash_flow_yield, f_fy2_ep, f_ltg, ret_next_1m, delisted_next_month. (61 columns last run, plus the additions.)
-- **monthly_returns.parquet**: every permno in the snapshots, every month with prices, also after leaving the index:
-  month_end, permno, ret_m, delisted_in_month, delisting_fill_applied, trading_days. Use it for holding returns.
+  f_cash_flow_yield, f_fy2_ep, f_ltg, beta_252d, beta_60m, ret_next_1m, delisted_next_month. (61 columns last
+  run, plus the additions.) Exported as factor_panel_monthly.
+- **rv_multiples.parquet** and **rv_peer_stats.parquet** (rules 10-11), exported as rv_multiples_monthly and
+  rv_peer_stats_monthly.
+- **universe_periods.parquet**: s01's periods rebuilt from the in-universe snapshots, plus the excluded stocks'
+  periods with excluded_non_member = True.
+- **security_master.parquet**: one row per permno (rule 12).
+- The monthly returns table is s02's monthly.parquet; s08 exports it as returns_monthly.
 
 **Rules** (ported):
 1. Rebalance dates = calendar month_ends from the first month with an effective snapshot (2008-04) to the last
    month with prices.
 2. Universe at t = the latest snapshot whose every line has eff_dt <= t (2009-04 uses 2009-02, 2009-05 and 2009-06
-   use 2009-03). index_weight = snapshot weight; new_entrant = not in the universe at the previous month end.
+   use 2009-03), keeping only lines with in_universe = True (decision 11). index_weight = snapshot weight;
+   new_entrant = not in the universe at the previous month end.
 3. Market data from s02 monthly for month t (`price_date` = last trading day); mom_12_1 = (1 + mom_12m) /
    (1 + mom_1m) - 1; ret_next_1m = ret_m of month t+1 (includes any delisting return).
 4. Fundamentals: as-of merge on report_date <= t. **Change:** among quarters reported by t, take the latest
@@ -381,6 +459,7 @@ Not s04: the annual statements stay their own table (decision 6).
      restated to month-end shares with cfacpr(t) / cfacpr(quarter end) (1 when the quarter end predates the CRSP
      history), divided by prc.
    - **Non-USD fundamentals** (fund_is_usd = False): all of these are NaN. Statement ratios are kept.
+   - **Month-end price below $0.01** (decision 14): all price-based ratios and multiples are NaN; counted.
 6. IBES: latest statpers <= t, at most 60 days old.
 7. **Sector and industry from Compustat GICS** (decision 4). `gsector` (11 sectors) is the sector filter, named
    with the GICS sector names. `gind` (industry, 81 in the data) is the peer group for relative value. They come
@@ -425,11 +504,34 @@ Not s04: the annual statements stay their own table (decision 6).
    | f_ltg | EPS FPI 0 mean / 100 (not price-scaled) |
 
    The ported f_forward_ep keeps its notebook definition (price at statpers).
+9. **Betas** vs the Fama-French market (mktrf + rf, excess returns on both sides): `beta_252d` from the last 252
+   daily returns up to t, `beta_60m` from the last 60 monthly returns up to t. Each needs 80% of the observations
+   (202 days, 48 months), else NaN. Delisting returns are included as they occur.
+10. **RV multiples at t** (rv_multiples): prc, company_mkt_cap_musd, ev_musd = company mkt cap + total debt +
+    preferred + minority interest - cash (from the fundamentals used at t); trailing pe_ttm (price / TTM diluted
+    EPS restated to month-end shares), pb, ps, ev_ebitda, ev_ebit, ev_sales, fcf_yield (fcf_ttm / company mkt cap),
+    dividend_yield; forward pe_fy1 and pe_fy2 (price_ibes_basis / EPS FY1, FY2), ev_ebitda_fy1 (EV / EBT FY1),
+    ev_sales_fy1 (EV / SAL FY1); ltg (EPS FPI 0 / 100) and peg = pe_fy1 / (ltg x 100). A multiple with a
+    denominator <= 0 is NaN (a negative P/E is not ranked). Non-USD fundamentals and prices below $0.01 give NaN.
+    `<multiple>_pct_gind` = percentile rank (0-1) of the multiple among the stocks of the same gind that month, NaN
+    when the industry has fewer than 5 values.
+11. **RV peer stats** (rv_peer_stats): per gind and month, n_peers and the 25th, 50th and 75th percentile of each
+    multiple over the stocks with a value.
+12. **security_master**: one row per permno in s02: permco, gvkey (latest), ibes_ticker (latest link), latest
+    ticker and security_name, GICS codes and names, latest siccd, first_date and last_date in the daily data.
 
 **Checks (asserts, FAIL):** no fundamentals with report_date > t; no IBES with statpers > t or older than 60 days;
 no surprise announced after t; no snapshot with eff_dt > t; no price_date > t; no duplicate (date, permno).
-**FAIL:** no price-based ratio on a non-USD fundamentals row; company_mkt_cap_musd >= mkt_cap_musd; every row has a
-sector. **WARN:** share of rows on the SIC fallback above 2%; stocks per month outside 1,800-2,100 (last run 1,831-2,043); coverage by year of price, roa,
+**FAIL:** no price-based ratio on a non-USD fundamentals row or a price below $0.01; company_mkt_cap_musd >=
+mkt_cap_musd; every row has a sector; excluded non-member stock-snapshots are not in the panel.
+**Missing share classes** (decision 12): the CIZ file only holds our permnos, so the permnos we did not pull are
+not visible in it. The check uses Compustat's company market cap instead (prccq x cshoq, all common shares of the
+company), at each quarter end: the gap = Compustat company market cap - the summed CRSP market cap of our permnos
+of that permco on the same date, where positive and above 5% of that company (smaller gaps are timing and share
+count noise). By year, the sum of the gaps over the universe vs the total universe market cap; WARN above 1% in
+any year, listing the largest companies. No new pull now. **WARN:** share of rows on the SIC fallback above 2%; percentiles of each multiple reported, and
+any multiple whose median moves more than 50% from one year to the next; stocks per month outside 1,800-2,100
+(last run 1,831-2,043); coverage by year of price, roa,
 book-to-price, forward E/P, next-month return below the last run by more than 3 points. **Smoke test (printed):**
 top-decile ROA, rebalanced each June and held 12 months, vs IWM (last run 12.5% vs 12.1% a year over 18 years).
 Last run: 435,860 rows, 222 month ends 2008-04-30 to 2026-09-30.
@@ -442,24 +544,25 @@ Consumer Staples, 1311 Energy, 4911 Utilities, 6798 Real Estate, 6021 Financials
 3674 and 7372 Information Technology, 3711 Consumer Discretionary, 3531 Industrials, missing and 9995
 Unclassified); fossil flag; two share classes of one permco: company ratios use the summed market cap and per-share
 ratios each class's own price; a CAD fundamentals row has no price ratios but keeps ROA; each analyst yield
-against a hand value; ret_next_1m includes a delisting return in month t+1.
+against a hand value; ret_next_1m includes a delisting return in month t+1; beta on a synthetic series with a
+known beta, NaN below 80% of observations; EV with each part missing; negative-earnings P/E is NaN; gind percentile
+ranks and peer percentiles on a hand-checked industry; an excluded non-member is not in the panel but is in
+universe_periods with the flag.
 
 ## s08_export
 
 **Inputs:** the outputs of s01-s07, and `processed/s00_inventory/inventory.json` (raw file checksums, so the 4 GB
 is not hashed twice).
 
-**Outputs** (`processed/s08_export/final/`): r2000_monthly_panel.parquet, r2000_monthly_returns.parquet,
-daily_prices/year=YYYY/data.parquet + daily_prices/_manifest.json, daily_last_prices.parquet,
-iwm_membership_snapshots.parquet, r2000_constituents_periods.parquet, fundamental_factors.parquet (quarterly),
-fundamentals_annual.parquet, ibes_consensus.parquet, ibes_factors.parquet, rates_daily.parquet,
-rates_monthly.parquet, benchmarks_daily.parquet, benchmarks_monthly.parquet, delistings.parquet, and
-manifest.json, DATA_DICTIONARY.md, UPLOAD.md.
+**Outputs** (`processed/final/`, s08's stage folder): exactly the files in [Final outputs](#final-outputs):
+factor_panel_monthly, universe_periods, returns_monthly, prices_daily/year=YYYY/data.parquet (+ _manifest.json),
+market_daily, market_monthly, rv_multiples_monthly, rv_peer_stats_monthly, dcf_inputs_annual,
+estimates_consensus, fundamentals_quarterly, security_master, manifest.json, DATA_DICTIONARY.md, plus UPLOAD.md.
 
 **Rules** (ported): the daily files keep the layout, column names and cleaning of the repo's
 `scripts/publish_daily_data_to_s3.py` so `src/s3_client.py` can read them, plus the flag rows (`is_delisting_row`,
-which that script would drop). fundamentals_annual.parquet is exported as its own table (decision 6), and
-ibes_consensus.parquet is the full consensus table (decision 5). manifest.json: data_version (build date),
+which that script would drop). dcf_inputs_annual is exported as its own table (decision 6), and
+estimates_consensus is the full consensus table (decision 5). manifest.json: data_version (build date),
 created_at, pipeline git commit, raw sha256 from s00, per dataset rows / MB / date range / permnos / column
 types, units, sector source (GICS, current classification) and the SIC fallback mapping, fossil flag,
 delisting rule, month-end convention, known gaps, where each source ends. DATA_DICTIONARY.md documents every
@@ -505,20 +608,32 @@ Ordered by how much they can move results. Each now has a fix in the stage rules
    `known_gaps.md` are missing, so their checks cannot be compared. Their checks that the notebook prints are
    ported into the stage checks above.
 
+## Phase 2a results (s01, s02 on the 2026-10-25 data)
+
+s01 PASS (15 s), s02 WARN (90 s; 6 daily returns above +1000%, all real penny-stock spikes such as Tempest
+Therapeutics on 2023-10-11; permno 79728 has no CIZ rows). The archive has no notebook outputs, so the notebook's
+MEMBERSHIP and PRICES cells were rerun unchanged on the same raw files (paths redirected only) to compare:
+
+| compared | result |
+|---|---|
+| snapshots (428,354 rows, 218 dates) | identical keys, eff_dt, weight, ticker, name, CUSIP |
+| periods (7,576), permno_list.txt (5,918), known gaps (72) | identical |
+| daily rows (15,309,394); 300 random permnos (780,850 rows) | identical ret, mom_1m/6m/12m, vol_gk and vol_close 1m/12m, mkt_cap; prc differs on the 46 delisting rows where CIZ gives a post-delisting price (now missing, decision 9) |
+| monthly rows (733,698) | identical ret_m, delisting flags, fills, SIC on every row; prc, mkt cap, momentum and volatility identical in every month without a delisting row. They differ only in the 3,186 delisting months, which now use the last real trading day (decision 9): 2,760 of them now have a price (the notebook had 774 post-delisting prices and no market cap); 426 hold only the delisting row and have none |
+
 ## Open questions
 
-The first round is answered in [Decisions](#decisions-2026-10-25). Raised by the raw data inspection:
-
-1. **Non-index stocks received in mergers** (Royal Bank of Canada 2008-02-29, Exxon Mobil 2023-11 and 2023-12).
-   They are real IWM lines, so the notebook put them in the universe for those months. Keep them (the holdings
-   are the truth), or drop snapshot lines whose market cap is far above the index's largest members (for example
-   above 5x the snapshot's 99th percentile)? s01 lists the candidates either way.
-2. **Share classes outside our CRSP pull.** company_mkt_cap_musd can only sum the permnos we downloaded, and
-   the CIZ query is by permno_list.txt. A class that IWM never held would be missing from the sum. s07 will count
-   the permcos that look affected (fundamentals shares well above the summed CRSP shares). If there are many, add
-   a CIZ pull by PERMCO?
-3. **Missing quarterly interest expense** (xintq missing on 44,102 rows of firms with debt). Leave interest_ttm
-   missing and let the DCF use the annual xint (recommended), or estimate it?
+1. **Decision 11 excludes real members.** The rules as written exclude 72 stock-snapshots (48 stocks). They catch
+   the merger stocks (RBC, Exxon, Salesforce 2018-05, Alexion 2015-06, NRG, ASML, Martin Marietta, Kimco, LinnCo,
+   Orbital ATK), but also:
+   - **rule (a): Super Micro Computer on 2024-02-29**, a real member (172 snapshots, weight 1.6%) that had grown
+     to 3.2x the next largest stock;
+   - **rule (b): 21 stocks in the last snapshot (2026-06-30)**, which have 1 snapshot only because the data ends
+     there (probably June reconstitution additions), and small stocks that were in the index briefly. Weights
+     below 0.005% round to 0.00%, and 27,934 holdings lines are 0.00%, so a zero weight alone does not mark a
+     merger stock.
+   A possible fix: apply (a) only to stocks with a 0.00% weight, and in (b) skip stocks whose snapshots touch the
+   first or last 3 snapshots of the data. This needs your decision; the code follows decision 11 as written.
 
 ## Phase 2 order
 

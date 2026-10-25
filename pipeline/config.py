@@ -143,6 +143,32 @@ QUERY_INPUTS = ("permno_list.txt", "ibes_tickers.txt")
 # Membership: a stock missing from one snapshot stays in its period; missing from 2+ starts a new period
 MEMBERSHIP_BRIDGE_SNAPSHOTS = 1
 
+# Holdings lines that are not common stock (ported unchanged from the notebook's membership cell, audit A8)
+NON_STOCK_PATTERN = (r"CASH|FUND|FUTURE|FEES|ADJUSTMENT|\bCVR\b|ESCROW|EARNOUT|RIGHTS?\b|WARRANT|GNMA|GOVT|SCH DIS|"
+                     r"AUTH|FING|TREASURY|SWAP|MARGIN|COLLATERAL|PAYABLE|RECEIVABLE|CURRENCY|DOLLAR|\bINDEX\b|E-MINI|"
+                     r"RUSSELL|STANDARD LIFE|CONTINGENT|LITIGATION|PENDING|\bTBA\b|NOTE|BOND|%|\d{2}-[A-Z]{3}-\d{4}|"
+                     r"BANK FINLAND")
+
+# Non-member stocks received in mergers (decision 11): excluded from the universe if (a) the month-end market cap
+# is more than NON_MEMBER_CAP_MULTIPLE x the largest other stock in the snapshot, or (b) the stock is in at most
+# NON_MEMBER_MAX_SNAPSHOTS snapshots, all with weight 0.00%
+NON_MEMBER_CAP_MULTIPLE = 3.0
+NON_MEMBER_MAX_SNAPSHOTS = 3
+
+# Membership checks
+SNAPSHOT_SIZE_RANGE = (1800, 2150)
+SNAPSHOT_WEIGHT_RANGE = (90.0, 110.0)          # percent of the fund
+KNOWN_MISSING_MONTHS = ("2009-04", "2009-05", "2009-06")
+NEIGHBOUR_MISSING_MAX = 20
+
+# Counts of the notebook's last run (2026-10-22); checks WARN when a stage is more than LAST_RUN_TOLERANCE away
+LAST_RUN = {
+    "snapshots": 218, "snapshot_rows": 428_354, "permnos": 5_918, "periods": 7_576, "known_gaps": 72,
+    "cusip_fill_lines": 1_569, "price_duplicates": 1_801, "daily_rows": 15_309_394, "monthly_rows": 733_698,
+    "delisting_fills": 49,
+}
+LAST_RUN_TOLERANCE = 0.02
+
 # Delisting returns: CIZ dlyret on the flagged row (DlyDelFlg = Y) already includes delret, so it is never added
 # again. A missing one is filled by delactiontype: -30% for GDR (dropped for performance), else 0%.
 DELISTING_FILL = {"GDR": -0.30}

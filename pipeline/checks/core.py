@@ -9,6 +9,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Iterable
 
+from pipeline.config import LAST_RUN, LAST_RUN_TOLERANCE
+
 PASS, WARN, FAIL = "PASS", "WARN", "FAIL"
 _RANK = {PASS: 0, WARN: 1, FAIL: 2}
 
@@ -43,6 +45,19 @@ def columns_present(name: str, columns: Iterable[str], required: Iterable[str]) 
 
 def not_empty(name: str, rows: int) -> Check:
     return Check(f"{name}: has rows", PASS if rows > 0 else FAIL, f"{rows:,} rows")
+
+
+def check(name: str, ok: bool, detail: str = "", level: str = FAIL) -> Check:
+    """PASS if ok, else `level` (FAIL by default)."""
+    return Check(name, PASS if ok else level, detail)
+
+
+def vs_last_run(name: str, value: int, key: str) -> Check:
+    """WARN when a count is more than LAST_RUN_TOLERANCE away from the notebook's last run."""
+    expected = LAST_RUN[key]
+    off = abs(value - expected) / expected if expected else float(value != 0)
+    return Check(f"{name} vs last run", WARN if off > LAST_RUN_TOLERANCE else PASS,
+                 f"{value:,} (last run {expected:,})")
 
 
 def values_present(name: str, column: str, observed: Iterable[str], expected: Iterable[str]) -> list[Check]:

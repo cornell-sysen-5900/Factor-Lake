@@ -41,7 +41,7 @@ def test_data_dir_needs_raw(tmp_path):
 
 
 def test_stub_stage_returns_exit_code_2(paths, capsys):
-    assert run.main(["--data-dir", str(paths.root), "--stage", "s01"]) == 2
+    assert run.main(["--data-dir", str(paths.root), "--stage", "s03"]) == 2
     assert "not written yet" in capsys.readouterr().out
 
 

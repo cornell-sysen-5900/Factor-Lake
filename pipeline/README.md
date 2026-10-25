@@ -23,14 +23,14 @@ written yet.
 | stage | what it does | status |
 |---|---|---|
 | s00_inventory | size, sha256, rows, columns, date range and expected columns of every raw file | done |
-| s01_membership | IWM snapshots, membership periods, permno fill from CUSIP, known gaps | planned |
-| s02_prices | daily cleaning, momentum, volatility, monthly returns incl. delisting rows | planned |
+| s01_membership | IWM snapshots, membership periods, permno fill from CUSIP, known gaps, non-member exclusions | done |
+| s02_prices | daily cleaning, momentum, volatility, monthly returns incl. delisting rows | done |
 | s03_fundamentals_q | quarterly factors, TTM, split adjustment, RV/DCF building blocks | planned |
 | s04_fundamentals_a | annual statements for DCF | planned |
 | s05_ibes | consensus by measure and FPI, linked to permno, analyst factors | planned |
 | s06_rates_benchmarks | FRED yields, Fama-French, index and ETF returns | planned |
 | s07_panel | monthly point-in-time panel and the all-stocks monthly returns table | planned |
-| s08_export | final Parquet set, manifest.json, DATA_DICTIONARY.md, UPLOAD.md | planned |
+| s08_export | final Parquet set in processed/final/, manifest.json, DATA_DICTIONARY.md, UPLOAD.md | planned |
 
 Tests use small synthetic data only: `uv run pytest tests/pipeline`.
 
