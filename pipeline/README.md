@@ -31,6 +31,7 @@ written yet.
 | s06_market | index and ETF returns, Fama-French, FRED yields and spreads (market_daily, market_monthly) | done |
 | s07_panel | factor_panel_monthly, rv_multiples_monthly, rv_peer_stats_monthly, security_master | done |
 | s08_export | final Parquet set in processed/final/, manifest.json, DATA_DICTIONARY.md, UPLOAD.md | done |
+| s09_validate | validation against IWM, Fama-French, the old panel and the raw CSVs; full rerun; VALIDATION.md | done |
 
 Tests use small synthetic data only: `uv run pytest tests/pipeline`.
 
@@ -49,6 +50,7 @@ The data never goes in the repo (`.gitignore` blocks `*.csv`, `*.parquet`, `*.zi
     s01_membership/
     ...
     s08_export/         summary.json only
+    s09_validation/     summary.json, VALIDATION.md (stage s09_validate)
     final/              what s08 exports: the files to share and upload (see final/UPLOAD.md)
 ```
 

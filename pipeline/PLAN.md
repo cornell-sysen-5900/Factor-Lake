@@ -1,6 +1,6 @@
 # WRDS pipeline plan
 
-The plan for stages s01 to s08. All stages are implemented (phases 2a to 2e).
+The plan for stages s01 to s09. All stages are implemented (phases 2a to 2e, 3).
 [Final outputs](#final-outputs) is what the pipeline must deliver; every stage builds toward it. The review
 answers are in [Decisions](#decisions) and are written into the stage rules below.
 
@@ -52,7 +52,7 @@ cite them. "Last run" numbers are the notebook's; they become the expected value
 
 ## Decisions
 
-Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the fourth, 21-23 and the s07 choices (24) from the fifth, 25-27 from the sixth (all 2026-10-25).
+Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the fourth, 21-23 and the s07 choices (24) from the fifth, 25-27 from the sixth, 28-29 from the seventh (all 2026-10-25).
 
 | # | decision | where |
 |---|---|---|
@@ -82,6 +82,8 @@ Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the 
 | 24 | s07: the share-class gap compares Compustat cshoq (millions) with CRSP shrout (thousands) on the quarter-end date of cshoq; the analyst surprise uses the CRSP price and share basis of the last trading day before anndats_act; the neighbour rule runs on IBES tickers before linking; late-filed older quarters are dropped before the as-of merge (counted). | s07 rules 5, 9, checks; s05 rule 6 |
 | 25 | Company market cap (sixth review): where Compustat cshoq, put on the CRSP share basis at t with cfacshr, exceeds the summed CRSP shares of our permnos with the same permco by more than 5%, company_mkt_cap_musd uses the Compustat count at the listed price (flag company_cap_from_compustat). mkt_cap_musd stays the listed security, for portfolio weights; company_mkt_cap_musd is for valuation. | s07 rule 3 |
 | 26 | RV multiples: TTM and forward total denominators (ib_ttm, ebitda_ttm, ebit_ttm, revenue_ttm, EBT FY1, SAL FY1) must be >= $1M, forward EPS on the CRSP basis >= $0.01 for fwd_pe; otherwise NaN. | s07 rule 10 |
+| 28 | The Compustat share count is never used for a company with an ADR (CRSP share type, the second part of the security name, has the word ADR; only C S R plc in 2011 was affected). | s02 monthly is_adr, s07 rule 3 |
+| 29 | A Compustat share flag lasting at most 3 consecutive months, with Compustat shares within 15% of CRSP's in all of them, is a share issuance between quarter ends: CRSP's count is used. (The episode length is known only afterwards; the value used, the CRSP company cap, is public at t.) | s07 rule 3 |
 | 27 | Panel yield caps: f_forward_ep, f_forward_ep_fy2, f_forward_cfp NaN beyond +-5, f_analyst_surprise NaN beyond +-1 (counted). The median-multiples check is informational. | s07 rules 8-9, checks |
 
 ## What s00 found in raw/
@@ -507,9 +509,12 @@ The monthly returns table is s02's monthly.parquet; s08 exports it as returns_mo
    company_shares_compustat_m = cshoq at the fundamentals' quarter end x cfacshr at the quarter end / cfacshr at t;
    then company_mkt_cap_musd = the CRSP company cap + (company_shares_compustat_m - company_shares_crsp_m) x the price
    of the company's largest listed class (with one listed class: Compustat shares x its price), and
-   company_cap_from_compustat = True (28,202 company-months, 1,154 companies; nearly all real dual-class companies,
-   e.g. GAMCO, UniFirst, Moog, AMC 2014-2016; two ADRs where Compustat counts ordinary shares, CSR 2011 and Nexxen
-   2025, are wrongly included). Stale fundamentals give no Compustat count. mom_12_1 = (1 + mom_12m) / (1 + mom_1m) - 1. ret_next_1m = the stock's ret_m of month t+1, delisting returns included.
+   company_cap_from_compustat = True. Not for companies with an ADR (decision 28) and not in episodes of at most 3
+   months within 15% of CRSP's count (decision 29): 26,476 company-months, 616 companies (of 1,154 ever above 5%;
+   677 had short episodes, 1,724 company-months; median longest episode of the companies used 14 months). Nexxen
+   2025 stays: it converted its ADSs to ordinary shares in Feb 2025 and CRSP's 16.5M shares look stale against
+   Compustat's 65.6M. Stale fundamentals give no Compustat count. One audit row per company in
+   compustat_share_flags.parquet (s07 only, not exported). mom_12_1 = (1 + mom_12m) / (1 + mom_1m) - 1. ret_next_1m = the stock's ret_m of month t+1, delisting returns included.
 4. **Betas:** excess return = return - rf. beta_252d = cov(stock daily excess return, mktrf) / var(mktrf) over the
    stock's last 252 trading rows ending t, with at least 80% of them (202); beta_60m the same with monthly returns over
    the last 60 calendar months (at least 48).
@@ -631,6 +636,30 @@ stale column FAILs; the daily files keep the publish layout and sort; the upload
 compiles.
 
 ---
+
+## s09_validate
+
+**Inputs:** `processed/final/` and `raw/` only, plus the old notebook panel (`config.OLD_PANEL_PATHS`) for check 3.
+**Outputs:** `processed/s09_validation/` (summary.json, VALIDATION.md for teammates, the recompute sample and its
+raw-side values, the extracted upload script). Never writes into final/.
+
+**Checks** (all WARN): (1) index tracking: universe at t weighted by mkt_cap_musd, returns_monthly in t+1, vs IWM
+total return and the Russell 2000 price index: correlation >= 0.99, tracking error <= 2% a year, every year's
+difference, and for years off by more than 2 pp the same stocks at IWM's own weights, the July-August share (the
+snapshot in use predates the June reconstitution) and the largest weighting effects; (2) factor sanity:
+value-weighted top 30% minus bottom 30% within the universe vs HML (B/P), UMD (12-1), RMW (gross profitability; ROE
+informational), CMA (asset growth, low minus high): correlation >= 0.5 (UMD 0.7), mean and t-stat; (3) top 10% by
+ROA each June, equal weight, held July-June, on the new and the old panel vs IWM: no year more than 3 pp apart;
+(4) 100 random panel rows (seed 20261025) recomputed from the raw CSVs by `scripts/wrds_independent_recompute.py`
+(no pipeline imports): B/P, ROA, 12-1 momentum, E/P, EV/EBITDA, the month's return within 1e-6 relative; (5) every
+stage rerun into a temporary folder (`--processed-dir`), each final file compared by rows and a hash of the data
+sorted by its key, full run time; (6) memory of factor_panel_monthly in pandas, full and with 9 columns, vs the
+~1 GB Streamlit free tier (WARN above half); (7) the UPLOAD.md script with `--offline`, no AWS variables and
+network blocked: 36 keys under factor-lake-data/wrds_YYYY_MM/.
+
+**Tests:** cap-weighted next-month returns, tracking statistics, long-short sorts both ways, the June portfolio,
+the rerun comparison (changed data found, row order and created_at ignored), the offline dry run, the recompute
+script on tiny raw files.
 
 ## Problems in the old notebook
 
