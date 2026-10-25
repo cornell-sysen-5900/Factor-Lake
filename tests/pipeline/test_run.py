@@ -40,7 +40,12 @@ def test_data_dir_needs_raw(tmp_path):
         DataPaths.from_data_dir(tmp_path)
 
 
-def test_stub_stage_returns_exit_code_2(paths, capsys):
+def test_unwritten_stage_returns_exit_code_2(paths, capsys, monkeypatch):
+    from pipeline.stages import s08_export
+
+    def not_written(_):
+        raise NotImplementedError("s08_export is not written yet")
+    monkeypatch.setattr(s08_export, "run", not_written)
     assert run.main(["--data-dir", str(paths.root), "--stage", "s08"]) == 2
     assert "not written yet" in capsys.readouterr().out
 
