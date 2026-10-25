@@ -204,12 +204,17 @@ def add_price_scaled(u: pd.DataFrame) -> pd.DataFrame:
 
 # ---------- Analyst data ----------
 
+def _ns(df: pd.DataFrame, *cols: str) -> pd.DataFrame:
+    """merge_asof needs the same datetime unit on both sides."""
+    return df.assign(**{c: df[c].astype("datetime64[ns]") for c in cols})
+
+
 def add_estimates(u: pd.DataFrame, est: pd.DataFrame) -> pd.DataFrame:
     """For each (measure, fpi) series: the latest statpers <= t, at most 60 days old."""
-    u = u.sort_values("date")
+    u = _ns(u, "date").sort_values("date")
     u["cfacpr_last"] = u["permno"].map(est.groupby("permno")["cfacpr_last"].first())
     for name, (measure, fpi) in SERIES.items():
-        s = est[(est["measure"] == measure) & (est["fpi"] == fpi)]
+        s = _ns(est[(est["measure"] == measure) & (est["fpi"] == fpi)], "statpers")
         keep = ["meanest", "stdev", "numest", "numup", "numdown"] if name == "eps1" else ["meanest"]
         s = s[["permno", "statpers", *keep]].rename(columns={"statpers": f"{name}_statpers",
                                                              **{c: f"{name}_{c}" for c in keep}})
@@ -222,12 +227,13 @@ def surprise_events(est: pd.DataFrame, prices: pd.DataFrame) -> pd.DataFrame:
     """One row per EPS FY1 announcement: (actual - the last consensus before it), both on the CRSP share basis of
     the last trading day before the announcement, divided by that day's price (at most 10 days earlier). Two fiscal
     years announced the same day: the later one wins."""
-    e = est[(est["measure"] == "EPS") & (est["fpi"] == 1) & est["anndats_act"].notna()]
+    e = _ns(est[(est["measure"] == "EPS") & (est["fpi"] == 1) & est["anndats_act"].notna()], "statpers",
+            "anndats_act")
     pre = e[e["statpers"] < e["anndats_act"]].sort_values("statpers")
     ev = pre.groupby(["permno", "fpedats"]).tail(1)[["permno", "fpedats", "anndats_act", "actual", "meanest",
                                                      "cfacpr_last"]]
     ev = ev.sort_values(["permno", "anndats_act", "fpedats"]).drop_duplicates(["permno", "anndats_act"], keep="last")
-    px = prices.dropna(subset=["prc", "cfacpr"])
+    px = _ns(prices.dropna(subset=["prc", "cfacpr"]), "date")
     px = px[px["cfacpr"] > 0].rename(columns={"date": "price_date_ann", "prc": "prc_ann", "cfacpr": "cfacpr_ann"})
     ev = pd.merge_asof(ev.sort_values("anndats_act"), px.sort_values("price_date_ann"), left_on="anndats_act",
                        right_on="price_date_ann", by="permno", direction="backward", allow_exact_matches=False,
@@ -240,7 +246,8 @@ def surprise_events(est: pd.DataFrame, prices: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_analyst(u: pd.DataFrame, events: pd.DataFrame) -> pd.DataFrame:
-    u = pd.merge_asof(u.sort_values("date"), events.sort_values("surprise_anndats"), left_on="date",
+    u = pd.merge_asof(_ns(u, "date").sort_values("date"), _ns(events, "surprise_anndats").sort_values(
+                      "surprise_anndats"), left_on="date",
                       right_on="surprise_anndats", by="permno", direction="backward",
                       tolerance=pd.Timedelta(days=SURPRISE_MAX_AGE_DAYS))
     basis = u["cfacpr_t"] / u["cfacpr_last"]                      # IBES per-share values -> shares at t
