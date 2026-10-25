@@ -51,7 +51,7 @@ cite them. "Last run" numbers are the notebook's; they become the expected value
 
 ## Decisions
 
-Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the fourth (all 2026-10-25).
+Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the fourth, 21-23 and the s07 choices from the fifth (all 2026-10-25).
 
 | # | decision | where |
 |---|---|---|
@@ -75,6 +75,9 @@ Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the 
 | 18 | Near-zero denominators in s03: f_sales_growth_1yr needs prior TTM sales >= $1M, f_rd_to_sales current TTM sales >= $1M, f_capex_growth_1yr prior TTM capex >= $1M, f_sue a std of EPS changes >= $0.01; otherwise NaN. | s03 rule 7 |
 | 19 | The s04 annual vs quarterly revenue check is informational, threshold 90%. | s04 checks |
 | 20 | s05 outputs estimates_consensus with the CRSP basis factor (the analyst factors move to s07); s06 is renamed s06_market and adds term and credit spreads and holiday-filled yields. | s05, s06 |
+| 21 | f_sue is NaN when its absolute value is above 50 (counted). | s03 rule 8 |
+| 22 | The IBES 100x rule compares each total-measure estimate with its neighbours: flagged only when more than 100x both the previous and the next estimate of the same ticker, measure and FPI (the one neighbour at the ends). | s05 rule 6 |
+| 23 | The Fama-French monthly vs compounded daily check is strict (50 bp) for mktrf and rf, informational for smb, hml, rmw, cma and umd. | s06 checks |
 
 ## What s00 found in raw/
 
@@ -302,6 +305,7 @@ row per permno per fiscal quarter:
    10.4 -> 0.48 (p99 46.1 -> 9.40), capex growth 4.3e12 -> 0.26 (p99 10.9 -> 4.53), SUE -9.6e10 -> -1,096
    (p1/p99 unchanged at -7.4/4.7). Capex growth coverage 2015+ drops from 78% to 66%. SUE keeps a few huge
    values (min -2.2e8) from huge EPS changes, not from the denominator.
+8. **SUE cap** (decision 21): |f_sue| > 50 is NaN; 134 rows today. SUE mean -1,096 -> 0.018, p1 -7.09, p99 4.65.
 
 **Checks:** unique (permno, fyearq, fqtr) (FAIL); duplicates and rows vs the notebook rerun (WARN); report_date
 on or after period_end (WARN); rdq proxy at most 2% (WARN); no price-based ratio on non-USD or sub-$0.01 rows
@@ -395,9 +399,13 @@ cfacpr), `raw/query_inputs/ibes_tickers.txt` (only to compare).
    permnos (share classes), so there are slightly more linked rows (10,061,304) than raw rows.
 5. **Units:** SAL, EBT, EBI, CPX are totals in $ millions; EPS, CPS, DPS are $ per share; FPI 0 (long-term
    growth) is converted from percent to decimal (meanest, medest, stdev, highest, lowest / 100).
-6. **100x rule:** a SAL, EBT, EBI or CPX mean estimate (FPI 1-3) above 100 times the ticker's own median for that
-   measure is set to NaN (all 5 values) and flagged `suspect_total`. See open question 1: today it flags 6,494
-   rows, mostly real pre-revenue companies.
+6. **Neighbour rule** (decision 22): a SAL, EBT, EBI or CPX mean estimate (FPI 1-3) more than 100 times both the
+   previous and the next estimate of the same ticker, measure and FPI (only the one neighbour for the first and
+   last; neighbours that are missing or 0 are skipped) is set to NaN (all 5 values) and flagged `suspect_total`.
+   It runs on IBES tickers before linking, so two share classes of one company never neighbour each other. Today
+   193 rows (CPX 101, EBI 58, EBT 18, SAL 16), about 1,000x their neighbours (totals entered in thousands); the
+   summary lists the 20 largest. The first rule (100x the ticker's median) flagged 6,494 rows, mostly real
+   pre-revenue companies.
 7. **Share basis.** CRSP's cumulative price factor `cfacpr` falls at each split (GameStop's 4-for-1 on 2022-07-22:
    4.05 before, 1.01 after) and is 1.0 at the end of the data, so `prc / cfacpr` is a price in end-of-data shares.
    IBES summary values are restated to the latest share basis too (GameStop's FY1 EPS on 2022-07-14, before the
@@ -416,7 +424,7 @@ cfacpr), `raw/query_inputs/ibes_tickers.txt` (only to compare).
 
 **Checks:** only USD and FPI 0-3 (FAIL); unique (permno, statpers, measure, fpi) (FAIL); every measure present
 (FAIL); every row inside one of its links' date windows (FAIL); long-term growth in decimals (EPS FPI 0 median
-0.03-0.30) (FAIL); suspect totals under 0.01% (WARN); CRSP price on statpers for 90%+ of EPS FY1 rows (WARN);
+0.03-0.30) (FAIL); suspect totals under 0.01% (WARN; 0.003% today); CRSP price on statpers for 90%+ of EPS FY1 rows (WARN);
 crsp_basis_factor > 0 (FAIL); EPS FY1 rows and permnos vs the notebook rerun (WARN); ibes_tickers.txt vs
 raw/query_inputs (WARN). The summary has rows and coverage by measure and FPI, linked rows and permnos by year, and
 count / missing % / mean / p1 / p50 / p99 of meanest for every measure and FPI.
@@ -452,8 +460,9 @@ long-term growth to decimals; the 100x rule; crsp_basis_factor across a 4-for-1 
 
 **Checks:** market-closed days have no index return (FAIL); yields in range: ust_10y 0-6%, tbill_3m -0.5-7%,
 moodys_baa 2-10%, moodys_aaa 1-9% (FAIL); Fama-French daily rf mean below 0.001 (FAIL: units); IWM total minus
-Russell 2000 price return 0.5-2.0% a year (WARN; 1.34% today); published monthly Fama-French within 50 bp of the
-compounded daily factors (WARN; see the phase 2c results: true for mktrf and rf, not for the long-short factors);
+Russell 2000 price return 0.5-2.0% a year (WARN; 1.34% today); published monthly mktrf and rf within 50 bp of the
+compounded daily factors (FAIL; decision 23); the same comparison for smb, hml, rmw, cma, umd reported as
+information (see the phase 2c results);
 no yield filled for more than 5 days in a row (WARN); every month present (FAIL). The summary has the end date of
 every source, coverage, and count / missing % / mean / p1 / p50 / p99 of every column, daily and monthly.
 
@@ -710,12 +719,7 @@ s03 PASS, s04 PASS (FCFF for 70% of years, 89% of DCF-applicable years), s05 WAR
 
 ## Open questions
 
-1. **The 100x rule flags real companies.** "A total above 100x the ticker's own median for that measure" flags
-   6,494 rows (CPX 3,650, SAL 2,133, EBI 529, EBT 182) for 456 tickers, mostly pre-revenue companies whose sales
-   estimates grow from near zero (Ocugen: median $0.02M, later estimates up to $954M; Endocyte, ImmunityBio) and
-   real capex ramps (Plug Power). Comparing each estimate with the neighbouring estimates of the same ticker,
-   measure and FPI (100x both the previous and next statpers) would flag 204 rows, which look like real
-   glitches. Keep the rule, or switch?
+None.
 
 ## Phase 2 order
 

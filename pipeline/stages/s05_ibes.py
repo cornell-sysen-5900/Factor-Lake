@@ -17,8 +17,9 @@ Rules (pipeline/PLAN.md, s05_ibes):
     2. two different actuals for one (ticker, measure, fpedats): the actual is not used
     3. duplicate (ticker, statpers, measure, fpi): the row with more analysts, then the first in the file
     4. link: scores 1-2, our permnos, sdate <= statpers <= edate; each permno's latest link is open-ended
-    5. FPI 0 (long-term growth) from percent to decimal; totals (SAL, EBT, EBI, CPX) are $ millions; a total above
-       100x the ticker's median for that measure is NaN (suspect_total)
+    5. FPI 0 (long-term growth) from percent to decimal; totals (SAL, EBT, EBI, CPX) are $ millions; a total more
+       than 100x both its previous and next estimate (same ticker, measure, FPI; one neighbour at the ends) is NaN
+       (suspect_total). Done on IBES tickers before linking, so share classes do not neighbour each other.
     6. share basis: IBES per-share values are restated to the latest share basis; CRSP prices are not.
        value x crsp_basis_factor (= cfacpr_statpers / cfacpr_last) is on the basis of the CRSP price at statpers
 """
@@ -105,18 +106,34 @@ def link(ib: pd.DataFrame, lk: pd.DataFrame) -> tuple[pd.DataFrame, int]:
     return m, n - len(m)
 
 
-def convert_units(ib: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
-    """Rule 5: long-term growth to decimals; totals far above the ticker's own median are NaN."""
+def neighbour_outliers(ib: pd.DataFrame) -> pd.DataFrame:
+    """The flagged total-measure estimates, with their previous and next estimate: more than 100x both neighbours of
+    the same ticker, measure and FPI (only the one neighbour for the first and last). Neighbours that are missing or
+    0 are skipped; with none left the estimate is not flagged."""
+    tot = ib[ib["measure"].isin(IBES_TOTALS) & (ib["fpi"] > 0)].sort_values(["ticker", "measure", "fpi", "statpers"])
+    g = tot.groupby(["ticker", "measure", "fpi"])["meanest"]
+    tot = tot.assign(previous=g.shift(1), next=g.shift(-1))
+    x, prev, nxt = tot["meanest"].abs(), tot["previous"].abs(), tot["next"].abs()
+    prev, nxt = prev.where(prev > 0), nxt.where(nxt > 0)
+    m = IBES_TOTAL_OUTLIER_MULTIPLE
+    hit = (prev.notna() | nxt.notna()) & ((x > m * prev) | prev.isna()) & ((x > m * nxt) | nxt.isna())
+    return tot[hit.to_numpy(dtype=bool)]
+
+
+def convert_units(ib: pd.DataFrame) -> tuple[pd.DataFrame, dict, list]:
+    """Rule 5: long-term growth to decimals; totals far above both neighbouring estimates are NaN. Also returns the
+    counts by measure and the 20 largest flagged estimates."""
     ltg = ib["fpi"] == 0
     ib.loc[ltg, list(VALUES)] = ib.loc[ltg, list(VALUES)] / 100
-    tot = ib["measure"].isin(IBES_TOTALS) & ~ltg
-    med = ib.loc[tot, "meanest"].abs().groupby([ib.loc[tot, "ticker"], ib.loc[tot, "measure"]]).transform("median")
-    suspect = pd.Series(False, index=ib.index)
-    hit = (ib.loc[tot, "meanest"].abs() > IBES_TOTAL_OUTLIER_MULTIPLE * med) & (med > 0)
-    suspect.loc[hit.index] = hit.to_numpy(dtype=bool)
+    flagged = neighbour_outliers(ib)
+    sample = [{"ticker": r.ticker, "statpers": f"{r.statpers:%Y-%m-%d}", "measure": r.measure, "fpi": int(r.fpi),
+               "meanest": float(r.meanest), "previous": None if pd.isna(r.previous) else float(r.previous),
+               "next": None if pd.isna(r.next) else float(r.next)}
+              for r in flagged.sort_values("meanest", key=abs, ascending=False).head(20).itertuples()]
+    suspect = ib.index.isin(flagged.index)
     ib.loc[suspect, list(VALUES)] = np.nan
     ib["suspect_total"] = suspect
-    return ib, ib.loc[suspect].groupby("measure").size().to_dict()
+    return ib, flagged.groupby("measure").size().to_dict(), sample
 
 
 def add_crsp_basis(ib: pd.DataFrame, daily: pd.DataFrame) -> pd.DataFrame:
@@ -150,7 +167,7 @@ def run_checks(out: pd.DataFrame, lk: pd.DataFrame, info: dict, raw_list: set | 
                         bool(0.03 <= ltg <= 0.30), f"median {ltg:.3f}"))
     tot = out["measure"].isin(IBES_TOTALS) & (out["fpi"] > 0)
     share = float(out.loc[tot, "suspect_total"].mean())
-    checks.append(check("suspect totals (100x the ticker's median) under 0.01% of total-measure rows",
+    checks.append(check("suspect totals (100x both neighbouring estimates) under 0.01% of total-measure rows",
                         share < 1e-4, f"{int(out['suspect_total'].sum())} rows ({share:.4%})", level=WARN))
     eps1 = out[(out["measure"] == "EPS") & (out["fpi"] == 1)]
     found = float(eps1["price_statpers"].notna().mean())
@@ -179,8 +196,8 @@ def run(paths: DataPaths) -> dict:
     (out_dir / "ibes_tickers.txt").write_text("\n".join(lk["ticker"].drop_duplicates()) + "\n")
 
     ib, info = filter_and_dedupe(read_estimates(paths.raw / RAW_FILE))
+    ib, suspects, suspect_sample = convert_units(ib)
     ib, info["two_tickers_dropped"] = link(ib, lk)
-    ib, suspects = convert_units(ib)
     daily = pd.read_parquet(paths.stage_dir("s02_prices") / "daily", columns=["date", "permno", "prc", "cfacpr"])
     ib = add_crsp_basis(ib, daily)
     del daily
@@ -196,7 +213,8 @@ def run(paths: DataPaths) -> dict:
     by_year = pd.DataFrame({"rows": out.groupby(year).size(), "permnos": out.groupby(year)["permno"].nunique(),
                             "eps_fy1_permnos": out[eps1].groupby(year[eps1])["permno"].nunique()})
     by_mf = out.groupby(["measure", "fpi"])
-    extra = {**info, "suspect_totals": suspects, "linked_rows": len(out), "linked_permnos": int(out["permno"].nunique()),
+    extra = {**info, "suspect_totals": suspects, "suspect_totals_sample": suspect_sample, "linked_rows": len(out),
+             "linked_permnos": int(out["permno"].nunique()),
              "links_used": len(lk), "link_permnos": int(lk["permno"].nunique()), "our_permnos": len(ours),
              "rows_by_measure_fpi": {f"{m} {f}": int(n) for (m, f), n in by_mf.size().items()},
              "coverage_by_measure_fpi": {f"{m} {f}": round(float(v), 4) for (m, f), v in

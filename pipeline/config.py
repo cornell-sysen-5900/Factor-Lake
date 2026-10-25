@@ -214,6 +214,7 @@ YTD_ITEMS = {"oancfy": "oancf_q", "capxy": "capx_q", "dvy": "dv_q", "sstky": "ss
              "dltisy": "dltis_q", "dltry": "dltr_q", "aqcy": "aqc_q"}
 SUE_HISTORY_QUARTERS = 8            # SUE is scaled by the std of the previous 8 four-quarter EPS changes
 SUE_MIN_HISTORY = 6                 # ... and needs at least 6 of them
+SUE_MAX_ABS = 50                    # |SUE| above this is NaN (counted)
 
 # GICS names. Compustat's GICS is each company's latest classification (current for active companies, the last
 # one used for inactive ones, so some discontinued industry codes appear). Industry names follow the 2023
@@ -270,7 +271,7 @@ DCF_EXCLUDED_SECTORS = (40, 60)     # Financials and Real Estate: FCFF-based DCF
 # IBES
 IBES_PER_SHARE = ("EPS", "CPS", "DPS")          # $ per share, restated by IBES to the latest share basis
 IBES_TOTALS = ("SAL", "EBT", "EBI", "CPX")       # $ millions, no share basis
-IBES_TOTAL_OUTLIER_MULTIPLE = 100               # a total above 100x the ticker's median for that measure is NaN
+IBES_TOTAL_OUTLIER_MULTIPLE = 100               # a total above 100x both neighbouring estimates is NaN
 IBES_OPEN_LINK_END = "2262-01-01"               # each permno's latest link is open-ended (WRDS ends active links)
 IBES_LINK_SCORES = (1, 2)
 IBES_CURRENCY = "USD"

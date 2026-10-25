@@ -26,6 +26,7 @@ from pipeline.checks import PASS, WARN, Check, check, vs_last_run
 from pipeline.config import (COVERAGE_TOLERANCE, GICS_INDUSTRIES, GICS_SECTORS, LAST_RUN_COVERAGE_2015,
                              PRICE_BASED_FACTORS, PRICE_FLOOR, REPORT_LAG_DAYS_Q, REPORT_LAG_DAYS_Q4,
                              MIN_SUE_STD, MIN_TTM_CAPEX_MUSD, MIN_TTM_SALES_MUSD, SUE_HISTORY_QUARTERS,
+                             SUE_MAX_ABS,
                              SUE_MIN_HISTORY, TAX_RATE_RANGE, YTD_ITEMS, DataPaths)
 from pipeline.outputs import fresh_stage_dir, table_info, write_parquet, write_summary
 
@@ -175,6 +176,8 @@ def add_factors(fq: pd.DataFrame, qs: Quarters) -> tuple[pd.DataFrame, dict]:
     std = hist.std(axis=1)
     f["f_sue"] = d_eps / std.where((hist.notna().sum(axis=1) >= SUE_MIN_HISTORY) & (std >= MIN_SUE_STD))
     f = f.replace([np.inf, -np.inf], np.nan)
+    sue_capped = f["f_sue"].abs() > SUE_MAX_ABS
+    f.loc[sue_capped, "f_sue"] = np.nan
 
     bad = {"f_sales_growth_1yr": f["f_sales_growth_1yr"] < -1, "f_capex_growth_1yr": f["f_capex_growth_1yr"] < -1,
            "f_rd_to_sales": f["f_rd_to_sales"] < 0}
@@ -185,7 +188,8 @@ def add_factors(fq: pd.DataFrame, qs: Quarters) -> tuple[pd.DataFrame, dict]:
     fq.loc[~fq["is_usd"], "mkt_cap_qe_musd"] = np.nan
     counts = {"impossible_to_nan": {k: int(v.sum()) for k, v in bad.items()},
               "non_usd_rows": int((~fq["is_usd"]).sum()), "non_usd_permnos": int(fq.loc[~fq["is_usd"], "permno"].nunique()),
-              "price_below_floor_rows": int((fq["prccq"] < PRICE_FLOOR).sum())}
+              "price_below_floor_rows": int((fq["prccq"] < PRICE_FLOOR).sum()),
+              "sue_above_max_abs": int(sue_capped.sum())}
     return pd.concat([fq, f], axis=1), counts
 
 

@@ -62,5 +62,5 @@ def test_market_daily_and_monthly(tmp_path):
     assert nov.moodys_baa == pytest.approx(0.046) and nov.rf == pytest.approx(1.0001 ** n_nov - 1)
     status = {c["name"]: c["status"] for c in summary["checks"]}
     assert status["ust_10y within 0.0%-6%"] == "PASS"
-    assert status["published monthly Fama-French within 50 bp of compounded daily"] == "PASS"
+    assert status["published monthly mktrf and rf within 50 bp of compounded daily"] == "PASS"
     assert status["monthly table has every month"] == "PASS"

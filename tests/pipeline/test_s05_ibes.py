@@ -64,17 +64,21 @@ def test_two_tickers_for_one_permno_keep_the_better_link():
     assert dropped == 1 and out["ticker"].tolist() == ["AAB"]
 
 
-def test_long_term_growth_to_decimal_and_100x_totals():
+def test_long_term_growth_to_decimal_and_neighbour_rule_for_totals():
+    sal = [400.0, 410.0, 52_000.0, 420.0, 430.0, 60_000.0]          # a glitch in the middle and one at the end
+    capx = [0.2, 0.3, 30.0, 32.0, 35.0, 40.0]                       # real growth from near zero: not flagged
     ib = estimates([("AAA", "2021-01-14", "EPS", 0, 15.0, 3)]
-                   + [("AAA", f"2021-{m:02d}-14", "SAL", 1, 400.0, 3) for m in range(2, 12)]
-                   + [("AAA", "2021-12-16", "SAL", 1, 52_000.0, 3)])                  # 130x the median
+                   + [("AAA", f"2021-{m + 2:02d}-14", "SAL", 1, v, 3) for m, v in enumerate(sal)]
+                   + [("BBB", f"2021-{m + 2:02d}-14", "CPX", 1, v, 3) for m, v in enumerate(capx)])
     ib["fpi"] = ib["fpi"].astype("int8")
-    out, counts = s05.convert_units(ib)
+    out, counts, sample = s05.convert_units(ib)
     assert out.loc[0, "meanest"] == pytest.approx(0.15) and out.loc[0, "stdev"] == pytest.approx(0.001)
-    assert counts == {"SAL": 1}
-    last = out.iloc[-1]
-    assert last.suspect_total and np.isnan(last.meanest) and np.isnan(last.highest)
-    assert out.loc[out["measure"] == "SAL", "meanest"].notna().sum() == 10
+    assert counts == {"SAL": 2}
+    flagged = out[out["suspect_total"]]
+    assert flagged["statpers"].dt.month.tolist() == [4, 7] and flagged["meanest"].isna().all()
+    assert sample[0] == {"ticker": "AAA", "statpers": "2021-07-14", "measure": "SAL", "fpi": 1, "meanest": 60_000.0,
+                         "previous": 430.0, "next": None}
+    assert out.loc[out["ticker"] == "BBB", "meanest"].notna().all()
 
 
 def test_crsp_basis_factor_lines_up_a_split():

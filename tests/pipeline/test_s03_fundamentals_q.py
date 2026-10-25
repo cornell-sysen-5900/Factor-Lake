@@ -153,3 +153,11 @@ def test_near_zero_denominators_give_nan():
 def test_sue_needs_a_std_of_at_least_one_cent():
     flat = [1.0 + 0.001 * (i % 2) for i in range(16)]          # EPS changes of a tenth of a cent
     assert built(quarters(16, epspxq=flat))["f_sue"].isna().all()
+
+
+def test_sue_above_50_is_nan_and_counted():
+    eps = [0.1 * (i % 3) for i in range(16)]
+    eps[14] = 50.0                                                  # a jump far beyond the earlier changes
+    out, info = s03.build(quarters(16, epspxq=eps))
+    assert info["sue_above_max_abs"] >= 1
+    assert out["f_sue"].dropna().abs().max() <= 50

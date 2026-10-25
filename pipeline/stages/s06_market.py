@@ -142,9 +142,13 @@ def run_checks(daily, monthly, ff_d) -> list[Check]:
     diff = (pub - comp).abs().dropna(how="all")
     worst = {c: f"max {diff[c].max() * 1e4:.0f} bp, {int((diff[c] > FF_MONTHLY_TOLERANCE).sum())} months over"
              for c in FF_COLS}
-    over = int((diff > FF_MONTHLY_TOLERANCE).sum().sum())
-    checks.append(check(f"published monthly Fama-French within {FF_MONTHLY_TOLERANCE * 1e4:.0f} bp of compounded "
-                        "daily", over == 0, "; ".join(f"{k}: {v}" for k, v in worst.items()), level=WARN))
+    # strict for the market and rf; the long-short factors' daily portfolios are built differently (informational)
+    strict, info = ("mktrf", "rf"), ("smb", "hml", "rmw", "cma", "umd")
+    over = int((diff[list(strict)] > FF_MONTHLY_TOLERANCE).sum().sum())
+    checks.append(check(f"published monthly mktrf and rf within {FF_MONTHLY_TOLERANCE * 1e4:.0f} bp of compounded "
+                        "daily", over == 0, "; ".join(f"{k}: {worst[k]}" for k in strict)))
+    checks.append(check("published monthly smb, hml, rmw, cma, umd vs compounded daily (informational)", True,
+                        "; ".join(f"{k}: {worst[k]}" for k in info)))
     run = daily["was_filled"].astype(int).groupby((~daily["was_filled"]).cumsum()).sum().max()
     checks.append(check(f"no yield filled for more than {MAX_FILLED_RUN_DAYS} days in a row",
                         int(run) <= MAX_FILLED_RUN_DAYS, f"longest run {int(run)} days", level=WARN))
