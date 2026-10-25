@@ -288,20 +288,36 @@ IWM_MINUS_INDEX_RANGE = (0.005, 0.02)
 FF_MONTHLY_TOLERANCE = 0.005
 MAX_FILLED_RUN_DAYS = 5
 
-# Sectors from the SIC code as of the date (last non-zero SICCD), checked in this order; anything else is
-# Industrials. Major group NN = SIC NN00-NN99.
-SECTOR_RULES: tuple[tuple[str, tuple[tuple[int, int], ...]], ...] = (
+# SIC fallback where Compustat GICS is missing (decision 4): the SIC code as of t mapped to a GICS sector name,
+# checked in this order (first match wins); missing, 0 or 9900-9999 is Unclassified; any other code is Industrials
+SIC_TO_GICS_SECTOR: tuple[tuple[str, tuple[tuple[int, int], ...]], ...] = (
+    ("Health Care", ((2830, 2836), (3841, 3851), (8000, 8099), (8731, 8731))),
+    ("Consumer Staples", ((100, 999), (2000, 2199), (2840, 2844), (5140, 5149), (5400, 5499), (5912, 5912))),
+    ("Consumer Discretionary", ((2200, 2399), (2500, 2599), (3630, 3639), (3651, 3651), (3710, 3716),
+                                (3750, 3751), (3940, 3949), (5200, 5999), (7000, 7099), (7200, 7299),
+                                (7500, 7599), (7900, 7999), (8200, 8299))),
     ("Energy", ((1200, 1399), (2900, 2999))),
-    ("Utilities", ((4900, 4949),)),
-    ("Other", ((9900, 9999),)),                       # also a missing SIC
-    ("Technology", ((3500, 3599), (3600, 3699), (3800, 3899), (7300, 7399), (8731, 8734))),
-    ("Healthcare", ((2800, 2899), (8000, 8099))),
+    ("Utilities", ((4900, 4949), (4960, 4999))),
+    ("Real Estate", ((6500, 6599), (6798, 6798))),
     ("Financials", ((6000, 6799),)),
-    ("Consumer", ((2000, 2399), (5000, 5999), (7000, 7099), (7200, 7299), (7500, 7599), (7800, 7999),
-                  (8200, 8299), (8400, 8499))),
+    ("Communication Services", ((2710, 2799), (4800, 4899), (7810, 7899))),
+    ("Information Technology", ((3570, 3579), (3600, 3699), (3820, 3829), (7370, 7379))),
+    ("Materials", ((1000, 1199), (1400, 1499), (2400, 2499), (2600, 2699), (2800, 2899), (3200, 3399))),
 )
-SECTOR_DEFAULT = "Industrials"
-SECTOR_MISSING = "Other"
+SIC_UNCLASSIFIED = "Unclassified"
+
+# s07 panel
+STALE_FUNDAMENTALS_DAYS = 365       # fundamentals older than this at t (t - period_end) are not used
+SURPRISE_MAX_AGE_DAYS = 120         # analyst surprise from an announcement at most this old
+SURPRISE_PRICE_MAX_DAYS = 10        # the price before an announcement is at most this many days older
+BETA_DAYS, BETA_MONTHS = 252, 60    # beta windows; each needs MIN_OBS_SHARE of the observations
+DISPERSION_MIN_MEAN = 0.01          # f_eps_dispersion needs |mean EPS estimate| >= $0.01 ...
+DISPERSION_MIN_NUMEST = 2           # ... and at least 2 estimates
+PEER_MIN = 5                        # percentile ranks and peer percentiles need 5 stocks with a value
+SHARE_CLASS_GAP_COMPANY = 0.05      # Compustat shares above ours by more than 5% of the company count as a gap ...
+SHARE_CLASS_GAP_YEAR = 0.01         # ... and the gaps may be at most 1% of the universe market cap in a year
+SANITY_MEDIAN_RANGES = {"pe": (15, 25), "pb": (1, 3), "ev_ebitda": (8, 15)}
+
 FOSSIL_SIC_RANGES = ((1200, 1299), (1300, 1399), (2900, 2999), (4920, 4929), (5170, 5179))
 
 UNITS = {
