@@ -30,7 +30,7 @@ written yet.
 | s05_ibes | full IBES consensus (estimates_consensus), linked to permno, with the CRSP share-basis factor | done |
 | s06_market | index and ETF returns, Fama-French, FRED yields and spreads (market_daily, market_monthly) | done |
 | s07_panel | factor_panel_monthly, rv_multiples_monthly, rv_peer_stats_monthly, security_master | done |
-| s08_export | final Parquet set in processed/final/, manifest.json, DATA_DICTIONARY.md, UPLOAD.md | planned |
+| s08_export | final Parquet set in processed/final/, manifest.json, DATA_DICTIONARY.md, UPLOAD.md | done |
 
 Tests use small synthetic data only: `uv run pytest tests/pipeline`.
 
@@ -48,12 +48,14 @@ The data never goes in the repo (`.gitignore` blocks `*.csv`, `*.parquet`, `*.zi
     s00_inventory/      one folder per stage, written only by that stage
     s01_membership/
     ...
+    s08_export/         summary.json only
+    final/              what s08 exports: the files to share and upload (see final/UPLOAD.md)
 ```
 
 ## Rules every stage follows
 
 1. **Inputs:** read only from `raw/` or from earlier stages' folders in `processed/`. Never write to `raw/`.
-2. **Outputs:** write only to `processed/<stage>/`. The folder is emptied at the start of the stage, so running a
+2. **Outputs:** write only to `processed/<stage>/` (s08 also to `processed/final/`). The folder is emptied at the start of the stage, so running a
    stage again overwrites only its own outputs and never leaves stale files.
 3. **Format:** tables are Parquet (pyarrow, zstd). Each stage also writes `summary.json`: status, and per output
    table its rows, date range and permnos, plus every check with PASS / WARN / FAIL and a short detail.

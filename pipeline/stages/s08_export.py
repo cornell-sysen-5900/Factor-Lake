@@ -154,7 +154,8 @@ def sha256(path: Path) -> str:
 def output_info(out: Path, name: str, date_col: str | None) -> dict:
     """Path, rows, MB, date range, permnos and column types of one output (all years for the daily files)."""
     files = sorted((out / "prices_daily").glob("year=*/data.parquet")) if name == DAILY else [out / name]
-    cols = [c for c in ("permno", date_col) if c]
+    names = pq.read_schema(files[0]).names
+    cols = [c for c in ("permno", date_col) if c and c in names]
     keys = pd.concat([pd.read_parquet(f, columns=cols) for f in files]) if cols else None
     info = {"path": "prices_daily/year=*/data.parquet" if name == DAILY else name,
             "files": len(files), "rows": sum(pq.read_metadata(f).num_rows for f in files),

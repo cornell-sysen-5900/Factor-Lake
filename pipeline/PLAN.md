@@ -1,12 +1,13 @@
 # WRDS pipeline plan
 
-The plan for stages s01 to s08. s00 to s07 are implemented (phases 2a to 2d); s08 is not written yet.
+The plan for stages s01 to s08. All stages are implemented (phases 2a to 2e).
 [Final outputs](#final-outputs) is what the pipeline must deliver; every stage builds toward it. The review
 answers are in [Decisions](#decisions) and are written into the stage rules below.
 
 ## Final outputs
 
-s08_export writes these files to `processed/final/` (s08's stage folder; Parquet, pyarrow, zstd). Every factor
+s08_export writes these files to `processed/final/` (Parquet, pyarrow, zstd; its summary.json goes to
+`processed/s08_export/`). The columns as built are in `processed/final/DATA_DICTIONARY.md`; the table below is the plan. Every factor
 and multiple is a raw value; the app z-scores or ranks at each rebalance.
 
 | file | one row per | key columns | built in | used by |
@@ -594,31 +595,40 @@ announcement.
 
 ## s08_export
 
-**Inputs:** the outputs of s01-s07, and `processed/s00_inventory/inventory.json` (raw file checksums, so the 4 GB
-is not hashed twice).
+**Inputs:** the outputs of s01-s07, and `processed/s00_inventory/inventory.json` (raw checksums and date ranges).
 
-**Outputs** (`processed/final/`, s08's stage folder): exactly the files in [Final outputs](#final-outputs):
-factor_panel_monthly, universe_periods, returns_monthly, prices_daily/year=YYYY/data.parquet (+ _manifest.json),
-market_daily, market_monthly, rv_multiples_monthly, rv_peer_stats_monthly, dcf_inputs_annual,
-estimates_consensus, fundamentals_quarterly, security_master, manifest.json, DATA_DICTIONARY.md, plus UPLOAD.md.
+**Outputs:** `processed/final/`, exactly these files (s08's summary.json goes to `processed/s08_export/`):
 
-**Rules** (ported): the daily files keep the layout, column names and cleaning of the repo's
-`scripts/publish_daily_data_to_s3.py` so `src/s3_client.py` can read them, plus the flag rows (`is_delisting_row`,
-which that script would drop). dcf_inputs_annual is exported as its own table (decision 6), and
-estimates_consensus is the full consensus table (decision 5). manifest.json: data_version (build date),
-created_at, pipeline git commit, raw sha256 from s00, per dataset rows / MB / date range / permnos / column
-types, units, sector source (GICS, current classification) and the SIC fallback mapping, fossil flag,
-delisting rule, month-end convention, known gaps, where each source ends. DATA_DICTIONARY.md documents every
-column (meaning, unit, source); the stage FAILs on an undocumented column. UPLOAD.md explains the dry run, upload
-and check against `s3://sysen-5900-factor-lake/factor-lake-data/wrds_YYYY_MM/` for a teammate with the AWS keys.
-**Nothing is uploaded by the pipeline.**
+| file | from |
+|---|---|
+| factor_panel_monthly.parquet | s07 (without the share-basis helpers cfacpr_t, cfacpr_last) |
+| universe_periods.parquet | s01 periods.parquet (excluded_non_member flag included) |
+| returns_monthly.parquet | s02 monthly.parquet without siccd, momentum and volatility (those are in the panel) |
+| prices_daily/year=YYYY/data.parquet, prices_daily/_manifest.json | s02 daily: permno, ticker, date, prc, prc_adj, cfacpr, shrout, mkt_cap_musd, ret, vol, is_delisting_row |
+| market_daily.parquet, market_monthly.parquet | s06 |
+| rv_multiples_monthly.parquet, rv_peer_stats_monthly.parquet, security_master.parquet | s07 |
+| dcf_inputs_annual.parquet | s04 |
+| estimates_consensus.parquet | s05 |
+| fundamentals_quarterly.parquet | s03 |
+| manifest.json | data_version (build date), created_at, pipeline git commit (and whether the tree was dirty), sha256 of every raw file (from s00), per output file path, rows, MB, date range, permnos, column types; units, sectors (GICS and the SIC fallback), delisting fill rule, month-end convention, which market cap to use for what, point-in-time note, known gaps (the 72 unmatched IWM holdings, unlisted share classes, where each source ends) |
+| DATA_DICTIONARY.md | rendered from `pipeline/dictionary.py`: per file what it is, its key and rows, and every column with type, meaning, unit, source and stage |
+| UPLOAD.md | dry run, upload and listing check against `s3://sysen-5900-factor-lake/factor-lake-data/wrds_YYYY_MM/` for a teammate with the repo's .env AWS keys. **Nothing is uploaded by the pipeline.** |
 
-**Checks:** each file reads back with its source's row count (FAIL); permno int32 and dates datetime64[ns] (FAIL);
-every column documented (FAIL); sha256 in the manifest equals s00 (FAIL); the repo's daily reader loads one year
-(FAIL); total size reported (last run 1,987 MB).
+**Rules:** permno int32, permco nullable int32, dates datetime64[ns] without time zone, floats float64, market cap in
+$ millions, returns and yields as decimals. Helper columns are dropped by name (`SOURCES` in s08_export.py), so a
+new column in an earlier stage stops s08 until it is documented in `pipeline/dictionary.py`. The daily files keep
+the layout of the repo's `scripts/publish_daily_data_to_s3.py` (year=YYYY/data.parquet, sorted by permno and
+date, row groups of 250,000, a `_manifest.json` with years, rows, bytes and columns) under `prices_daily/`, with
+mkt_cap_musd instead of the old mkt_cap in $ thousands.
 
-**Tests:** an undocumented column FAILs; types are cast; the manifest lists every file; daily files round-trip
-through `src/s3_client.py`'s reader.
+**Checks:** every file reads back with its source's row count (FAIL); no duplicate keys in any file (FAIL);
+permno int32 and dates datetime64[ns] (FAIL); every output column is in DATA_DICTIONARY.md and every column there
+is in the outputs, read from the written files (FAIL); final/ holds exactly the planned files (FAIL); the manifest
+sha256 of every raw file equals the raw file re-hashed now (FAIL); total size and size per file (reported).
+
+**Tests:** types are standardized; the dictionary renders every column and parses back; an undocumented or a
+stale column FAILs; the daily files keep the publish layout and sort; the upload script targets the new folder and
+compiles.
 
 ---
 
