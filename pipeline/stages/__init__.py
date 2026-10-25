@@ -10,4 +10,5 @@ STAGES = (
     "s06_market",
     "s07_panel",
     "s08_export",
+    "s09_validate",
 )

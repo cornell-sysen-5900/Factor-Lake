@@ -36,9 +36,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m pipeline.run", description="Factor-Lake WRDS data pipeline")
     parser.add_argument("--data-dir", required=True, help="data folder that contains raw/ (processed/ is written)")
     parser.add_argument("--stage", required=True, help="stage name, number, short name, or all")
+    parser.add_argument("--processed-dir", help="write the stage folders here instead of <data-dir>/processed")
     args = parser.parse_args(argv)
 
-    paths = DataPaths.from_data_dir(args.data_dir)
+    paths = DataPaths.from_data_dir(args.data_dir, args.processed_dir)
     for stage in resolve_stages(args.stage):
         print(f"== {stage}", flush=True)
         started = time.time()

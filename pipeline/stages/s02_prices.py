@@ -38,10 +38,11 @@ from pipeline.stages.s00_inventory import read_header
 STAGE = "s02_prices"
 CIZ_FILE = "r2000_price_crsp_ciz.csv"
 _NUMERIC = ("dlyprc", "dlyret", "dlyvol", "shrout", "dlyopen", "dlyhigh", "dlylow", "dlycumfacpr", "dlycumfacshr")
-ALL_COLUMNS = ("permno", "permco", "dlycaldt", "ticker", "siccd", "dlydelflg") + _NUMERIC
+ALL_COLUMNS = ("permno", "permco", "dlycaldt", "ticker", "siccd", "dlydelflg", "securitynm") + _NUMERIC
 MARKET_CAP_COLUMNS = ("permno", "dlycaldt", "dlydelflg", "dlyprc", "shrout")       # what s01 needs
 _TYPES = {"permno": pa.int32(), "permco": pa.int32(), "dlycaldt": pa.date32(), "siccd": pa.string(),
           "ticker": pa.dictionary(pa.int32(), pa.string()), "dlydelflg": pa.dictionary(pa.int32(), pa.string()),
+          "securitynm": pa.dictionary(pa.int32(), pa.string()),
           **{c: pa.float64() for c in _NUMERIC}}
 MOM_COLS = tuple(MOMENTUM_WINDOWS)
 VOL_COLS = tuple(f"vol_{kind}_{label}" for label in VOL_WINDOWS for kind in ("gk", "close"))
@@ -161,6 +162,15 @@ def build_calendar(px: pd.DataFrame) -> pd.DataFrame:
     return cal.reset_index(names="month")
 
 
+def is_adr(names: pd.Series) -> pd.Series:
+    """True where the share type (second part of the CRSP security name) has the word ADR: "C S R PLC; COM NONE
+    ADR; CONS" is, "SEADRILL LTD; COM NONE; CONS" is not. Decided once per distinct name."""
+    names = names.astype("category")
+    words = [str(n).split(";")[1].split() if ";" in str(n) else [] for n in names.cat.categories]
+    flag = pd.Series(["ADR" in w for w in words], index=names.cat.categories)
+    return pd.Series(names.map(flag).astype("boolean").fillna(False).astype(bool).to_numpy(), index=names.index)
+
+
 def build_monthly(px: pd.DataFrame, calendar: pd.DataFrame) -> pd.DataFrame:
     """One row per permno and month with any row: ret_m compounds every row (delisting row included); prc, shrout,
     mkt cap, momentum and volatility come from the last real trading day; siccd is the last non-zero SIC so far."""
@@ -176,6 +186,8 @@ def build_monthly(px: pd.DataFrame, calendar: pd.DataFrame) -> pd.DataFrame:
         "permco": px["permco"].groupby(keys, sort=False).last(),
         "ticker": px["ticker"].astype(object).groupby(keys, sort=False).last(),
         "siccd": sic.groupby(keys, sort=False).last(),
+        # CRSP's share type is the second part of the security name ("C S R PLC; COM NONE ADR; CONS")
+        "is_adr": is_adr(px["securitynm"]).groupby(keys, sort=False).last(),
     })
     out.index.names = ["permno", "month"]
     out = out.reset_index()
@@ -186,7 +198,7 @@ def build_monthly(px: pd.DataFrame, calendar: pd.DataFrame) -> pd.DataFrame:
     out = out.merge(end, on=["permno", "month"], how="left")
     out = out.merge(calendar[["month", "month_end"]], on="month", how="left")
     cols = ["month_end", "permno", "permco", "ticker", "siccd", "last_trade_date", "prc", "shrout", "mkt_cap_musd",
-            *MOM_COLS, *VOL_COLS, "ret_m", "trading_days", "delisted_in_month", "delist_ret_filled"]
+            *MOM_COLS, *VOL_COLS, "ret_m", "trading_days", "delisted_in_month", "delist_ret_filled", "is_adr"]
     return out[cols].sort_values(["month_end", "permno"]).reset_index(drop=True)
 
 

@@ -156,9 +156,10 @@ def test_company_cap_from_compustat_shares_on_the_crsp_basis():
     t = pd.Timestamp("2020-03-31")
     u = pd.DataFrame({"date": t, "permno": [1, 2], "permco": [10, 20], "fund_period_end": pd.Timestamp("2019-12-31"),
                       "cshoq": [30.0, 41.0], "cfacshr_t": 1.0, "company_shares_crsp_m": 40.0,
-                      "company_main_prc": 10.0, "company_mkt_cap_musd": 400.0})
+                      "company_main_prc": 10.0, "company_mkt_cap_musd": 400.0, "company_has_adr": False,
+                      "ticker": "T", "security_name": "N", "n_share_classes": 1})
     me = pd.DataFrame({"permno": [1, 2], "month": pd.Period("2019-12", "M"), "cfacshr_t": [2.0, 1.0]})
-    out = s07.add_company_cap(u, me).set_index("permno")
+    out = s07.add_company_cap(u, me)[0].set_index("permno")
     assert out.loc[1, "company_shares_compustat_m"] == 60.0 and out.loc[1, "company_cap_from_compustat"]
     assert out.loc[1, "company_mkt_cap_musd"] == 600.0 and out.loc[1, "company_mkt_cap_crsp_musd"] == 400.0
     assert not out.loc[2, "company_cap_from_compustat"] and out.loc[2, "company_mkt_cap_musd"] == 400.0
@@ -181,3 +182,24 @@ def test_forward_yields_and_surprise_are_capped():
     assert counts == {"f_forward_ep": 1, "f_forward_ep_fy2": 1, "f_forward_cfp": 0, "f_analyst_surprise": 1}
     assert np.isnan(out.loc[1, "f_forward_ep"]) and out.loc[2, "f_forward_ep"] == 5.0
     assert np.isnan(out.loc[1, "f_analyst_surprise"]) and out.loc[2, "f_analyst_surprise"] == 1.0
+
+
+def company_months(permco, dates, cshoq, crsp=40.0, adr=False):
+    return pd.DataFrame({"date": pd.to_datetime(dates), "permno": permco, "permco": permco,
+                         "fund_period_end": pd.Timestamp("2019-12-31"), "cshoq": cshoq, "cfacshr_t": 1.0,
+                         "company_shares_crsp_m": crsp, "company_main_prc": 10.0, "company_mkt_cap_musd": crsp * 10,
+                         "company_has_adr": adr, "ticker": "T", "security_name": "N", "n_share_classes": 1})
+
+
+def test_adrs_and_short_issuance_episodes_keep_the_crsp_count():
+    months = ["2020-01-31", "2020-02-28", "2020-03-31", "2020-04-30", "2020-05-29"]
+    u = pd.concat([company_months(1, months, 80.0, adr=True),                      # ADR: never
+                   company_months(2, months[:3], 44.0) .assign(cshoq=[44.0, 44.0, 30.0]),  # 2 months, 10%: issuance
+                   company_months(3, months[:3], 50.0),                             # 3 months but 25% more: used
+                   company_months(4, months, 44.0)], ignore_index=True)             # 10% but 5 months: used
+    me = pd.DataFrame({"permno": [1, 2, 3, 4], "month": pd.Period("2019-12", "M"), "cfacshr_t": 1.0})
+    out, audit = s07.add_company_cap(u, me)
+    used = out.groupby("permco")["company_cap_from_compustat"].sum()
+    assert used.to_dict() == {1: 0, 2: 0, 3: 3, 4: 5}
+    a = audit.set_index("permco")
+    assert a.loc[1, "adr"] and a.loc[2, "short_episode_months"] == 2 and a.loc[4, "longest_episode_months"] == 5

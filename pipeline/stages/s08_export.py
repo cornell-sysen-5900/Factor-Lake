@@ -280,12 +280,10 @@ parser.add_argument("final_dir", type=Path, help="the processed/final folder")
 parser.add_argument("--upload", action="store_true", help="really upload (default: dry run)")
 parser.add_argument("--check", action="store_true", help="list the S3 folder and compare with the local files")
 parser.add_argument("--overwrite", action="store_true", help="allow replacing objects already in the folder")
+parser.add_argument("--offline", action="store_true", help="dry run without credentials or network: only list keys")
 args = parser.parse_args()
-
-load_dotenv(Path(__file__).resolve().parent / ".env")          # the repo's .env
-missing = [k for k in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY") if not os.environ.get(k)]
-if missing:
-    sys.exit(f"Not set in .env: {{', '.join(missing)}}")
+if args.offline and (args.upload or args.check):
+    sys.exit("--offline is a dry run only")
 if not PREFIX.startswith("{S3_PREFIX}/wrds_"):
     sys.exit("Refusing a prefix outside {S3_PREFIX}/wrds_*: the live app's files must not be touched")
 
@@ -294,6 +292,16 @@ if not (final / "manifest.json").is_file():
     sys.exit(f"{{final}} has no manifest.json; pass the processed/final folder")
 files = sorted((p for p in final.rglob("*") if p.is_file()), key=lambda p: p.name == "manifest.json")
 local = {{f"{{PREFIX}}/{{p.relative_to(final).as_posix()}}": p for p in files}}
+if args.offline:
+    for key, path in local.items():
+        print(f"would upload s3://{{BUCKET}}/{{key}} ({{path.stat().st_size / 1e6:,.1f}} MB)")
+    print(f"{{len(local)}} files, {{sum(p.stat().st_size for p in local.values()) / 1e6:,.0f}} MB (offline dry run)")
+    sys.exit(0)
+
+load_dotenv(Path(__file__).resolve().parent / ".env")          # the repo's .env
+missing = [k for k in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY") if not os.environ.get(k)]
+if missing:
+    sys.exit(f"Not set in .env: {{', '.join(missing)}}")
 s3 = boto3.client("s3", region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
 
 
@@ -343,7 +351,8 @@ From the repo root, with the path of this `final/` folder:
     uv run python upload_wrds.py "C:/path/to/WRDS FA26/processed/final"
 
 It loads the keys from the repo's `.env`, lists what is already in the target folder (this checks that the keys
-work), and prints every S3 object key it would upload with its size. Check that every line starts with
+work), and prints every S3 object key it would upload with its size. Add `--offline` to only print the keys, with
+no credentials and no network. Check that every line starts with
 `s3://{S3_BUCKET}/{S3_PREFIX}/{folder}/`.
 
 ## 3. Upload

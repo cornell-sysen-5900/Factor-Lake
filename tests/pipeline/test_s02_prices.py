@@ -11,7 +11,7 @@ from pipeline.config import DataPaths
 from pipeline.stages import s02_prices as s02
 
 HEADER = ["permno", "PERMCO", "Ticker", "SICCD", "DlyCalDt", "DlyDelFlg", "DlyPrc", "DlyRet", "DlyVol", "ShrOut",
-          "DlyOpen", "DlyHigh", "DlyLow", "DlyCumFacPr", "DlyCumFacShr"]
+          "DlyOpen", "DlyHigh", "DlyLow", "DlyCumFacPr", "DlyCumFacShr", "SecurityNm"]
 
 
 def ciz_rows(permno, dates, rets, prc=10.0, flag="N", sic=3571, **over):
@@ -20,7 +20,7 @@ def ciz_rows(permno, dates, rets, prc=10.0, flag="N", sic=3571, **over):
         row = {"permno": permno, "PERMCO": permno + 50000, "Ticker": f"T{permno}", "SICCD": sic,
                "DlyCalDt": d.date(), "DlyDelFlg": flag, "DlyPrc": prc, "DlyRet": r, "DlyVol": 1000,
                "ShrOut": 2000, "DlyOpen": prc, "DlyHigh": prc * 1.02, "DlyLow": prc * 0.98, "DlyCumFacPr": 1.0,
-               "DlyCumFacShr": 1.0}
+               "DlyCumFacShr": 1.0, "SecurityNm": f"CO {permno}; COM NONE; CONS"}
         row.update(over)
         rows.append(row)
     return rows
@@ -190,3 +190,13 @@ def test_run_end_to_end(tmp_path):
     assert summary["tables"]["monthly.parquet"]["stats"]["ret_m"]["count"] == 8
     assert json.loads((out / "summary.json").read_text())["delisting_fills"] == {"total": 1, "gdr_minus_30pct": 1,
                                                                                  "zero": 0}
+
+
+def test_adr_flag_reads_the_share_type_not_the_company_name(tmp_path):
+    days = pd.bdate_range("2021-01-04", periods=5)
+    rows = (ciz_rows(1, days, [0.0] * 5, SecurityNm="C S R PLC; COM NONE ADR; CONS")
+            + ciz_rows(2, days, [0.0] * 5, SecurityNm="SEADRILL LTD 2021; COM NONE; CONS"))
+    px, _, _ = load(tmp_path, rows)
+    px = s02.add_volatility(s02.add_momentum(px))
+    m = s02.build_monthly(px, s02.build_calendar(px)).set_index("permno")
+    assert m.loc[1, "is_adr"] and not m.loc[2, "is_adr"]

@@ -26,7 +26,8 @@ import numpy as np
 import pandas as pd
 
 from pipeline.checks import PASS, WARN, Check, check
-from pipeline.config import (BETA_DAYS, BETA_MONTHS, COMPUSTAT_SHARES_MIN_EXCESS, DISPERSION_MIN_MEAN,
+from pipeline.config import (BETA_DAYS, BETA_MONTHS, COMPUSTAT_FLAG_SHORT_MAX_RATIO, COMPUSTAT_FLAG_SHORT_MONTHS,
+                             COMPUSTAT_SHARES_MIN_EXCESS, DISPERSION_MIN_MEAN,
                              DISPERSION_MIN_NUMEST, FORWARD_YIELD_MAX_ABS, GICS_INDUSTRIES, GICS_SECTORS,
                              IBES_MAX_AGE_DAYS, MIN_OBS_SHARE, PEER_MIN, PRICE_BASED_FACTORS, PRICE_FLOOR,
                              RV_MIN_DENOMINATOR_MUSD, RV_MIN_FORWARD_EPS, SANITY_MEDIAN_RANGES,
@@ -39,6 +40,7 @@ from pipeline.stages import s02_prices
 STAGE = "s07_panel"
 PANEL, RV, PEERS, MASTER = ("factor_panel_monthly.parquet", "rv_multiples_monthly.parquet",
                             "rv_peer_stats_monthly.parquet", "security_master.parquet")
+FLAGS = "compustat_share_flags.parquet"
 STATEMENT_FACTORS = ("f_roe", "f_roa", "f_gross_profitability", "f_accruals_to_assets", "f_leverage",
                      "f_current_ratio", "f_rd_to_sales", "f_asset_growth_1yr", "f_sales_growth_1yr",
                      "f_capex_growth_1yr", "f_net_share_issuance", "f_sue")
@@ -134,10 +136,12 @@ def add_market(u: pd.DataFrame, monthly: pd.DataFrame, me: pd.DataFrame, beta_m:
     mo["n_share_classes"] = grp.transform("count")
     mo["company_shares_crsp_m"] = mo.groupby(["month_end", "permco"])["shrout"].transform(
         lambda s: s.sum(min_count=1)) / 1000
+    mo["company_has_adr"] = mo.groupby(["month_end", "permco"])["is_adr"].transform("any")
     top = mo.dropna(subset=["mkt_cap_musd"]).sort_values("mkt_cap_musd").groupby(["month_end", "permco"])["prc"].last()
     mo = mo.merge(top.rename("company_main_prc"), left_on=["month_end", "permco"], right_index=True, how="left")
     cols = ["permno", "month_end", "permco", "ticker", "siccd", "last_trade_date", "prc", "shrout", "mkt_cap_musd",
-            "company_mkt_cap_musd", "n_share_classes", "company_shares_crsp_m", "company_main_prc", "mom_1m",
+            "company_mkt_cap_musd", "n_share_classes", "company_shares_crsp_m", "company_main_prc", "is_adr",
+            "company_has_adr", "mom_1m",
             "mom_6m", "mom_12m", *s02_prices.VOL_COLS]
     u = u.merge(mo[cols].rename(columns={"month_end": "date", "last_trade_date": "price_date"}),
                 on=["date", "permno"], how="left")
@@ -197,22 +201,56 @@ def add_fundamentals(u: pd.DataFrame, fq: pd.DataFrame) -> tuple[pd.DataFrame, d
     return u, {"late_filed_quarters_dropped": late, "stale_rows": int(stale.sum())}
 
 
-def add_company_cap(u: pd.DataFrame, me: pd.DataFrame) -> pd.DataFrame:
+def flag_episodes(firm: pd.DataFrame, dates) -> pd.DataFrame:
+    """firm: one row per (date, permco) with flag and ratio (Compustat / CRSP shares). Adds episode (consecutive
+    flagged months of one company), episode_months, and short: an episode of at most 3 months whose Compustat
+    shares stay within 15% of CRSP's (a share issuance between quarter ends, not an unlisted class)."""
+    pos = {d: i for i, d in enumerate(sorted(pd.unique(dates)))}
+    f = firm.sort_values(["permco", "date"]).copy()
+    k = f["date"].map(pos)
+    prev = f.groupby("permco")["flag"].shift(1, fill_value=False).astype(bool) & (k.groupby(f["permco"]).diff() == 1)
+    f["episode"] = (f["flag"] & ~prev).cumsum().where(f["flag"])
+    f["episode_months"] = f["episode"].map(f["episode"].value_counts())
+    f["short"] = (f["flag"] & (f["episode_months"] <= COMPUSTAT_FLAG_SHORT_MONTHS)
+                  & (f.groupby("episode")["ratio"].transform("max") <= COMPUSTAT_FLAG_SHORT_MAX_RATIO))
+    return f
+
+
+def add_company_cap(u: pd.DataFrame, me: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Unlisted share classes: where Compustat's common shares (cshoq at the quarter end, put on the CRSP share
     basis at t with cfacshr at the quarter end / cfacshr at t) exceed the summed CRSP shares of our permnos with the
     same permco by more than 5%, the company market cap is the CRSP one plus the extra shares at the price of the
-    company's largest listed class at t (with one listed class: Compustat shares x its price)."""
+    company's largest listed class at t (with one listed class: Compustat shares x its price). Never for companies
+    with an ADR (Compustat counts the ordinary shares behind it), and not in short episodes (flag_episodes).
+    Returns the panel and one audit row per company ever above the 5%."""
     qe = me[["permno", "month", "cfacshr_t"]].rename(columns={"month": "qe_month", "cfacshr_t": "cfacshr_qe"})
     u = u.assign(qe_month=u["fund_period_end"].dt.to_period("M")).merge(qe, on=["permno", "qe_month"], how="left")
     cs = u["cshoq"] * u["cfacshr_qe"] / u["cfacshr_t"].where(u["cfacshr_t"] > 0)
     u["company_shares_compustat_m"] = cs.where(cs > 0).groupby([u["date"], u["permco"]]).transform("first")
     extra = u["company_shares_compustat_m"] - u["company_shares_crsp_m"]
-    flag = (extra > COMPUSTAT_SHARES_MIN_EXCESS * u["company_shares_crsp_m"]) & u["company_main_prc"].notna()
+    above = (extra > COMPUSTAT_SHARES_MIN_EXCESS * u["company_shares_crsp_m"]) & u["company_main_prc"].notna()
+    firm = u.assign(flag=above & ~u["company_has_adr"].eq(True), above=above,
+                    ratio=u["company_shares_compustat_m"] / u["company_shares_crsp_m"]).dropna(subset=["permco"])
+    firm = flag_episodes(firm.drop_duplicates(["date", "permco"])[
+        ["date", "permco", "ticker", "security_name", "above", "flag", "ratio", "company_has_adr",
+         "n_share_classes"]], u["date"])
+    u = u.merge(firm[["date", "permco", "flag", "short"]], on=["date", "permco"], how="left")
+    flag = u["flag"].eq(True) & ~u["short"].eq(True)
+    extra = u["company_shares_compustat_m"] - u["company_shares_crsp_m"]
     u["company_mkt_cap_crsp_musd"] = u["company_mkt_cap_musd"]
     u["company_mkt_cap_musd"] = u["company_mkt_cap_musd"].where(~flag, u["company_mkt_cap_musd"]
                                                                 + extra * u["company_main_prc"])
     u["company_cap_from_compustat"] = flag
-    return u
+    hit = firm[firm["above"]]
+    audit = hit.groupby("permco").agg(
+        ticker=("ticker", "last"), security_name=("security_name", "last"), months_above_5pct=("above", "size"),
+        adr=("company_has_adr", "any"), months_flagged=("flag", "sum"), episodes=("episode", "nunique"),
+        longest_episode_months=("episode_months", "max"), short_episode_months=("short", "sum"),
+        median_ratio=("ratio", "median"), max_ratio=("ratio", "max"),
+        second_class_listed=("n_share_classes", lambda s: bool((s > 1).any())),
+        first=("date", "min"), last=("date", "max")).reset_index()
+    audit["months_used"] = audit["months_flagged"] - audit["short_episode_months"]
+    return u.drop(columns=["flag", "short"]), audit
 
 
 def add_price_scaled(u: pd.DataFrame) -> pd.DataFrame:
@@ -388,6 +426,21 @@ def build_master(listed, monthly, fq, link, panel, snaps) -> pd.DataFrame:
 
 # ---------- Checks ----------
 
+def flag_summary(flags: pd.DataFrame) -> dict:
+    """Counts of the Compustat share flag: above 5%, removed as ADRs, removed as short episodes, used."""
+    used = flags["months_used"] > 0
+    return {"companies_above_5pct": len(flags), "company_months_above_5pct": int(flags["months_above_5pct"].sum()),
+            "adr_companies": int(flags["adr"].sum()),
+            "adr_company_months": int(flags.loc[flags["adr"], "months_above_5pct"].sum()),
+            "adr_list": flags.loc[flags["adr"], ["ticker", "security_name", "first", "last", "months_above_5pct"]]
+                        .astype(str).to_dict("records"),
+            "short_episode_companies": int((flags["short_episode_months"] > 0).sum()),
+            "short_episode_company_months": int(flags["short_episode_months"].sum()),
+            "companies_used": int(used.sum()), "company_months_used": int(flags["months_used"].sum()),
+            "companies_used_with_second_class_listed": int((used & flags["second_class_listed"]).sum()),
+            "longest_episode_months_of_companies_used": {k: float(v) for k, v in flags.loc[
+                used, "longest_episode_months"].describe()[["min", "50%", "max"]].items()}}
+
 def coverage_by_year(df: pd.DataFrame, cols) -> dict:
     y = df["date"].dt.year
     return {c: {str(k): round(float(v), 3) for k, v in df[c].notna().groupby(y).mean().items()} for c in cols}
@@ -406,8 +459,8 @@ def share_class_gap(u: pd.DataFrame, monthly: pd.DataFrame, after_fix: bool = Tr
     ours = crsp.reindex(pd.MultiIndex.from_arrays([c["permco"], c["fund_period_end"].dt.to_period("M")])).to_numpy()
     share_gap = np.clip((c["cshoq"].to_numpy() - ours) / c["cshoq"].to_numpy(), 0, 1)
     big = share_gap > SHARE_CLASS_GAP_COMPANY
-    if after_fix:
-        big &= ~c["company_cap_from_compustat"].to_numpy()
+    if after_fix:                    # ADRs: Compustat counts the ordinary shares behind them, not a missing class
+        big &= ~c["company_cap_from_compustat"].to_numpy() & ~c["is_adr"].eq(True).to_numpy()
     missing = np.where(big, c[cap] * share_gap / np.maximum(1 - share_gap, 1e-9), 0.0)
     year = c["date"].dt.year
     firms = u.drop_duplicates(["date", "permco"])
@@ -482,7 +535,8 @@ def run_checks(panel: pd.DataFrame, rv: pd.DataFrame, snaps: pd.DataFrame,
 PANEL_COLS = ("date", "permno", "permco", "gvkey", "ticker", "security_name", "gsector", "gsector_name", "ggroup",
               "gind", "gind_name", "gsubind", "sector_name", "gics_from_sic", "siccd", "index_weight",
               "snapshot_report_dt", "snapshot_eff_dt", "new_entrant", "price_date", "prc", "shrout", "mkt_cap_musd",
-              "company_mkt_cap_musd", "company_mkt_cap_crsp_musd", "company_cap_from_compustat", "n_share_classes",
+              "company_mkt_cap_musd", "company_mkt_cap_crsp_musd", "company_cap_from_compustat", "is_adr",
+              "n_share_classes",
               "company_shares_crsp_m", "company_shares_compustat_m", "cfacpr_t", "cfacpr_last", *PRICE_FACTORS, "beta_252d",
               "beta_60m", "fund_period_end", "fund_report_date", "fund_is_usd", "fund_stale", *BLOCKS, "ev",
               *STATEMENT_FACTORS, *PRICE_SCALED, *QE_FACTORS, "ibes_statpers", "numest_fy1", *ANALYST,
@@ -513,7 +567,9 @@ def build(paths: DataPaths) -> dict:
     u = add_market(u, monthly, me, monthly_beta(monthly, mkt_m))
     fq = pd.read_parquet(s03 / "fundamentals_quarterly.parquet")
     u, finfo = add_fundamentals(u, fq)
-    u = add_price_scaled(add_company_cap(u, me))
+    u, flags = add_company_cap(u, me)
+    u = add_price_scaled(u)
+    finfo["compustat_share_flags"] = flag_summary(flags)
     u, finfo["capped_yields"] = cap_yields(add_analyst(add_estimates(u, est), events))
     del est
     u = u.sort_values(["date", "permno"]).reset_index(drop=True)
@@ -521,7 +577,7 @@ def build(paths: DataPaths) -> dict:
     listed = set(int(x) for x in (s01 / "permno_list.txt").read_text().split())
     master = build_master(listed, monthly, fq, pd.read_parquet(s05 / "link.parquet"), u, snaps)
     return {"panel": u[list(PANEL_COLS)], "rv": rv, "peers": build_peers(rv), "master": master, "snaps": snaps,
-            "monthly": monthly, "info": finfo}
+            "monthly": monthly, "info": finfo, "flags": flags}
 
 
 def run(paths: DataPaths) -> dict:
@@ -533,6 +589,7 @@ def run(paths: DataPaths) -> dict:
     write_parquet(rv, out / RV)
     write_parquet(peers, out / PEERS)
     write_parquet(master, out / MASTER)
+    write_parquet(b["flags"], out / FLAGS)
 
     factor_cols = ["prc", "mkt_cap_musd", "company_mkt_cap_musd", *PRICE_FACTORS, "beta_252d", "beta_60m",
                    *STATEMENT_FACTORS, *PRICE_SCALED, *QE_FACTORS, *ANALYST, "ret_next_1m"]

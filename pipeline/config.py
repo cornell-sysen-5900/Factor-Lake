@@ -22,13 +22,14 @@ from pathlib import Path
 class DataPaths:
     """Folders inside the data folder passed with --data-dir."""
     root: Path
+    processed_dir: Path | None = None   # default <root>/processed; s09 reruns everything into a temporary one
 
     @classmethod
-    def from_data_dir(cls, data_dir: str | Path) -> "DataPaths":
+    def from_data_dir(cls, data_dir: str | Path, processed_dir: str | Path | None = None) -> "DataPaths":
         root = Path(data_dir).expanduser().resolve()
         if not (root / "raw").is_dir():
             raise FileNotFoundError(f"{root} has no raw/ folder; pass the data folder with --data-dir")
-        return cls(root)
+        return cls(root, Path(processed_dir).expanduser().resolve() if processed_dir else None)
 
     @property
     def raw(self) -> Path:
@@ -40,10 +41,15 @@ class DataPaths:
 
     @property
     def processed(self) -> Path:
-        return self.root / "processed"
+        return self.processed_dir or self.root / "processed"
 
     def stage_dir(self, stage: str) -> Path:
-        return self.processed / stage
+        return self.processed / STAGE_FOLDERS.get(stage, stage)
+
+
+STAGE_FOLDERS = {"s09_validate": "s09_validation"}       # stages whose folder is not named after them
+OLD_PANEL_PATHS = ("archive/r2000_monthly_panel.parquet",  # the notebook's panel, for s09's old vs new backtest
+                   "scratch/notebook_ref/r2000_monthly_panel.parquet")
 
 
 # ---------- Date ranges of the WRDS pulls (also in the refresh checklist in README.md) ----------
@@ -318,6 +324,8 @@ PEER_MIN = 5                        # percentile ranks and peer percentiles need
 SHARE_CLASS_GAP_COMPANY = 0.05      # Compustat shares above ours by more than 5% of the company count as a gap ...
 SHARE_CLASS_GAP_YEAR = 0.01         # ... and the gaps may be at most 1% of the universe market cap in a year
 COMPUSTAT_SHARES_MIN_EXCESS = 0.05  # company mkt cap from Compustat shares when they exceed ours by more than 5%
+COMPUSTAT_FLAG_SHORT_MONTHS = 3     # ... but a flag lasting at most 3 months with Compustat shares within 15%
+COMPUSTAT_FLAG_SHORT_MAX_RATIO = 1.15  # of CRSP's is a share issuance between quarter ends: CRSP's count
 RV_MIN_DENOMINATOR_MUSD = 1.0       # RV multiples: TTM and forward total denominators below $1M are NaN
 RV_MIN_FORWARD_EPS = 0.01           # fwd_pe: forward EPS (CRSP basis) below $0.01 is NaN
 FORWARD_YIELD_MAX_ABS = 5.0         # f_forward_ep, f_forward_ep_fy2, f_forward_cfp beyond +-5: NaN (counted)

@@ -125,8 +125,11 @@ FILES["factor_panel_monthly.parquet"] = {
         "company_mkt_cap_crsp_musd": ("company market cap from CRSP only: sum of mkt_cap_musd over our permnos with "
                                       "the same permco", MUSD, CIZ),
         "company_cap_from_compustat": ("Compustat common shares exceed our CRSP shares by more than 5% (an unlisted "
-                                       "share class), so company_mkt_cap_musd uses the Compustat count", FLAG,
-                                       DERIVED),
+                                       "share class), so company_mkt_cap_musd uses the Compustat count. Never for "
+                                       "ADRs; not for episodes of at most 3 months within 15% of CRSP's count (share "
+                                       "issuance between quarter ends)", FLAG, DERIVED),
+        "is_adr": ("CRSP share type is an ADR (security name '...; COM NONE ADR; ...'); a company with an ADR never "
+                   "uses the Compustat share count", FLAG, CIZ, "s02_prices"),
         "n_share_classes": ("number of our permnos with this permco and a market cap at t", N, CIZ),
         "company_shares_crsp_m": ("shares of all our permnos with this permco at t", MSH, CIZ),
         "company_shares_compustat_m": ("Compustat cshoq at the quarter end put on the CRSP share basis at t "
@@ -230,6 +233,7 @@ FILES["returns_monthly.parquet"] = {
         "trading_days": ("real trading days of the stock in the month", N, CIZ),
         "delisted_in_month": ("the month has the stock's delisting row", FLAG, CIZ),
         "delist_ret_filled": ("the delisting return was missing and filled (-30% for GDR, else 0%)", FLAG, DERIVED),
+        "is_adr": ("CRSP share type is an ADR (from the security name)", FLAG, CIZ),
     },
 }
 

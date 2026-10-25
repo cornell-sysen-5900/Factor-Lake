@@ -27,7 +27,7 @@ def test_stage_names(name):
 
 def test_all_runs_every_stage_in_order():
     assert run.resolve_stages("all") == list(STAGES)
-    assert STAGES[0] == "s00_inventory" and STAGES[-1] == "s08_export"
+    assert STAGES[0] == "s00_inventory" and STAGES[-1] == "s09_validate"
 
 
 def test_unknown_stage_exits():
