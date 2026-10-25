@@ -1,6 +1,6 @@
 # WRDS pipeline plan
 
-The plan for stages s01 to s08. s00 to s06 are implemented (phases 2a to 2c); s07 and s08 are not written yet.
+The plan for stages s01 to s08. s00 to s07 are implemented (phases 2a to 2d); s08 is not written yet.
 [Final outputs](#final-outputs) is what the pipeline must deliver; every stage builds toward it. The review
 answers are in [Decisions](#decisions) and are written into the stage rules below.
 
@@ -78,6 +78,7 @@ Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the 
 | 21 | f_sue is NaN when its absolute value is above 50 (counted). | s03 rule 8 |
 | 22 | The IBES 100x rule compares each total-measure estimate with its neighbours: flagged only when more than 100x both the previous and the next estimate of the same ticker, measure and FPI (the one neighbour at the ends). | s05 rule 6 |
 | 23 | The Fama-French monthly vs compounded daily check is strict (50 bp) for mktrf and rf, informational for smb, hml, rmw, cma and umd. | s06 checks |
+| 24 | s07: the share-class gap compares Compustat cshoq (millions) with CRSP shrout (thousands) on the quarter-end date of cshoq; the analyst surprise uses the CRSP price and share basis of the last trading day before anndats_act; the neighbour rule runs on IBES tickers before linking; late-filed older quarters are dropped before the as-of merge (counted). | s07 rules 5, 9, checks; s05 rule 6 |
 
 ## What s00 found in raw/
 
@@ -472,139 +473,108 @@ month-end levels; yields at the month end.
 
 ## s07_panel
 
-**Inputs:** s01 snapshots and periods, s02 monthly + calendar + daily (cfacpr, ret), s03 fundamentals_quarterly,
-s05 estimates_consensus, s06 market_daily and market_monthly (Fama-French market for betas). Not s04: the annual
+**Inputs:** s01 snapshots.parquet and permno_list.txt; s02 monthly.parquet, calendar.parquet and daily/ (date,
+permno, prc, ret, cfacpr, is_delisting_row); s03 fundamentals_quarterly.parquet; s05 estimates_consensus.parquet
+(EPS, CPS, SAL, EBT; FPI 0-2) and link.parquet; s06 market_daily and market_monthly (mktrf, rf). Not s04: the annual
 statements stay their own table (decision 6).
 
-**Outputs** (`processed/s07_panel/`):
-- **panel.parquet**, one row per index stock per month_end: date, permno, permco, ticker, security_name, sector
-  (GICS sector name), gsector, gind, gind_name, sector_source (`gics` / `sic`), siccd, is_fossil_fuel,
-  index_weight, snapshot_report_dt, snapshot_eff_dt, new_entrant, has_price, price_date, prc, shrout,
-  mkt_cap_musd, company_mkt_cap_musd, n_share_classes, mom_1m, mom_6m, mom_12m, mom_12_1, vol_*, fund_period_end,
-  fund_report_date, fund_is_usd, the 17 f_* fundamentals (price-scaled five at month end, `_qe` versions kept),
-  the RV building blocks used by the app (book_equity, revenue_ttm, ebitda_ttm, ebit_ttm, net_debt, ev_claims,
-  fcf_ttm, epsfx_ttm_adj), ibes_statpers, numest, f_forward_ep, f_eps_revision, f_eps_dispersion,
-  f_analyst_surprise, surprise_anndats, the new analyst yields f_forward_sales_yield, f_forward_ebitda_ev,
-  f_cash_flow_yield, f_fy2_ep, f_ltg, beta_252d, beta_60m, ret_next_1m, delisted_next_month. (61 columns last
-  run, plus the additions.) Exported as factor_panel_monthly.
-- **rv_multiples.parquet** and **rv_peer_stats.parquet** (rules 10-11), exported as rv_multiples_monthly and
-  rv_peer_stats_monthly.
-- **universe_periods.parquet**: s01's periods rebuilt from the in-universe snapshots, plus the excluded stocks'
-  periods with excluded_non_member = True.
-- **security_master.parquet**: one row per permno (rule 12).
-- The monthly returns table is s02's monthly.parquet; s08 exports it as returns_monthly.
+**Outputs** (`processed/s07_panel/`; s08 exports them under the same names):
 
-**Rules** (ported):
-1. Rebalance dates = calendar month_ends from the first month with an effective snapshot (2008-04) to the last
-   month with prices.
-2. Universe at t = the latest snapshot whose every line has eff_dt <= t (2009-04 uses 2009-02, 2009-05 and 2009-06
-   use 2009-03), keeping only lines with in_universe = True (decision 11). index_weight = snapshot weight;
-   new_entrant = not in the universe at the previous month end.
-3. Market data from s02 monthly for month t (`price_date` = last trading day); mom_12_1 = (1 + mom_12m) /
-   (1 + mom_1m) - 1; ret_next_1m = ret_m of month t+1 (includes any delisting return).
-4. Fundamentals: as-of merge on report_date <= t. **Change:** among quarters reported by t, take the latest
-   period_end, so a late-filed older quarter never replaces a newer one ([problem 4](#problems-in-the-old-notebook)).
-5. Price-scaled factors at t (decisions 2 and 3):
-   - **Company-level ratios use the company's market cap.** `company_mkt_cap_musd` = sum of the month-end market
-     cap of all permnos with the same permco on that date (`n_share_classes` = how many). Book / company mkt cap,
-     sales / company mkt cap, EBITDA / (company mkt cap + net debt) with NaN if EV <= 0.
-   - **Per-share ratios stay per share**, with the security's own price: the per-share TTM EPS and dividends
-     restated to month-end shares with cfacpr(t) / cfacpr(quarter end) (1 when the quarter end predates the CRSP
-     history), divided by prc.
-   - **Non-USD fundamentals** (fund_is_usd = False): all of these are NaN. Statement ratios are kept.
-   - **Month-end price below $0.01** (decision 14): all price-based ratios and multiples are NaN; counted.
-6. IBES: latest statpers <= t, at most 60 days old.
-7. **Sector and industry from Compustat GICS** (decision 4). `gsector` (11 sectors) is the sector filter, named
-   with the GICS sector names. `gind` (industry, 81 in the data) is the peer group for relative value. They come
-   from the fundamentals row used at t, else the permno's latest row with GICS. 22 permnos change gsector across
-   rows because they move to another gvkey. **GICS here is the current classification, not historical**: a
-   company that changed sector carries its current sector back in time.
-   - **Fallback** only where GICS is missing (40 permnos today: 37 without Compustat rows, 3 without gsector): the
-     SIC code as of t is mapped to a GICS sector name (`sector_source` = `sic`). The mapping is fixed so that SIC
-     28 is not all Health Care. Rules are checked in this order; the first match wins, so specific ranges come
-     first:
+| file | one row per | columns |
+|---|---|---|
+| factor_panel_monthly.parquet | universe stock, month end t | identity (permno, permco, gvkey, ticker, security_name, gsector, gsector_name, ggroup, gind, gind_name, gsubind, sector_name, gics_from_sic, siccd), index_weight, snapshot_report_dt, snapshot_eff_dt, new_entrant, price_date, prc, shrout, mkt_cap_musd, company_mkt_cap_musd, n_share_classes, cfacpr_t, cfacpr_last, mom_1m, mom_6m, mom_12m, mom_12_1, vol_gk_* and vol_close_*, beta_252d, beta_60m, fund_period_end, fund_report_date, fund_is_usd, fund_stale, the building blocks used (book_equity, ib_ttm, revenue_ttm, dv_ttm, fcf_ttm, ev_claims, ebitda_ttm, ebit_ttm, cshoq), ev, the 12 statement factors, the 8 price-scaled factors, the 5 quarter-end versions (`_qe`), ibes_statpers, numest_fy1, the 9 analyst factors, surprise_anndats, surprise_fpedats, ret_next_1m, delisted_next_month, and the statpers of each IBES series used |
+| rv_multiples_monthly.parquet | same rows | date, permno, gsector, gind, prc, company_mkt_cap_musd, ev, the 15 multiples, and `<multiple>_pct_gind`, `<multiple>_pct_gsector` |
+| rv_peer_stats_monthly.parquet | gind, month end | date, gind, gind_name, n_peers, and per multiple `_n`, `_p25`, `_p50`, `_p75` |
+| security_master.parquet | permno in permno_list.txt | permco, gvkey, ibes_ticker (all linked tickers, `;`-separated), ticker, security_name, GICS codes and names, siccd, first and last price date, first and last universe date, excluded_non_member |
 
-     | # | GICS sector | SIC |
-     |---|---|---|
-     | 1 | Unclassified | missing, 0, or 9900-9999 |
-     | 2 | Health Care | 2830-2836 (drugs, biologics), 3841-3851 (medical devices and instruments), 8000-8099, 8731 |
-     | 3 | Consumer Staples | 0100-0999, 2000-2199, 2840-2844 (soap, cosmetics), 5140-5149, 5400-5499, 5912 |
-     | 4 | Consumer Discretionary | 2200-2399, 2500-2599, 3630-3639, 3651, 3710-3716, 3750-3751, 3940-3949, 5200-5999, 7000-7099, 7200-7299, 7500-7599, 7900-7999, 8200-8299 |
-     | 5 | Energy | 1200-1399, 2900-2999 |
-     | 6 | Utilities | 4900-4949, 4960-4999 |
-     | 7 | Real Estate | 6500-6599, 6798 (REITs) |
-     | 8 | Financials | 6000-6799 |
-     | 9 | Communication Services | 2710-2799 (publishing), 4800-4899, 7810-7899 |
-     | 10 | Information Technology | 3570-3579, 3600-3699, 3820-3829, 7370-7379 |
-     | 11 | Materials | 1000-1199, 1400-1499, 2400-2499, 2600-2699, 2800-2899 (the rest of chemicals), 3200-3399 |
-     | 12 | Industrials | every other SIC code |
+The monthly returns table is s02's monthly.parquet; s08 exports it as returns_monthly.
 
-     This replaces `config.SECTOR_RULES` (the notebook's 8 SIC sectors) in phase 2.
+**Rules:**
+1. **Calendar:** every month end t (last CRSP trading day) from the first month with an effective snapshot (2008-04)
+   to the last month with prices (2026-09): 222 months.
+2. **Universe at t:** the latest s01 snapshot whose every line has eff_dt <= t, lines with in_universe = True
+   (decision 11). 2009-04 uses the 2009-02 snapshot, 2009-05 and 2009-06 use 2009-03. new_entrant = not in the
+   universe at the previous t.
+3. **Market at t:** prc, shrout and mkt_cap_musd from the last real trading day of month t (s02 monthly; never a
+   delisting row). company_mkt_cap_musd = sum over our permnos with the same permco at t (decision 3). mom_12_1 =
+   (1 + mom_12m) / (1 + mom_1m) - 1. ret_next_1m = the stock's ret_m of month t+1, delisting returns included.
+4. **Betas:** excess return = return - rf. beta_252d = cov(stock daily excess return, mktrf) / var(mktrf) over the
+   stock's last 252 trading rows ending t, with at least 80% of them (202); beta_60m the same with monthly returns over
+   the last 60 calendar months (at least 48).
+5. **Fundamentals:** merge_asof by permno on report_date <= t. Before the merge, a quarter reported after a newer
+   quarter of the same permno is dropped (a late-filed older quarter never replaces a newer one; 124 rows). After a
+   fiscal-year change Compustat can list one quarter twice (old and new numbering, same period end and report date);
+   the new numbering is used. If t - fund_period_end > 365 days the fundamentals are stale: every fundamental factor
+   and building block is NaN (fund_stale; 378 rows).
+6. **Sector:** GICS from the fundamentals row used at t, else the permno's latest row with GICS (decision 4);
+   sector_name is the GICS sector name. Where GICS is missing (425 rows), the SIC code as of t is mapped to a GICS
+   sector name with `config.SIC_TO_GICS_SECTOR` (the table below) and gics_from_sic = True.
+7. **Price-scaled factors at t** (all $ millions, company market cap; NaN for non-USD fundamentals and prices below
+   $0.01): f_book_to_price = book_equity / company mkt cap (NaN if book_equity <= 0); f_earnings_to_price = ib_ttm /
+   company mkt cap; f_sales_to_price = revenue_ttm / company mkt cap; f_dividend_yield = dv_ttm / company mkt cap;
+   f_fcf_yield = fcf_ttm / company mkt cap; ev = company mkt cap + ev_claims (debt + preferred + minority interest -
+   cash), NaN if ev <= 0; f_ebitda_to_ev, f_ebit_to_ev, f_sales_to_ev = ebitda_ttm, ebit_ttm, revenue_ttm / ev. The
+   quarter-end versions from s03 are kept with `_qe`. (Earnings and dividend yields now use company totals, ib_ttm
+   and dv_ttm, instead of the notebook's per-share EPS and DPS over the price.)
+8. **Analyst factors at t** (decision 5): for each series (EPS FY1, EPS FY2, CPS FY1, SAL FY1, EBT FY1, EPS FPI 0) the
+   latest statpers <= t, at most 60 days old. Per-share values are put on the CRSP basis at t, estimate x cfacpr(t) /
+   cfacpr_last (s05 rule 7), then divided by prc(t): f_forward_ep (EPS FY1), f_forward_ep_fy2, f_forward_cfp (CPS
+   FY1). f_forward_sales_to_ev = SAL FY1 / ev, f_forward_ebitda_to_ev = EBT FY1 / ev, f_ltg = EPS FPI 0 (decimal),
+   f_eps_revision = (numup - numdown) / numest, f_eps_dispersion = stdev / |meanest| (NaN if |meanest| < 0.01 or
+   numest < 2), all EPS FY1. f_forward_ep's 0.1% and 99.9% values are in the summary (decision 15; -21.0 and 2.92).
+9. **Analyst surprise** (fifth review): for each EPS FY1 announcement, (actual - the last consensus before
+   anndats_act), both converted to the CRSP share basis of the last trading day before anndats_act (cfacpr that day /
+   cfacpr_last), divided by that day's CRSP price (at most 10 days before; NaN below $0.01). Two fiscal years
+   announced the same day: the later one wins. At t: the latest announcement on or before t, at most 120 days old.
+10. **RV multiples** (same rows): pe = company mkt cap / ib_ttm, pb = / book_equity, ps = / revenue_ttm, ev_ebitda,
+    ev_ebit, ev_sales, each NaN when the denominator <= 0; yields (may be negative): fcf_yield, dividend_yield,
+    earnings_yield; forward: fwd_pe_fy1, fwd_pe_fy2 = price / EPS estimate on the CRSP basis, fwd_ev_ebitda = ev /
+    EBT FY1, fwd_ev_sales = ev / SAL FY1, NaN when the denominator <= 0; ltg; peg = fwd_pe_fy1 / (ltg x 100), only
+    when ltg > 0. `<multiple>_pct_gind` and `_pct_gsector` = percentile rank (0-1) within the GICS industry and sector
+    at t, NaN when the group has fewer than 5 stocks with a value.
+11. **Peer stats:** per gind and t: n_peers, and per multiple the count and the 25th, 50th, 75th percentile (NaN
+    with fewer than 5 values).
+12. **Security master:** one row per permno in permno_list.txt (5,918): the latest CRSP permco, ticker and SIC, the
+    latest Compustat gvkey and GICS, all linked IBES tickers, the latest IWM name, first and last CRSP price date,
+    first and last date in the panel, and whether any of its snapshots was excluded (decision 11).
 
-   - **The app needs updating** (separate PR): `app/streamlit_config.py` `SECTOR_OPTIONS` lists Consumer,
-     Technology, Financials, Industrials, Healthcare, Energy, Materials, Utilities. That is already different from
-     the notebook's 8 (which had Other, not Materials), and it must become the 11 GICS names.
-   - is_fossil_fuel stays SIC-based: SIC 1200-1399, 2900-2999, 4920-4929, 5170-5179.
-8. **Analyst yields at month end** (decision 5), from the consensus with the latest statpers <= t, at most 60 days
-   old, all USD. Per-share estimates are put on the basis of prc(t) with cfacpr(t) / cfacpr_last (s05 rule 7);
-   price_ibes_basis(t) = prc(t) x cfacpr_last / cfacpr(t) is the same thing seen from the price side:
+SIC fallback (rule 6), checked in order, the first match wins:
 
-   | column | definition |
-   |---|---|
-   | f_forward_sales_yield | SAL FY1 mean / company_mkt_cap_musd |
-   | f_forward_ebitda_ev | EBT FY1 mean / (company_mkt_cap_musd + ev_claims), NaN if EV <= 0 or the fundamentals are not USD |
-   | f_cash_flow_yield | CPS FY1 mean / price_ibes_basis(t) |
-   | f_fy2_ep | EPS FY2 mean / price_ibes_basis(t) |
-   | f_ltg | EPS FPI 0 mean / 100 (not price-scaled) |
+| # | GICS sector | SIC |
+|---|---|---|
+| 1 | Unclassified | missing, 0, or 9900-9999 |
+| 2 | Health Care | 2830-2836 (drugs, biologics), 3841-3851 (medical devices and instruments), 8000-8099, 8731 |
+| 3 | Consumer Staples | 0100-0999, 2000-2199, 2840-2844 (soap, cosmetics), 5140-5149, 5400-5499, 5912 |
+| 4 | Consumer Discretionary | 2200-2399, 2500-2599, 3630-3639, 3651, 3710-3716, 3750-3751, 3940-3949, 5200-5999, 7000-7099, 7200-7299, 7500-7599, 7900-7999, 8200-8299 |
+| 5 | Energy | 1200-1399, 2900-2999 |
+| 6 | Utilities | 4900-4949, 4960-4999 |
+| 7 | Real Estate | 6500-6599, 6798 (REITs) |
+| 8 | Financials | 6000-6799 |
+| 9 | Communication Services | 2710-2799 (publishing), 4800-4899, 7810-7899 |
+| 10 | Information Technology | 3570-3579, 3600-3699, 3820-3829, 7370-7379 |
+| 11 | Materials | 1000-1199, 1400-1499, 2400-2499, 2600-2699, 2800-2899 (the rest of chemicals), 3200-3399 |
+| 12 | Industrials | every other SIC code |
 
-   The ported analyst factors are computed here from estimates_consensus: f_forward_ep = EPS FY1 / price on the
-   IBES basis (at statpers, as the notebook), with its 0.1% and 99.9% values in the summary (decision 15);
-   f_eps_revision, f_eps_dispersion and f_analyst_surprise as in the notebook, using actual only when
-   anndats_act <= t.
-9. **Betas** vs the Fama-French market (mktrf + rf, excess returns on both sides): `beta_252d` from the last 252
-   daily returns up to t, `beta_60m` from the last 60 monthly returns up to t. Each needs 80% of the observations
-   (202 days, 48 months), else NaN. Delisting returns are included as they occur.
-10. **RV multiples at t** (rv_multiples): prc, company_mkt_cap_musd, ev_musd = company mkt cap + total debt +
-    preferred + minority interest - cash (from the fundamentals used at t); trailing pe_ttm (price / TTM diluted
-    EPS restated to month-end shares), pb, ps, ev_ebitda, ev_ebit, ev_sales, fcf_yield (fcf_ttm / company mkt cap),
-    dividend_yield; forward pe_fy1 and pe_fy2 (price_ibes_basis / EPS FY1, FY2), ev_ebitda_fy1 (EV / EBT FY1),
-    ev_sales_fy1 (EV / SAL FY1); ltg (EPS FPI 0 / 100) and peg = pe_fy1 / (ltg x 100). A multiple with a
-    denominator <= 0 is NaN (a negative P/E is not ranked). Non-USD fundamentals and prices below $0.01 give NaN.
-    `<multiple>_pct_gind` = percentile rank (0-1) of the multiple among the stocks of the same gind that month, NaN
-    when the industry has fewer than 5 values.
-11. **RV peer stats** (rv_peer_stats): per gind and month, n_peers and the 25th, 50th and 75th percentile of each
-    multiple over the stocks with a value.
-12. **security_master**: one row per permno in s02: permco, gvkey (latest), ibes_ticker (latest link), latest
-    ticker and security_name, GICS codes and names, latest siccd, first_date and last_date in the daily data.
+The app needs updating (separate PR): `app/streamlit_config.py` `SECTOR_OPTIONS` must become the 11 GICS sector
+names. is_fossil_fuel (SIC 1200-1399, 2900-2999, 4920-4929, 5170-5179) is not in the panel yet.
 
-**Checks (asserts, FAIL):** no fundamentals with report_date > t; no IBES with statpers > t or older than 60 days;
-no surprise announced after t; no snapshot with eff_dt > t; no price_date > t; no duplicate (date, permno).
-**FAIL:** no price-based ratio on a non-USD fundamentals row or a price below $0.01; company_mkt_cap_musd >=
-mkt_cap_musd; every row has a sector; excluded non-member stock-snapshots are not in the panel.
-**Missing share classes** (decision 12): the CIZ file only holds our permnos, so the permnos we did not pull are
-not visible in it. The check uses Compustat's company market cap instead (prccq x cshoq, all common shares of the
-company), at each quarter end: the gap = Compustat company market cap - the summed CRSP market cap of our permnos
-of that permco on the same date, where positive and above 5% of that company (smaller gaps are timing and share
-count noise). By year, the sum of the gaps over the universe vs the total universe market cap; WARN above 1% in
-any year, listing the largest companies. No new pull now. **WARN:** share of rows on the SIC fallback above 2%; percentiles of each multiple reported, and
-any multiple whose median moves more than 50% from one year to the next; stocks per month outside 1,800-2,100
-(last run 1,831-2,043); coverage by year of price, roa,
-book-to-price, forward E/P, next-month return below the last run by more than 3 points. **Smoke test (printed):**
-top-decile ROA, rebalanced each June and held 12 months, vs IWM (last run 12.5% vs 12.1% a year over 18 years).
-Last run: 435,860 rows, 222 month ends 2008-04-30 to 2026-09-30.
+**Checks:** no duplicate (t, permno) (FAIL); 1,800-2,150 stocks per month (WARN; 1,831-2,043); look-ahead asserts:
+no fund_report_date, IBES statpers, snapshot eff_dt, surprise anndats or price date after t, every IBES series within
+60 days (FAIL); excluded non-members not in the panel (FAIL); company mkt cap >= the stock's (FAIL); no price-scaled
+factor on non-USD or sub-$0.01 rows (FAIL); stale rows have no factors (FAIL); every row has a sector (FAIL);
+**share-class gap** (decision 12, fifth review): on the quarter-end date of cshoq, Compustat cshoq (millions) vs the
+summed CRSP shrout (thousands / 1000) of our permnos with the same permco; a company counts when the gap is above 5%
+of its Compustat shares, and its missing market cap at t is the missing share fraction applied to its market cap; by
+year, the sum vs the universe's company market cap, WARN above 1%; median pe, pb, ev_ebitda by year within 15-25,
+1-3, 8-15 (WARN). The summary has coverage by year (prc, roa, book-to-price, forward E/P, beta_252d, ret_next_1m and
+every multiple) and count / missing % / mean / p1 / p50 / p99 of every factor and multiple.
 
-**Tests:** a snapshot is used only when its last line is effective; the 2009 gap uses the older snapshot;
-fundamentals reported after t are not used; a late-filed older quarter does not replace a newer one; IBES 61 days
-old is NaN; a split between quarter end and month end restates EPS; GICS used when present, from the gvkey in use
-at t; every SIC fallback rule with a boundary SIC (2834 and 3845 Health Care, 2821 and 2851 Materials, 2844
-Consumer Staples, 1311 Energy, 4911 Utilities, 6798 Real Estate, 6021 Financials, 4813 Communication Services,
-3674 and 7372 Information Technology, 3711 Consumer Discretionary, 3531 Industrials, missing and 9995
-Unclassified); fossil flag; two share classes of one permco: company ratios use the summed market cap and per-share
-ratios each class's own price; a CAD fundamentals row has no price ratios but keeps ROA; each analyst yield
-against a hand value; ret_next_1m includes a delisting return in month t+1; beta on a synthetic series with a
-known beta, NaN below 80% of observations; EV with each part missing; negative-earnings P/E is NaN; gind percentile
-ranks and peer percentiles on a hand-checked industry; an excluded non-member is not in the panel but is in
-universe_periods with the flag.
+**Tests:** the universe uses the latest snapshot whose every line is effective, without excluded lines; the as-of
+merge waits for the report date, ignores a late-filed older quarter, takes the new numbering after a fiscal-year
+change, and goes stale after 365 days; the SIC fallback at boundary codes; beta on a series with a known beta, NaN
+below 80% of days; EV and the <= 0 rules, sub-$0.01 and non-USD rows; percentile ranks and the 5-peer minimum; peer
+percentiles; forward E/P across a 4-for-1 split; the surprise uses the price and share basis of the day before the
+announcement.
 
 ## s08_export
 
@@ -717,9 +687,38 @@ s03 PASS, s04 PASS (FCFF for 70% of years, 89% of DCF-applicable years), s05 WAR
   differently from the monthly ones), not a data error. The published monthly factors are what market_monthly
   uses.
 
+## Phase 2d results (s03, s05, s06 fixes; s07)
+
+s03, s05, s06 PASS. s07 WARN (80 s): 435,846 rows, 222 months, 1,831-2,043 stocks a month; the two WARNs are
+the share-class gap and the median multiples (open questions 1 and 2).
+
+**s07 vs the notebook's MASTER MONTHLY PANEL cell** (rerun unchanged on the same raw files and the reruns of its
+earlier cells):
+
+- **Rows:** 435,860 in the notebook, 435,846 here. The 14 missing rows are exactly the excluded non-member
+  stock-snapshots (decision 11) in the months they were used; no row is only here.
+- **mom_12m:** identical on 99.55%; all 1,966 differing rows are months with the stock's delisting row, where the
+  month-end value now comes from the last real trading day (decision 9).
+- **f_roa:** identical on 99.92%; 331 rows are stale fundamentals (now NaN) and 14 use the newer quarter instead
+  of a late-filed older one; no other difference.
+- **ret_next_1m:** identical on every row.
+- **f_forward_ep:** rank correlation 0.997, correlation 0.916, median difference 0.0023. The notebook divides by the
+  price at statpers, this panel by the price at t; rebuilding the notebook's value from s05 (EPS / price at
+  statpers on the IBES basis) matches it on 100% of 405,870 rows. 677 rows have no value here because prc(t) is
+  missing or below $0.01; 62 have one only here (the notebook found no price within 7 days of statpers).
+
 ## Open questions
 
-None.
+1. **Unlisted share classes.** The share-class gap is about 2% of the universe market cap in every year
+   (1.5-2.2%). It comes from companies whose second class is not listed, so no CIZ pull can add it: EchoStar,
+   AppFolio, Tootsie Roll, Appian, Houlihan Lokey, Asana, GAMCO, Nelnet, WWE, UniFirst, Sinclair, among others
+   (gaps of 20-70% of their shares). For them company_mkt_cap_musd counts only the listed class, so B/P, S/P and
+   EV multiples are too high. Keep it (consistent with CRSP), or use Compustat cshoq x the listed price for the
+   company market cap when the gap is above 5%?
+2. **Near-zero denominators in the multiples.** ev_ebitda has a median of 10 but a mean of 2.9e13: a few positive
+   but tiny EBITDA values pass the `<= 0 -> NaN` rule. A $1M floor on the trailing and forward denominators
+   (as in s03) would remove them. The medians are inside the expected ranges except pe in 2022-2023 (14.3, 14.0)
+   and ev_ebitda in 2009 (7.8), which fit those markets.
 
 ## Phase 2 order
 

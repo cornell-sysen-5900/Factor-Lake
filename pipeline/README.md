@@ -29,7 +29,7 @@ written yet.
 | s04_fundamentals_a | annual statements for DCF (dcf_inputs_annual) | done |
 | s05_ibes | full IBES consensus (estimates_consensus), linked to permno, with the CRSP share-basis factor | done |
 | s06_market | index and ETF returns, Fama-French, FRED yields and spreads (market_daily, market_monthly) | done |
-| s07_panel | monthly point-in-time panel and the all-stocks monthly returns table | planned |
+| s07_panel | factor_panel_monthly, rv_multiples_monthly, rv_peer_stats_monthly, security_master | done |
 | s08_export | final Parquet set in processed/final/, manifest.json, DATA_DICTIONARY.md, UPLOAD.md | planned |
 
 Tests use small synthetic data only: `uv run pytest tests/pipeline`.

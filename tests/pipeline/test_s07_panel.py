@@ -27,8 +27,9 @@ def test_universe_uses_the_latest_snapshot_whose_every_line_is_effective():
 
 
 def quarter(permno, end, report, **vals):
-    row = {"permno": permno, "gvkey": "001", "period_end": pd.Timestamp(end), "report_date": pd.Timestamp(report),
-           "is_usd": True, "gsector": 45, "ggroup": 4510, "gind": 451030, "gsubind": 45103010,
+    end = pd.Timestamp(end)
+    row = {"permno": permno, "gvkey": "001", "period_end": end, "report_date": pd.Timestamp(report),
+           "fyearq": end.year, "fqtr": (end.month - 1) // 3 + 1, "is_usd": True, "gsector": 45, "ggroup": 4510, "gind": 451030, "gsubind": 45103010,
            **{c: 1.0 for c in (*s07.BLOCKS, *s07.STATEMENT_FACTORS, *PRICE_BASED_FACTORS)}}
     row.update(vals)
     return row
@@ -137,3 +138,13 @@ def test_surprise_uses_the_price_before_the_announcement():
     ev = s07.surprise_events(est, prices)
     # last consensus before the announcement 1.1; price of 2022-02-28 (not the announcement day), share basis x2
     assert ev["f_analyst_surprise"].item() == pytest.approx((1.3 - 1.1) * 2 / 44.0)
+
+
+def test_fiscal_year_change_takes_the_new_numbering():
+    # the quarter ending 2008-12-31 appears as fiscal 2008 Q4 (old) and fiscal 2009 Q2 (new), same report date
+    old = quarter(1, "2008-12-31", "2009-02-12", fyearq=2008, fqtr=4, f_roa=-0.19)
+    new = quarter(1, "2008-12-31", "2009-02-12", fyearq=2009, fqtr=2, f_roa=-0.18)
+    for rows in ([old, new], [new, old]):
+        out, _ = s07.add_fundamentals(pd.DataFrame({"date": [pd.Timestamp("2009-03-31")], "permno": [1],
+                                                    "siccd": [7372.0]}), pd.DataFrame(rows))
+        assert out["f_roa"].item() == -0.18

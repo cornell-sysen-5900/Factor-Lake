@@ -146,8 +146,10 @@ def add_market(u: pd.DataFrame, monthly: pd.DataFrame, me: pd.DataFrame, beta_m:
 # ---------- Fundamentals and sectors ----------
 
 def latest_quarters(fq: pd.DataFrame) -> tuple[pd.DataFrame, int]:
-    """Drop quarters reported after a newer quarter of the same permno, so the as-of merge never moves back."""
-    fq = fq.sort_values(["permno", "report_date", "period_end"]).reset_index(drop=True)
+    """Drop quarters reported after a newer quarter of the same permno, so the as-of merge never moves back. After a
+    fiscal-year change Compustat can list one quarter twice (old and new fiscal numbering, same period end and report
+    date); sorting on the fiscal quarter last makes the as-of merge take the new numbering."""
+    fq = fq.sort_values(["permno", "report_date", "period_end", "fyearq", "fqtr"]).reset_index(drop=True)
     newest = fq.groupby("permno")["period_end"].cummax()
     keep = fq["period_end"] >= newest
     return fq[keep], int((~keep).sum())
@@ -169,7 +171,7 @@ def add_fundamentals(u: pd.DataFrame, fq: pd.DataFrame) -> tuple[pd.DataFrame, d
             *BLOCKS, *STATEMENT_FACTORS, *PRICE_BASED_FACTORS]
     f = fq[cols].rename(columns={"period_end": "fund_period_end", "report_date": "fund_report_date",
                                  "is_usd": "fund_is_usd", **{c: f"{c}_qe" for c in PRICE_BASED_FACTORS}})
-    u = pd.merge_asof(u.sort_values("date"), f.sort_values("fund_report_date"), left_on="date",
+    u = pd.merge_asof(u.sort_values("date"), f.sort_values("fund_report_date", kind="stable"), left_on="date",
                       right_on="fund_report_date", by="permno", direction="backward")
     stale = (u["date"] - u["fund_period_end"]).dt.days > STALE_FUNDAMENTALS_DAYS
     u.loc[stale, [*BLOCKS, *STATEMENT_FACTORS, *QE_FACTORS]] = np.nan
