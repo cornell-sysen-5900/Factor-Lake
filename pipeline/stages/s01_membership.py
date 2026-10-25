@@ -20,7 +20,8 @@ Rules (pipeline/PLAN.md, s01_membership):
     4. a stock missing from 2+ consecutive snapshots starts a new period; one missing snapshot is bridged (A7)
     5. permno_list.txt = every snapshot permno
     6. a stock-snapshot is out of the universe if (a) its month-end market cap is > 3x the largest other stock in
-       the snapshot, or (b) the stock is in <= 3 snapshots in total, all with weight 0.00% (decision 11)
+       the snapshot and its weight is below 0.05%, or (b) the stock is in <= 3 snapshots in total, all with weight
+       0.00%, and its market cap is above the snapshot's 95th percentile (decision 11, revised)
 """
 
 from __future__ import annotations
@@ -30,7 +31,8 @@ import pandas as pd
 
 from pipeline.checks import PASS, WARN, Check, check, vs_last_run
 from pipeline.config import (KNOWN_MISSING_MONTHS, MEMBERSHIP_BRIDGE_SNAPSHOTS, NEIGHBOUR_MISSING_MAX,
-                             NON_MEMBER_CAP_MULTIPLE, NON_MEMBER_MAX_SNAPSHOTS, NON_STOCK_PATTERN,
+                             NON_MEMBER_CAP_MULTIPLE, NON_MEMBER_CAP_QUANTILE_B, NON_MEMBER_MAX_SNAPSHOTS,
+                             NON_MEMBER_MAX_WEIGHT_A, NON_STOCK_PATTERN,
                              SNAPSHOT_SIZE_RANGE, SNAPSHOT_WEIGHT_RANGE, DataPaths)
 from pipeline.outputs import fresh_stage_dir, table_info, write_parquet, write_summary
 from pipeline.stages import s02_prices
@@ -88,8 +90,8 @@ def build_snapshots(h: pd.DataFrame) -> pd.DataFrame:
 
 
 def apply_non_member_rules(snap: pd.DataFrame, caps: pd.DataFrame) -> pd.DataFrame:
-    """Rule 6: adds mkt_cap_musd (month-end of report_dt), max_other_mkt_cap_musd, n_snapshots_total,
-    exclusion_rule ('', 'a', 'b', 'a+b') and in_universe."""
+    """Rule 6: adds mkt_cap_musd (month-end of report_dt), max_other_mkt_cap_musd, p95_mkt_cap_musd,
+    n_snapshots_total, exclusion_rule ('', 'a', 'b', 'a+b') and in_universe."""
     snap = snap.assign(month=snap["report_dt"].dt.to_period("M"))
     snap = snap.merge(caps[["permno", "month", "mkt_cap_musd"]], on=["permno", "month"], how="left")
     mc = snap["mkt_cap_musd"]
@@ -99,11 +101,15 @@ def apply_non_member_rules(snap: pd.DataFrame, caps: pd.DataFrame) -> pd.DataFra
     is_top = mc.eq(max1)
     unique_top = is_top & is_top.groupby(snap["report_dt"]).transform("sum").eq(1)
     snap["max_other_mkt_cap_musd"] = np.where(unique_top, max2, max1)
-    rule_a = (mc > NON_MEMBER_CAP_MULTIPLE * snap["max_other_mkt_cap_musd"]).fillna(False)
+    snap["p95_mkt_cap_musd"] = by.transform(lambda s: s.quantile(NON_MEMBER_CAP_QUANTILE_B))
+    # (a) far above every other stock, with an index weight that does not fit that size
+    rule_a = ((mc > NON_MEMBER_CAP_MULTIPLE * snap["max_other_mkt_cap_musd"])
+              & (snap["weight"] < NON_MEMBER_MAX_WEIGHT_A))
 
+    # (b) briefly held at 0.00% and large for the index
     per = snap.groupby("permno").agg(n=("report_dt", "nunique"), w=("weight", lambda w: w.round(2).abs().max()))
     small = per.index[(per["n"] <= NON_MEMBER_MAX_SNAPSHOTS) & (per["w"] == 0)]
-    rule_b = snap["permno"].isin(small)
+    rule_b = snap["permno"].isin(small) & (mc > snap["p95_mkt_cap_musd"])
 
     snap["n_snapshots_total"] = snap["permno"].map(per["n"]).astype("int32")
     snap["exclusion_rule"] = np.select([rule_a & rule_b, rule_a, rule_b], ["a+b", "a", "b"], default="")
@@ -193,9 +199,10 @@ def run(paths: DataPaths) -> dict:
     snap = apply_non_member_rules(snap, caps)
     periods = build_periods(snap)
     excluded = snap.loc[~snap["in_universe"], ["report_dt", "eff_dt", "permno", "ticker", "security_name",
-                                                "mkt_cap_musd", "max_other_mkt_cap_musd", "weight",
-                                                "n_snapshots_total", "exclusion_rule"]].rename(
+                                                "mkt_cap_musd", "max_other_mkt_cap_musd", "p95_mkt_cap_musd",
+                                                "weight", "n_snapshots_total", "exclusion_rule"]].rename(
         columns={"exclusion_rule": "rule"}).reset_index(drop=True)
+    money = lambda v: None if pd.isna(v) else round(float(v), 1)
 
     listed = set(snap["permno"].tolist())
     raw_path = paths.query_inputs / "permno_list.txt"
@@ -219,9 +226,8 @@ def run(paths: DataPaths) -> dict:
              "excluded_non_members": [
                  {"security_name": r.security_name, "ticker": r.ticker, "permno": int(r.permno),
                   "report_dt": f"{r.report_dt:%Y-%m-%d}", "eff_dt": f"{r.eff_dt:%Y-%m-%d}",
-                  "mkt_cap_musd": None if pd.isna(r.mkt_cap_musd) else round(float(r.mkt_cap_musd), 1),
-                  "max_other_mkt_cap_musd": None if pd.isna(r.max_other_mkt_cap_musd)
-                  else round(float(r.max_other_mkt_cap_musd), 1),
+                  "mkt_cap_musd": money(r.mkt_cap_musd), "max_other_mkt_cap_musd": money(r.max_other_mkt_cap_musd),
+                  "p95_mkt_cap_musd": money(r.p95_mkt_cap_musd),
                   "weight_pct": round(float(r.weight), 4), "n_snapshots_total": int(r.n_snapshots_total),
                   "rule": r.rule} for r in excluded.itertuples()]}
     summary = write_summary(out, STAGE, tables, checks, extra)

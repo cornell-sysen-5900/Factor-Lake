@@ -25,8 +25,8 @@ written yet.
 | s00_inventory | size, sha256, rows, columns, date range and expected columns of every raw file | done |
 | s01_membership | IWM snapshots, membership periods, permno fill from CUSIP, known gaps, non-member exclusions | done |
 | s02_prices | daily cleaning, momentum, volatility, monthly returns incl. delisting rows | done |
-| s03_fundamentals_q | quarterly factors, TTM, split adjustment, RV/DCF building blocks | planned |
-| s04_fundamentals_a | annual statements for DCF | planned |
+| s03_fundamentals_q | quarterly factors, TTM, split adjustment, RV/DCF building blocks | done |
+| s04_fundamentals_a | annual statements for DCF (dcf_inputs_annual) | done |
 | s05_ibes | consensus by measure and FPI, linked to permno, analyst factors | planned |
 | s06_rates_benchmarks | FRED yields, Fama-French, index and ETF returns | planned |
 | s07_panel | monthly point-in-time panel and the all-stocks monthly returns table | planned |

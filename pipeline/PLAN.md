@@ -1,6 +1,6 @@
 # WRDS pipeline plan
 
-The plan for stages s01 to s08. s00, s01 and s02 are implemented (phase 2a); s03 to s08 are not written yet.
+The plan for stages s01 to s08. s00 to s04 are implemented (phases 2a and 2b); s05 to s08 are not written yet.
 [Final outputs](#final-outputs) is what the pipeline must deliver; every stage builds toward it. The review
 answers are in [Decisions](#decisions) and are written into the stage rules below.
 
@@ -64,8 +64,8 @@ Decisions 1-10 are from the first review, 11-15 from the second (both 2026-10-25
 | 7 | Upload lists: the pipeline writes permno_list.txt and ibes_tickers.txt to processed/; they are copied to raw/query_inputs/ by hand. | s01 rule 5, s05 rule 1 |
 | 8 | The empty folders in the data folder (`cleaned/`, `parquests/`, `scripts/`) are deleted by hand; the pipeline never touches them. | - |
 | 9 | Delisting rows (DlyDelFlg = Y) never provide a month-end price or market cap. Those come from the last real trading day; the delisting row only contributes its return. | s02 rule 8 |
-| 10 | Annual report date = the rdq of the matching quarterly Q4 row (same gvkey and fiscal year), otherwise datadate + 90 days. | s04 rule 2 |
-| 11 | Non-member stocks from mergers: a stock-snapshot is excluded from the universe if (a) its month-end market cap is more than 3x the largest among the other stocks in that snapshot, or (b) the stock appears in 3 or fewer snapshots in total, all with weight 0.00%. Their data is kept; they are only excluded from the universe, and listed in processed/s01_membership/excluded_non_members.parquet and the s01 summary. | s01 rule 6 |
+| 10 | Annual report date = the rdq of the matching quarterly Q4 row (same gvkey and fiscal year, and, added after the first run, the same period end), otherwise datadate + 90 days. | s04 rule 2 |
+| 11 | Non-member stocks from mergers (revised in the third review: the first version also excluded real members): a stock-snapshot is excluded from the universe if (a) its month-end market cap is more than 3x the largest among the other stocks in that snapshot **and** its weight is below 0.05%, or (b) the stock appears in 3 or fewer snapshots in total, all with weight 0.00%, **and** its market cap is above that snapshot's 95th percentile. Their data is kept; they are only excluded from the universe, and listed in processed/s01_membership/excluded_non_members.parquet and the s01 summary. | s01 rule 6 |
 | 12 | Missing share classes: s07 compares the company market cap from our permnos with all permnos sharing a permco, by year, and flags a gap above 1% of total universe market cap in any year. No new pull now. | s07 checks |
 | 13 | Interest expense is never filled with 0. The DCF uses annual xint, else xintd; where both are missing, the cost of debt falls back to the FRED Baa yield. | s03, s04 rule 6 |
 | 14 | Prices below $0.01: price-based ratios are missing for those rows, and the rows are counted. | s03 rule 5, s07 rule 5 |
@@ -144,10 +144,15 @@ for rule 6), `raw/query_inputs/permno_list.txt` (only to compare).
    period's first eff_dt, when that report became public (A5).
 5. permno_list.txt = every permno in the snapshots, sorted. It is written to processed/ only; you copy it to
    raw/query_inputs/ before the permno-based queries (decision 7; the pipeline never writes raw/).
-6. **Non-member stocks from mergers** (decision 11). A stock-snapshot gets `in_universe` = False if
-   (a) its month-end market cap is more than 3x the largest market cap among the other stocks in that snapshot, or
-   (b) the stock is in 3 or fewer snapshots in total and its weight is 0.00% in all of them (weight rounded to 2
-   decimals, as IWM reports it). The data of these stocks is kept everywhere; only the universe drops them.
+6. **Non-member stocks from mergers** (decision 11, revised). A stock-snapshot gets `in_universe` = False if
+   (a) its month-end market cap is more than 3x the largest market cap among the other stocks in that snapshot and
+   its weight is below 0.05%, or
+   (b) the stock is in 3 or fewer snapshots in total, its weight is 0.00% in all of them (rounded to 2 decimals, as
+   IWM reports it), and its market cap is above that snapshot's 95th percentile (`p95_mkt_cap_musd`).
+   The data of these stocks is kept everywhere; only the universe drops them. The weight condition in (a) keeps a
+   real member that grew large (Super Micro Computer, 2024-02, weight 1.6%); the size condition in (b) keeps small
+   members that were in the index briefly or are in the last snapshots of the data. Today: 11 stock-snapshots,
+   10 stocks (RBC, NRG, ASML, LinnCo, Martin Marietta, Orbital ATK, Alexion, Salesforce, Exxon, Kimco).
    - **Where rule (a) runs.** The month-end market cap is s02's: the last real trading day of the report_dt's
      month (DlyDelFlg = N), |DlyPrc| x ShrOut. s01 cannot read s02's output, because s01 must run first: its
      permno_list.txt is the upload list for the CIZ query that s02 cleans. So s01 reads the four needed CIZ
@@ -172,8 +177,9 @@ snapshots, 428,354 rows, 5,918 permnos, 7,576 periods.
 **Tests:** CUSIP fill (including a CUSIP with no permno anywhere -> gap); non-stock names are not gaps; share
 classes summed; ticker from the largest line regardless of row order; a one-snapshot absence is bridged and a
 two-snapshot absence splits the period; first_known = min eff_dt of the period; rule (a) excludes a stock at
-3.1x the next largest but not at 2.9x; rule (b) excludes a stock in 3 zero-weight snapshots but not one with 4,
-or with one non-zero weight; reruns give identical files.
+3.1x the next largest with weight 0.04%, but not at 2.9x or with weight 0.05%; rule (b) excludes a large stock in
+3 zero-weight snapshots, but not a small one, one with 4 snapshots, or one with a non-zero weight; ties in weight
+broken on shares; reruns give identical files.
 
 ## s02_prices
 
@@ -233,103 +239,118 @@ month, including a flag row that carries a price; flag row alone in the next mon
 
 **Inputs:** `raw/fundamentals_raw.csv` (all 67 columns, 127 MB).
 
-**Output** (`processed/s03_fundamentals_q/fundamentals_q.parquet`), one row per permno per fiscal quarter:
+**Output** (`processed/s03_fundamentals_q/fundamentals_quarterly.parquet`, exported as fundamentals_quarterly), one
+row per permno per fiscal quarter:
 
-- **Ids and timing:** permno, gvkey, period_end (datadate), report_date, report_date_source (`rdq` / `proxy`),
-  fyearq, fqtr, curcdq, is_usd, ajexq.
-- **Industry (current GICS, see decision 4):** gsector, gsector_name, ggroup, gind, gind_name, gsubind, naics.
-  The names come from a GICS code table in config.
-- **Quarter-end market data:** price_qe (prccq), mkt_cap_qe_musd (prccq x cshoq), cshoq, cshfdq.
-- **Balance sheet (as reported):** atq, ltq, actq, lctq, cheq, invtq, rectq, apq, ppentq, gdwlq, intanq, dlcq,
-  dlttq, pstkq, mibtq, seqq, ceqq, txditcq.
+- **Ids and timing:** permno, gvkey, tic, conm, period_end (datadate), report_date, report_date_source (`rdq` /
+  `proxy`), rdq, fyearq, fqtr, curcdq, is_usd, ajexq.
+- **Industry (decision 4):** gsector, gsector_name, ggroup, gind, gind_name, gsubind, naics. Names come from the
+  GICS tables in config. Compustat's GICS is each company's latest classification, so inactive companies keep
+  discontinued codes (e.g. 254010 Media before 2018, 404020 REITs before 2016); they keep their last name. Code
+  601020 (86 rows) has no name yet (WARN).
+- **Quarter-end market data:** price_qe (prccq), cshoq, mkt_cap_qe_musd (prccq x cshoq; missing for non-USD rows).
+- **As reported:** balance sheet (atq, ltq, actq, lctq, cheq, invtq, rectq, apq, ppentq, gdwlq, intanq, dlcq,
+  dlttq, pstkq, mibtq, seqq, ceqq, txditcq), income (saleq, revtq, cogsq, xsgaq, xrdq, oibdpq, dpq, oiadpq, xintq,
+  piq, txtq, niq, ibq, epsfxq, epspxq, dvpsxq) and the quarterly cash flows from the YTD items (oancf_q, capx_q,
+  dv_q, sstk_q, prstkc_q, dltis_q, dltr_q, aqc_q).
 - **RV and DCF building blocks:**
 
 | column | rule |
 |---|---|
-| book_equity | seqq (else ceqq + pstkq, else atq - ltq) + txditcq - pstkq; missing parts 0 (ported) |
-| total_debt, net_debt | dlttq + dlcq; total_debt - cheq (missing parts 0) |
-| ev_claims | net_debt + pstkq + mibtq (missing 0); EV = market cap + ev_claims |
-| nwc | (actq - cheq) - (lctq - dlcq) (operating working capital) |
-| d_nwc_4q | nwc - nwc exactly 4 quarters earlier |
-| ebitda_ttm, ebit_ttm, da_ttm | oibdpq, oiadpq, dpq summed over 4 quarters |
-| pretax_ttm, tax_ttm, interest_ttm | piq, txtq, xintq summed (xintq is missing on 21% of rows, so interest_ttm is often missing; the annual table has xint) |
-| tax_rate_ttm | tax_ttm / pretax_ttm, NaN when pretax_ttm <= 0 or the result is outside 0-1 |
-| sale_ttm, revt_ttm, cogs_ttm, xsga_ttm, xrd_ttm, ni_ttm, ib_ttm | summed |
-| oancf_ttm, capx_ttm, dv_ttm, sstk_ttm, prstkc_ttm, dltis_ttm, dltr_ttm, aqc_ttm | quarterly values from the year-to-date items (Q1 = YTD, else YTD - previous quarter of the same fiscal year), then summed |
+| revenue_ttm, revt_ttm, cogs_ttm, xsga_ttm, xrd_ttm | saleq, revtq, cogsq, xsgaq, xrdq over 4 quarters |
+| ebitda_ttm, ebit_ttm, da_ttm | oibdpq, oiadpq, dpq over 4 quarters |
+| interest_ttm | xintq over 4 quarters, never 0-filled (decision 13): missing when any of the 4 is missing (21% of xintq rows are) |
+| pretax_ttm, tax_ttm, ni_ttm, ib_ttm | piq, txtq, niq, ibq over 4 quarters |
+| tax_rate_ttm | tax_ttm / pretax_ttm, only when pretax_ttm > 0, clipped to 0-60% |
+| oancf_ttm, capx_ttm, dv_ttm, sstk_ttm, prstkc_ttm, dltis_ttm, dltr_ttm, aqc_ttm | the quarterly cash flows over 4 quarters |
 | fcf_ttm | oancf_ttm - capx_ttm |
-| epsfx_ttm_adj, dvpsx_ttm_adj | per-share sums on a split-adjusted basis (each quarter / ajexq), restated in this quarter's shares (x ajexq) (D4) |
-| cshfd_adj, csho_adj | cshfdq x ajexq, cshoq x ajexq (comparable across splits) |
+| book_equity | seqq (else ceqq + pstkq, else atq - ltq) + txditcq - pstkq (Fama-French; missing parts 0) |
+| total_debt, cash, net_debt | dlttq + dlcq (missing parts 0); cheq; total_debt - cheq |
+| preferred, minority_interest, ev_claims | pstkq; mibtq; net_debt + preferred + minority interest (missing parts 0). EV = market cap + ev_claims |
+| nwc, d_nwc_4q | (actq - cheq) - (lctq - dlcq); its change vs exactly 4 quarters earlier |
+| epsfxq_ttm_adj, dvpsxq_ttm_adj | diluted EPS and dividends per share: each quarter / ajexq, summed, x this quarter's ajexq (D4) |
+| diluted_shares, csho_adj, cshfd_adj | cshfdq; cshoq x ajexq; cshfdq x ajexq (comparable across splits) |
 
-- **The 17 factors at quarter end** (ported unchanged): f_book_to_price, f_earnings_to_price, f_sales_to_price,
-  f_ebitda_to_ev, f_dividend_yield, f_roe, f_roa, f_gross_profitability, f_accruals_to_assets, f_leverage,
-  f_current_ratio, f_rd_to_sales (R&D missing = 0), f_asset_growth_1yr, f_sales_growth_1yr, f_capex_growth_1yr,
-  f_net_share_issuance, f_sue. The price-scaled five are recomputed at month end in s07.
+- **The 17 factors at quarter end** (ported unchanged from the notebook): f_book_to_price, f_earnings_to_price,
+  f_sales_to_price, f_ebitda_to_ev (EV = market cap + net debt, as the notebook), f_dividend_yield, f_roe, f_roa,
+  f_gross_profitability, f_accruals_to_assets, f_leverage, f_current_ratio, f_rd_to_sales (R&D missing = 0),
+  f_asset_growth_1yr, f_sales_growth_1yr, f_capex_growth_1yr, f_net_share_issuance, f_sue. s07 recomputes the
+  price-scaled five at month end.
 
 **Rules:**
-1. Keep rows with permno, datadate, fyearq and fqtr. One row per (permno, fyearq, fqtr): keep the most complete
-   row, then the latest rdq (last run removed 81; they come from fiscal-year changes).
-2. `report_date` = rdq; if missing (0.3%), datadate + 45 days for fiscal Q1-Q3 and + 90 days for Q4.
-3. **TTM = exactly 4 consecutive fiscal quarters** (quarter index fyearq x 4 + fqtr); one missing quarter makes
-   the sum NaN. Growth and changes use exactly 4 quarters earlier.
-4. Impossible values to NaN: sales or capex growth below -100%, negative R&D ratio; inf to NaN. Other values stay
-   as reported (negative quarterly sales and D&A are restatement adjustments) and are counted in the checks.
-5. **Non-USD rows** (curcdq != USD; decision 2): `is_usd` = False, and the price-based ratios are NaN:
-   f_book_to_price, f_earnings_to_price, f_sales_to_price, f_ebitda_to_ev, f_dividend_yield (also at quarter
-   end), and mkt_cap_qe_musd. Ratios within the statements (ROA, ROE, margins, growth, leverage, current ratio,
-   accruals, SUE) are kept. The amounts stay in their own currency, so s07 also leaves the price-based ratios
-   missing for these rows.
-6. **Prices below $0.01** (decision 14): rows with prccq < 0.01 (24 today) get the same treatment as non-USD rows:
-   price-based ratios missing, counted in the summary.
-7. **Interest is never filled with 0** (decision 13): interest_ttm is missing when any of the 4 xintq values is
-   missing.
+1. Keep rows with permno, datadate, fyearq and fqtr. One row per (permno, fyearq, fqtr): the most complete row,
+   then the latest rdq (81 removed; they come from fiscal-year changes).
+2. `report_date` = rdq; if missing (725 rows, 0.3%), datadate + 45 days for fiscal Q1-Q3 and + 90 days for Q4.
+3. YTD cash flows to quarterly: Q1 = YTD; later quarters = YTD - the previous quarter's YTD of the same fiscal
+   year, else missing. **TTM = exactly 4 consecutive fiscal quarters** (index fyearq x 4 + fqtr); one missing
+   quarter makes the sum missing. Growth and changes use exactly 4 quarters earlier.
+4. Split adjustment with ajexq for EPS, dividends per share and share counts (D4). SUE = (split-adjusted basic EPS
+   minus the same 4 quarters earlier) / std of the previous 8 such changes, at least 6 of them.
+5. Impossible values to NaN: sales or capex growth below -100%, negative R&D ratio (183, 625, 18 rows); inf to
+   NaN. Other values stay as reported and are counted (negative saleq 389, negative dpq 35, zero cshoq 1, zero
+   atq 1).
+6. **Non-USD rows** (402 rows, 19 permnos; decision 2) and **prices below $0.01** (24 rows; decision 14): the 5
+   price-based factors are missing; non-USD rows also have no mkt_cap_qe_musd. Statement ratios are kept.
 
-**Checks:** unique (permno, fyearq, fqtr) (FAIL); report_date >= period_end (WARN with count); rdq proxy share
-(WARN above 2%); non-USD rows counted, and no price-based ratio on a non-USD row (FAIL); negative saleq and dpq,
-cshoq or atq of 0, prccq below $0.01 counted (WARN; 389, 35, 1, 1, 24 today); ajexq > 0 (FAIL); factor coverage
-for 2015+ within 5
-points of the last run (WARN; e.g. roa 95%, book_to_price 93%, sue 85%); TTM equals the hand sum for 20 random rows
-(FAIL). Last run: 256,935 rows.
+**Checks:** unique (permno, fyearq, fqtr) (FAIL); duplicates and rows vs the notebook rerun (WARN); report_date
+on or after period_end (WARN); rdq proxy at most 2% (WARN); no price-based ratio on non-USD or sub-$0.01 rows
+(FAIL); ajexq > 0 (FAIL); tax rate within 0-60% (FAIL); interest_ttm present exactly where all 4 xintq are
+(FAIL); revenue_ttm equals an independent sum of 4 fiscal quarters for 200 random rows (FAIL); factor coverage
+2015+ within 5 points of the notebook (WARN); every gind has a name (WARN). The summary has count / missing % /
+mean / p1 / p50 / p99 for every factor and building block, and coverage overall and for 2015+.
 
-**Tests:** a missing quarter makes 4 TTM windows NaN; YTD to quarterly including Q1 and a fiscal-year change; a
-2-for-1 split (ajexq 1 -> 2) keeps EPS TTM in current shares; duplicate quarters keep the most complete row; rdq
-proxy +45 / +90; book equity fallback chain; growth exactly 4 quarters back; tax rate NaN rules; NWC and EV claims
-with missing parts; a CAD row keeps ROA and leverage but has no B/P, E/P, S/P, EBITDA/EV or dividend yield.
+**Tests:** a missing quarter makes every TTM window that needs it missing; interest never 0-filled; YTD to
+quarterly including Q1 and a missing previous quarter; growth vs exactly 4 quarters earlier (missing when that
+quarter is missing); a 2-for-1 split keeps EPS and dividends TTM in current shares and share counts comparable;
+tax rate rule (normal, clipped at 60%, negative taxes to 0, pretax <= 0 missing); non-USD and sub-$0.01 rows lose
+only the price ratios; duplicate quarters keep the most complete row; rdq proxy +45 / +90; book equity fallback;
+SUE against a hand value; an end-to-end run.
 
 ## s04_fundamentals_a
 
-**Inputs:** `raw/fundamentals_annual_raw.csv`, `processed/s03_fundamentals_q/fundamentals_q.parquet` (Q4 rdq).
+**Inputs:** `raw/fundamentals_annual_raw.csv`, `processed/s03_fundamentals_q/fundamentals_quarterly.parquet` (Q4
+rdq, and TTM revenue for a cross-check).
 
-**Output** (`processed/s04_fundamentals_a/fundamentals_a.parquet`), one row per permno per fiscal year:
-permno, gvkey, fyear, fyr, period_end, report_date, report_date_source, curcd, ajex, price_fye (prcc_f), csho,
-cshfd, emp, sich, gsector, ggroup, gind, gsubind, naics; the statement items as reported (sale, revt, cogs, xsga,
-xrd, oibdp, dp, oiadp, xint, xintd, pi, txt, ni, ib, epsfx, epspx, dvpsx_f; at, lt, act, lct, che, invt, rect, ap,
-ppent, gdwl, intan, dlc, dltt, pstk, mib, seq, ceq, txditc; oancf, capx, dv, dvc, sstk, prstkc, dltis, dltr, aqc);
-and the same building blocks as s03 on an annual basis (book_equity, total_debt, net_debt, ev_claims, nwc, d_nwc,
-fcf, tax_rate, epsfx_adj = epsfx / ajex, growth of sale, ebit, capex vs the previous fiscal year).
+**Output** (`processed/s04_fundamentals_a/dcf_inputs_annual.parquet`, exported as dcf_inputs_annual), one row per
+permno per fiscal year:
+
+- **Ids and timing:** permno, gvkey, tic, conm, fyear, fyr, period_end, report_date, report_date_source
+  (`q4_rdq` / `proxy`), curcd, is_usd, ajex, price_fye (prcc_f), epsfx, emp, sich, GICS codes and names.
+- **DCF inputs:** revenue (sale), ebitda (oibdp), ebit (oiadp), da (dp), capex (capx), oancf, pretax_income (pi),
+  taxes (txt), tax_rate, interest_expense and interest_source, net_income (ni), nwc and d_nwc, total_debt, cash
+  (che), net_debt, preferred (pstk), minority_interest (mib), diluted_shares (cshfd), basic_shares (csho),
+  book_equity, dividends (dvc, common) and dividends_total (dv), buybacks (prstkc), share_issuance (sstk), fcff,
+  revenue_growth, ebitda_growth.
 
 **Rules:**
-1. One row per (permno, fyear): keep the most complete row (1 duplicate today).
-2. **report_date** (the annual file has no rdq; decision 10): the rdq of the matching quarterly Q4 row, i.e. the
-   same gvkey, fyearq = fyear and fqtr = 4 (96.4% of annual rows match today; in 2 of them the Q4 datadate
-   differs from the annual datadate, which is WARNed), otherwise datadate + 90 days.
-3. Previous-year values only from exactly fyear - 1; a fiscal-year-end change gives NaN changes.
-4. No TTM: each row is a fiscal year. dp missing stays missing (5% of rows); EBITDA uses oibdp as reported.
-5. **Own table** (decision 6): fundamentals_a is not merged into the monthly panel. DCF code joins it by permno
-   with report_date <= the valuation date.
-6. **Interest expense** (decision 13): `interest_expense` = xint, else xintd; never 0-filled.
-   `interest_source` = `xint` / `xintd` / `missing`. Where it is missing, the DCF's cost of debt falls back to the
-   FRED Baa yield (moodys_baa in market_monthly) at the valuation date.
-7. **dcf_inputs_annual** (the final file) is the DCF subset of fundamentals_a: revenue (sale), ebitda (oibdp),
-   ebit (oiadp), da (dp), capex (capx), d_nwc, tax_rate, interest_expense, interest_source, total_debt, cash (che),
-   net_debt, diluted_shares (cshfd), and historical fcff = ebit x (1 - tax_rate) + da - capex - d_nwc (missing if
-   any part is missing).
+1. One row per (permno, fyear): the most complete row, then the latest datadate (1 duplicate today).
+2. **report_date** (decision 10): the rdq of the quarterly Q4 row with the same gvkey and fiscal year **that ends
+   on the same date as the annual row**, otherwise datadate + 90 days. The same-date condition was added after the
+   first run: after a fiscal-year-end change (TuHURA Biosciences 2024, Grubb & Ellis 2007, June to December) the
+   Q4 of the same fiscal year is the old June quarter, and its rdq predated the annual period end, a look-ahead.
+   Today 63,034 rows use the Q4 rdq and 2,325 the proxy (2 rejected for that reason).
+3. Changes and growth only vs exactly fyear - 1; a missing or changed year gives missing values. Revenue and EBITDA
+   growth need a positive previous value.
+4. **Interest expense** (decision 13): xint, else xintd, never 0-filled. `interest_source` = xint (54,069) /
+   xintd (2,019) / missing (9,271). Where it is missing, the DCF's cost of debt falls back to the FRED Baa yield.
+5. tax_rate = txt / pi, only when pi > 0, clipped to 0-60% (as s03). nwc = (act - che) - (lct - dlc); total debt,
+   cash, net debt and book equity as in s03.
+6. **fcff** = ebit x (1 - tax_rate) + da - capex - d_nwc, missing if any part is missing. Today 40% of fiscal
+   years have one: tax_rate is missing in loss years (37.8%) and d_nwc in first years, after gaps and for banks
+   without current assets (30.1%). See open question 1.
+7. **Own table** (decision 6): not merged into the monthly panel. DCF code joins it by permno with report_date <=
+   the valuation date.
 
-**Checks:** unique key (FAIL); report_date >= period_end (WARN); share of proxy report dates (WARN above 10%);
-annual sale and oiadp vs the sum of the 4 quarters in s03 within 1% for at least 95% of matched rows (WARN);
-missing dp, oiadp, xint counted; negative capx or sale counted (WARN; 23 and 61 today).
+**Checks:** unique (permno, fyear) (FAIL); report_date on or after period_end (WARN); proxy report dates at most
+10% (WARN); tax rate within 0-60% (FAIL); interest never filled where xint and xintd are missing (FAIL); FCFF
+present exactly when all its parts are (FAIL); annual revenue within 1% of the quarterly TTM at the matching Q4
+for at least 95% of years (WARN; 94.8% today, 96.9% within 5%: mostly restatements, since Compustat restates
+annual figures and keeps quarters as first reported). The summary has the count / missing % / mean / p1 / p50 /
+p99 of every column, the report date and interest source counts, and coverage.
 
-**Tests:** Q4 rdq borrowed, proxy otherwise; fiscal-year change gives NaN growth; dedup; building blocks with
-missing parts.
+**Tests:** report date from the matching Q4 rdq, proxy when the Q4 ends on another date or is missing; FCFF against
+a hand value and missing when a part is missing; changes only vs exactly the previous fiscal year; interest xint,
+then xintd, never 0; tax rate rule; duplicate years keep the most complete row; an end-to-end run.
 
 ## s05_ibes
 
@@ -429,7 +450,7 @@ statements stay their own table (decision 6).
   index_weight, snapshot_report_dt, snapshot_eff_dt, new_entrant, has_price, price_date, prc, shrout,
   mkt_cap_musd, company_mkt_cap_musd, n_share_classes, mom_1m, mom_6m, mom_12m, mom_12_1, vol_*, fund_period_end,
   fund_report_date, fund_is_usd, the 17 f_* fundamentals (price-scaled five at month end, `_qe` versions kept),
-  the RV building blocks used by the app (book_equity, sale_ttm, ebitda_ttm, ebit_ttm, net_debt, ev_claims,
+  the RV building blocks used by the app (book_equity, revenue_ttm, ebitda_ttm, ebit_ttm, net_debt, ev_claims,
   fcf_ttm, epsfx_ttm_adj), ibes_statpers, numest, f_forward_ep, f_eps_revision, f_eps_dispersion,
   f_analyst_surprise, surprise_anndats, the new analyst yields f_forward_sales_yield, f_forward_ebitda_ev,
   f_cash_flow_yield, f_fy2_ep, f_ltg, beta_252d, beta_60m, ret_next_1m, delisted_next_month. (61 columns last
@@ -621,19 +642,34 @@ MEMBERSHIP and PRICES cells were rerun unchanged on the same raw files (paths re
 | daily rows (15,309,394); 300 random permnos (780,850 rows) | identical ret, mom_1m/6m/12m, vol_gk and vol_close 1m/12m, mkt_cap; prc differs on the 46 delisting rows where CIZ gives a post-delisting price (now missing, decision 9) |
 | monthly rows (733,698) | identical ret_m, delisting flags, fills, SIC on every row; prc, mkt cap, momentum and volatility identical in every month without a delisting row. They differ only in the 3,186 delisting months, which now use the last real trading day (decision 9): 2,760 of them now have a price (the notebook had 774 post-delisting prices and no market cap); 426 hold only the delisting row and have none |
 
+The first version of decision 11 excluded 72 stock-snapshots (48 stocks), including Super Micro Computer and 21
+new stocks in the 2026-06-30 snapshot; the revised rule excludes the 10 merger stocks only.
+
+## Phase 2b results (s03, s04)
+
+s03 WARN (9 s; one GICS code without a name), s04 WARN (2 s; revenue agreement 94.8% vs 95%). The notebook's
+FUNDAMENTALS cell was rerun unchanged on the same raw file. Rows: 257,447 in both, and the same source row was
+kept for every fiscal quarter. The 12 statement factors are identical on all 257,447 rows. The 5 price-based
+factors differ on 1,735 factor-rows, all of them a notebook value that is now missing for one of two decisions:
+
+| factor | differ | non-USD (decision 2) | price below $0.01 (decision 14) | other |
+|---|---|---|---|---|
+| f_book_to_price | 372 | 372 | 0 | 0 |
+| f_earnings_to_price | 351 | 328 | 23 | 0 |
+| f_sales_to_price | 351 | 328 | 23 | 0 |
+| f_ebitda_to_ev | 302 | 291 | 11 | 0 |
+| f_dividend_yield | 359 | 335 | 24 | 0 |
+| the other 12 | 0 | | | |
+
+(Split-adjusted E/P and dividend yield, the impossible-value rules and the SUE definition were already in the
+archived notebook, so they cause no differences.)
+
 ## Open questions
 
-1. **Decision 11 excludes real members.** The rules as written exclude 72 stock-snapshots (48 stocks). They catch
-   the merger stocks (RBC, Exxon, Salesforce 2018-05, Alexion 2015-06, NRG, ASML, Martin Marietta, Kimco, LinnCo,
-   Orbital ATK), but also:
-   - **rule (a): Super Micro Computer on 2024-02-29**, a real member (172 snapshots, weight 1.6%) that had grown
-     to 3.2x the next largest stock;
-   - **rule (b): 21 stocks in the last snapshot (2026-06-30)**, which have 1 snapshot only because the data ends
-     there (probably June reconstitution additions), and small stocks that were in the index briefly. Weights
-     below 0.005% round to 0.00%, and 27,934 holdings lines are 0.00%, so a zero weight alone does not mark a
-     merger stock.
-   A possible fix: apply (a) only to stocks with a 0.00% weight, and in (b) skip stocks whose snapshots touch the
-   first or last 3 snapshots of the data. This needs your decision; the code follows decision 11 as written.
+1. **FCFF in loss years.** With the tax rate defined only when pretax income > 0, FCFF is missing in every loss
+   year (37.8% of fiscal years) and covers 40% of years. Setting the tax rate to 0 when pretax income <= 0 (no tax
+   on a loss, the usual DCF convention) would raise FCFF coverage to 70%. Keep the rule, or use 0 in loss years?
+2. **GICS industry 601020** (86 quarterly rows) has no name in the table; I could not confirm what it is.
 
 ## Phase 2 order
 

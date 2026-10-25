@@ -85,9 +85,14 @@ def caps_for(snap, values):
                          "mkt_cap_musd": list(values.values())})
 
 
-@pytest.mark.parametrize("big, excluded", [(310.0, True), (290.0, False)])
-def test_rule_a_market_cap_above_3x_the_largest_other(big, excluded):
+@pytest.mark.parametrize("big, weight, excluded", [
+    (310.0, 0.04, True),       # 3.1x the next largest, weight below 0.05%
+    (290.0, 0.04, False),      # only 2.9x
+    (310.0, 0.05, False),      # big but with a weight that fits its size (a real member that grew, e.g. SMCI)
+])
+def test_rule_a_market_cap_above_3x_and_small_weight(big, weight, excluded):
     snap = pd.concat([snaps([0], permno=p) for p in (1, 2, 3)]).assign(weight=1.0)
+    snap.loc[snap.permno == 1, "weight"] = weight
     for p in (1, 2, 3):            # long histories, so rule b never applies
         snap = pd.concat([snap, snaps([1, 2, 3, 4], permno=p).assign(weight=1.0)])
     out = s01.apply_non_member_rules(snap.reset_index(drop=True), caps_for(snap, {1: big, 2: 100.0, 3: 50.0}))
@@ -97,18 +102,22 @@ def test_rule_a_market_cap_above_3x_the_largest_other(big, excluded):
     assert first.loc[[2, 3], "in_universe"].all()
 
 
-@pytest.mark.parametrize("present, weights, excluded", [
-    ([0, 1, 2], [0.0, 0.0, 0.004], True),          # 3 snapshots, all 0.00% after rounding
-    ([0, 1, 2, 3], [0.0, 0.0, 0.0, 0.0], False),   # 4 snapshots
-    ([0, 1, 2], [0.0, 0.01, 0.0], False),          # one non-zero weight
+@pytest.mark.parametrize("present, weights, cap, excluded", [
+    ([0, 1, 2], [0.0, 0.0, 0.004], 50.0, True),          # 3 snapshots, all 0.00% after rounding, above p95
+    ([0, 1, 2], [0.0, 0.0, 0.0], 3.0, False),            # same, but a small stock (below p95)
+    ([0, 1, 2, 3], [0.0, 0.0, 0.0, 0.0], 50.0, False),   # 4 snapshots
+    ([0, 1, 2], [0.0, 0.01, 0.0], 50.0, False),          # one non-zero weight
 ])
-def test_rule_b_few_zero_weight_snapshots(present, weights, excluded):
-    other = snaps(list(range(6)), permno=999)
+def test_rule_b_few_zero_weight_snapshots_and_large(present, weights, cap, excluded):
+    others = pd.concat([snaps(list(range(6)), permno=p) for p in range(100, 120)])     # caps 1 to 20
     stock = snaps(present, permno=5).assign(weight=weights)
-    out = s01.apply_non_member_rules(pd.concat([other, stock]).reset_index(drop=True),
-                                     pd.DataFrame(columns=["permno", "month", "mkt_cap_musd"]))
+    snap = pd.concat([others, stock]).reset_index(drop=True)
+    caps = pd.DataFrame([(p, d.to_period("M"), float(p - 99)) for p in range(100, 120) for d in D]
+                        + [(5, D[k].to_period("M"), cap) for k in present], columns=["permno", "month", "mkt_cap_musd"])
+    out = s01.apply_non_member_rules(snap, caps)
     s = out[out.permno == 5]
     assert (~s["in_universe"]).all() == excluded and (s["exclusion_rule"] == "b").all() == excluded
+    assert (s["p95_mkt_cap_musd"] < 50).all()                                      # p95 of 1-20 (+ the stock)
     periods = s01.build_periods(out)
     assert periods.loc[periods.permno == 5, "excluded_non_member"].item() == excluded
 

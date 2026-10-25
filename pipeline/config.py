@@ -149,11 +149,15 @@ NON_STOCK_PATTERN = (r"CASH|FUND|FUTURE|FEES|ADJUSTMENT|\bCVR\b|ESCROW|EARNOUT|R
                      r"RUSSELL|STANDARD LIFE|CONTINGENT|LITIGATION|PENDING|\bTBA\b|NOTE|BOND|%|\d{2}-[A-Z]{3}-\d{4}|"
                      r"BANK FINLAND")
 
-# Non-member stocks received in mergers (decision 11): excluded from the universe if (a) the month-end market cap
-# is more than NON_MEMBER_CAP_MULTIPLE x the largest other stock in the snapshot, or (b) the stock is in at most
-# NON_MEMBER_MAX_SNAPSHOTS snapshots, all with weight 0.00%
+# Non-member stocks received in mergers (decision 11, revised): a stock-snapshot is excluded from the universe if
+# (a) its month-end market cap is more than NON_MEMBER_CAP_MULTIPLE x the largest other stock in the snapshot and
+#     its weight is below NON_MEMBER_MAX_WEIGHT_A percent, or
+# (b) the stock is in at most NON_MEMBER_MAX_SNAPSHOTS snapshots, all with weight 0.00%, and its market cap is
+#     above the snapshot's NON_MEMBER_CAP_QUANTILE_B quantile
 NON_MEMBER_CAP_MULTIPLE = 3.0
+NON_MEMBER_MAX_WEIGHT_A = 0.05
 NON_MEMBER_MAX_SNAPSHOTS = 3
+NON_MEMBER_CAP_QUANTILE_B = 0.95
 
 # Membership checks
 SNAPSHOT_SIZE_RANGE = (1800, 2150)
@@ -166,8 +170,19 @@ LAST_RUN = {
     "snapshots": 218, "snapshot_rows": 428_354, "permnos": 5_918, "periods": 7_576, "known_gaps": 72,
     "cusip_fill_lines": 1_569, "price_duplicates": 1_801, "daily_rows": 15_309_394, "monthly_rows": 733_698,
     "delisting_fills": 49,
+    # notebook FUNDAMENTALS cell rerun on the 2026-10-25 pull (fundamentals_raw.csv was re-pulled with more columns)
+    "fundamentals_rows": 257_447, "fundamentals_duplicates": 81,
 }
 LAST_RUN_TOLERANCE = 0.02
+# Factor coverage (share of rows with a value) for fiscal quarters ending 2015 or later, notebook's last run
+LAST_RUN_COVERAGE_2015 = {
+    "f_book_to_price": 0.93, "f_earnings_to_price": 0.95, "f_sales_to_price": 0.95, "f_ebitda_to_ev": 0.86,
+    "f_dividend_yield": 0.96, "f_roe": 0.89, "f_roa": 0.95, "f_gross_profitability": 0.85,
+    "f_accruals_to_assets": 0.93, "f_leverage": 1.00, "f_current_ratio": 0.78, "f_rd_to_sales": 0.90,
+    "f_asset_growth_1yr": 0.94, "f_sales_growth_1yr": 0.84, "f_capex_growth_1yr": 0.78,
+    "f_net_share_issuance": 0.94, "f_sue": 0.85,
+}
+COVERAGE_TOLERANCE = 0.05
 
 # Delisting returns: CIZ dlyret on the flagged row (DlyDelFlg = Y) already includes delret, so it is never added
 # again. A missing one is filled by delactiontype: -30% for GDR (dropped for performance), else 0%.
@@ -184,6 +199,59 @@ TRADING_DAYS_PER_YEAR = 252
 REPORT_LAG_DAYS_Q = 45
 REPORT_LAG_DAYS_Q4 = 90
 REPORT_LAG_DAYS_ANNUAL = 90
+
+# Fundamentals (s03, s04)
+TAX_RATE_RANGE = (0.0, 0.60)        # effective tax rate = taxes / pretax income, only when pretax income > 0
+PRICE_FLOOR = 0.01                  # below this price, price-based ratios are missing (decision 14)
+# The quarterly factors whose denominator or numerator is the share price or market cap (decisions 2 and 14)
+PRICE_BASED_FACTORS = ("f_book_to_price", "f_earnings_to_price", "f_sales_to_price", "f_ebitda_to_ev",
+                       "f_dividend_yield")
+# Year-to-date cash flow items converted to quarterly values: raw column -> quarterly column
+YTD_ITEMS = {"oancfy": "oancf_q", "capxy": "capx_q", "dvy": "dv_q", "sstky": "sstk_q", "prstkcy": "prstkc_q",
+             "dltisy": "dltis_q", "dltry": "dltr_q", "aqcy": "aqc_q"}
+SUE_HISTORY_QUARTERS = 8            # SUE is scaled by the std of the previous 8 four-quarter EPS changes
+SUE_MIN_HISTORY = 6                 # ... and needs at least 6 of them
+
+# GICS names. Compustat's GICS is each company's latest classification (current for active companies, the last
+# one used for inactive ones, so some discontinued industry codes appear). Industry names follow the 2023
+# structure; discontinued codes keep their last name.
+GICS_SECTORS = {10: "Energy", 15: "Materials", 20: "Industrials", 25: "Consumer Discretionary",
+                30: "Consumer Staples", 35: "Health Care", 40: "Financials", 45: "Information Technology",
+                50: "Communication Services", 55: "Utilities", 60: "Real Estate"}
+GICS_INDUSTRIES = {
+    101010: "Energy Equipment & Services", 101020: "Oil, Gas & Consumable Fuels",
+    151010: "Chemicals", 151020: "Construction Materials", 151030: "Containers & Packaging",
+    151040: "Metals & Mining", 151050: "Paper & Forest Products",
+    201010: "Aerospace & Defense", 201020: "Building Products", 201030: "Construction & Engineering",
+    201040: "Electrical Equipment", 201050: "Industrial Conglomerates", 201060: "Machinery",
+    201070: "Trading Companies & Distributors", 202010: "Commercial Services & Supplies",
+    202020: "Professional Services", 203010: "Air Freight & Logistics", 203020: "Passenger Airlines",
+    203030: "Marine Transportation", 203040: "Ground Transportation", 203050: "Transportation Infrastructure",
+    251010: "Automobile Components", 251020: "Automobiles", 252010: "Household Durables",
+    252020: "Leisure Products", 252030: "Textiles, Apparel & Luxury Goods", 253010: "Hotels, Restaurants & Leisure",
+    253020: "Diversified Consumer Services", 254010: "Media (discontinued 2018)", 255010: "Distributors",
+    255020: "Internet & Direct Marketing Retail (discontinued 2023)", 255030: "Broadline Retail",
+    255040: "Specialty Retail",
+    301010: "Consumer Staples Distribution & Retail", 302010: "Beverages", 302020: "Food Products",
+    302030: "Tobacco", 303010: "Household Products", 303020: "Personal Care Products",
+    351010: "Health Care Equipment & Supplies", 351020: "Health Care Providers & Services",
+    351030: "Health Care Technology", 352010: "Biotechnology", 352020: "Pharmaceuticals",
+    352030: "Life Sciences Tools & Services",
+    401010: "Banks", 401020: "Thrifts & Mortgage Finance (discontinued 2023)", 402010: "Financial Services",
+    402020: "Consumer Finance", 402030: "Capital Markets", 402040: "Mortgage Real Estate Investment Trusts (REITs)",
+    403010: "Insurance", 404020: "Real Estate Investment Trusts (discontinued 2016)",
+    404030: "Real Estate Management & Development (discontinued 2016)",
+    451010: "Internet Software & Services (discontinued 2018)", 451020: "IT Services", 451030: "Software",
+    452010: "Communications Equipment", 452020: "Technology Hardware, Storage & Peripherals",
+    452030: "Electronic Equipment, Instruments & Components", 453010: "Semiconductors & Semiconductor Equipment",
+    501010: "Diversified Telecommunication Services", 501020: "Wireless Telecommunication Services",
+    502010: "Media", 502020: "Entertainment", 502030: "Interactive Media & Services",
+    551010: "Electric Utilities", 551020: "Gas Utilities", 551030: "Multi-Utilities", 551040: "Water Utilities",
+    551050: "Independent Power and Renewable Electricity Producers",
+    601010: "Diversified REITs", 601025: "Industrial REITs", 601030: "Hotel & Resort REITs",
+    601040: "Office REITs", 601050: "Health Care REITs", 601060: "Residential REITs", 601070: "Retail REITs",
+    601080: "Specialized REITs", 602010: "Real Estate Management & Development",
+}
 
 # IBES
 IBES_LINK_SCORES = (1, 2)
