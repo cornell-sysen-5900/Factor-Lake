@@ -402,8 +402,10 @@ def check_upload(final: Path, out: Path, manifest: dict) -> tuple[list[Check], d
     res = {"exit_code": proc.returncode, "keys": len(keys), "files_in_final": n_files, "prefix": prefix,
            "outside_prefix": bad, "first_keys": keys[:3], "last_key": keys[-1] if keys else None,
            "stderr": proc.stderr[-300:]}
-    ok = proc.returncode == 0 and len(keys) == n_files == 36 and not bad
-    return [check(f"upload dry run offline: 36 keys under {prefix}", ok,
+    planned = sum(o["files"] for o in manifest["outputs"].values()) + 4    # + daily _manifest.json and 3 documents
+    res["planned_files"] = planned
+    ok = proc.returncode == 0 and len(keys) == n_files == planned and not bad
+    return [check(f"upload dry run offline: one key per planned file ({planned}) under {prefix}", ok,
                   f"{len(keys)} keys, {n_files} files, exit code {proc.returncode}", level=WARN)], res
 
 

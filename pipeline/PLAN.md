@@ -30,6 +30,7 @@ and multiple is a raw value; the app z-scores or ranks at each rebalance.
 | fundamentals_quarterly.parquet | permno, fiscal quarter | full quarterly statements, building blocks and the quarter-end factors | s03 | Data Viewer, factor research |
 | security_master.parquet | permno | permno, permco, gvkey, ibes_ticker, ticker, security_name (latest), gsector, gsector_name, ggroup, gind, gind_name, gsubind, siccd, first_date, last_date | s07 | ticker and name lookup, holdings table |
 | manifest.json, DATA_DICTIONARY.md | - | data_version, source sha256s, per-file rows, dates, columns, units, known gaps; every column with meaning, unit and source | s08 | data loading checks, documentation |
+| column_stats.parquet | final table, column | file, column, kind, dtype, rows, non_null_pct, min, p1, p25, median, mean, p75, p99, max, date_min, date_max, unique, top_values, true_pct | s08 | the Stats tables in DATA_DICTIONARY.md, data checks |
 
 **Sources.** `archive/WRDS_Cleaning.ipynb` (code, markdown and printed outputs of its last run, 2026-10-22) and
 the s00 inventory of `raw/` (2026-10-25). `archive/data_audit/report.md` is **not in the data folder**, so the
@@ -615,8 +616,9 @@ announcement.
 | dcf_inputs_annual.parquet | s04 |
 | estimates_consensus.parquet | s05 |
 | fundamentals_quarterly.parquet | s03 |
+| column_stats.parquet | computed by s08 from the other final tables (prices_daily's years combined): numeric dtype, rows, non-null %, min, p1, p25, median, mean, p75, p99, max; dates non-null %, min, max, unique; text non-null %, unique, top 5 with their share of rows; booleans non-null %, share True |
 | manifest.json | data_version (build date), created_at, pipeline git commit (and whether the tree was dirty), sha256 of every raw file (from s00), per output file path, rows, MB, date range, permnos, column types; units, sectors (GICS and the SIC fallback), delisting fill rule, month-end convention, which market cap to use for what, point-in-time note, known gaps (the 72 unmatched IWM holdings, unlisted share classes, where each source ends) |
-| DATA_DICTIONARY.md | rendered from `pipeline/dictionary.py`: per file what it is, its key and rows, and every column with type, meaning, unit, source and stage |
+| DATA_DICTIONARY.md | rendered from `pipeline/dictionary.py`: per file what it is, its key and rows, every column with type, meaning, unit, source and stage, a Stats table from column_stats.parquet (non-null %, min, median, mean, max, and p1 / p99 for factors and multiples; 4 significant figures), and for factor_panel_monthly the non-null % of every factor by year |
 | UPLOAD.md | dry run, upload and listing check against `s3://sysen-5900-factor-lake/factor-lake-data/wrds_YYYY_MM/` for a teammate with the repo's .env AWS keys. **Nothing is uploaded by the pipeline.** |
 
 **Rules:** permno int32, permco nullable int32, dates datetime64[ns] without time zone, floats float64, market cap in
@@ -628,10 +630,12 @@ mkt_cap_musd instead of the old mkt_cap in $ thousands.
 
 **Checks:** every file reads back with its source's row count (FAIL); no duplicate keys in any file (FAIL);
 permno int32 and dates datetime64[ns] (FAIL); every output column is in DATA_DICTIONARY.md and every column there
-is in the outputs, read from the written files (FAIL); final/ holds exactly the planned files (FAIL); the manifest
+is in the outputs, read from the written files (FAIL); every output column has a column_stats row and the
+dictionary's Stats tables equal column_stats.parquet read back (FAIL); final/ holds exactly the planned files (FAIL); the manifest
 sha256 of every raw file equals the raw file re-hashed now (FAIL); total size and size per file (reported).
 
-**Tests:** types are standardized; the dictionary renders every column and parses back; an undocumented or a
+**Tests:** types are standardized; the dictionary renders every column and parses back; column stats of every kind
+across several files, 4 significant figures, coverage by year, a missing stats row or a changed number FAILs; an undocumented or a
 stale column FAILs; the daily files keep the publish layout and sort; the upload script targets the new folder and
 compiles.
 
@@ -655,7 +659,7 @@ ROA each June, equal weight, held July-June, on the new and the old panel vs IWM
 stage rerun into a temporary folder (`--processed-dir`), each final file compared by rows and a hash of the data
 sorted by its key, full run time; (6) memory of factor_panel_monthly in pandas, full and with 9 columns, vs the
 ~1 GB Streamlit free tier (WARN above half); (7) the UPLOAD.md script with `--offline`, no AWS variables and
-network blocked: 36 keys under factor-lake-data/wrds_YYYY_MM/.
+network blocked: one key per planned file (37 with column_stats.parquet) under factor-lake-data/wrds_YYYY_MM/.
 
 **Tests:** cap-weighted next-month returns, tracking statistics, long-short sorts both ways, the June portfolio,
 the rerun comparison (changed data found, row order and created_at ignored), the offline dry run, the recompute

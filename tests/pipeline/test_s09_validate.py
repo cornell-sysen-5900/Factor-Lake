@@ -90,7 +90,8 @@ def test_upload_dry_run_works_offline(tmp_path, monkeypatch):
         (final / f"f{i}.parquet").write_bytes(b"x")
     (final / "manifest.json").write_text("{}")
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "should-not-be-needed")
-    manifest = {"s3_target": "s3://sysen-5900-factor-lake/factor-lake-data/wrds_2026_10/"}
+    manifest = {"s3_target": "s3://sysen-5900-factor-lake/factor-lake-data/wrds_2026_10/",
+                "outputs": {"tables": {"files": 32}}}                       # + daily manifest + 3 documents
     checks, res = s09.check_upload(final, out, manifest)
     assert res["exit_code"] == 0, res["stderr"]
     assert res["keys"] == 36 and not res["outside_prefix"] and checks[0].status == "PASS"

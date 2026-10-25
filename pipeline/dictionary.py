@@ -526,6 +526,31 @@ FILES["security_master.parquet"] = {
 }
 
 
+FILES["column_stats.parquet"] = {
+    "stage": "s08_export", "row": "final table, column", "key": ["file", "column"],
+    "about": "Statistics of every column of every other final table (prices_daily's years combined), rebuilt on "
+             "every export; the Stats tables in this dictionary are printed from it.",
+    "columns": {
+        "file": ("final table (prices_daily/year=YYYY/data.parquet for all daily years)", TEXT, DERIVED),
+        "column": ("column name", TEXT, DERIVED),
+        "kind": ("numeric, date, text or bool", TEXT, DERIVED),
+        "dtype": ("Parquet (Arrow) type", TEXT, DERIVED),
+        "rows": ("rows of the table", N, DERIVED),
+        "non_null_pct": ("share of rows with a value", "percent", DERIVED),
+        **{s: (f"{name} of the non-missing values (numeric columns)", "the column's unit", DERIVED)
+           for s, name in (("min", "minimum"), ("p1", "1st percentile"), ("p25", "25th percentile"),
+                           ("median", "median"), ("mean", "mean"), ("p75", "75th percentile"),
+                           ("p99", "99th percentile"), ("max", "maximum"))},
+        "date_min": ("earliest date (date columns)", DATE, DERIVED),
+        "date_max": ("latest date (date columns)", DATE, DERIVED),
+        "unique": ("distinct values (text and date columns)", N, DERIVED),
+        "top_values": ("the 5 most common values with their share of rows, as JSON [[value, percent], ...] (text "
+                       "columns)", TEXT, DERIVED),
+        "true_pct": ("share True of the non-missing values (boolean columns)", "percent", DERIVED),
+    },
+}
+
+
 def columns(name: str) -> dict[str, tuple[str, str, str, str]]:
     """The file's columns as (meaning, unit, source, stage)."""
     f = FILES[name]
@@ -534,8 +559,10 @@ def columns(name: str) -> dict[str, tuple[str, str, str, str]]:
 
 # ---------- rendering ----------
 
-def render(manifest: dict) -> str:
-    """DATA_DICTIONARY.md for teammates who never saw the pipeline; types and row counts from the manifest."""
+def render(manifest: dict, stats=None, coverage=None) -> str:
+    """DATA_DICTIONARY.md for teammates who never saw the pipeline; types and row counts from the manifest, a Stats
+    table per file from column_stats (stats), and factor coverage by year for factor_panel_monthly."""
+    from pipeline import column_stats
     out = manifest["outputs"]
     md = [f"# Factor-Lake WRDS data: data dictionary (version {manifest['data_version']})", "",
           "Built by the WRDS pipeline in the Factor-Lake repo (`pipeline/`, commit "
@@ -571,6 +598,12 @@ def render(manifest: dict) -> str:
         for c, (meaning, unit, source, stage) in columns(name).items():
             md.append(f"| `{c}` | {o['columns'].get(c, '?')} | {meaning} | {unit} | {source} | {stage} |")
         md.append("")
+        if stats is not None and name != "column_stats.parquet":
+            md += [*column_stats.stats_table(stats, name), "",
+                   "Rounded to 4 significant figures; p1 and p99 for factors and multiples. Text columns: unique values "
+                   "and the 3 most common with their share of rows (5 in column_stats.parquet).", ""]
+        if coverage is not None and name == "factor_panel_monthly.parquet":
+            md += [*column_stats.coverage_table(coverage), ""]
     md += ["## Sectors", "", "`gsector` and `gsector_name` are Compustat GICS (the current classification, applied to "
            "all history). Where GICS is missing, `sector_name` maps the CRSP SIC code to a GICS sector name, first "
            "match wins:", "", "| GICS sector | SIC ranges |", "|---|---|",
@@ -594,6 +627,8 @@ def parse_columns(md: str) -> dict[str, list[str]]:
         if line.startswith("## "):
             section = line[3:].strip()
             section = section if section in FILES else None
+        elif line.startswith("### "):                   # Stats and coverage tables come after the column table
+            section = None
         elif section and line.startswith("| `"):
             found.setdefault(section, []).append(line.split("`")[1])
     return found

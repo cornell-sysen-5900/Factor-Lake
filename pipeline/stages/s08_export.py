@@ -8,7 +8,7 @@ In:  the outputs of s01-s07; processed/s00_inventory/inventory.json (raw checksu
 Out: processed/final/factor_panel_monthly.parquet, universe_periods.parquet, returns_monthly.parquet,
      prices_daily/year=YYYY/data.parquet + prices_daily/_manifest.json, market_daily.parquet, market_monthly.parquet,
      rv_multiples_monthly.parquet, rv_peer_stats_monthly.parquet, dcf_inputs_annual.parquet,
-     estimates_consensus.parquet, fundamentals_quarterly.parquet, security_master.parquet,
+     estimates_consensus.parquet, fundamentals_quarterly.parquet, security_master.parquet, column_stats.parquet,
      manifest.json, DATA_DICTIONARY.md, UPLOAD.md (exactly these files);
      processed/s08_export/summary.json (kept out of final/)
 
@@ -29,6 +29,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from pipeline import column_stats as cs
 from pipeline import dictionary
 from pipeline.checks import PASS, Check, check
 from pipeline.config import (DELISTING_FILL, DELISTING_FILL_DEFAULT, GICS_SECTORS, PARQUET_COMPRESSION,
@@ -60,6 +61,7 @@ SOURCES = {
     "security_master.parquet": ("s07_panel", "security_master.parquet", None, ()),
 }
 DOCS = ("manifest.json", "DATA_DICTIONARY.md", "UPLOAD.md")
+STATS = "column_stats.parquet"
 
 
 # ---------- Types ----------
@@ -149,6 +151,10 @@ def sha256(path: Path) -> str:
         for block in iter(lambda: f.read(1 << 22), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def table_files(out: Path, name: str) -> list[Path]:
+    return sorted((out / "prices_daily").glob("year=*/data.parquet")) if name == DAILY else [out / name]
 
 
 def output_info(out: Path, name: str, date_col: str | None) -> dict:
@@ -389,6 +395,19 @@ def dictionary_checks(md: str, outputs: dict) -> list[Check]:
             check("every DATA_DICTIONARY.md column is in the outputs", not stale, str(stale) if stale else "")]
 
 
+def stats_checks(md: str, stats: pd.DataFrame, outputs: dict) -> list[Check]:
+    """Every output column has a stats row, and the dictionary's Stats tables equal column_stats.parquet."""
+    want = {(n, c) for n, o in outputs.items() if n != STATS for c in o["columns"]}
+    have = set(zip(stats["file"], stats["column"]))
+    written = cs.parse_stats(md)
+    differ = [n for n in outputs if n != STATS and written.get(n, []) != cs.stats_rows(stats, n)]
+    return [check("every output column has a column_stats row", want == have,
+                  f"{len(have):,} rows" + (f"; missing {sorted(want - have)[:5]}" if want - have else "")
+                  + (f"; extra {sorted(have - want)[:5]}" if have - want else "")),
+            check("DATA_DICTIONARY.md stats match column_stats.parquet", not differ,
+                  ", ".join(differ) or f"{len(outputs) - 1} Stats tables")]
+
+
 def run_checks(paths: DataPaths, out: Path, exported: dict, outputs: dict, manifest: dict) -> list[Check]:
     checks = []
     for name, e in exported.items():
@@ -413,7 +432,9 @@ def run_checks(paths: DataPaths, out: Path, exported: dict, outputs: dict, manif
     bad_types = {k: v for k, v in bad_types.items() if v}
     checks.append(check("permno is int32 and every date datetime64[ns] without time zone", not bad_types,
                         str(bad_types) if bad_types else "all files"))
-    checks += dictionary_checks((out / "DATA_DICTIONARY.md").read_text(encoding="utf-8"), outputs)
+    md = (out / "DATA_DICTIONARY.md").read_text(encoding="utf-8")
+    checks += dictionary_checks(md, outputs)
+    checks += stats_checks(md, pd.read_parquet(out / STATS), outputs)
     expected = {o["path"] for n, o in outputs.items() if n != DAILY} | set(DOCS) | {"prices_daily/_manifest.json"}
     expected |= {f"prices_daily/year={y}/data.parquet" for y in exported[DAILY]["years"]}
     found = {f.relative_to(out).as_posix() for f in out.rglob("*") if f.is_file()}
@@ -439,10 +460,20 @@ def run(paths: DataPaths) -> dict:
     for name in SOURCES:
         exported[name] = export_daily(paths, out) if name == DAILY else export_table(paths, out, name)
         print(f"  {name}")
-    outputs = {name: output_info(out, name, SOURCES[name][2]) for name in dictionary.FILES}
+    stats = cs.stats_frame([r for name in SOURCES for r in cs.file_stats(name, table_files(out, name))])
+    write_parquet(stats, out / STATS)
+    exported[STATS] = {"source": "computed from the final tables", "source_rows": len(stats), "dropped_columns": []}
+    panel_path = out / "factor_panel_monthly.parquet"
+    coverage = cs.coverage_by_year(pd.read_parquet(panel_path, columns=["date", *[
+        c for c in pq.read_schema(panel_path).names if cs.is_factor(c)]]))
+    print(f"  {STATS} ({len(stats):,} columns)")
+    outputs = {name: output_info(out, name, SOURCES[name][2] if name in SOURCES else None)
+               for name in dictionary.FILES}
     manifest = build_manifest(paths, out, version, outputs, inventory)
+    manifest["factor_coverage_by_year_pct"] = {c: {str(y): round(float(v), 1) for y, v in row.items()}
+                                               for c, row in coverage.iterrows()}
     write_json(manifest, out / "manifest.json")
-    (out / "DATA_DICTIONARY.md").write_text(dictionary.render(manifest), encoding="utf-8")
+    (out / "DATA_DICTIONARY.md").write_text(dictionary.render(manifest, stats, coverage), encoding="utf-8")
     (out / "UPLOAD.md").write_text(upload_md(version, outputs), encoding="utf-8")
 
     checks = run_checks(paths, out, exported, outputs, manifest)
