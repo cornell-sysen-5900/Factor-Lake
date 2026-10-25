@@ -19,8 +19,8 @@ Rules re-implemented (PLAN.md s02, s03, s07):
             rows (delisting rows included), needing 80% of them; 12-1 = (1 + m12) / (1 + m1) - 1
     company market cap: all permnos in the CIZ file with the same permco at their last real row in the month; plus
             Compustat shares (cshoq x cfacshr at the quarter end / cfacshr at t) at the largest class's price when
-            they exceed the CRSP shares by > 5%, no class is an ADR, and the excess does not last <= 3 months
-            within 15% (computed here over calendar months)
+            they exceed the CRSP shares by > 5%, no class is an ADR, and that held at this month end and the 2
+            month ends before it (month ends of the CIZ rows read)
     fundamentals: one row per (permno, fyearq, fqtr), the most complete, then the latest rdq; report date = rdq or
             datadate + 45 days (+ 90 for Q4); drop quarters filed after a newer one; latest report date <= t (ties:
             the latest period end, then fiscal year and quarter); stale after 365 days; TTM = 4 consecutive
@@ -118,7 +118,7 @@ def company_shares(df_end, permco, month):
 
 
 def compustat_flag(df_end, fq, permno, permco, month, t):
-    """(flag, excess shares in millions, main price) for one company-month, before the episode rule."""
+    """(flag, excess shares in millions, main price, ratio) for one company-month, before the 3-month rule."""
     rows = company_shares(df_end, permco, month)
     if rows.empty or rows["adr"].any():
         return False, np.nan, np.nan, np.nan
@@ -146,6 +146,7 @@ def main(raw_dir: str, sample_csv: str, out_csv: str) -> None:
     df = read_ciz(raw, wanted)
     fq = read_fundamentals(raw, set(df["permno"]))
     end = month_end_rows(df)
+    month_ends = df.groupby("month")["date"].max().to_dict()      # last trading day of each month
     out = []
     for s in sample.itertuples():
         t, month = s.date, s.date.to_period("M")
@@ -164,23 +165,12 @@ def main(raw_dir: str, sample_csv: str, out_csv: str) -> None:
         rows = company_shares(end, permco, month)
         cap = (rows["prc"] * rows["shrout"]).sum(min_count=1) / 1000
         flag, extra, main_prc, ratio = compustat_flag(end, fq, s.permno, permco, month, t)
-        if flag and ratio <= 1.15:                    # episode rule: is the flag a short one?
-            run, k = 1, 1
-            for step in (-1, 1):
-                k = 1
-                while True:
-                    m2 = month + step * k
-                    t2 = end[end.index.get_level_values("month") == m2]["date"].max()
-                    if pd.isna(t2):
-                        break
-                    f2, _, _, r2 = compustat_flag(end, fq, s.permno, permco, m2, t2)
-                    if not f2:
-                        break
-                    run += 1
-                    ratio = max(ratio, r2)
-                    k += 1
-            if run <= 3 and ratio <= 1.15:
-                flag = False
+        for k in (1, 2):                              # the gap must also hold at the 2 month ends before t
+            if not flag:
+                break
+            m2 = month - k
+            t2 = month_ends.get(m2)
+            flag = t2 is not None and compustat_flag(end, fq, s.permno, permco, m2, t2)[0]
         if flag:
             cap = cap + extra * main_prc
         rec.update({"company_mkt_cap_musd": cap, "compustat_flag": flag})

@@ -419,20 +419,28 @@ def _pct(v, signed=False):
     return "n/a" if v is None else (f"{v:+.2%}" if signed else f"{v:.2%}")
 
 
+SECTIONS = (("1. Index tracking", "index tracking"), ("2. Factor sanity", "factor sanity"),
+            ("3. Old vs new backtest", "old vs new"), ("4. Independent recompute", "independent"),
+            ("5. Reproducibility", "reproducibility"), ("6. App memory", "app memory"), ("7. Upload dry run", "upload"))
+
+
+def summary_rows(checks: list[Check]) -> list[str]:
+    """One row per check: its section, its name (without the section prefix), its verdict and the key number."""
+    rows = []
+    for title, prefix in SECTIONS:
+        for c in (c for c in checks if c.name.startswith(prefix)):
+            name = c.name.split(": ", 1)[-1]
+            rows.append(f"| {title} | {name} | **{c.status}** | {c.detail.split(';')[0]} |")
+    return rows
+
+
 def render(r: dict, checks: list[Check], manifest: dict) -> str:
-    verdict = {c.name: c.status for c in checks}
-    v = lambda prefix: " ".join(s for n, s in verdict.items() if n.startswith(prefix)) or "n/a"
     md = [f"# Validation of the WRDS data (version {manifest['data_version']})", "",
           f"Stage `s09_validate` of the pipeline (commit `{manifest['pipeline_git_commit'][:12]}`) checks the files "
           "in `processed/final/` against sources it did not build: the IWM ETF and the Russell 2000 index, the "
           "Fama-French factors, the old notebook's panel, and the raw CSVs read by a separate script. Every "
           "threshold is a warning (WARN), not a failure.", "",
-          "| check | verdict |", "|---|---|"]
-    for title, prefix in (("1. Index tracking", "index tracking"), ("2. Factor sanity", "factor sanity"),
-                          ("3. Old vs new backtest", "old vs new"), ("4. Independent recompute", "independent"),
-                          ("5. Reproducibility", "reproducibility"), ("6. App memory", "app memory"),
-                          ("7. Upload dry run", "upload")):
-        md.append(f"| {title} | {v(prefix)} |")
+          "| section | check | verdict | result |", "|---|---|---|---|", *summary_rows(checks)]
     t = r["tracking"]
     a, b, c = t["vs_iwm"], t["vs_r2000_price_index"], t["iwm_weighted_vs_iwm"]
     md += ["", "## 1. Index tracking", "",

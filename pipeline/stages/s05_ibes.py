@@ -5,7 +5,8 @@ PURPOSE: Stage s05_ibes: the full IBES consensus (7 measures, FPI 0-3, USD) link
          factors that put IBES per-share values on the same share basis as a CRSP price.
 
 In:  raw/forward_estimates.csv (1.1 GB, needed columns only), raw/crsp_ibes_link.csv,
-     processed/s01_membership/snapshots.parquet (our permnos), processed/s02_prices/daily/ (date, permno, prc, cfacpr),
+     processed/s01_membership/snapshots.parquet (our permnos), processed/s02_prices/daily/ (date, permno, permco, prc,
+     cfacpr, mkt_cap_musd), processed/s03_fundamentals_q/fundamentals_quarterly.parquet (company size at statpers),
      raw/query_inputs/ibes_tickers.txt (only to compare)
 Out: processed/s05_ibes/estimates_consensus.parquet  one row per permno, statpers, measure, fpi
      processed/s05_ibes/link.parquet                 the links used
@@ -21,7 +22,10 @@ Rules (pipeline/PLAN.md, s05_ibes):
        than 100x both its previous and next estimate (same ticker, measure, FPI; one neighbour at the ends) is NaN
        (suspect_total). Done on IBES tickers before linking, so share classes do not neighbour each other.
     6. share basis: IBES per-share values are restated to the latest share basis; CRSP prices are not.
-       value x crsp_basis_factor (= cfacpr_statpers / cfacpr_last) is on the basis of the CRSP price at statpers
+       value x crsp_basis_factor (= cfacpr_statpers / the permno's last cfacpr) is on the basis of the CRSP price at
+       statpers
+    7. scale rule: a total (estimate or actual) more than 100x the largest of the company's Compustat TTM revenue,
+       total assets and company market cap, as known at statpers, is NaN (suspect_scale); skipped when none is known
 """
 
 from __future__ import annotations
@@ -46,8 +50,8 @@ _TYPES = {"ticker": pa.string(), "statpers": pa.date32(), "measure": pa.string()
           "curcode": pa.string(), "fpedats": pa.date32(), "anndats_act": pa.date32(),
           **{c: pa.float64() for c in ("numest", "numup", "numdown", "actual", *VALUES)}}
 OUT_COLS = ("permno", "ibes_ticker", "statpers", "measure", "fpi", "fpedats", "numest", "numup", "numdown",
-            *VALUES, "actual", "anndats_act", "price_statpers", "cfacpr_statpers", "cfacpr_last",
-            "crsp_basis_factor", "suspect_total")
+            *VALUES, "actual", "anndats_act", "price_statpers", "cfacpr_statpers", "crsp_basis_factor",
+            "suspect_total", "suspect_scale")
 
 
 def read_estimates(path) -> pd.DataFrame:
@@ -151,6 +155,59 @@ def add_crsp_basis(ib: pd.DataFrame, daily: pd.DataFrame) -> pd.DataFrame:
     return ib
 
 
+def company_size(fq: pd.DataFrame, daily: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Size inputs for the scale rule: Compustat TTM revenue and total assets by report date, and the company market
+    cap (all our permnos with the same permco) by trading day."""
+    fund = fq[["permno", "report_date", "revenue_ttm", "atq"]].dropna(subset=["report_date"])
+    px = daily.dropna(subset=["mkt_cap_musd"])
+    cap = px.groupby(["date", "permco"])["mkt_cap_musd"].transform("sum")
+    caps = pd.DataFrame({"permno": px["permno"].to_numpy(), "date": px["date"].to_numpy(),
+                         "company_mkt_cap_musd": cap.to_numpy()})
+    return fund, caps
+
+
+def scale_outliers(ib: pd.DataFrame, fund: pd.DataFrame, caps: pd.DataFrame) -> pd.DataFrame:
+    """Rule 7: per total-measure row, the company size known at statpers (latest report_date <= statpers; market cap
+    on the last trading day <= statpers, at most 7 days earlier) and whether the estimate or the actual is more than
+    100x it. Returns the size columns and the two hit flags, indexed like ib."""
+    tot = ib.loc[ib["measure"].isin(IBES_TOTALS), ["permno", "statpers", "meanest", "actual"]]
+    tot = tot.assign(statpers=tot["statpers"].astype("datetime64[ns]"), _i=tot.index).sort_values("statpers")
+    f = fund.assign(report_date=fund["report_date"].astype("datetime64[ns]")).sort_values("report_date",
+                                                                                          kind="stable")
+    c = caps.assign(date=caps["date"].astype("datetime64[ns]")).sort_values("date")
+    tot = pd.merge_asof(tot, f, left_on="statpers", right_on="report_date", by="permno", direction="backward")
+    tot = pd.merge_asof(tot, c, left_on="statpers", right_on="date", by="permno", direction="backward",
+                        tolerance=pd.Timedelta(days=PRICE_ASOF_DAYS))
+    size = tot[["revenue_ttm", "atq", "company_mkt_cap_musd"]].where(lambda x: x > 0).max(axis=1)
+    m = IBES_TOTAL_OUTLIER_MULTIPLE
+    out = pd.DataFrame({"size_musd": size.to_numpy(), "revenue_ttm": tot["revenue_ttm"].to_numpy(),
+                        "atq": tot["atq"].to_numpy(), "company_mkt_cap_musd": tot["company_mkt_cap_musd"].to_numpy(),
+                        "estimate_hit": (tot["meanest"].abs() > m * size).to_numpy(),
+                        "actual_hit": (tot["actual"].abs() > m * size).to_numpy()}, index=tot["_i"].to_numpy())
+    return out.sort_index()
+
+
+def apply_scale_rule(ib: pd.DataFrame, fund: pd.DataFrame, caps: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    s = scale_outliers(ib, fund, caps)
+    est_hit, act_hit = s.index[s["estimate_hit"]], s.index[s["actual_hit"]]
+    info = {"estimates_by_measure": ib.loc[est_hit].groupby("measure").size().to_dict(),
+            "actuals_by_measure": ib.loc[act_hit].groupby("measure").size().to_dict(),
+            "no_size_known_rows": int(s["size_musd"].isna().sum()),
+            "tickers_caught": sorted(ib.loc[est_hit.union(act_hit), "ticker"].unique().tolist())}
+    ib.loc[est_hit, list(VALUES)] = np.nan
+    ib.loc[act_hit, "actual"] = np.nan
+    ib["suspect_scale"] = ib.index.isin(est_hit.union(act_hit))
+    left = ib.loc[s.index].join(s[["size_musd", "revenue_ttm", "atq", "company_mkt_cap_musd"]])
+    left = left.dropna(subset=["meanest"]).sort_values("meanest", key=abs, ascending=False)
+    left = left.drop_duplicates(["ticker", "measure"]).head(10)
+    info["largest_remaining"] = [
+        {"ticker": r.ticker, "permno": int(r.permno), "statpers": f"{r.statpers:%Y-%m-%d}", "measure": r.measure,
+         "fpi": int(r.fpi), "meanest": float(r.meanest),
+         **{k: None if pd.isna(getattr(r, k)) else round(float(getattr(r, k)), 1)
+            for k in ("revenue_ttm", "atq", "company_mkt_cap_musd", "size_musd")}} for r in left.itertuples()]
+    return ib, info
+
+
 def run_checks(out: pd.DataFrame, lk: pd.DataFrame, info: dict, raw_list: set | None, tickers: set) -> list[Check]:
     checks = [check("only USD and FPI 0-3", bool(out["fpi"].isin([0, 1, 2, 3]).all())),
               check("unique permno, statpers, measure, fpi",
@@ -198,9 +255,13 @@ def run(paths: DataPaths) -> dict:
     ib, info = filter_and_dedupe(read_estimates(paths.raw / RAW_FILE))
     ib, suspects, suspect_sample = convert_units(ib)
     ib, info["two_tickers_dropped"] = link(ib, lk)
-    daily = pd.read_parquet(paths.stage_dir("s02_prices") / "daily", columns=["date", "permno", "prc", "cfacpr"])
+    daily = pd.read_parquet(paths.stage_dir("s02_prices") / "daily",
+                            columns=["date", "permno", "permco", "prc", "cfacpr", "mkt_cap_musd"])
     ib = add_crsp_basis(ib, daily)
-    del daily
+    fq = pd.read_parquet(paths.stage_dir("s03_fundamentals_q") / "fundamentals_quarterly.parquet",
+                         columns=["permno", "report_date", "revenue_ttm", "atq"])
+    ib, scale = apply_scale_rule(ib, *company_size(fq, daily))
+    del daily, fq
     out = (ib.rename(columns={"ticker": "ibes_ticker"})[list(OUT_COLS)]
              .sort_values(["permno", "statpers", "measure", "fpi"]).reset_index(drop=True))
     raw_path = paths.query_inputs / "ibes_tickers.txt"
@@ -213,7 +274,8 @@ def run(paths: DataPaths) -> dict:
     by_year = pd.DataFrame({"rows": out.groupby(year).size(), "permnos": out.groupby(year)["permno"].nunique(),
                             "eps_fy1_permnos": out[eps1].groupby(year[eps1])["permno"].nunique()})
     by_mf = out.groupby(["measure", "fpi"])
-    extra = {**info, "suspect_totals": suspects, "suspect_totals_sample": suspect_sample, "linked_rows": len(out),
+    extra = {**info, "suspect_totals": suspects, "suspect_totals_sample": suspect_sample, "scale_rule": scale,
+             "linked_rows": len(out),
              "linked_permnos": int(out["permno"].nunique()),
              "links_used": len(lk), "link_permnos": int(lk["permno"].nunique()), "our_permnos": len(ours),
              "rows_by_measure_fpi": {f"{m} {f}": int(n) for (m, f), n in by_mf.size().items()},
@@ -230,7 +292,8 @@ def run(paths: DataPaths) -> dict:
     summary = write_summary(out_dir, STAGE, tables, checks, extra)
     print(f"  {info['raw_rows']:,} raw rows -> {len(out):,} linked rows, {out['permno'].nunique():,} permnos | "
           f"non-USD {info['non_usd_dropped']:,}, duplicates {info['duplicates_dropped']:,}, "
-          f"two tickers {info['two_tickers_dropped']}, suspect totals {suspects}")
+          f"two tickers {info['two_tickers_dropped']}, suspect totals {suspects}, scale rule estimates "
+          f"{scale['estimates_by_measure']} actuals {scale['actuals_by_measure']}")
     for c in checks:
         if c.status != PASS:
             print(f"  {c.status}  {c.name}: {c.detail}")

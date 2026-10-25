@@ -93,3 +93,26 @@ def test_crsp_basis_factor_lines_up_a_split():
     assert first.meanest * first.crsp_basis_factor / first.price_statpers == pytest.approx(-0.92 / 37.5)
     assert out.loc["2022-07-18", "price_statpers"] == 150.0                      # last trading day within 7 days
     assert np.isnan(out.loc["2022-08-18", "price_statpers"])                     # 27 days old: no price
+
+
+def test_scale_rule_uses_company_size_known_at_statpers():
+    ib = pd.DataFrame({
+        "ticker": "ABC", "permno": 1, "measure": ["SAL", "SAL", "EBI", "SAL", "EPS", "SAL"], "fpi": 1,
+        "statpers": pd.to_datetime(["2020-02-20", "2020-06-18", "2020-06-18", "2019-01-17", "2020-06-18",
+                                    "2020-06-18"]),
+        "meanest": [500.0, 2e6, 150_000.0, 2e6, 9e9, 5e5], "medest": 1.0, "stdev": 1.0, "highest": 1.0,
+        "lowest": 1.0, "actual": [np.nan, np.nan, np.nan, np.nan, np.nan, 3e5]})
+    ib.loc[5, "permno"] = 2                                               # permno 2: no size known at all
+    fund = pd.DataFrame({"permno": 1, "report_date": pd.to_datetime(["2020-01-15", "2020-07-15"]),
+                         "revenue_ttm": [1000.0, 1e9], "atq": [800.0, 1e9]})  # the July filing must not be used
+    caps = pd.DataFrame({"permno": 1, "date": pd.to_datetime(["2020-02-19", "2020-06-17"]),
+                         "company_mkt_cap_musd": [1500.0, 1400.0]})
+    out, info = s05.apply_scale_rule(ib, fund, caps)
+    # size at 2020-06-18: max(1000, 800, 1400) = 1400; 100x = 140,000
+    assert out.loc[1, "suspect_scale"] and np.isnan(out.loc[1, "meanest"])          # 2e6 > 140,000
+    assert out.loc[2, "suspect_scale"] and np.isnan(out.loc[2, "medest"])           # 150,000 > 140,000
+    assert not out.loc[0, "suspect_scale"] and out.loc[0, "meanest"] == 500.0
+    assert not out.loc[3, "suspect_scale"]            # 2019: no fundamentals or price known yet, rule skipped
+    assert not out.loc[4, "suspect_scale"]            # per-share measures are not totals
+    assert not out.loc[5, "suspect_scale"]            # permno 2: no size known
+    assert info["estimates_by_measure"] == {"EBI": 1, "SAL": 1} and info["no_size_known_rows"] == 2

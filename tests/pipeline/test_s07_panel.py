@@ -150,21 +150,6 @@ def test_fiscal_year_change_takes_the_new_numbering():
         assert out["f_roa"].item() == -0.18
 
 
-def test_company_cap_from_compustat_shares_on_the_crsp_basis():
-    # company 10: Compustat 30M shares at 2019-12-31, before a 2-for-1 split (cfacshr 2 -> 1): 60M at t, CRSP 40M
-    # company 20: Compustat 41M vs CRSP 40M (2.5% more): stays the CRSP market cap
-    t = pd.Timestamp("2020-03-31")
-    u = pd.DataFrame({"date": t, "permno": [1, 2], "permco": [10, 20], "fund_period_end": pd.Timestamp("2019-12-31"),
-                      "cshoq": [30.0, 41.0], "cfacshr_t": 1.0, "company_shares_crsp_m": 40.0,
-                      "company_main_prc": 10.0, "company_mkt_cap_musd": 400.0, "company_has_adr": False,
-                      "ticker": "T", "security_name": "N", "n_share_classes": 1})
-    me = pd.DataFrame({"permno": [1, 2], "month": pd.Period("2019-12", "M"), "cfacshr_t": [2.0, 1.0]})
-    out = s07.add_company_cap(u, me)[0].set_index("permno")
-    assert out.loc[1, "company_shares_compustat_m"] == 60.0 and out.loc[1, "company_cap_from_compustat"]
-    assert out.loc[1, "company_mkt_cap_musd"] == 600.0 and out.loc[1, "company_mkt_cap_crsp_musd"] == 400.0
-    assert not out.loc[2, "company_cap_from_compustat"] and out.loc[2, "company_mkt_cap_musd"] == 400.0
-
-
 def test_multiples_need_1m_denominators_and_1_cent_forward_eps():
     u = s07.add_price_scaled(pd.concat([panel_rows(), panel_rows(permno=2, ib_ttm=0.5, ebitda_ttm=0.9, eps1_crsp=0.005,
                                                                  ebt1_meanest=0.4, sal1_meanest=0.99),
@@ -184,22 +169,70 @@ def test_forward_yields_and_surprise_are_capped():
     assert np.isnan(out.loc[1, "f_analyst_surprise"]) and out.loc[2, "f_analyst_surprise"] == 1.0
 
 
-def company_months(permco, dates, cshoq, crsp=40.0, adr=False):
-    return pd.DataFrame({"date": pd.to_datetime(dates), "permno": permco, "permco": permco,
-                         "fund_period_end": pd.Timestamp("2019-12-31"), "cshoq": cshoq, "cfacshr_t": 1.0,
-                         "company_shares_crsp_m": crsp, "company_main_prc": 10.0, "company_mkt_cap_musd": crsp * 10,
-                         "company_has_adr": adr, "ticker": "T", "security_name": "N", "n_share_classes": 1})
+MONTHS = pd.to_datetime(["2020-01-31", "2020-02-28", "2020-03-31", "2020-04-30", "2020-05-29", "2020-06-30"])
 
 
-def test_adrs_and_short_issuance_episodes_keep_the_crsp_count():
-    months = ["2020-01-31", "2020-02-28", "2020-03-31", "2020-04-30", "2020-05-29"]
-    u = pd.concat([company_months(1, months, 80.0, adr=True),                      # ADR: never
-                   company_months(2, months[:3], 44.0) .assign(cshoq=[44.0, 44.0, 30.0]),  # 2 months, 10%: issuance
-                   company_months(3, months[:3], 50.0),                             # 3 months but 25% more: used
-                   company_months(4, months, 44.0)], ignore_index=True)             # 10% but 5 months: used
-    me = pd.DataFrame({"permno": [1, 2, 3, 4], "month": pd.Period("2019-12", "M"), "cfacshr_t": 1.0})
-    out, audit = s07.add_company_cap(u, me)
-    used = out.groupby("permco")["company_cap_from_compustat"].sum()
-    assert used.to_dict() == {1: 0, 2: 0, 3: 3, 4: 5}
-    a = audit.set_index("permco")
-    assert a.loc[1, "adr"] and a.loc[2, "short_episode_months"] == 2 and a.loc[4, "longest_episode_months"] == 5
+def crsp_months(permno, permco, shrout=40_000.0, adr=False, months=MONTHS):
+    """s02 monthly rows (shrout in thousands: 40M shares) and the month-end cfacshr of one permno."""
+    mo = pd.DataFrame({"month_end": months, "permno": permno, "permco": permco, "shrout": shrout, "prc": 10.0,
+                       "mkt_cap_musd": shrout / 1000 * 10.0, "is_adr": adr})
+    me = pd.DataFrame({"permno": permno, "month": months.to_period("M").insert(0, pd.Period("2019-12", "M")),
+                       "cfacshr_t": 1.0})                             # the quarter end's factor too
+    return mo, me
+
+
+def quarters(permno, rows):
+    """(period_end, report_date, cshoq in millions) -> s03 rows."""
+    return pd.DataFrame([{"permno": permno, "period_end": pd.Timestamp(e), "report_date": pd.Timestamp(r),
+                          "fyearq": pd.Timestamp(e).year, "fqtr": (pd.Timestamp(e).month - 1) // 3 + 1, "cshoq": c}
+                         for e, r, c in rows])
+
+
+def build_firm(*companies):
+    mo = pd.concat([c[0] for c in companies], ignore_index=True)
+    me = pd.concat([c[1] for c in companies], ignore_index=True)
+    fq = pd.concat([c[2] for c in companies], ignore_index=True)
+    return s07.company_months(mo, fq, me).set_index(["permco", "month_end"])
+
+
+def test_compustat_count_needs_the_gap_at_3_month_ends():
+    # company 10: 60M Compustat shares vs 40M CRSP, known from Jan 15: used from the 3rd month end (March)
+    # company 20: an ADR with the same gap: never; company 30: 41M (2.5% more): never
+    firm = build_firm((*crsp_months(1, 10), quarters(1, [("2019-12-31", "2020-01-15", 60.0)])),
+                      (*crsp_months(2, 20, adr=True), quarters(2, [("2019-12-31", "2020-01-15", 60.0)])),
+                      (*crsp_months(3, 30), quarters(3, [("2019-12-31", "2020-01-15", 41.0)])))
+    used = firm["used"].groupby(level="permco").apply(lambda s: s.tolist())
+    assert used[10] == [False, False, True, True, True, True]
+    assert not any(used[20]) and not any(used[30])
+    assert firm.loc[(10, MONTHS[0]), "company_shares_compustat_m"] == 60.0
+
+
+def test_compustat_count_uses_no_later_data():
+    # the gap shows at Jan-Mar month ends, then a new quarter (filed Apr 20) closes it. Changing that later quarter
+    # must not change any month end before its report date.
+    base = [("2019-12-31", "2020-01-15", 60.0)]
+    a = build_firm((*crsp_months(1, 10), quarters(1, base + [("2020-03-31", "2020-04-20", 40.0)])))
+    b = build_firm((*crsp_months(1, 10), quarters(1, base + [("2020-03-31", "2020-04-20", 90.0)])))
+    before = a.index.get_level_values("month_end") < pd.Timestamp("2020-04-20")
+    assert a.loc[before, "used"].tolist() == b.loc[before, "used"].tolist() == [False, False, True]
+    assert a.loc[~before, "used"].tolist() == [False, False, False] and b.loc[~before, "used"].all()
+    # a month missing from CRSP breaks the run: the count waits for 3 consecutive month ends again
+    mo, me = crsp_months(1, 10, months=MONTHS.delete(2))
+    gap = build_firm((mo, me, quarters(1, base)))
+    assert gap["used"].tolist() == [False, False, False, False, True]
+
+
+def test_company_cap_on_the_crsp_basis_with_the_largest_class_price():
+    # 2-for-1 split after the quarter end: 30M at the quarter end = 60M on the basis at t; CRSP 40M
+    mo, me = crsp_months(1, 10)
+    me.loc[me["month"] == pd.Period("2019-12", "M"), "cfacshr_t"] = 2.0
+    firm = s07.company_months(mo, quarters(1, [("2019-12-31", "2020-01-15", 30.0)]), me)
+    assert firm["company_shares_compustat_m"].iloc[0] == 60.0
+    u = pd.DataFrame({"date": MONTHS, "permno": 1, "permco": 10, "company_shares_crsp_m": 40.0,
+                      "company_main_prc": 10.0, "company_mkt_cap_musd": 400.0, "company_has_adr": False,
+                      "ticker": "T", "security_name": "N", "n_share_classes": 1})
+    out, audit = s07.add_company_cap(u, firm)
+    assert out["company_mkt_cap_musd"].tolist() == [400.0, 400.0, 600.0, 600.0, 600.0, 600.0]
+    assert out["company_mkt_cap_crsp_musd"].eq(400.0).all()
+    a = audit.set_index("permco").loc[10]
+    assert a["months_above_5pct"] == 6 and a["months_used"] == 4 and a["months_waiting"] == 2

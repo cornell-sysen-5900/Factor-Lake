@@ -426,8 +426,8 @@ FILES["estimates_consensus.parquet"] = {
         "anndats_act": ("announcement date of the actual", DATE, IBES),
         "price_statpers": ("CRSP price on statpers (last trading day, at most 7 days earlier)", PS, CIZ),
         "cfacpr_statpers": ("CRSP cfacpr on that day", X, CIZ),
-        "cfacpr_last": ("the permno's last CRSP cfacpr", X, CIZ),
-        "crsp_basis_factor": ("cfacpr_statpers / cfacpr_last: per-share value x this = on the CRSP basis at "
+        "crsp_basis_factor": ("cfacpr_statpers / the permno's last cfacpr (1 in CIZ, so equal to "
+                              "cfacpr_statpers): per-share value x this = on the CRSP basis at "
                               "statpers", X, DERIVED),
         "suspect_total": ("a total (SAL, EBT, EBI, CPX) more than 100x both its previous and next estimate; its "
                           "values are NaN", FLAG, DERIVED),
