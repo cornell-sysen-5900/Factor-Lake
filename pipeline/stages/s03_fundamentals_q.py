@@ -25,7 +25,8 @@ import pandas as pd
 from pipeline.checks import PASS, WARN, Check, check, vs_last_run
 from pipeline.config import (COVERAGE_TOLERANCE, GICS_INDUSTRIES, GICS_SECTORS, LAST_RUN_COVERAGE_2015,
                              PRICE_BASED_FACTORS, PRICE_FLOOR, REPORT_LAG_DAYS_Q, REPORT_LAG_DAYS_Q4,
-                             SUE_HISTORY_QUARTERS, SUE_MIN_HISTORY, TAX_RATE_RANGE, YTD_ITEMS, DataPaths)
+                             MIN_SUE_STD, MIN_TTM_CAPEX_MUSD, MIN_TTM_SALES_MUSD, SUE_HISTORY_QUARTERS,
+                             SUE_MIN_HISTORY, TAX_RATE_RANGE, YTD_ITEMS, DataPaths)
 from pipeline.outputs import fresh_stage_dir, table_info, write_parquet, write_summary
 
 STAGE = "s03_fundamentals_q"
@@ -159,18 +160,20 @@ def add_factors(fq: pd.DataFrame, qs: Quarters) -> tuple[pd.DataFrame, dict]:
     f["f_accruals_to_assets"] = (fq["ni_ttm"] - fq["oancf_ttm"]) / fq["atq"]
     f["f_leverage"] = fq["total_debt"] / fq["atq"]
     f["f_current_ratio"] = fq["actq"] / fq["lctq"].where(fq["lctq"] > 0)
-    f["f_rd_to_sales"] = fq["xrd_ttm"].fillna(0) / fq["revenue_ttm"].where(fq["revenue_ttm"] > 0)
+    # near-zero denominators give meaningless ratios: TTM sales and capex need $1M, the SUE std $0.01
+    f["f_rd_to_sales"] = fq["xrd_ttm"].fillna(0) / fq["revenue_ttm"].where(fq["revenue_ttm"] >= MIN_TTM_SALES_MUSD)
     atq4, sale4, capx4 = qs.lag(fq["atq"], 4), qs.lag(fq["revenue_ttm"], 4), qs.lag(fq["capx_ttm"], 4)
     f["f_asset_growth_1yr"] = fq["atq"] / atq4 - 1
-    f["f_sales_growth_1yr"] = fq["revenue_ttm"] / np.where(sale4 > 0, sale4, np.nan) - 1
-    f["f_capex_growth_1yr"] = fq["capx_ttm"] / np.where(capx4 > 0, capx4, np.nan) - 1
+    f["f_sales_growth_1yr"] = fq["revenue_ttm"] / np.where(sale4 >= MIN_TTM_SALES_MUSD, sale4, np.nan) - 1
+    f["f_capex_growth_1yr"] = fq["capx_ttm"] / np.where(capx4 >= MIN_TTM_CAPEX_MUSD, capx4, np.nan) - 1
     with np.errstate(divide="ignore", invalid="ignore"):
         f["f_net_share_issuance"] = np.log(fq["csho_adj"] / qs.lag(fq["csho_adj"], 4))
     # SUE: change in split-adjusted EPS vs 4 quarters earlier / std of the previous 8 such changes
     eps = fq["epspxq"] / fq["ajexq"]
     d_eps = eps - qs.lag(eps, 4)
     hist = pd.DataFrame({k: qs.lag(d_eps, k) for k in range(1, SUE_HISTORY_QUARTERS + 1)}, index=fq.index)
-    f["f_sue"] = d_eps / hist.std(axis=1).where(hist.notna().sum(axis=1) >= SUE_MIN_HISTORY)
+    std = hist.std(axis=1)
+    f["f_sue"] = d_eps / std.where((hist.notna().sum(axis=1) >= SUE_MIN_HISTORY) & (std >= MIN_SUE_STD))
     f = f.replace([np.inf, -np.inf], np.nan)
 
     bad = {"f_sales_growth_1yr": f["f_sales_growth_1yr"] < -1, "f_capex_growth_1yr": f["f_capex_growth_1yr"] < -1,

@@ -12,9 +12,11 @@ Rules (pipeline/PLAN.md, s04_fundamentals_a):
     2. report_date = rdq of the quarterly Q4 row with the same gvkey and fiscal year, else datadate + 90 days
     3. changes and growth only vs exactly fyear - 1
     4. interest expense = xint, else xintd; never filled with 0 (decision 13)
-    5. tax rate = txt / pi when pi > 0, clipped to 0-60%; FCFF = EBIT x (1 - tax rate) + D&A - capex - change in
-       NWC, missing if any part is missing
-    6. own table: not merged into the monthly panel (decision 6)
+    5. tax_rate = txt / pi when pi > 0, clipped to 0-60% (the reported effective rate); tax_rate_fcff = tax_rate,
+       or 0% when pi <= 0 (no tax on a loss); FCFF = EBIT x (1 - tax_rate_fcff) + D&A - capex - change in NWC,
+       missing if any part is missing; statutory_tax_rate 35% up to fiscal 2017, 21% from 2018
+    6. dcf_applicable = False for GICS sectors 40 (Financials) and 60 (Real Estate)
+    7. own table: not merged into the monthly panel (decision 6)
 """
 
 from __future__ import annotations
@@ -23,7 +25,8 @@ import numpy as np
 import pandas as pd
 
 from pipeline.checks import PASS, WARN, Check, check
-from pipeline.config import GICS_INDUSTRIES, GICS_SECTORS, REPORT_LAG_DAYS_ANNUAL, TAX_RATE_RANGE, DataPaths
+from pipeline.config import (DCF_EXCLUDED_SECTORS, GICS_INDUSTRIES, GICS_SECTORS, REPORT_LAG_DAYS_ANNUAL,
+                             STATUTORY_TAX_RATE, STATUTORY_TAX_RATE_FROM_2018, TAX_RATE_RANGE, DataPaths)
 from pipeline.outputs import fresh_stage_dir, table_info, write_parquet, write_summary
 from pipeline.stages.s03_fundamentals_q import OUTPUT as QUARTERLY_OUTPUT
 from pipeline.stages.s03_fundamentals_q import STAGE as QUARTERLY_STAGE
@@ -32,14 +35,14 @@ STAGE = "s04_fundamentals_a"
 RAW_FILE = "fundamentals_annual_raw.csv"
 OUTPUT = "dcf_inputs_annual.parquet"
 _TEXT = ("gvkey", "tic", "conm", "indfmt", "consol", "popsrc", "datafmt", "curcd", "costat")
-FCFF_PARTS = ("ebit", "tax_rate", "da", "capex", "d_nwc")
+FCFF_PARTS = ("ebit", "tax_rate_fcff", "da", "capex", "d_nwc")
 BLOCKS = ("revenue", "ebitda", "ebit", "da", "capex", "oancf", "pretax_income", "taxes", "tax_rate",
-          "interest_expense", "net_income", "nwc", "d_nwc", "total_debt", "cash", "net_debt", "preferred",
+          "tax_rate_fcff", "statutory_tax_rate", "interest_expense", "net_income", "nwc", "d_nwc", "total_debt", "cash", "net_debt", "preferred",
           "minority_interest", "diluted_shares", "basic_shares", "book_equity", "dividends", "dividends_total",
           "buybacks", "share_issuance", "fcff", "revenue_growth", "ebitda_growth")
 ID_COLS = ("permno", "gvkey", "tic", "conm", "fyear", "fyr", "period_end", "report_date", "report_date_source",
            "curcd", "is_usd", "ajex", "price_fye", "epsfx", "emp", "sich", "gsector", "gsector_name", "ggroup",
-           "gind", "gind_name", "gsubind", "naics", "interest_source")
+           "gind", "gind_name", "gsubind", "naics", "dcf_applicable", "interest_source")
 
 
 def load_annual(path) -> pd.DataFrame:
@@ -93,6 +96,9 @@ def add_blocks(fa: pd.DataFrame) -> pd.DataFrame:
     fa["pretax_income"], fa["taxes"] = fa["pi"], fa["txt"]
     lo, hi = TAX_RATE_RANGE
     fa["tax_rate"] = (fa["txt"] / fa["pi"]).where(fa["pi"] > 0).clip(lo, hi)
+    fa["tax_rate_fcff"] = fa["tax_rate"].where(~(fa["pi"] <= 0), 0.0)            # no tax on a loss
+    fa["statutory_tax_rate"] = np.where(fa["fyear"] <= max(STATUTORY_TAX_RATE), STATUTORY_TAX_RATE[2017],
+                                        STATUTORY_TAX_RATE_FROM_2018)
     fa["interest_expense"] = fa["xint"].fillna(fa["xintd"])                     # never 0-filled
     fa["interest_source"] = np.select([fa["xint"].notna(), fa["xintd"].notna()], ["xint", "xintd"], "missing")
     fa["total_debt"] = fa["dltt"].fillna(0) + fa["dlc"].fillna(0)
@@ -108,7 +114,7 @@ def add_blocks(fa: pd.DataFrame) -> pd.DataFrame:
     fa["dividends"], fa["dividends_total"] = fa["dvc"], fa["dv"]
     fa["buybacks"], fa["share_issuance"] = fa["prstkc"], fa["sstk"]
     # FCFF; NaN arithmetic leaves it missing when any part is missing
-    fa["fcff"] = fa["ebit"] * (1 - fa["tax_rate"]) + fa["da"] - fa["capex"] - fa["d_nwc"]
+    fa["fcff"] = fa["ebit"] * (1 - fa["tax_rate_fcff"]) + fa["da"] - fa["capex"] - fa["d_nwc"]
     prev_rev, prev_ebitda = previous_year(fa, fa["revenue"]), previous_year(fa, fa["ebitda"])
     fa["revenue_growth"] = fa["revenue"] / np.where(prev_rev > 0, prev_rev, np.nan) - 1
     fa["ebitda_growth"] = fa["ebitda"] / np.where(prev_ebitda > 0, prev_ebitda, np.nan) - 1
@@ -119,6 +125,7 @@ def add_blocks(fa: pd.DataFrame) -> pd.DataFrame:
         fa[c] = pd.to_numeric(fa[c], errors="coerce").astype("Int64")
     fa["gsector_name"] = fa["gsector"].map(GICS_SECTORS).astype(object)
     fa["gind_name"] = fa["gind"].map(GICS_INDUSTRIES).astype(object)
+    fa["dcf_applicable"] = ~fa["gsector"].isin(DCF_EXCLUDED_SECTORS).fillna(False).astype(bool)
     return fa
 
 
@@ -152,8 +159,9 @@ def run_checks(fa: pd.DataFrame, quarterly: pd.DataFrame, info: dict) -> list[Ch
     m = m.dropna(subset=["revenue", "revenue_ttm"])
     m = m[m["revenue"].abs() > 1]                               # $1m floor: tiny revenues give noisy ratios
     close = float((np.abs(m["revenue_ttm"] / m["revenue"] - 1) <= 0.01).mean()) if len(m) else 1.0
-    checks.append(check("annual revenue within 1% of the quarterly TTM for at least 95% of matched years",
-                        close >= 0.95, f"{close:.1%} of {len(m):,}", level=WARN))
+    checks.append(check("annual revenue within 1% of the quarterly TTM for at least 90% of matched years "
+                        "(informational: restatements change annual figures)", close >= 0.90,
+                        f"{close:.1%} of {len(m):,}", level=WARN))
     return checks
 
 
@@ -169,11 +177,16 @@ def run(paths: DataPaths) -> dict:
              "interest_source": fa["interest_source"].value_counts().to_dict(),
              "odd_values": {"capex_negative": int((fa["capex"] < 0).sum()),
                             "revenue_negative": int((fa["revenue"] < 0).sum())},
-             "coverage": {c: round(float(fa[c].notna().mean()), 4) for c in BLOCKS}}
+             "coverage": {c: round(float(fa[c].notna().mean()), 4) for c in BLOCKS},
+             "dcf_applicable_rows": int(fa["dcf_applicable"].sum()),
+             "fcff_coverage_dcf_applicable": round(float(fa.loc[fa["dcf_applicable"], "fcff"].notna().mean()), 4),
+             "fcff_parts_missing_dcf_applicable": {c: round(float(fa.loc[fa["dcf_applicable"], c].isna().mean()), 4)
+                                                  for c in FCFF_PARTS}}
     summary = write_summary(out, STAGE, {OUTPUT: table_info(fa, "period_end", list(BLOCKS))}, checks, extra)
     print(f"  {len(fa):,} fiscal years, {fa['permno'].nunique():,} permnos | report date: "
           f"{extra['report_date_source']} | interest: {extra['interest_source']} | "
-          f"FCFF for {extra['coverage']['fcff']:.0%}")
+          f"FCFF for {extra['coverage']['fcff']:.0%} of all, {extra['fcff_coverage_dcf_applicable']:.0%} of "
+          f"{extra['dcf_applicable_rows']:,} DCF-applicable years")
     for c in checks:
         if c.status != PASS:
             print(f"  {c.status}  {c.name}: {c.detail}")

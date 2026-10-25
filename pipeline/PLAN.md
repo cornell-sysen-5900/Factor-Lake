@@ -1,6 +1,6 @@
 # WRDS pipeline plan
 
-The plan for stages s01 to s08. s00 to s04 are implemented (phases 2a and 2b); s05 to s08 are not written yet.
+The plan for stages s01 to s08. s00 to s06 are implemented (phases 2a to 2c); s07 and s08 are not written yet.
 [Final outputs](#final-outputs) is what the pipeline must deliver; every stage builds toward it. The review
 answers are in [Decisions](#decisions) and are written into the stage rules below.
 
@@ -18,13 +18,13 @@ and multiple is a raw value; the app z-scores or ranks at each rebalance.
 | returns_monthly.parquet | stock, month, for every permno in permno_list.txt, also after it leaves the index | month_end, permno, ret_m (includes delisting returns), delisted_in_month, delist_ret_filled, trading_days | s02 | backtest holding returns, delisting handling |
 | prices_daily/year=YYYY/data.parquet | stock, trading day | date, permno, ticker, prc, prc_adj, cfacpr, ret, vol, shrout, mkt_cap, mkt_cap_musd, is_delisting_row | s02 | daily data loader (`src/s3_client.py`), sub-annual rebalancing, Data Viewer |
 | **Market** | | | | |
-| market_daily.parquet, market_monthly.parquet | trading day / month | r2000_price_ret, r2000_growth_price_ret, r2000_value_price_ret, iwm_total_ret, iwo_total_ret, iwn_total_ret, mktrf, smb, hml, rmw, cma, umd, rf, ust_10y, tbill_3m, moodys_baa, moodys_aaa (decimals), yields_filled | s06 | benchmarks, performance metrics (risk-free rate), betas, DCF discount rates |
+| market_daily.parquet, market_monthly.parquet | trading day / month | r2000_price_ret, r2000_growth_price_ret, r2000_value_price_ret, iwm_total_ret, iwo_total_ret, iwn_total_ret, mktrf, smb, hml, rmw, cma, umd, rf, ust_10y, tbill_3m, moodys_baa, moodys_aaa (decimals), term_spread, credit_spread, was_filled (daily) | s06 | benchmarks, performance metrics (risk-free rate), betas, DCF discount rates |
 | **Relative value** | | | | |
 | rv_multiples_monthly.parquet | index member, month end | date, permno, gind, prc, mkt_cap_musd, ev_musd, pe_ttm, pb, ps, ev_ebitda, ev_ebit, ev_sales, fcf_yield, dividend_yield, pe_fy1, pe_fy2, ev_ebitda_fy1, ev_sales_fy1, ltg, peg, and `<multiple>_pct_gind` (percentile rank within the GICS industry that month) | s07 | RV screen |
 | rv_peer_stats_monthly.parquet | gind, month end | date, gind, gind_name, n_peers, `<multiple>_p25`, `<multiple>_p50`, `<multiple>_p75` | s07 | RV peer comparison |
 | **DCF** | | | | |
-| dcf_inputs_annual.parquet | company, fiscal year | permno, gvkey, fyear, period_end, report_date (Q4 rdq rule), revenue, ebitda, ebit, da, capex, d_nwc, tax_rate, interest_expense, interest_source, total_debt, cash, net_debt, diluted_shares, fcff | s04 | DCF valuation |
-| estimates_consensus.parquet | permno, statpers, measure, fpi | permno, ibes_ticker, statpers, measure (EPS, SAL, EBT, EBI, CPX, CPS, DPS), fpi (0-3), fpedats, numest, numup, numdown, meanest, medest, stdev (USD only) | s05 | DCF forecasts, forward multiples |
+| dcf_inputs_annual.parquet | company, fiscal year | permno, gvkey, fyear, period_end, report_date (Q4 rdq rule), revenue, ebitda, ebit, da, capex, oancf, d_nwc, tax_rate, tax_rate_fcff, statutory_tax_rate, interest_expense, interest_source, total_debt, cash, net_debt, preferred, minority_interest, diluted_shares, basic_shares, book_equity, dividends, buybacks, share_issuance, fcff, revenue_growth, ebitda_growth, GICS codes, dcf_applicable | s04 | DCF valuation |
+| estimates_consensus.parquet | permno, statpers, measure, fpi | permno, ibes_ticker, statpers, measure (EPS, SAL, EBT, EBI, CPX, CPS, DPS), fpi (0-3), fpedats, numest, numup, numdown, meanest, medest, stdev, highest, lowest, actual, anndats_act (USD only), price_statpers, cfacpr_statpers, cfacpr_last, crsp_basis_factor, suspect_total | s05 | DCF forecasts, forward multiples |
 | **Reference** | | | | |
 | fundamentals_quarterly.parquet | permno, fiscal quarter | full quarterly statements, building blocks and the quarter-end factors | s03 | Data Viewer, factor research |
 | security_master.parquet | permno | permno, permco, gvkey, ibes_ticker, ticker, security_name (latest), gsector, gsector_name, ggroup, gind, gind_name, gsubind, siccd, first_date, last_date | s07 | ticker and name lookup, holdings table |
@@ -51,7 +51,7 @@ cite them. "Last run" numbers are the notebook's; they become the expected value
 
 ## Decisions
 
-Decisions 1-10 are from the first review, 11-15 from the second (both 2026-10-25).
+Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the fourth (all 2026-10-25).
 
 | # | decision | where |
 |---|---|---|
@@ -69,7 +69,12 @@ Decisions 1-10 are from the first review, 11-15 from the second (both 2026-10-25
 | 12 | Missing share classes: s07 compares the company market cap from our permnos with all permnos sharing a permco, by year, and flags a gap above 1% of total universe market cap in any year. No new pull now. | s07 checks |
 | 13 | Interest expense is never filled with 0. The DCF uses annual xint, else xintd; where both are missing, the cost of debt falls back to the FRED Baa yield. | s03, s04 rule 6 |
 | 14 | Prices below $0.01: price-based ratios are missing for those rows, and the rows are counted. | s03 rule 5, s07 rule 5 |
-| 15 | IBES forward E/P uses the price on the same restated basis as the estimate; its 0.1% and 99.9% values are reported as a check. | s05 rule 8 |
+| 15 | IBES forward E/P uses the price on the same restated basis as the estimate; its 0.1% and 99.9% values are reported as a check. | s05 rule 7, s07 rule 8 |
+| 16 | GICS industry 601020 = Real Estate Management & Development (code used 2016-2023, renumbered 602010 in 2023), sector 60. | config.GICS_INDUSTRIES |
+| 17 | FCFF uses tax_rate_fcff: the effective tax rate, or 0% when pretax income <= 0 (no tax on a loss); tax_rate stays the reported effective rate. s04 adds statutory_tax_rate (35% up to fiscal 2017, 21% from 2018) and dcf_applicable (False for GICS sectors 40 Financials and 60 Real Estate). | s04 rules 5-6 |
+| 18 | Near-zero denominators in s03: f_sales_growth_1yr needs prior TTM sales >= $1M, f_rd_to_sales current TTM sales >= $1M, f_capex_growth_1yr prior TTM capex >= $1M, f_sue a std of EPS changes >= $0.01; otherwise NaN. | s03 rule 7 |
+| 19 | The s04 annual vs quarterly revenue check is informational, threshold 90%. | s04 checks |
+| 20 | s05 outputs estimates_consensus with the CRSP basis factor (the analyst factors move to s07); s06 is renamed s06_market and adds term and credit spreads and holiday-filled yields. | s05, s06 |
 
 ## What s00 found in raw/
 
@@ -246,8 +251,8 @@ row per permno per fiscal quarter:
   `proxy`), rdq, fyearq, fqtr, curcdq, is_usd, ajexq.
 - **Industry (decision 4):** gsector, gsector_name, ggroup, gind, gind_name, gsubind, naics. Names come from the
   GICS tables in config. Compustat's GICS is each company's latest classification, so inactive companies keep
-  discontinued codes (e.g. 254010 Media before 2018, 404020 REITs before 2016); they keep their last name. Code
-  601020 (86 rows) has no name yet (WARN).
+  discontinued codes (e.g. 254010 Media before 2018, 404020 REITs before 2016, 601020 Real Estate Management &
+  Development 2016-2023); they keep their last name.
 - **Quarter-end market data:** price_qe (prccq), cshoq, mkt_cap_qe_musd (prccq x cshoq; missing for non-USD rows).
 - **As reported:** balance sheet (atq, ltq, actq, lctq, cheq, invtq, rectq, apq, ppentq, gdwlq, intanq, dlcq,
   dlttq, pstkq, mibtq, seqq, ceqq, txditcq), income (saleq, revtq, cogsq, xsgaq, xrdq, oibdpq, dpq, oiadpq, xintq,
@@ -291,12 +296,18 @@ row per permno per fiscal quarter:
    atq 1).
 6. **Non-USD rows** (402 rows, 19 permnos; decision 2) and **prices below $0.01** (24 rows; decision 14): the 5
    price-based factors are missing; non-USD rows also have no mkt_cap_qe_musd. Statement ratios are kept.
+7. **Near-zero denominators** (decision 18): f_sales_growth_1yr needs prior TTM sales >= $1M, f_rd_to_sales
+   current TTM sales >= $1M, f_capex_growth_1yr prior TTM capex >= $1M, f_sue a std of the previous 8 EPS
+   changes >= $0.01. Before -> after (all rows): sales growth mean 1.31 -> 0.20 (p99 4.18 -> 2.64), R&D to sales
+   10.4 -> 0.48 (p99 46.1 -> 9.40), capex growth 4.3e12 -> 0.26 (p99 10.9 -> 4.53), SUE -9.6e10 -> -1,096
+   (p1/p99 unchanged at -7.4/4.7). Capex growth coverage 2015+ drops from 78% to 66%. SUE keeps a few huge
+   values (min -2.2e8) from huge EPS changes, not from the denominator.
 
 **Checks:** unique (permno, fyearq, fqtr) (FAIL); duplicates and rows vs the notebook rerun (WARN); report_date
 on or after period_end (WARN); rdq proxy at most 2% (WARN); no price-based ratio on non-USD or sub-$0.01 rows
 (FAIL); ajexq > 0 (FAIL); tax rate within 0-60% (FAIL); interest_ttm present exactly where all 4 xintq are
 (FAIL); revenue_ttm equals an independent sum of 4 fiscal quarters for 200 random rows (FAIL); factor coverage
-2015+ within 5 points of the notebook (WARN); every gind has a name (WARN). The summary has count / missing % /
+2015+ within 5 points of the notebook (WARN; capex growth expected at 66% since decision 18); every gind has a name (WARN). The summary has count / missing % /
 mean / p1 / p50 / p99 for every factor and building block, and coverage overall and for 2015+.
 
 **Tests:** a missing quarter makes every TTM window that needs it missing; interest never 0-filled; YTD to
@@ -333,115 +344,127 @@ permno per fiscal year:
    growth need a positive previous value.
 4. **Interest expense** (decision 13): xint, else xintd, never 0-filled. `interest_source` = xint (54,069) /
    xintd (2,019) / missing (9,271). Where it is missing, the DCF's cost of debt falls back to the FRED Baa yield.
-5. tax_rate = txt / pi, only when pi > 0, clipped to 0-60% (as s03). nwc = (act - che) - (lct - dlc); total debt,
-   cash, net debt and book equity as in s03.
-6. **fcff** = ebit x (1 - tax_rate) + da - capex - d_nwc, missing if any part is missing. Today 40% of fiscal
-   years have one: tax_rate is missing in loss years (37.8%) and d_nwc in first years, after gaps and for banks
-   without current assets (30.1%). See open question 1.
+5. tax_rate = txt / pi, only when pi > 0, clipped to 0-60% (as s03; the reported effective rate).
+   **tax_rate_fcff** = tax_rate, or 0% when pi <= 0 (no tax on a loss; decision 17). statutory_tax_rate = 35%
+   for fiscal years up to 2017, 21% from 2018. nwc = (act - che) - (lct - dlc); total debt, cash, net debt and
+   book equity as in s03.
+6. **fcff** = ebit x (1 - tax_rate_fcff) + da - capex - d_nwc, missing if any part is missing.
+   **dcf_applicable** = False for GICS sectors 40 (Financials) and 60 (Real Estate), else True (50,063 of 65,359
+   years). FCFF coverage: 40% of all years with the reported tax rate, now 70% of all years and 89% of
+   DCF-applicable years; the rest misses d_nwc (first years and gaps) or D&A.
 7. **Own table** (decision 6): not merged into the monthly panel. DCF code joins it by permno with report_date <=
    the valuation date.
 
 **Checks:** unique (permno, fyear) (FAIL); report_date on or after period_end (WARN); proxy report dates at most
 10% (WARN); tax rate within 0-60% (FAIL); interest never filled where xint and xintd are missing (FAIL); FCFF
 present exactly when all its parts are (FAIL); annual revenue within 1% of the quarterly TTM at the matching Q4
-for at least 95% of years (WARN; 94.8% today, 96.9% within 5%: mostly restatements, since Compustat restates
-annual figures and keeps quarters as first reported). The summary has the count / missing % / mean / p1 / p50 /
+for at least 90% of years (informational, decision 19; 94.8% today, 96.9% within 5%: mostly restatements, since
+Compustat restates annual figures and keeps quarters as first reported). The summary has the count / missing % / mean / p1 / p50 /
 p99 of every column, the report date and interest source counts, and coverage.
 
 **Tests:** report date from the matching Q4 rdq, proxy when the Q4 ends on another date or is missing; FCFF against
-a hand value and missing when a part is missing; changes only vs exactly the previous fiscal year; interest xint,
+a hand value and missing when a part is missing; 0% tax in a loss year; statutory rate and dcf_applicable; changes only vs exactly the previous fiscal year; interest xint,
 then xintd, never 0; tax rate rule; duplicate years keep the most complete row; an end-to-end run.
 
 ## s05_ibes
 
 **Inputs:** `raw/forward_estimates.csv` (1.1 GB, needed columns only), `raw/crsp_ibes_link.csv`,
 `processed/s01_membership/snapshots.parquet` (our permnos), `processed/s02_prices/daily/` (date, permno, prc,
-cfacpr).
+cfacpr), `raw/query_inputs/ibes_tickers.txt` (only to compare).
 
 **Outputs** (`processed/s05_ibes/`):
 
 | file | one row per | columns |
 |---|---|---|
-| link.parquet | link | ibes_ticker, permno, ncusip, sdate, edate, edate_used, score |
-| ibes_tickers.txt | IBES ticker | the upload list for query 10 |
-| consensus.parquet | permno, statpers, measure, fpi | the full consensus table (decision 5): all 7 measures, FPI 0-3. permno, ibes_ticker, statpers, measure, fpi, fiscalp, fpedats, numest, numup, numdown, meanest, medest, stdev, highest, lowest, price, price_ibes_basis, suspect_total |
-| actuals.parquet | permno, measure, fpedats | permno, ibes_ticker, measure, fpedats, actual, anndats_act (future information at statpers: never for selection) |
-| factors.parquet | permno, statpers | permno, ibes_ticker, statpers, fpedats, numest, f_forward_ep, f_eps_revision, f_eps_dispersion, f_analyst_surprise, surprise_anndats, surprise_fpedats, f_ltg |
+| estimates_consensus.parquet | permno, statpers, measure, fpi | permno, ibes_ticker, statpers, measure, fpi, fpedats, numest, numup, numdown, meanest, medest, stdev, highest, lowest, actual, anndats_act, price_statpers, cfacpr_statpers, cfacpr_last, crsp_basis_factor, suspect_total |
+| link.parquet | link | ticker, permno, ncusip, sdate, edate, edate_used, score |
+| ibes_tickers.txt | IBES ticker | the upload list for query 10 (decision 7) |
+
+`actual` and `anndats_act` are future information at statpers: s07 may use an actual only when anndats_act <= t.
 
 **Rules:**
-1. Link (ported): scores 1-2, our permnos only, each permno's latest link treated as open-ended because WRDS ends
-   active links at the table's last update (2025-12-31) (H2). The link step runs first and writes
-   ibes_tickers.txt to processed/ only (decision 7), even when forward_estimates.csv is missing (then the stage
-   FAILs with "run query 10").
-2. Keep FPI 0-3 (FY4 is not used, decision 1) and CURCODE = USD. Drop duplicate (ticker, statpers, measure, fpi)
-   rows (H2), keeping the row with the most
-   estimates, then the first (1,796 today). If IBES gives two different actuals for one (ticker, measure,
-   fpedats), the actual is not used.
-3. Attach permno when sdate <= statpers <= edate_used. A permno-statpers with two tickers is dropped.
-4. Price = CRSP price on statpers or the last trading day before, at most 7 days earlier.
-5. **Share basis:** IBES adjusted values are restated in today's shares; CRSP prices are not.
-   `price_ibes_basis = price x cfacpr_last / cfacpr_t` (ported; 18.5% of EPS rows restated last run). This applies
-   to the per-share measures (EPS, CPS, DPS). SAL, EBT, EBI, CPX are totals ($ millions; FY1 medians today:
-   SAL 408, EBT 97, EBI 55, CPX 25) and need no share adjustment. Per-share values in the thousands of dollars
-   (0.5% of rows) are old estimates restated for later reverse splits. They are kept, because `price_ibes_basis`
-   is restated the same way.
-6. FPI 0 (fiscalp LTG) is a long-term growth rate in percent (EPS median 13.8); stored as a decimal (/100).
-   Values beyond ±100% (4,360 rows) are kept and counted.
-7. **Suspect totals:** a SAL, EBT, EBI or CPX mean estimate more than 100 times the median of the same ticker,
-   measure and FPI is set to NaN and flagged `suspect_total` (the 3 Air Transport Services SAL rows of 2023).
-8. Factors at statpers (EPS FY1, ported). **f_forward_ep uses the price on the same restated basis as the estimate**
-   (decision 15): f_forward_ep = meanest / price_ibes_basis; its 0.1% and 99.9% values are reported in the
-   summary as a check. f_eps_revision = (numup -
-   numdown) / numest; f_eps_dispersion = stdev / |meanest| (NaN if meanest = 0); f_analyst_surprise = (actual -
-   last consensus before the announcement) / price at that consensus, from the latest announcement on or before
-   statpers, never an older one as fallback, later fiscal year wins on the same day. Added: f_ltg = EPS FPI 0
-   meanest / 100. The other analyst yields need month-end market cap and EV, so s07 computes them from
-   consensus.parquet (s07 rule 8).
+1. Keep CURCODE = USD (27,133 rows dropped) and FPI 0-3 (decision 1).
+2. If IBES gives two different actuals for one (ticker, measure, fpedats), the actual is blanked (not trusted for
+   surprises; ported).
+3. Duplicate (ticker, statpers, measure, fpi) rows: keep the one with more analysts (numest), then the first in the
+   file (634 dropped).
+4. **Link** (ported): crsp_ibes_link.csv with scores 1-2, our permnos only; a row gets a permno when sdate <=
+   statpers <= edate. Each permno's latest link (latest sdate) is open-ended past its edate, because WRDS ends active
+   links at the table's last update (2025-12-31) (H2). If two tickers give the same permno, statpers, measure and
+   fpi, the better link (score 1) wins, then more analysts (0 cases today). One IBES ticker can link to two
+   permnos (share classes), so there are slightly more linked rows (10,061,304) than raw rows.
+5. **Units:** SAL, EBT, EBI, CPX are totals in $ millions; EPS, CPS, DPS are $ per share; FPI 0 (long-term
+   growth) is converted from percent to decimal (meanest, medest, stdev, highest, lowest / 100).
+6. **100x rule:** a SAL, EBT, EBI or CPX mean estimate (FPI 1-3) above 100 times the ticker's own median for that
+   measure is set to NaN (all 5 values) and flagged `suspect_total`. See open question 1: today it flags 6,494
+   rows, mostly real pre-revenue companies.
+7. **Share basis.** CRSP's cumulative price factor `cfacpr` falls at each split (GameStop's 4-for-1 on 2022-07-22:
+   4.05 before, 1.01 after) and is 1.0 at the end of the data, so `prc / cfacpr` is a price in end-of-data shares.
+   IBES summary values are restated to the latest share basis too (GameStop's FY1 EPS on 2022-07-14, before the
+   split, is -0.92, a post-split number). So:
+   - `cfacpr_statpers` = CRSP cfacpr on the last trading day with a price on or before statpers (at most 7 days
+     earlier), `price_statpers` = that day's price; `cfacpr_last` = the permno's last cfacpr in the data.
+   - `crsp_basis_factor` = cfacpr_statpers / cfacpr_last. **An IBES per-share value x crsp_basis_factor is in
+     statpers shares**, the same basis as price_statpers. Equivalently, price_statpers / crsp_basis_factor is the
+     price on the IBES basis (the notebook's `price_ibes_basis`).
+   - At a month end t in s07: per-share estimate on the basis of prc(t) = meanest x cfacpr(t) / cfacpr_last.
+     Forward E/P = meanest x cfacpr(t) / cfacpr_last / prc(t). Totals need no factor.
+   - Caveat: cfacpr_last is CRSP's last day (2026-09-30), IBES's basis is its pull date. A split between the two
+     would be missed; pull both together.
+8. The analyst factors (forward E/P, revision, dispersion, surprise, and the yields of decision 5) are computed in
+   s07 from this table, at the month end, so they use the month-end price and market cap (decision 15 included).
 
-**Checks:** rows by measure and fpi after filters; only FPI 0-3 (FAIL on any other); every measure in config
-present (FAIL); suspect totals counted (WARN; 3 today); per-share |meanest| above $1,000 counted (WARN; 0.5%);
-permnos linked vs ours (last run 5,751 of 5,918 for EPS FY1); price found for 90%+ of EPS
-FY1 rows (WARN; 91.6% last run); surprise_anndats <= statpers (FAIL); no actual or anndats_act column in
-consensus or factors (FAIL); ibes_tickers.txt vs raw/query_inputs/ibes_tickers.txt (WARN).
+**Checks:** only USD and FPI 0-3 (FAIL); unique (permno, statpers, measure, fpi) (FAIL); every measure present
+(FAIL); every row inside one of its links' date windows (FAIL); long-term growth in decimals (EPS FPI 0 median
+0.03-0.30) (FAIL); suspect totals under 0.01% (WARN); CRSP price on statpers for 90%+ of EPS FY1 rows (WARN);
+crsp_basis_factor > 0 (FAIL); EPS FY1 rows and permnos vs the notebook rerun (WARN); ibes_tickers.txt vs
+raw/query_inputs (WARN). The summary has rows and coverage by measure and FPI, linked rows and permnos by year, and
+count / missing % / mean / p1 / p50 / p99 of meanest for every measure and FPI.
 
-**Tests:** link window and open-ended latest link; two tickers on one permno-date dropped; `NA` read as a ticker;
-duplicate rows; conflicting actuals give no surprise; a split after statpers restates the price; price older than 7
-days is NaN; surprise appears only after the announcement and never falls back; same-day announcements; LTG
-percent to decimal; totals are not share-adjusted; FPI 4 rows are dropped; a total 100x the ticker's median is
-NaN and flagged.
+**Tests:** USD and FPI filters; duplicates keep more analysts; conflicting actuals blanked; link date windows,
+score filter, our permnos only, the latest link open-ended; two tickers for one permno keep the better link;
+long-term growth to decimals; the 100x rule; crsp_basis_factor across a 4-for-1 split and the 7-day price rule.
 
-## s06_rates_benchmarks
+## s06_market
 
-**Inputs:** `raw/fred_*.csv`, `raw/ff_daily.csv`, `raw/ff_monthly.csv`, `raw/index_close.csv`,
-`raw/benchmark_etfs.csv`, `processed/s02_prices/calendar.parquet`.
+**Inputs:** `raw/index_close.csv`, `raw/benchmark_etfs.csv`, `raw/ff_daily.csv`, `raw/ff_monthly.csv`,
+`raw/fred_DGS10.csv`, `raw/fred_DGS3MO.csv`, `raw/fred_DBAA.csv`, `raw/fred_DAAA.csv`,
+`processed/s02_prices/calendar.parquet` (month ends).
 
-**Outputs** (`processed/s06_rates_benchmarks/`):
+**Outputs** (`processed/s06_market/`, exported as market_daily and market_monthly):
 
 | file | one row per | columns |
 |---|---|---|
-| rates_daily.parquet | FRED date | date, ust_10y, tbill_3m, moodys_baa, moodys_aaa, yields_filled |
-| rates_monthly.parquet | month | month, month_end, the same 4 (last value on or before month_end, at most 7 days old) |
-| benchmarks_daily.parquet | date | date, r2000_price_ret, r2000_growth_price_ret, r2000_value_price_ret, iwm_total_ret, iwn_total_ret, iwo_total_ret, mktrf, smb, hml, rmw, cma, umd, rf |
-| benchmarks_monthly.parquet | month | month, month_end, the same columns |
+| market_daily.parquet | date (trading day or FRED business day, from 2006-12-04) | date, r2000_price_ret, r2000_growth_price_ret, r2000_value_price_ret, iwm_total_ret, iwn_total_ret, iwo_total_ret, mktrf, smb, hml, rmw, cma, umd, rf, ust_10y, tbill_3m, moodys_baa, moodys_aaa, term_spread, credit_spread, was_filled |
+| market_monthly.parquet | month of the CRSP calendar (2007-01 on) | month, month_end, the same return, yield and spread columns |
 
-**Rules:** FRED percent / 100. Holidays (blank FRED days) are forward-filled from the previous value, and
-`yields_filled` = True marks those days, so market_daily has a yield on every row. Fama-French are already
-decimals. Index levels: drop 2012-10-29 and 2012-10-30 (Hurricane Sandy, no CRSP rows), price return from
-consecutive levels; monthly = last level on or before month_end. ETF monthly returns compound the daily returns.
-Monthly Fama-French = the published monthly factors matched by month (dateff). The first month (no prior level) is
-dropped. Each monthly row is that month's return; the panel's ret_next_1m at month t lines up with month t+1.
+**Rules:**
+1. Index levels (Compustat I0124 Russell 2000, I0120 Growth, I0122 Value): 2012-10-29 and 2012-10-30 dropped
+   (Hurricane Sandy, no CRSP rows), so the 2012-10-31 return spans 10-26 to 10-31. Price return from consecutive
+   levels; monthly = the level on the last day <= month_end vs the previous month's.
+2. ETFs (CRSP IWM 88222, IWN 88399, IWO 88401): daily total returns as CRSP gives them; monthly = compounded.
+3. Fama-French: daily as given (decimals); monthly = the published monthly factors, matched by the month of dateff.
+4. FRED: percent / 100. Blank days (bond-market holidays such as Columbus and Veterans Day, when stocks trade) are
+   forward-filled, and `was_filled` = True on those days (219 today). term_spread = ust_10y - tbill_3m,
+   credit_spread = moodys_baa - moodys_aaa. Monthly = the value on the last day <= month_end.
+5. The first month (no previous index level) is dropped. Each monthly row is that month's return; the panel's
+   ret_next_1m at month t lines up with month t+1.
 
-**Checks:** yields within -1% to 25% (FAIL); no blank run longer than 5 business days (WARN); FF daily mean rf
-below 0.001 (FAIL: percent units); IWM total minus Russell 2000 price return 0.5-2.5% a year (WARN; 1.34%
-last run); source end dates reported; benchmark dates covered by the calendar (WARN).
+**Checks:** market-closed days have no index return (FAIL); yields in range: ust_10y 0-6%, tbill_3m -0.5-7%,
+moodys_baa 2-10%, moodys_aaa 1-9% (FAIL); Fama-French daily rf mean below 0.001 (FAIL: units); IWM total minus
+Russell 2000 price return 0.5-2.0% a year (WARN; 1.34% today); published monthly Fama-French within 50 bp of the
+compounded daily factors (WARN; see the phase 2c results: true for mktrf and rf, not for the long-short factors);
+no yield filled for more than 5 days in a row (WARN); every month present (FAIL). The summary has the end date of
+every source, coverage, and count / missing % / mean / p1 / p50 / p99 of every column, daily and monthly.
 
-**Tests:** percent to decimal; month-end as-of with a blank month end; Sandy days dropped; ETF compounding; FF
-matched by month when dateff is not the CRSP month end.
+**Tests:** Sandy days dropped and the next return spans them; percent to decimal; a holiday forward-filled and
+flagged; spreads; first month dropped; ETF and Fama-French monthly compounding; the index monthly return from
+month-end levels; yields at the month end.
 
 ## s07_panel
 
-**Inputs:** s01 snapshots and periods, s02 monthly + calendar + daily (cfacpr, ret), s03 fundamentals_q, s05
-factors and consensus, s06 market_daily and market_monthly (Fama-French market for betas). Not s04: the annual
+**Inputs:** s01 snapshots and periods, s02 monthly + calendar + daily (cfacpr, ret), s03 fundamentals_quarterly,
+s05 estimates_consensus, s06 market_daily and market_monthly (Fama-French market for betas). Not s04: the annual
 statements stay their own table (decision 6).
 
 **Outputs** (`processed/s07_panel/`):
@@ -514,7 +537,8 @@ statements stay their own table (decision 6).
      the notebook's 8 (which had Other, not Materials), and it must become the 11 GICS names.
    - is_fossil_fuel stays SIC-based: SIC 1200-1399, 2900-2999, 4920-4929, 5170-5179.
 8. **Analyst yields at month end** (decision 5), from the consensus with the latest statpers <= t, at most 60 days
-   old, all USD. price_ibes_basis(t) = prc(t) x cfacpr_last / cfacpr(t):
+   old, all USD. Per-share estimates are put on the basis of prc(t) with cfacpr(t) / cfacpr_last (s05 rule 7);
+   price_ibes_basis(t) = prc(t) x cfacpr_last / cfacpr(t) is the same thing seen from the price side:
 
    | column | definition |
    |---|---|
@@ -524,7 +548,10 @@ statements stay their own table (decision 6).
    | f_fy2_ep | EPS FY2 mean / price_ibes_basis(t) |
    | f_ltg | EPS FPI 0 mean / 100 (not price-scaled) |
 
-   The ported f_forward_ep keeps its notebook definition (price at statpers).
+   The ported analyst factors are computed here from estimates_consensus: f_forward_ep = EPS FY1 / price on the
+   IBES basis (at statpers, as the notebook), with its 0.1% and 99.9% values in the summary (decision 15);
+   f_eps_revision, f_eps_dispersion and f_analyst_surprise as in the notebook, using actual only when
+   anndats_act <= t.
 9. **Betas** vs the Fama-French market (mktrf + rf, excess returns on both sides): `beta_252d` from the last 252
    daily returns up to t, `beta_60m` from the last 60 monthly returns up to t. Each needs 80% of the observations
    (202 days, 48 months), else NaN. Delisting returns are included as they occur.
@@ -664,12 +691,31 @@ factors differ on 1,735 factor-rows, all of them a notebook value that is now mi
 (Split-adjusted E/P and dividend yield, the impossible-value rules and the SUE definition were already in the
 archived notebook, so they cause no differences.)
 
+## Phase 2c results (s03, s04 fixes; s05, s06)
+
+s03 PASS, s04 PASS (FCFF for 70% of years, 89% of DCF-applicable years), s05 WARN (59 s; the 100x rule flags
+6,494 rows, see open question 1), s06 WARN (1 s; long-short Fama-French factors vs compounded daily).
+
+- **s05 vs the notebook's IBES FACTORS cell** (rerun unchanged on the same raw files; the notebook keeps EPS FY1
+  only): 683,325 rows and 5,751 permnos in both; every (permno, statpers) key matches, and meanest, medest,
+  stdev, numest, numup, numdown and the ticker are identical on all rows. The USD filter and the open-ended
+  latest link are the same rules in both. The 63 EPS FY1 duplicate groups (126 rows) differ only in `actual`,
+  so keeping the row with more analysts instead of the first gives the same values.
+- **s06 Fama-French check:** mktrf (max 8 bp) and rf (max 11 bp) match their compounded daily values every
+  month. The long-short factors do not always: smb 4 months over 50 bp, hml 11, rmw 5, cma 3, umd 126 (max 759
+  bp). The months line up (same-month correlation 0.96 for umd, 0.997-0.998 for smb and hml, near 0 shifted
+  one month), so this is how Ken French builds the daily factors (daily momentum portfolios are formed
+  differently from the monthly ones), not a data error. The published monthly factors are what market_monthly
+  uses.
+
 ## Open questions
 
-1. **FCFF in loss years.** With the tax rate defined only when pretax income > 0, FCFF is missing in every loss
-   year (37.8% of fiscal years) and covers 40% of years. Setting the tax rate to 0 when pretax income <= 0 (no tax
-   on a loss, the usual DCF convention) would raise FCFF coverage to 70%. Keep the rule, or use 0 in loss years?
-2. **GICS industry 601020** (86 quarterly rows) has no name in the table; I could not confirm what it is.
+1. **The 100x rule flags real companies.** "A total above 100x the ticker's own median for that measure" flags
+   6,494 rows (CPX 3,650, SAL 2,133, EBI 529, EBT 182) for 456 tickers, mostly pre-revenue companies whose sales
+   estimates grow from near zero (Ocugen: median $0.02M, later estimates up to $954M; Endocyte, ImmunityBio) and
+   real capex ramps (Plug Power). Comparing each estimate with the neighbouring estimates of the same ticker,
+   measure and FPI (100x both the previous and next statpers) would flag 204 rows, which look like real
+   glitches. Keep the rule, or switch?
 
 ## Phase 2 order
 

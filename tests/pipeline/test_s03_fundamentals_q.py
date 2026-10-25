@@ -137,3 +137,19 @@ def test_run_writes_output_and_summary(tmp_path):
     status = {c["name"]: c["status"] for c in summary["checks"]}
     assert status["no price-based ratio on non-USD rows or prices below $0.01"] == "PASS"
     assert status["revenue_ttm equals the sum of 4 fiscal quarters (200 random rows)"] == "PASS"
+
+
+def test_near_zero_denominators_give_nan():
+    # prior TTM sales 0.8 (< $1M): no sales growth; prior TTM capex 0.4: no capex growth; current sales 0.8: no R&D ratio
+    raw = quarters(8, saleq=[0.2] * 4 + [5.0] * 4, capxy=[0.1, 0.2, 0.3, 0.4, 2.0, 4.0, 6.0, 8.0], xrdq=1.0)
+    out = built(raw)
+    assert np.isnan(out.loc[(2021, 4), "f_sales_growth_1yr"]) and np.isnan(out.loc[(2021, 4), "f_capex_growth_1yr"])
+    assert np.isnan(out.loc[(2020, 4), "f_rd_to_sales"]) and out.loc[(2021, 4), "f_rd_to_sales"] == pytest.approx(0.2)
+    big = built(quarters(8, saleq=[1.0] * 4 + [5.0] * 4, capxy=[1.0, 2.0, 3.0, 4.0, 2.0, 4.0, 6.0, 8.0]))
+    assert big.loc[(2021, 4), "f_sales_growth_1yr"] == pytest.approx(4.0)
+    assert big.loc[(2021, 4), "f_capex_growth_1yr"] == pytest.approx(1.0)
+
+
+def test_sue_needs_a_std_of_at_least_one_cent():
+    flat = [1.0 + 0.001 * (i % 2) for i in range(16)]          # EPS changes of a tenth of a cent
+    assert built(quarters(16, epspxq=flat))["f_sue"].isna().all()

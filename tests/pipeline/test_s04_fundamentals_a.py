@@ -96,3 +96,20 @@ def test_run_end_to_end(tmp_path):
     assert summary["report_date_source"] == {"q4_rdq": 3}
     assert {c["status"] for c in summary["checks"]} == {"PASS"}
     assert set(s04.BLOCKS) <= set(summary["tables"][s04.OUTPUT]["stats"])
+
+
+def test_fcff_uses_zero_tax_in_loss_years_and_keeps_the_reported_rate():
+    raw = years((2020, 2021), oiadp=-10.0, pi=-12.0, txt=1.0, dp=5.0, capx=3.0, act=[50.0, 60.0], che=0.0,
+                lct=20.0, dlc=0.0)
+    out = built(raw)
+    assert np.isnan(out.loc[2021, "tax_rate"]) and out.loc[2021, "tax_rate_fcff"] == 0.0
+    assert out.loc[2021, "fcff"] == pytest.approx(-10.0 + 5.0 - 3.0 - 10.0)
+
+
+def test_statutory_tax_rate_and_dcf_applicable():
+    raw = pd.concat([years((2017, 2018), permno=1), years((2018,), permno=2, gsector=40),
+                     years((2018,), permno=3, gsector=60), years((2018,), permno=4, gsector=np.nan)], ignore_index=True)
+    out = s04.build(raw, q4())[0].set_index(["permno", "fyear"])
+    assert out.loc[(1, 2017), "statutory_tax_rate"] == 0.35 and out.loc[(1, 2018), "statutory_tax_rate"] == 0.21
+    assert out["dcf_applicable"].to_dict() == {(1, 2017): True, (1, 2018): True, (2, 2018): False, (3, 2018): False,
+                                               (4, 2018): True}

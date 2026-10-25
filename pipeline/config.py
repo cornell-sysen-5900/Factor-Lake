@@ -172,6 +172,8 @@ LAST_RUN = {
     "delisting_fills": 49,
     # notebook FUNDAMENTALS cell rerun on the 2026-10-25 pull (fundamentals_raw.csv was re-pulled with more columns)
     "fundamentals_rows": 257_447, "fundamentals_duplicates": 81,
+    # notebook IBES LINK + IBES FACTORS cells rerun on the 2026-10-25 pull (EPS FY1, USD, linked)
+    "ibes_eps_fy1_rows": 683_325, "ibes_eps_fy1_permnos": 5_751,
 }
 LAST_RUN_TOLERANCE = 0.02
 # Factor coverage (share of rows with a value) for fiscal quarters ending 2015 or later, notebook's last run
@@ -179,7 +181,8 @@ LAST_RUN_COVERAGE_2015 = {
     "f_book_to_price": 0.93, "f_earnings_to_price": 0.95, "f_sales_to_price": 0.95, "f_ebitda_to_ev": 0.86,
     "f_dividend_yield": 0.96, "f_roe": 0.89, "f_roa": 0.95, "f_gross_profitability": 0.85,
     "f_accruals_to_assets": 0.93, "f_leverage": 1.00, "f_current_ratio": 0.78, "f_rd_to_sales": 0.90,
-    "f_asset_growth_1yr": 0.94, "f_sales_growth_1yr": 0.84, "f_capex_growth_1yr": 0.78,
+    # capex growth: 78% in the notebook; 66% since the $1M prior-capex floor (phase 2c)
+    "f_asset_growth_1yr": 0.94, "f_sales_growth_1yr": 0.84, "f_capex_growth_1yr": 0.66,
     "f_net_share_issuance": 0.94, "f_sue": 0.85,
 }
 COVERAGE_TOLERANCE = 0.05
@@ -251,9 +254,24 @@ GICS_INDUSTRIES = {
     601010: "Diversified REITs", 601025: "Industrial REITs", 601030: "Hotel & Resort REITs",
     601040: "Office REITs", 601050: "Health Care REITs", 601060: "Residential REITs", 601070: "Retail REITs",
     601080: "Specialized REITs", 602010: "Real Estate Management & Development",
+    601020: "Real Estate Management & Development (2016-2023 code, renumbered 602010)",
 }
 
+# Near-zero denominators (s03): below these the ratio is missing
+MIN_TTM_SALES_MUSD = 1.0            # f_sales_growth_1yr (prior TTM sales), f_rd_to_sales (current TTM sales)
+MIN_TTM_CAPEX_MUSD = 1.0            # f_capex_growth_1yr (prior TTM capex)
+MIN_SUE_STD = 0.01                  # f_sue: std of the previous 8 EPS changes, $ per share
+
+# DCF (s04)
+STATUTORY_TAX_RATE = {2017: 0.35}   # fiscal years up to 2017: 35%; from 2018 (Tax Cuts and Jobs Act): 21%
+STATUTORY_TAX_RATE_FROM_2018 = 0.21
+DCF_EXCLUDED_SECTORS = (40, 60)     # Financials and Real Estate: FCFF-based DCF does not apply
+
 # IBES
+IBES_PER_SHARE = ("EPS", "CPS", "DPS")          # $ per share, restated by IBES to the latest share basis
+IBES_TOTALS = ("SAL", "EBT", "EBI", "CPX")       # $ millions, no share basis
+IBES_TOTAL_OUTLIER_MULTIPLE = 100               # a total above 100x the ticker's median for that measure is NaN
+IBES_OPEN_LINK_END = "2262-01-01"               # each permno's latest link is open-ended (WRDS ends active links)
 IBES_LINK_SCORES = (1, 2)
 IBES_CURRENCY = "USD"
 IBES_MAX_AGE_DAYS = 60          # panel uses the latest statpers within 60 days of the rebalance date
@@ -261,6 +279,14 @@ PRICE_ASOF_DAYS = 7             # price on a date = last trading day on or befor
 
 # Market closed (Hurricane Sandy) but Compustat has index levels; dropped so returns line up with CRSP
 CLOSED_MARKET_DAYS = ("2012-10-29", "2012-10-30")
+
+# s06 checks: sensible yield ranges (decimals), IWM total minus Russell 2000 price return per year (dividends minus
+# fees), and how far a published monthly Fama-French factor may be from its compounded daily values
+YIELD_RANGES = {"ust_10y": (0.0, 0.06), "tbill_3m": (-0.005, 0.07), "moodys_baa": (0.02, 0.10),
+                "moodys_aaa": (0.01, 0.09)}
+IWM_MINUS_INDEX_RANGE = (0.005, 0.02)
+FF_MONTHLY_TOLERANCE = 0.005
+MAX_FILLED_RUN_DAYS = 5
 
 # Sectors from the SIC code as of the date (last non-zero SICCD), checked in this order; anything else is
 # Industrials. Major group NN = SIC NN00-NN99.

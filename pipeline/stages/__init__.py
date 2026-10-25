@@ -7,7 +7,7 @@ STAGES = (
     "s03_fundamentals_q",
     "s04_fundamentals_a",
     "s05_ibes",
-    "s06_rates_benchmarks",
+    "s06_market",
     "s07_panel",
     "s08_export",
 )

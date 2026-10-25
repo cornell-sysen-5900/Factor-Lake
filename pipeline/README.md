@@ -27,8 +27,8 @@ written yet.
 | s02_prices | daily cleaning, momentum, volatility, monthly returns incl. delisting rows | done |
 | s03_fundamentals_q | quarterly factors, TTM, split adjustment, RV/DCF building blocks | done |
 | s04_fundamentals_a | annual statements for DCF (dcf_inputs_annual) | done |
-| s05_ibes | consensus by measure and FPI, linked to permno, analyst factors | planned |
-| s06_rates_benchmarks | FRED yields, Fama-French, index and ETF returns | planned |
+| s05_ibes | full IBES consensus (estimates_consensus), linked to permno, with the CRSP share-basis factor | done |
+| s06_market | index and ETF returns, Fama-French, FRED yields and spreads (market_daily, market_monthly) | done |
 | s07_panel | monthly point-in-time panel and the all-stocks monthly returns table | planned |
 | s08_export | final Parquet set in processed/final/, manifest.json, DATA_DICTIONARY.md, UPLOAD.md | planned |
 
