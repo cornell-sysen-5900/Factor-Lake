@@ -431,6 +431,9 @@ FILES["estimates_consensus.parquet"] = {
                               "statpers", X, DERIVED),
         "suspect_total": ("a total (SAL, EBT, EBI, CPX) more than 100x both its previous and next estimate; its "
                           "values are NaN", FLAG, DERIVED),
+        "suspect_scale": ("a total estimate or actual more than 100x the largest of the company's Compustat TTM "
+                          "revenue, total assets and market cap known at statpers; that value is NaN", FLAG,
+                          DERIVED),
     },
 }
 
