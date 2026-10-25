@@ -781,6 +781,10 @@ rv_peer_stats_monthly 17,083 (5.4), dcf_inputs_annual 65,359 (11.1), estimates_c
 fundamentals_quarterly 257,447 (116.8), security_master 5,918 (0.3); 506 documented columns. Every file reads back
 with its source's rows, no duplicate keys, the 15 raw files re-hash to the s00 checksums.
 
+## Phase 3 results (s07 share-flag fixes; s09)
+
+s09 WARN (7 min; 9 PASS, 2 WARN): tracking vs IWM correlation 0.998, tracking error 1.43% a year, mean difference 0.00%; Fama-French correlations HML 0.78, UMD 0.93, CMA 0.54, RMW 0.31 with gross profitability (WARN; 0.66 with ROE); ROA backtest identical to the notebook panel's (no year more than 3 pp apart); 600 of 600 recomputed values match; a full rerun (6 min) gives 36 of 36 identical final files; the full panel takes 540 MB in pandas (WARN; 80 MB with 9 columns); the offline upload dry run lists 36 keys. Details in processed/s09_validation/VALIDATION.md.
+
 ## Open questions
 
 None.
