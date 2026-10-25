@@ -590,6 +590,13 @@ docs = [
     { name = "mkdocs-section-index" },
     { name = "mkdocstrings", extra = ["python"] },
 ]
+pipeline = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "pandas", version = "3.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pyarrow" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -618,6 +625,11 @@ docs = [
     { name = "mkdocs-material", specifier = ">=9.0.0" },
     { name = "mkdocs-section-index", specifier = ">=0.3.0" },
     { name = "mkdocstrings", extras = ["python"], specifier = ">=0.24.0" },
+]
+pipeline = [
+    { name = "numpy", specifier = ">=1.23" },
+    { name = "pandas", specifier = ">=2.2.2" },
+    { name = "pyarrow", specifier = ">=15.0.0" },
 ]
 
 [[package]]

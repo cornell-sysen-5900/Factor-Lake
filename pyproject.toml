@@ -36,6 +36,12 @@ docs = [
     "mkdocs-literate-nav>=0.6.0",
     "mkdocs-section-index>=0.3.0",
 ]
+# WRDS data pipeline (pipeline/); not installed by Streamlit Cloud. Run with `uv run --group pipeline`.
+pipeline = [
+    "numpy>=1.23",
+    "pandas>=2.2.2",
+    "pyarrow>=15.0.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

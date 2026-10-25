@@ -33,10 +33,15 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# Data files (avoid committing large raw data)
+# Data files: never commit data (WRDS licence terms, file size). Applies anywhere in the repo.
 *.xlsx
 *.csv
+*.parquet
+*.zip
+*.gz
 data/
+raw/
+processed/
 
 # Jupyter / Colab checkpoints
 .ipynb_checkpoints/
