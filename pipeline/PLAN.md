@@ -798,6 +798,12 @@ with its source's rows, no duplicate keys, the 15 raw files re-hash to the s00 c
 
 s09 WARN (7 min; 9 PASS, 2 WARN): tracking vs IWM correlation 0.998, tracking error 1.43% a year, mean difference 0.00%; Fama-French correlations HML 0.78, UMD 0.93, CMA 0.54, RMW 0.31 with gross profitability (WARN; 0.66 with ROE); ROA backtest identical to the notebook panel's (no year more than 3 pp apart); 600 of 600 recomputed values match; a full rerun (6 min) gives 36 of 36 identical final files; the full panel takes 540 MB in pandas (WARN; 80 MB with 9 columns); the offline upload dry run lists 36 keys. Details in processed/s09_validation/VALIDATION.md.
 
+## Phase 3b results (causal share flag, IBES scale rule)
+
+- **Share flag (decision 29):** 25,758 company-months and 630 companies use the Compustat count (were 26,476 and 616 with the duration rule); 2,442 company-months wait for the third month end. Share-class gap 0.08-0.40% a year (max 2022), check PASS.
+- **IBES scale rule (decision 30):** 402 estimates (CPX 93, EBI 126, EBT 117, SAL 66) and 6 actuals set to NaN; FMPN, KVPH, DINE, ABX, CIBR caught. Not caught: CNTE (real: Centene), AEI (EBI $241B, revenue $1.5B, assets $49B), COWN, CODI, FFSM, FFG (EBIT, EBITDA or capex estimates 12-95x their total assets).
+- **s09:** unchanged (tracking 0.9977 / 1.43%, factor correlations, backtest, 600 of 600 recomputed values, 37 of 37 identical files after a 6 min rerun); final/ holds 37 files, 831 MB.
+
 ## Open questions
 
 None.
