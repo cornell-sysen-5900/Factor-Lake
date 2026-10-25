@@ -37,7 +37,7 @@ from pipeline.stages.s00_inventory import read_header
 
 STAGE = "s02_prices"
 CIZ_FILE = "r2000_price_crsp_ciz.csv"
-_NUMERIC = ("dlyprc", "dlyret", "dlyvol", "shrout", "dlyopen", "dlyhigh", "dlylow", "dlycumfacpr")
+_NUMERIC = ("dlyprc", "dlyret", "dlyvol", "shrout", "dlyopen", "dlyhigh", "dlylow", "dlycumfacpr", "dlycumfacshr")
 ALL_COLUMNS = ("permno", "permco", "dlycaldt", "ticker", "siccd", "dlydelflg") + _NUMERIC
 MARKET_CAP_COLUMNS = ("permno", "dlycaldt", "dlydelflg", "dlyprc", "shrout")       # what s01 needs
 _TYPES = {"permno": pa.int32(), "permco": pa.int32(), "dlycaldt": pa.date32(), "siccd": pa.string(),
@@ -45,8 +45,8 @@ _TYPES = {"permno": pa.int32(), "permco": pa.int32(), "dlycaldt": pa.date32(), "
           **{c: pa.float64() for c in _NUMERIC}}
 MOM_COLS = tuple(MOMENTUM_WINDOWS)
 VOL_COLS = tuple(f"vol_{kind}_{label}" for label in VOL_WINDOWS for kind in ("gk", "close"))
-DAILY_COLUMNS = ("date", "permno", "permco", "ticker", "siccd", "prc", "prc_adj", "cfacpr", "shrout", "mkt_cap",
-                 "mkt_cap_musd", "ret", "vol", "is_delisting_row", "delist_ret_filled") + MOM_COLS + VOL_COLS
+DAILY_COLUMNS = ("date", "permno", "permco", "ticker", "siccd", "prc", "prc_adj", "cfacpr", "cfacshr", "shrout",
+                 "mkt_cap", "mkt_cap_musd", "ret", "vol", "is_delisting_row", "delist_ret_filled") + MOM_COLS + VOL_COLS
 
 
 # ---------- Reading and cleaning (also used by s01 for month-end market caps) ----------
@@ -191,7 +191,7 @@ def build_monthly(px: pd.DataFrame, calendar: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_daily(px: pd.DataFrame) -> pd.DataFrame:
-    px["cfacpr"] = px["dlycumfacpr"]
+    px["cfacpr"], px["cfacshr"] = px["dlycumfacpr"], px["dlycumfacshr"]
     px["prc_adj"] = (px["prc"] / px["cfacpr"].where(px["cfacpr"] > 0)).fillna(px["prc"])
     px["vol"] = px["dlyvol"].where(px["dlyvol"] >= 0)
     return px[list(DAILY_COLUMNS)]

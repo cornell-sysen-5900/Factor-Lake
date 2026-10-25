@@ -76,7 +76,7 @@ def test_rolling_beta_on_a_known_series():
 
 def panel_rows(**cols):
     base = {"date": T[0], "permno": 1, "gsector": 45, "gind": 451030, "prc": 20.0, "company_mkt_cap_musd": 1000.0,
-            "fund_is_usd": True, "ev_claims": 200.0, "book_equity": 500.0, "ib_ttm": 50.0, "revenue_ttm": 800.0,
+            "company_cap_from_compustat": False, "fund_is_usd": True, "ev_claims": 200.0, "book_equity": 500.0, "ib_ttm": 50.0, "revenue_ttm": 800.0,
             "dv_ttm": 10.0, "fcf_ttm": 40.0, "ebitda_ttm": 120.0, "ebit_ttm": 90.0, "eps1_crsp": 1.0, "eps2_crsp": 1.25,
             "ebt1_meanest": 130.0, "sal1_meanest": 850.0, "ltg_meanest": 0.10,
             **{c: np.nan for c in s07.QE_FACTORS}}
@@ -148,3 +148,36 @@ def test_fiscal_year_change_takes_the_new_numbering():
         out, _ = s07.add_fundamentals(pd.DataFrame({"date": [pd.Timestamp("2009-03-31")], "permno": [1],
                                                     "siccd": [7372.0]}), pd.DataFrame(rows))
         assert out["f_roa"].item() == -0.18
+
+
+def test_company_cap_from_compustat_shares_on_the_crsp_basis():
+    # company 10: Compustat 30M shares at 2019-12-31, before a 2-for-1 split (cfacshr 2 -> 1): 60M at t, CRSP 40M
+    # company 20: Compustat 41M vs CRSP 40M (2.5% more): stays the CRSP market cap
+    t = pd.Timestamp("2020-03-31")
+    u = pd.DataFrame({"date": t, "permno": [1, 2], "permco": [10, 20], "fund_period_end": pd.Timestamp("2019-12-31"),
+                      "cshoq": [30.0, 41.0], "cfacshr_t": 1.0, "company_shares_crsp_m": 40.0,
+                      "company_main_prc": 10.0, "company_mkt_cap_musd": 400.0})
+    me = pd.DataFrame({"permno": [1, 2], "month": pd.Period("2019-12", "M"), "cfacshr_t": [2.0, 1.0]})
+    out = s07.add_company_cap(u, me).set_index("permno")
+    assert out.loc[1, "company_shares_compustat_m"] == 60.0 and out.loc[1, "company_cap_from_compustat"]
+    assert out.loc[1, "company_mkt_cap_musd"] == 600.0 and out.loc[1, "company_mkt_cap_crsp_musd"] == 400.0
+    assert not out.loc[2, "company_cap_from_compustat"] and out.loc[2, "company_mkt_cap_musd"] == 400.0
+
+
+def test_multiples_need_1m_denominators_and_1_cent_forward_eps():
+    u = s07.add_price_scaled(pd.concat([panel_rows(), panel_rows(permno=2, ib_ttm=0.5, ebitda_ttm=0.9, eps1_crsp=0.005,
+                                                                 ebt1_meanest=0.4, sal1_meanest=0.99),
+                                        panel_rows(permno=3, ib_ttm=1.0, eps1_crsp=0.01)], ignore_index=True))
+    rv = s07.build_rv(u).set_index("permno")
+    assert rv.loc[2, ["pe", "ev_ebitda", "fwd_pe_fy1", "fwd_ev_ebitda", "fwd_ev_sales", "peg"]].isna().all()
+    assert rv.loc[2, "ev_ebit"] == pytest.approx(1200 / 90)                            # 90 is above the floor
+    assert rv.loc[3, "pe"] == pytest.approx(1000.0) and rv.loc[3, "fwd_pe_fy1"] == pytest.approx(2000.0)
+
+
+def test_forward_yields_and_surprise_are_capped():
+    u = pd.DataFrame({"f_forward_ep": [0.1, -6.0, 5.0], "f_forward_ep_fy2": [0.1, 0.2, 7.0],
+                      "f_forward_cfp": [0.1, np.nan, 0.3], "f_analyst_surprise": [0.02, -1.5, 1.0]})
+    out, counts = s07.cap_yields(u)
+    assert counts == {"f_forward_ep": 1, "f_forward_ep_fy2": 1, "f_forward_cfp": 0, "f_analyst_surprise": 1}
+    assert np.isnan(out.loc[1, "f_forward_ep"]) and out.loc[2, "f_forward_ep"] == 5.0
+    assert np.isnan(out.loc[1, "f_analyst_surprise"]) and out.loc[2, "f_analyst_surprise"] == 1.0

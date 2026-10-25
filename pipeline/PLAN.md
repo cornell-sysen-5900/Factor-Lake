@@ -51,7 +51,7 @@ cite them. "Last run" numbers are the notebook's; they become the expected value
 
 ## Decisions
 
-Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the fourth, 21-23 and the s07 choices from the fifth (all 2026-10-25).
+Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the fourth, 21-23 and the s07 choices (24) from the fifth, 25-27 from the sixth (all 2026-10-25).
 
 | # | decision | where |
 |---|---|---|
@@ -79,6 +79,9 @@ Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the 
 | 22 | The IBES 100x rule compares each total-measure estimate with its neighbours: flagged only when more than 100x both the previous and the next estimate of the same ticker, measure and FPI (the one neighbour at the ends). | s05 rule 6 |
 | 23 | The Fama-French monthly vs compounded daily check is strict (50 bp) for mktrf and rf, informational for smb, hml, rmw, cma and umd. | s06 checks |
 | 24 | s07: the share-class gap compares Compustat cshoq (millions) with CRSP shrout (thousands) on the quarter-end date of cshoq; the analyst surprise uses the CRSP price and share basis of the last trading day before anndats_act; the neighbour rule runs on IBES tickers before linking; late-filed older quarters are dropped before the as-of merge (counted). | s07 rules 5, 9, checks; s05 rule 6 |
+| 25 | Company market cap (sixth review): where Compustat cshoq, put on the CRSP share basis at t with cfacshr, exceeds the summed CRSP shares of our permnos with the same permco by more than 5%, company_mkt_cap_musd uses the Compustat count at the listed price (flag company_cap_from_compustat). mkt_cap_musd stays the listed security, for portfolio weights; company_mkt_cap_musd is for valuation. | s07 rule 3 |
+| 26 | RV multiples: TTM and forward total denominators (ib_ttm, ebitda_ttm, ebit_ttm, revenue_ttm, EBT FY1, SAL FY1) must be >= $1M, forward EPS on the CRSP basis >= $0.01 for fwd_pe; otherwise NaN. | s07 rule 10 |
+| 27 | Panel yield caps: f_forward_ep, f_forward_ep_fy2, f_forward_cfp NaN beyond +-5, f_analyst_surprise NaN beyond +-1 (counted). The median-multiples check is informational. | s07 rules 8-9, checks |
 
 ## What s00 found in raw/
 
@@ -193,13 +196,14 @@ broken on shares; reruns give identical files.
 ## s02_prices
 
 **Inputs:** `raw/r2000_price_crsp_ciz.csv` (columns permno, permco, dlycaldt, ticker, siccd, dlydelflg,
-delreasontype, dlyprc, dlyret, dlyvol, shrout, dlyopen, dlyhigh, dlylow, dlycumfacpr), `raw/delistings.csv`.
+delreasontype, dlyprc, dlyret, dlyvol, shrout, dlyopen, dlyhigh, dlylow, dlycumfacpr, dlycumfacshr),
+`raw/delistings.csv`.
 
 **Outputs** (`processed/s02_prices/`):
 
 | file | one row per | columns |
 |---|---|---|
-| daily/year=YYYY/data.parquet | permno, trading day | date, permno, permco, ticker, siccd, prc, prc_adj, cfacpr, shrout, mkt_cap, mkt_cap_musd, ret, vol, is_delisting_row, delist_ret_filled, mom_1m, mom_6m, mom_12m, vol_gk_{1m,3m,6m,12m}, vol_close_{1m,3m,6m,12m} |
+| daily/year=YYYY/data.parquet | permno, trading day | date, permno, permco, ticker, siccd, prc, prc_adj, cfacpr, cfacshr, shrout, mkt_cap, mkt_cap_musd, ret, vol, is_delisting_row, delist_ret_filled, mom_1m, mom_6m, mom_12m, vol_gk_{1m,3m,6m,12m}, vol_close_{1m,3m,6m,12m} |
 | monthly.parquet | permno, month | month_end, permno, permco, ticker, siccd, last_trade_date, prc, shrout, mkt_cap_musd, mom_*, vol_*, ret_m, trading_days, delisted_in_month, delist_ret_filled (s08 exports returns_monthly from it) |
 | calendar.parquet | month | month, month_end, trading_days |
 | delistings.parquet | delisting | permno, delisting_date, flagged_row_date, flagged_row_prc, delactiontype, delreasontype, delpaymenttype, delret, delret_used |
@@ -474,7 +478,7 @@ month-end levels; yields at the month end.
 ## s07_panel
 
 **Inputs:** s01 snapshots.parquet and permno_list.txt; s02 monthly.parquet, calendar.parquet and daily/ (date,
-permno, prc, ret, cfacpr, is_delisting_row); s03 fundamentals_quarterly.parquet; s05 estimates_consensus.parquet
+permno, prc, ret, cfacpr, cfacshr, is_delisting_row); s03 fundamentals_quarterly.parquet; s05 estimates_consensus.parquet
 (EPS, CPS, SAL, EBT; FPI 0-2) and link.parquet; s06 market_daily and market_monthly (mktrf, rf). Not s04: the annual
 statements stay their own table (decision 6).
 
@@ -482,8 +486,8 @@ statements stay their own table (decision 6).
 
 | file | one row per | columns |
 |---|---|---|
-| factor_panel_monthly.parquet | universe stock, month end t | identity (permno, permco, gvkey, ticker, security_name, gsector, gsector_name, ggroup, gind, gind_name, gsubind, sector_name, gics_from_sic, siccd), index_weight, snapshot_report_dt, snapshot_eff_dt, new_entrant, price_date, prc, shrout, mkt_cap_musd, company_mkt_cap_musd, n_share_classes, cfacpr_t, cfacpr_last, mom_1m, mom_6m, mom_12m, mom_12_1, vol_gk_* and vol_close_*, beta_252d, beta_60m, fund_period_end, fund_report_date, fund_is_usd, fund_stale, the building blocks used (book_equity, ib_ttm, revenue_ttm, dv_ttm, fcf_ttm, ev_claims, ebitda_ttm, ebit_ttm, cshoq), ev, the 12 statement factors, the 8 price-scaled factors, the 5 quarter-end versions (`_qe`), ibes_statpers, numest_fy1, the 9 analyst factors, surprise_anndats, surprise_fpedats, ret_next_1m, delisted_next_month, and the statpers of each IBES series used |
-| rv_multiples_monthly.parquet | same rows | date, permno, gsector, gind, prc, company_mkt_cap_musd, ev, the 15 multiples, and `<multiple>_pct_gind`, `<multiple>_pct_gsector` |
+| factor_panel_monthly.parquet | universe stock, month end t | identity (permno, permco, gvkey, ticker, security_name, gsector, gsector_name, ggroup, gind, gind_name, gsubind, sector_name, gics_from_sic, siccd), index_weight, snapshot_report_dt, snapshot_eff_dt, new_entrant, price_date, prc, shrout, mkt_cap_musd, company_mkt_cap_musd, company_mkt_cap_crsp_musd, company_cap_from_compustat, n_share_classes, company_shares_crsp_m, company_shares_compustat_m, cfacpr_t, cfacpr_last (s08 drops these two), mom_1m, mom_6m, mom_12m, mom_12_1, vol_gk_* and vol_close_*, beta_252d, beta_60m, fund_period_end, fund_report_date, fund_is_usd, fund_stale, the building blocks used (book_equity, ib_ttm, revenue_ttm, dv_ttm, fcf_ttm, ev_claims, ebitda_ttm, ebit_ttm, cshoq), ev, the 12 statement factors, the 8 price-scaled factors, the 5 quarter-end versions (`_qe`), ibes_statpers, numest_fy1, the 9 analyst factors, surprise_anndats, surprise_fpedats, ret_next_1m, delisted_next_month, and the statpers of each IBES series used |
+| rv_multiples_monthly.parquet | same rows | date, permno, gsector, gind, prc, company_mkt_cap_musd, company_cap_from_compustat, ev, the 15 multiples, and `<multiple>_pct_gind`, `<multiple>_pct_gsector` |
 | rv_peer_stats_monthly.parquet | gind, month end | date, gind, gind_name, n_peers, and per multiple `_n`, `_p25`, `_p50`, `_p75` |
 | security_master.parquet | permno in permno_list.txt | permco, gvkey, ibes_ticker (all linked tickers, `;`-separated), ticker, security_name, GICS codes and names, siccd, first and last price date, first and last universe date, excluded_non_member |
 
@@ -496,8 +500,15 @@ The monthly returns table is s02's monthly.parquet; s08 exports it as returns_mo
    (decision 11). 2009-04 uses the 2009-02 snapshot, 2009-05 and 2009-06 use 2009-03. new_entrant = not in the
    universe at the previous t.
 3. **Market at t:** prc, shrout and mkt_cap_musd from the last real trading day of month t (s02 monthly; never a
-   delisting row). company_mkt_cap_musd = sum over our permnos with the same permco at t (decision 3). mom_12_1 =
-   (1 + mom_12m) / (1 + mom_1m) - 1. ret_next_1m = the stock's ret_m of month t+1, delisting returns included.
+   delisting row); mkt_cap_musd is the listed security, the one for portfolio weights. company_mkt_cap_musd (for
+   valuation: B/P, EV, multiples) = sum over our permnos with the same permco at t (decision 3; kept as
+   company_mkt_cap_crsp_musd), except where Compustat's common shares exceed ours by more than 5% (decision 25):
+   company_shares_compustat_m = cshoq at the fundamentals' quarter end x cfacshr at the quarter end / cfacshr at t;
+   then company_mkt_cap_musd = the CRSP company cap + (company_shares_compustat_m - company_shares_crsp_m) x the price
+   of the company's largest listed class (with one listed class: Compustat shares x its price), and
+   company_cap_from_compustat = True (28,202 company-months, 1,154 companies; nearly all real dual-class companies,
+   e.g. GAMCO, UniFirst, Moog, AMC 2014-2016; two ADRs where Compustat counts ordinary shares, CSR 2011 and Nexxen
+   2025, are wrongly included). Stale fundamentals give no Compustat count. mom_12_1 = (1 + mom_12m) / (1 + mom_1m) - 1. ret_next_1m = the stock's ret_m of month t+1, delisting returns included.
 4. **Betas:** excess return = return - rf. beta_252d = cov(stock daily excess return, mktrf) / var(mktrf) over the
    stock's last 252 trading rows ending t, with at least 80% of them (202); beta_60m the same with monthly returns over
    the last 60 calendar months (at least 48).
@@ -521,15 +532,18 @@ The monthly returns table is s02's monthly.parquet; s08 exports it as returns_mo
    cfacpr_last (s05 rule 7), then divided by prc(t): f_forward_ep (EPS FY1), f_forward_ep_fy2, f_forward_cfp (CPS
    FY1). f_forward_sales_to_ev = SAL FY1 / ev, f_forward_ebitda_to_ev = EBT FY1 / ev, f_ltg = EPS FPI 0 (decimal),
    f_eps_revision = (numup - numdown) / numest, f_eps_dispersion = stdev / |meanest| (NaN if |meanest| < 0.01 or
-   numest < 2), all EPS FY1. f_forward_ep's 0.1% and 99.9% values are in the summary (decision 15; -21.0 and 2.92).
+   numest < 2), all EPS FY1. f_forward_ep, f_forward_ep_fy2 and f_forward_cfp are NaN beyond +-5 (decision 27;
+   1,319, 1,012 and 709 values). f_forward_ep's 0.1% and 99.9% values are in the summary (decision 15; -3.34 and
+   1.27, were -21.0 and 2.92 before the cap).
 9. **Analyst surprise** (fifth review): for each EPS FY1 announcement, (actual - the last consensus before
    anndats_act), both converted to the CRSP share basis of the last trading day before anndats_act (cfacpr that day /
    cfacpr_last), divided by that day's CRSP price (at most 10 days before; NaN below $0.01). Two fiscal years
    announced the same day: the later one wins. At t: the latest announcement on or before t, at most 120 days old.
+   NaN beyond +-1 (decision 27; 880 values).
 10. **RV multiples** (same rows): pe = company mkt cap / ib_ttm, pb = / book_equity, ps = / revenue_ttm, ev_ebitda,
-    ev_ebit, ev_sales, each NaN when the denominator <= 0; yields (may be negative): fcf_yield, dividend_yield,
-    earnings_yield; forward: fwd_pe_fy1, fwd_pe_fy2 = price / EPS estimate on the CRSP basis, fwd_ev_ebitda = ev /
-    EBT FY1, fwd_ev_sales = ev / SAL FY1, NaN when the denominator <= 0; ltg; peg = fwd_pe_fy1 / (ltg x 100), only
+    ev_ebit, ev_sales; NaN when the denominator is below $1M (pb: book_equity <= 0) (decision 26); yields (may be
+    negative): fcf_yield, dividend_yield, earnings_yield; forward: fwd_pe_fy1, fwd_pe_fy2 = price / EPS estimate on
+    the CRSP basis (NaN below $0.01), fwd_ev_ebitda = ev / EBT FY1, fwd_ev_sales = ev / SAL FY1 (NaN below $1M); ltg; peg = fwd_pe_fy1 / (ltg x 100), only
     when ltg > 0. `<multiple>_pct_gind` and `_pct_gsector` = percentile rank (0-1) within the GICS industry and sector
     at t, NaN when the group has fewer than 5 stocks with a value.
 11. **Peer stats:** per gind and t: n_peers, and per multiple the count and the 25th, 50th, 75th percentile (NaN
@@ -564,15 +578,17 @@ no fund_report_date, IBES statpers, snapshot eff_dt, surprise anndats or price d
 factor on non-USD or sub-$0.01 rows (FAIL); stale rows have no factors (FAIL); every row has a sector (FAIL);
 **share-class gap** (decision 12, fifth review): on the quarter-end date of cshoq, Compustat cshoq (millions) vs the
 summed CRSP shrout (thousands / 1000) of our permnos with the same permco; a company counts when the gap is above 5%
-of its Compustat shares, and its missing market cap at t is the missing share fraction applied to its market cap; by
-year, the sum vs the universe's company market cap, WARN above 1%; median pe, pb, ev_ebitda by year within 15-25,
-1-3, 8-15 (WARN). The summary has coverage by year (prc, roa, book-to-price, forward E/P, beta_252d, ret_next_1m and
+of its Compustat shares and its market cap at t does not already use the Compustat count, and its missing market
+cap at t is the missing share fraction applied to its CRSP company market cap; by year, the sum vs the universe's
+company market cap, WARN above 1% (max 0.38% in 2022; 1.5-2.2% a year before decision 25); median pe, pb, ev_ebitda
+by year vs 15-25, 1-3, 8-15 (informational, decision 27). The summary has coverage by year (prc, roa, book-to-price, forward E/P, beta_252d, ret_next_1m and
 every multiple) and count / missing % / mean / p1 / p50 / p99 of every factor and multiple.
 
 **Tests:** the universe uses the latest snapshot whose every line is effective, without excluded lines; the as-of
 merge waits for the report date, ignores a late-filed older quarter, takes the new numbering after a fiscal-year
 change, and goes stale after 365 days; the SIC fallback at boundary codes; beta on a series with a known beta, NaN
-below 80% of days; EV and the <= 0 rules, sub-$0.01 and non-USD rows; percentile ranks and the 5-peer minimum; peer
+below 80% of days; EV and the <= 0 rules, sub-$0.01 and non-USD rows; the Compustat company cap across a split
+and below 5%; the $1M and $0.01 denominator floors; the yield caps; percentile ranks and the 5-peer minimum; peer
 percentiles; forward E/P across a 4-for-1 split; the surprise uses the price and share basis of the day before the
 announcement.
 
@@ -707,18 +723,21 @@ earlier cells):
   statpers on the IBES basis) matches it on 100% of 405,870 rows. 677 rows have no value here because prc(t) is
   missing or below $0.01; 62 have one only here (the notebook found no price within 7 days of statpers).
 
+## Phase 2e results (s07 fixes; s08)
+
+s02 rerun (keeps cfacshr), s07 PASS (114 s). Before -> after the s07 fixes (decisions 25-27):
+
+- **Company market cap:** 28,202 company-months (1,154 companies) use the Compustat share count; the universe's
+  company market cap rises 1.4-1.8% a year. The share-class gap falls from 1.5-2.2% to 0.06-0.38% a year.
+- **Multiples** (mean; p1 / p99): pe 67.8 -> 36.3 (575.7 -> 343.4 at p99); ps 340 -> 8.0; ev_ebitda 2.9e13 -> 18.4
+  (p99 203 -> 158); ev_ebit 48.8 -> 28.8; ev_sales 319 -> 8.0; fwd_pe_fy1 41.5 -> 35.0; fwd_ev_ebitda 22.4 -> 17.4;
+  fwd_ev_sales 46.0 -> 8.6; the yields, pb and ltg move only through the company market cap.
+- **Yield caps:** f_forward_ep mean -2.17 -> -0.007 (1,319 values removed), f_forward_ep_fy2 -1.06 -> 0.021 (1,012),
+  f_forward_cfp -1.61 -> 0.087 (709), f_analyst_surprise -5.81 -> -0.004 (880).
+
 ## Open questions
 
-1. **Unlisted share classes.** The share-class gap is about 2% of the universe market cap in every year
-   (1.5-2.2%). It comes from companies whose second class is not listed, so no CIZ pull can add it: EchoStar,
-   AppFolio, Tootsie Roll, Appian, Houlihan Lokey, Asana, GAMCO, Nelnet, WWE, UniFirst, Sinclair, among others
-   (gaps of 20-70% of their shares). For them company_mkt_cap_musd counts only the listed class, so B/P, S/P and
-   EV multiples are too high. Keep it (consistent with CRSP), or use Compustat cshoq x the listed price for the
-   company market cap when the gap is above 5%?
-2. **Near-zero denominators in the multiples.** ev_ebitda has a median of 10 but a mean of 2.9e13: a few positive
-   but tiny EBITDA values pass the `<= 0 -> NaN` rule. A $1M floor on the trailing and forward denominators
-   (as in s03) would remove them. The medians are inside the expected ranges except pe in 2022-2023 (14.3, 14.0)
-   and ev_ebitda in 2009 (7.8), which fit those markets.
+None.
 
 ## Phase 2 order
 

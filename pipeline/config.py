@@ -317,6 +317,11 @@ DISPERSION_MIN_NUMEST = 2           # ... and at least 2 estimates
 PEER_MIN = 5                        # percentile ranks and peer percentiles need 5 stocks with a value
 SHARE_CLASS_GAP_COMPANY = 0.05      # Compustat shares above ours by more than 5% of the company count as a gap ...
 SHARE_CLASS_GAP_YEAR = 0.01         # ... and the gaps may be at most 1% of the universe market cap in a year
+COMPUSTAT_SHARES_MIN_EXCESS = 0.05  # company mkt cap from Compustat shares when they exceed ours by more than 5%
+RV_MIN_DENOMINATOR_MUSD = 1.0       # RV multiples: TTM and forward total denominators below $1M are NaN
+RV_MIN_FORWARD_EPS = 0.01           # fwd_pe: forward EPS (CRSP basis) below $0.01 is NaN
+FORWARD_YIELD_MAX_ABS = 5.0         # f_forward_ep, f_forward_ep_fy2, f_forward_cfp beyond +-5: NaN (counted)
+SURPRISE_MAX_ABS = 1.0              # f_analyst_surprise beyond +-1: NaN (counted)
 SANITY_MEDIAN_RANGES = {"pe": (15, 25), "pb": (1, 3), "ev_ebitda": (8, 15)}
 
 FOSSIL_SIC_RANGES = ((1200, 1299), (1300, 1399), (2900, 2999), (4920, 4929), (5170, 5179))

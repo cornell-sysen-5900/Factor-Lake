@@ -26,11 +26,13 @@ import numpy as np
 import pandas as pd
 
 from pipeline.checks import PASS, WARN, Check, check
-from pipeline.config import (BETA_DAYS, BETA_MONTHS, DISPERSION_MIN_MEAN, DISPERSION_MIN_NUMEST, GICS_INDUSTRIES,
-                             GICS_SECTORS, IBES_MAX_AGE_DAYS, MIN_OBS_SHARE, PEER_MIN, PRICE_BASED_FACTORS,
-                             PRICE_FLOOR, SANITY_MEDIAN_RANGES, SHARE_CLASS_GAP_COMPANY, SHARE_CLASS_GAP_YEAR,
-                             SIC_TO_GICS_SECTOR, SIC_UNCLASSIFIED, SNAPSHOT_SIZE_RANGE, STALE_FUNDAMENTALS_DAYS,
-                             SURPRISE_MAX_AGE_DAYS, SURPRISE_PRICE_MAX_DAYS, DataPaths)
+from pipeline.config import (BETA_DAYS, BETA_MONTHS, COMPUSTAT_SHARES_MIN_EXCESS, DISPERSION_MIN_MEAN,
+                             DISPERSION_MIN_NUMEST, FORWARD_YIELD_MAX_ABS, GICS_INDUSTRIES, GICS_SECTORS,
+                             IBES_MAX_AGE_DAYS, MIN_OBS_SHARE, PEER_MIN, PRICE_BASED_FACTORS, PRICE_FLOOR,
+                             RV_MIN_DENOMINATOR_MUSD, RV_MIN_FORWARD_EPS, SANITY_MEDIAN_RANGES,
+                             SHARE_CLASS_GAP_COMPANY, SHARE_CLASS_GAP_YEAR, SIC_TO_GICS_SECTOR, SIC_UNCLASSIFIED,
+                             SNAPSHOT_SIZE_RANGE, STALE_FUNDAMENTALS_DAYS, SURPRISE_MAX_ABS, SURPRISE_MAX_AGE_DAYS,
+                             SURPRISE_PRICE_MAX_DAYS, DataPaths)
 from pipeline.outputs import fresh_stage_dir, table_info, write_parquet, write_summary
 from pipeline.stages import s02_prices
 
@@ -95,7 +97,8 @@ def rolling_beta(y: pd.Series, x: pd.Series, g: pd.Series, n: int, min_obs: floa
 
 
 def daily_month_end(daily: pd.DataFrame, mkt_d: pd.DataFrame) -> pd.DataFrame:
-    """Per permno and month: cfacpr and beta_252d on the last real trading day of the month. daily is sorted."""
+    """Per permno and month: cfacpr, cfacshr and beta_252d on the last real trading day of the month. daily is
+    sorted."""
     m = mkt_d.set_index("date")
     x = daily["date"].map(m["mktrf"])
     y = daily["ret"] - daily["date"].map(m["rf"])
@@ -103,7 +106,8 @@ def daily_month_end(daily: pd.DataFrame, mkt_d: pd.DataFrame) -> pd.DataFrame:
     rows = s02_prices.month_end_rows(daily)
     return pd.DataFrame({"permno": daily.loc[rows, "permno"].to_numpy(),
                          "month": daily.loc[rows, "date"].dt.to_period("M").to_numpy(),
-                         "cfacpr_t": daily.loc[rows, "cfacpr"].to_numpy(), "beta_252d": beta[rows].to_numpy()})
+                         "cfacpr_t": daily.loc[rows, "cfacpr"].to_numpy(),
+                         "cfacshr_t": daily.loc[rows, "cfacshr"].to_numpy(), "beta_252d": beta[rows].to_numpy()})
 
 
 def monthly_beta(monthly: pd.DataFrame, mkt_m: pd.DataFrame) -> pd.DataFrame:
@@ -128,8 +132,13 @@ def add_market(u: pd.DataFrame, monthly: pd.DataFrame, me: pd.DataFrame, beta_m:
     grp = mo.groupby(["month_end", "permco"])["mkt_cap_musd"]
     mo["company_mkt_cap_musd"] = grp.transform(lambda s: s.sum(min_count=1))
     mo["n_share_classes"] = grp.transform("count")
+    mo["company_shares_crsp_m"] = mo.groupby(["month_end", "permco"])["shrout"].transform(
+        lambda s: s.sum(min_count=1)) / 1000
+    top = mo.dropna(subset=["mkt_cap_musd"]).sort_values("mkt_cap_musd").groupby(["month_end", "permco"])["prc"].last()
+    mo = mo.merge(top.rename("company_main_prc"), left_on=["month_end", "permco"], right_index=True, how="left")
     cols = ["permno", "month_end", "permco", "ticker", "siccd", "last_trade_date", "prc", "shrout", "mkt_cap_musd",
-            "company_mkt_cap_musd", "n_share_classes", "mom_1m", "mom_6m", "mom_12m", *s02_prices.VOL_COLS]
+            "company_mkt_cap_musd", "n_share_classes", "company_shares_crsp_m", "company_main_prc", "mom_1m",
+            "mom_6m", "mom_12m", *s02_prices.VOL_COLS]
     u = u.merge(mo[cols].rename(columns={"month_end": "date", "last_trade_date": "price_date"}),
                 on=["date", "permno"], how="left")
     u["mom_12_1"] = (1 + u["mom_12m"]) / (1 + u["mom_1m"]) - 1
@@ -186,6 +195,24 @@ def add_fundamentals(u: pd.DataFrame, fq: pd.DataFrame) -> tuple[pd.DataFrame, d
     u["gind_name"] = u["gind"].map(GICS_INDUSTRIES).astype(object)
     u["sector_name"] = u["gsector_name"].where(~u["gics_from_sic"], sic_to_sector(u["siccd"]))
     return u, {"late_filed_quarters_dropped": late, "stale_rows": int(stale.sum())}
+
+
+def add_company_cap(u: pd.DataFrame, me: pd.DataFrame) -> pd.DataFrame:
+    """Unlisted share classes: where Compustat's common shares (cshoq at the quarter end, put on the CRSP share
+    basis at t with cfacshr at the quarter end / cfacshr at t) exceed the summed CRSP shares of our permnos with the
+    same permco by more than 5%, the company market cap is the CRSP one plus the extra shares at the price of the
+    company's largest listed class at t (with one listed class: Compustat shares x its price)."""
+    qe = me[["permno", "month", "cfacshr_t"]].rename(columns={"month": "qe_month", "cfacshr_t": "cfacshr_qe"})
+    u = u.assign(qe_month=u["fund_period_end"].dt.to_period("M")).merge(qe, on=["permno", "qe_month"], how="left")
+    cs = u["cshoq"] * u["cfacshr_qe"] / u["cfacshr_t"].where(u["cfacshr_t"] > 0)
+    u["company_shares_compustat_m"] = cs.where(cs > 0).groupby([u["date"], u["permco"]]).transform("first")
+    extra = u["company_shares_compustat_m"] - u["company_shares_crsp_m"]
+    flag = (extra > COMPUSTAT_SHARES_MIN_EXCESS * u["company_shares_crsp_m"]) & u["company_main_prc"].notna()
+    u["company_mkt_cap_crsp_musd"] = u["company_mkt_cap_musd"]
+    u["company_mkt_cap_musd"] = u["company_mkt_cap_musd"].where(~flag, u["company_mkt_cap_musd"]
+                                                                + extra * u["company_main_prc"])
+    u["company_cap_from_compustat"] = flag
+    return u
 
 
 def add_price_scaled(u: pd.DataFrame) -> pd.DataFrame:
@@ -269,25 +296,45 @@ def add_analyst(u: pd.DataFrame, events: pd.DataFrame) -> pd.DataFrame:
     return u
 
 
+def cap_yields(u: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    """Forward yields beyond +-5 and surprises beyond +-1 are NaN (counted): tiny prices or bad estimates."""
+    counts = {}
+    for cols, lim in ((("f_forward_ep", "f_forward_ep_fy2", "f_forward_cfp"), FORWARD_YIELD_MAX_ABS),
+                      (("f_analyst_surprise",), SURPRISE_MAX_ABS)):
+        for c in cols:
+            out = u[c].abs() > lim
+            counts[c] = int(out.sum())
+            u.loc[out, c] = np.nan
+    return u, counts
+
+
 # ---------- RV multiples and peers ----------
 
 def _pos(s: pd.Series) -> pd.Series:
     return s.where(s > 0)
 
 
+def _floor(s: pd.Series, lo: float = RV_MIN_DENOMINATOR_MUSD) -> pd.Series:
+    """Denominators below the floor are NaN, so near-zero earnings do not make huge multiples."""
+    return s.where(s >= lo)
+
+
 def build_rv(u: pd.DataFrame) -> pd.DataFrame:
     cmc = u["company_mkt_cap_musd"].where(u["fund_is_usd"].eq(True) & (u["prc"] >= PRICE_FLOOR))
-    rv = u[["date", "permno", "gsector", "gind", "prc", "company_mkt_cap_musd", "ev"]].copy()
-    rv["pe"], rv["pb"], rv["ps"] = cmc / _pos(u["ib_ttm"]), cmc / _pos(u["book_equity"]), cmc / _pos(u["revenue_ttm"])
-    rv["ev_ebitda"] = u["ev"] / _pos(u["ebitda_ttm"])
-    rv["ev_ebit"] = u["ev"] / _pos(u["ebit_ttm"])
-    rv["ev_sales"] = u["ev"] / _pos(u["revenue_ttm"])
+    rv = u[["date", "permno", "gsector", "gind", "prc", "company_mkt_cap_musd", "company_cap_from_compustat",
+            "ev"]].copy()
+    rv["pe"], rv["pb"], rv["ps"] = cmc / _floor(u["ib_ttm"]), cmc / _pos(u["book_equity"]), cmc / _floor(
+        u["revenue_ttm"])
+    rv["ev_ebitda"] = u["ev"] / _floor(u["ebitda_ttm"])
+    rv["ev_ebit"] = u["ev"] / _floor(u["ebit_ttm"])
+    rv["ev_sales"] = u["ev"] / _floor(u["revenue_ttm"])
     rv["fcf_yield"], rv["dividend_yield"] = u["fcf_ttm"] / cmc, u["dv_ttm"] / cmc
     rv["earnings_yield"] = u["ib_ttm"] / cmc
     prc = u["prc"].where(u["prc"] >= PRICE_FLOOR)
-    rv["fwd_pe_fy1"], rv["fwd_pe_fy2"] = prc / _pos(u["eps1_crsp"]), prc / _pos(u["eps2_crsp"])
-    rv["fwd_ev_ebitda"] = u["ev"] / _pos(u["ebt1_meanest"])
-    rv["fwd_ev_sales"] = u["ev"] / _pos(u["sal1_meanest"])
+    rv["fwd_pe_fy1"] = prc / _floor(u["eps1_crsp"], RV_MIN_FORWARD_EPS)
+    rv["fwd_pe_fy2"] = prc / _floor(u["eps2_crsp"], RV_MIN_FORWARD_EPS)
+    rv["fwd_ev_ebitda"] = u["ev"] / _floor(u["ebt1_meanest"])
+    rv["fwd_ev_sales"] = u["ev"] / _floor(u["sal1_meanest"])
     rv["ltg"] = u["ltg_meanest"]
     rv["peg"] = rv["fwd_pe_fy1"] / (_pos(rv["ltg"]) * 100)
     rv[list(MULTIPLES)] = rv[list(MULTIPLES)].replace([np.inf, -np.inf], np.nan)
@@ -346,22 +393,25 @@ def coverage_by_year(df: pd.DataFrame, cols) -> dict:
     return {c: {str(k): round(float(v), 3) for k, v in df[c].notna().groupby(y).mean().items()} for c in cols}
 
 
-def share_class_gap(u: pd.DataFrame, monthly: pd.DataFrame) -> pd.DataFrame:
-    """By year: company shares that Compustat counts but our permnos do not. On the quarter-end date of cshoq,
-    Compustat cshoq (millions) vs the summed CRSP shrout (thousands / 1000) of our permnos with the same permco in that
-    month. A company counts when the gap is above 5% of its Compustat shares; the missing market cap at t is the
-    missing share fraction applied to the company market cap at t."""
+def share_class_gap(u: pd.DataFrame, monthly: pd.DataFrame, after_fix: bool = True) -> pd.DataFrame:
+    """By year: company shares that Compustat counts but our company market cap does not. On the quarter-end date of
+    cshoq, Compustat cshoq (millions) vs the summed CRSP shrout (thousands / 1000) of our permnos with the same permco
+    in that month. A company counts when the gap is above 5% of its Compustat shares; the missing market cap at t is
+    the missing share fraction applied to the CRSP company market cap at t. after_fix: company-months whose market
+    cap already uses the Compustat count (company_cap_from_compustat) have no gap."""
+    cap = "company_mkt_cap_crsp_musd"
     crsp = monthly.groupby(["permco", monthly["month_end"].dt.to_period("M")])["shrout"].sum() / 1000
-    c = u.dropna(subset=["permco", "cshoq", "fund_period_end", "company_mkt_cap_musd"]).drop_duplicates(
-        ["date", "permco"])
+    c = u.dropna(subset=["permco", "cshoq", "fund_period_end", cap]).drop_duplicates(["date", "permco"])
     c = c[c["cshoq"] > 0]
     ours = crsp.reindex(pd.MultiIndex.from_arrays([c["permco"], c["fund_period_end"].dt.to_period("M")])).to_numpy()
     share_gap = np.clip((c["cshoq"].to_numpy() - ours) / c["cshoq"].to_numpy(), 0, 1)
     big = share_gap > SHARE_CLASS_GAP_COMPANY
-    missing = np.where(big, c["company_mkt_cap_musd"] * share_gap / np.maximum(1 - share_gap, 1e-9), 0.0)
+    if after_fix:
+        big &= ~c["company_cap_from_compustat"].to_numpy()
+    missing = np.where(big, c[cap] * share_gap / np.maximum(1 - share_gap, 1e-9), 0.0)
     year = c["date"].dt.year
     firms = u.drop_duplicates(["date", "permco"])
-    total = firms.groupby(firms["date"].dt.year)["company_mkt_cap_musd"].sum()
+    total = firms.groupby(firms["date"].dt.year)["company_mkt_cap_musd" if after_fix else cap].sum()
     out = pd.DataFrame({"missing_mkt_cap_musd": pd.Series(missing, index=c.index).groupby(year).sum(),
                         "company_months": pd.Series(big, index=c.index).groupby(year).sum(),
                         "universe_mkt_cap_musd": total})
@@ -399,7 +449,7 @@ def run_checks(panel: pd.DataFrame, rv: pd.DataFrame, snaps: pd.DataFrame,
     checks.append(check("stale fundamentals (> 365 days) have no factor values", stale_vals == 0))
     checks.append(check("every row has a sector name", bool(panel["sector_name"].notna().all())))
 
-    gaps = share_class_gap(panel, monthly)
+    gaps, before = share_class_gap(panel, monthly), share_class_gap(panel, monthly, after_fix=False)
     bad = gaps[gaps["share"] > SHARE_CLASS_GAP_YEAR]
     checks.append(check(f"share-class gap at most {SHARE_CLASS_GAP_YEAR:.0%} of universe market cap in every year",
                         bad.empty, f"max {gaps['share'].max():.2%} ({gaps['share'].idxmax()})"
@@ -407,13 +457,21 @@ def run_checks(panel: pd.DataFrame, rv: pd.DataFrame, snaps: pd.DataFrame,
     med = rv.groupby(rv["date"].dt.year)[list(SANITY_MEDIAN_RANGES)].median()
     outside = {c: [int(y) for y, v in med[c].items() if not lo_ <= v <= hi_]
                for c, (lo_, hi_) in SANITY_MEDIAN_RANGES.items()}
-    checks.append(check("median pe, pb, ev_ebitda by year in the expected small-cap ranges",
-                        not any(outside.values()),
+    checks.append(check("median pe, pb, ev_ebitda by year vs the usual small-cap ranges (informational)", True,
                         "; ".join(f"{c} outside {SANITY_MEDIAN_RANGES[c]} in {v}" for c, v in outside.items() if v)
-                        or "all years inside", level=WARN))
+                        or "all years inside"))
+    firms = panel.drop_duplicates(["date", "permco"])
+    from_cs = firms.groupby(firms["date"].dt.year)["company_cap_from_compustat"].sum()
     extra = {"share_class_gap_by_year": {str(k): {"share": round(float(r.share), 5),
-                                                  "company_months": int(r.company_months)}
+                                                  "company_months": int(r.company_months),
+                                                  "share_before_fix": round(float(before.loc[k, "share"]), 5),
+                                                  "company_months_before_fix": int(before.loc[k, "company_months"]),
+                                                  "company_months_from_compustat": int(from_cs.get(k, 0))}
                                          for k, r in gaps.iterrows()},
+             "company_cap_from_compustat": {"company_months": int(firms["company_cap_from_compustat"].sum()),
+                                            "rows": int(panel["company_cap_from_compustat"].sum()),
+                                            "companies": int(firms.loc[firms["company_cap_from_compustat"],
+                                                                       "permco"].nunique())},
              "median_multiples_by_year": {c: {str(y): round(float(v), 2) for y, v in med[c].items()}
                                           for c in SANITY_MEDIAN_RANGES}}
     return checks, extra
@@ -424,7 +482,8 @@ def run_checks(panel: pd.DataFrame, rv: pd.DataFrame, snaps: pd.DataFrame,
 PANEL_COLS = ("date", "permno", "permco", "gvkey", "ticker", "security_name", "gsector", "gsector_name", "ggroup",
               "gind", "gind_name", "gsubind", "sector_name", "gics_from_sic", "siccd", "index_weight",
               "snapshot_report_dt", "snapshot_eff_dt", "new_entrant", "price_date", "prc", "shrout", "mkt_cap_musd",
-              "company_mkt_cap_musd", "n_share_classes", "cfacpr_t", "cfacpr_last", *PRICE_FACTORS, "beta_252d",
+              "company_mkt_cap_musd", "company_mkt_cap_crsp_musd", "company_cap_from_compustat", "n_share_classes",
+              "company_shares_crsp_m", "company_shares_compustat_m", "cfacpr_t", "cfacpr_last", *PRICE_FACTORS, "beta_252d",
               "beta_60m", "fund_period_end", "fund_report_date", "fund_is_usd", "fund_stale", *BLOCKS, "ev",
               *STATEMENT_FACTORS, *PRICE_SCALED, *QE_FACTORS, "ibes_statpers", "numest_fy1", *ANALYST,
               "surprise_anndats", "surprise_fpedats", "ret_next_1m", "delisted_next_month",
@@ -445,7 +504,8 @@ def build(paths: DataPaths) -> dict:
                           filters=[("measure", "in", ["EPS", "CPS", "SAL", "EBT"]), ("fpi", "in", [0, 1, 2])])
     dates = rebalance_dates(calendar, snaps)
     u = build_universe(dates, snaps)
-    daily = pd.read_parquet(s02 / "daily", columns=["date", "permno", "prc", "ret", "cfacpr", "is_delisting_row"])
+    daily = pd.read_parquet(s02 / "daily", columns=["date", "permno", "prc", "ret", "cfacpr", "cfacshr",
+                                                    "is_delisting_row"])
     daily = daily.sort_values(["permno", "date"]).reset_index(drop=True)
     me = daily_month_end(daily, mkt_d)
     events = surprise_events(est, daily[["date", "permno", "prc", "cfacpr"]])
@@ -453,8 +513,8 @@ def build(paths: DataPaths) -> dict:
     u = add_market(u, monthly, me, monthly_beta(monthly, mkt_m))
     fq = pd.read_parquet(s03 / "fundamentals_quarterly.parquet")
     u, finfo = add_fundamentals(u, fq)
-    u = add_price_scaled(u)
-    u = add_analyst(add_estimates(u, est), events)
+    u = add_price_scaled(add_company_cap(u, me))
+    u, finfo["capped_yields"] = cap_yields(add_analyst(add_estimates(u, est), events))
     del est
     u = u.sort_values(["date", "permno"]).reset_index(drop=True)
     rv = build_rv(u)
@@ -490,7 +550,8 @@ def run(paths: DataPaths) -> dict:
     print(f"  panel {len(panel):,} rows, {extra['months']} months {panel['date'].min():%Y-%m} to "
           f"{panel['date'].max():%Y-%m}, {n.min():,}-{n.max():,} stocks | stale fundamentals {b['info']['stale_rows']:,}"
           f" | late-filed quarters dropped {b['info']['late_filed_quarters_dropped']} | peer rows {len(peers):,} | "
-          f"master {len(master):,}")
+          f"master {len(master):,} | company-months from Compustat shares "
+          f"{cinfo['company_cap_from_compustat']['company_months']:,} | capped {b['info']['capped_yields']}")
     for c in checks:
         if c.status != PASS:
             print(f"  {c.status}  {c.name}: {c.detail}")

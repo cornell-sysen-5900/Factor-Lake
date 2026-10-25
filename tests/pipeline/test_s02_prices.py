@@ -11,7 +11,7 @@ from pipeline.config import DataPaths
 from pipeline.stages import s02_prices as s02
 
 HEADER = ["permno", "PERMCO", "Ticker", "SICCD", "DlyCalDt", "DlyDelFlg", "DlyPrc", "DlyRet", "DlyVol", "ShrOut",
-          "DlyOpen", "DlyHigh", "DlyLow", "DlyCumFacPr"]
+          "DlyOpen", "DlyHigh", "DlyLow", "DlyCumFacPr", "DlyCumFacShr"]
 
 
 def ciz_rows(permno, dates, rets, prc=10.0, flag="N", sic=3571, **over):
@@ -19,7 +19,8 @@ def ciz_rows(permno, dates, rets, prc=10.0, flag="N", sic=3571, **over):
     for d, r in zip(dates, rets):
         row = {"permno": permno, "PERMCO": permno + 50000, "Ticker": f"T{permno}", "SICCD": sic,
                "DlyCalDt": d.date(), "DlyDelFlg": flag, "DlyPrc": prc, "DlyRet": r, "DlyVol": 1000,
-               "ShrOut": 2000, "DlyOpen": prc, "DlyHigh": prc * 1.02, "DlyLow": prc * 0.98, "DlyCumFacPr": 1.0}
+               "ShrOut": 2000, "DlyOpen": prc, "DlyHigh": prc * 1.02, "DlyLow": prc * 0.98, "DlyCumFacPr": 1.0,
+               "DlyCumFacShr": 1.0}
         row.update(over)
         rows.append(row)
     return rows
