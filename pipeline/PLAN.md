@@ -25,7 +25,7 @@ and multiple is a raw value; the app z-scores or ranks at each rebalance.
 | rv_peer_stats_monthly.parquet | gind, month end | date, gind, gind_name, n_peers, `<multiple>_p25`, `<multiple>_p50`, `<multiple>_p75` | s07 | RV peer comparison |
 | **DCF** | | | | |
 | dcf_inputs_annual.parquet | company, fiscal year | permno, gvkey, fyear, period_end, report_date (Q4 rdq rule), revenue, ebitda, ebit, da, capex, oancf, d_nwc, tax_rate, tax_rate_fcff, statutory_tax_rate, interest_expense, interest_source, total_debt, cash, net_debt, preferred, minority_interest, diluted_shares, basic_shares, book_equity, dividends, buybacks, share_issuance, fcff, revenue_growth, ebitda_growth, GICS codes, dcf_applicable | s04 | DCF valuation |
-| estimates_consensus.parquet | permno, statpers, measure, fpi | permno, ibes_ticker, statpers, measure (EPS, SAL, EBT, EBI, CPX, CPS, DPS), fpi (0-3), fpedats, numest, numup, numdown, meanest, medest, stdev, highest, lowest, actual, anndats_act (USD only), price_statpers, cfacpr_statpers, cfacpr_last, crsp_basis_factor, suspect_total | s05 | DCF forecasts, forward multiples |
+| estimates_consensus.parquet | permno, statpers, measure, fpi | permno, ibes_ticker, statpers, measure (EPS, SAL, EBT, EBI, CPX, CPS, DPS), fpi (0-3), fpedats, numest, numup, numdown, meanest, medest, stdev, highest, lowest, actual, anndats_act (USD only), price_statpers, cfacpr_statpers, crsp_basis_factor, suspect_total, suspect_scale | s05 | DCF forecasts, forward multiples |
 | **Reference** | | | | |
 | fundamentals_quarterly.parquet | permno, fiscal quarter | full quarterly statements, building blocks and the quarter-end factors | s03 | Data Viewer, factor research |
 | security_master.parquet | permno | permno, permco, gvkey, ibes_ticker, ticker, security_name (latest), gsector, gsector_name, ggroup, gind, gind_name, gsubind, siccd, first_date, last_date | s07 | ticker and name lookup, holdings table |
@@ -53,7 +53,7 @@ cite them. "Last run" numbers are the notebook's; they become the expected value
 
 ## Decisions
 
-Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the fourth, 21-23 and the s07 choices (24) from the fifth, 25-27 from the sixth, 28-29 from the seventh (all 2026-10-25).
+Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the fourth, 21-23 and the s07 choices (24) from the fifth, 25-27 from the sixth, 28-29 from the seventh, 30-31 and the new 29 from the eighth (all 2026-10-25).
 
 | # | decision | where |
 |---|---|---|
@@ -84,7 +84,9 @@ Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the 
 | 25 | Company market cap (sixth review): where Compustat cshoq, put on the CRSP share basis at t with cfacshr, exceeds the summed CRSP shares of our permnos with the same permco by more than 5%, company_mkt_cap_musd uses the Compustat count at the listed price (flag company_cap_from_compustat). mkt_cap_musd stays the listed security, for portfolio weights; company_mkt_cap_musd is for valuation. | s07 rule 3 |
 | 26 | RV multiples: TTM and forward total denominators (ib_ttm, ebitda_ttm, ebit_ttm, revenue_ttm, EBT FY1, SAL FY1) must be >= $1M, forward EPS on the CRSP basis >= $0.01 for fwd_pe; otherwise NaN. | s07 rule 10 |
 | 28 | The Compustat share count is never used for a company with an ADR (CRSP share type, the second part of the security name, has the word ADR; only C S R plc in 2011 was affected). | s02 monthly is_adr, s07 rule 3 |
-| 29 | A Compustat share flag lasting at most 3 consecutive months, with Compustat shares within 15% of CRSP's in all of them, is a share issuance between quarter ends: CRSP's count is used. (The episode length is known only afterwards; the value used, the CRSP company cap, is public at t.) | s07 rule 3 |
+| 29 | The Compustat share count is used at month end t only when the gap (more than 5%, no ADR) has held at t and at each of the 2 calendar month ends before it, checked on every month with CRSP rows, in or out of the universe; otherwise CRSP's count. Causal: nothing after t is used. (Replaces the first version, which used how long the flag lasted, known only afterwards.) | s07 rule 3 |
+| 30 | IBES scale rule: a total (SAL, EBT, EBI, CPX) estimate or actual more than 100x the largest of the company's Compustat TTM revenue, total assets and company market cap known at statpers (latest report_date <= statpers; market cap on the last trading day <= statpers, at most 7 days back) is NaN (suspect_scale); skipped when none of the three is known. | s05 rule 8 |
+| 31 | estimates_consensus drops cfacpr_last (always 1.0 in CIZ); crsp_basis_factor stays. s07 takes each permno's last cfacpr from the daily prices. | s05, s07 |
 | 27 | Panel yield caps: f_forward_ep, f_forward_ep_fy2, f_forward_cfp NaN beyond +-5, f_analyst_surprise NaN beyond +-1 (counted). The median-multiples check is informational. | s07 rules 8-9, checks |
 
 ## What s00 found in raw/
@@ -389,7 +391,7 @@ cfacpr), `raw/query_inputs/ibes_tickers.txt` (only to compare).
 
 | file | one row per | columns |
 |---|---|---|
-| estimates_consensus.parquet | permno, statpers, measure, fpi | permno, ibes_ticker, statpers, measure, fpi, fpedats, numest, numup, numdown, meanest, medest, stdev, highest, lowest, actual, anndats_act, price_statpers, cfacpr_statpers, cfacpr_last, crsp_basis_factor, suspect_total |
+| estimates_consensus.parquet | permno, statpers, measure, fpi | permno, ibes_ticker, statpers, measure, fpi, fpedats, numest, numup, numdown, meanest, medest, stdev, highest, lowest, actual, anndats_act, price_statpers, cfacpr_statpers, crsp_basis_factor, suspect_total, suspect_scale |
 | link.parquet | link | ticker, permno, ncusip, sdate, edate, edate_used, score |
 | ibes_tickers.txt | IBES ticker | the upload list for query 10 (decision 7) |
 
@@ -420,7 +422,8 @@ cfacpr), `raw/query_inputs/ibes_tickers.txt` (only to compare).
    IBES summary values are restated to the latest share basis too (GameStop's FY1 EPS on 2022-07-14, before the
    split, is -0.92, a post-split number). So:
    - `cfacpr_statpers` = CRSP cfacpr on the last trading day with a price on or before statpers (at most 7 days
-     earlier), `price_statpers` = that day's price; `cfacpr_last` = the permno's last cfacpr in the data.
+     earlier), `price_statpers` = that day's price; cfacpr_last = the permno's last cfacpr in the data (1.0 in CIZ;
+     not exported, decision 31).
    - `crsp_basis_factor` = cfacpr_statpers / cfacpr_last. **An IBES per-share value x crsp_basis_factor is in
      statpers shares**, the same basis as price_statpers. Equivalently, price_statpers / crsp_basis_factor is the
      price on the IBES basis (the notebook's `price_ibes_basis`).
@@ -428,7 +431,12 @@ cfacpr), `raw/query_inputs/ibes_tickers.txt` (only to compare).
      Forward E/P = meanest x cfacpr(t) / cfacpr_last / prc(t). Totals need no factor.
    - Caveat: cfacpr_last is CRSP's last day (2026-09-30), IBES's basis is its pull date. A split between the two
      would be missed; pull both together.
-8. The analyst factors (forward E/P, revision, dispersion, surprise, and the yields of decision 5) are computed in
+8. **Scale rule** (decision 30): a total estimate or actual more than 100x the company's size known at statpers
+   (the largest of Compustat TTM revenue, total assets and company market cap) is NaN, flag `suspect_scale`; skipped
+   when no size is known (39,662 rows). Today 402 estimates (CPX 93, EBI 126, EBT 117, SAL 66) and 6 actuals (CPX
+   4, SAL 2). It catches FMPN, KVPH, DINE, ABX and CIBR. CNTE is real (Centene, $203B revenue). AEI (EBI $241B
+   against $1.5B revenue but $49B of assets) and a few others with large balance sheets stay; see Phase 3b.
+9. The analyst factors (forward E/P, revision, dispersion, surprise, and the yields of decision 5) are computed in
    s07 from this table, at the month end, so they use the month-end price and market cap (decision 15 included).
 
 **Checks:** only USD and FPI 0-3 (FAIL); unique (permno, statpers, measure, fpi) (FAIL); every measure present
@@ -510,9 +518,10 @@ The monthly returns table is s02's monthly.parquet; s08 exports it as returns_mo
    company_shares_compustat_m = cshoq at the fundamentals' quarter end x cfacshr at the quarter end / cfacshr at t;
    then company_mkt_cap_musd = the CRSP company cap + (company_shares_compustat_m - company_shares_crsp_m) x the price
    of the company's largest listed class (with one listed class: Compustat shares x its price), and
-   company_cap_from_compustat = True. Not for companies with an ADR (decision 28) and not in episodes of at most 3
-   months within 15% of CRSP's count (decision 29): 26,476 company-months, 616 companies (of 1,154 ever above 5%;
-   677 had short episodes, 1,724 company-months; median longest episode of the companies used 14 months). Nexxen
+   company_cap_from_compustat = True. Not for companies with an ADR (decision 28), and only once the gap has held at
+   t and the 2 month ends before it (decision 29; computed on every month with CRSP rows by `company_months`):
+   25,758 company-months, 630 companies (of 1,154 ever above 5% in a panel month; 2,442 company-months wait for the
+   third month end, 523 companies never reach it). Nexxen
    2025 stays: it converted its ADSs to ordinary shares in Feb 2025 and CRSP's 16.5M shares look stale against
    Compustat's 65.6M. Stale fundamentals give no Compustat count. One audit row per company in
    compustat_share_flags.parquet (s07 only, not exported). mom_12_1 = (1 + mom_12m) / (1 + mom_1m) - 1. ret_next_1m = the stock's ret_m of month t+1, delisting returns included.
