@@ -745,6 +745,13 @@ s02 rerun (keeps cfacshr), s07 PASS (114 s). Before -> after the s07 fixes (deci
 - **Yield caps:** f_forward_ep mean -2.17 -> -0.007 (1,319 values removed), f_forward_ep_fy2 -1.06 -> 0.021 (1,012),
   f_forward_cfp -1.61 -> 0.087 (709), f_analyst_surprise -5.81 -> -0.004 (880).
 
+**s08 PASS (35 s):** processed/final/ holds 36 files, 831 MB (the notebook's last run: 1,987 MB): factor_panel_monthly
+435,846 rows (155.8 MB), universe_periods 7,576 (0.2), returns_monthly 733,698 (17.0), prices_daily 15,309,394 in
+21 yearly files (333.5), market_daily 5,189 (0.4), market_monthly 237 (0.0), rv_multiples_monthly 435,846 (67.8),
+rv_peer_stats_monthly 17,083 (5.4), dcf_inputs_annual 65,359 (11.1), estimates_consensus 10,061,304 (122.3),
+fundamentals_quarterly 257,447 (116.8), security_master 5,918 (0.3); 506 documented columns. Every file reads back
+with its source's rows, no duplicate keys, the 15 raw files re-hash to the s00 checksums.
+
 ## Open questions
 
 None.
