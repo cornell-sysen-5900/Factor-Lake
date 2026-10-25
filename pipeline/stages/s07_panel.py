@@ -254,7 +254,9 @@ def add_company_cap(u: pd.DataFrame, firm: pd.DataFrame) -> tuple[pd.DataFrame, 
     Compustat shares were ever more than 5% above CRSP's in a panel month."""
     cols = ["date", "permco", "company_shares_compustat_m", "above", "flag", "used"]
     u = u.merge(firm.rename(columns={"month_end": "date"})[cols], on=["date", "permco"], how="left")
-    used = u["used"].eq(True)
+    for c in ("above", "flag", "used"):                     # rows without a company-month (no permco) are False
+        u[c] = u[c].astype("boolean").fillna(False).astype(bool)
+    used = u["used"]
     extra = u["company_shares_compustat_m"] - u["company_shares_crsp_m"]
     u["company_mkt_cap_crsp_musd"] = u["company_mkt_cap_musd"]
     u["company_mkt_cap_musd"] = u["company_mkt_cap_musd"].where(~used, u["company_mkt_cap_musd"]

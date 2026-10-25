@@ -231,8 +231,10 @@ def test_company_cap_on_the_crsp_basis_with_the_largest_class_price():
     u = pd.DataFrame({"date": MONTHS, "permno": 1, "permco": 10, "company_shares_crsp_m": 40.0,
                       "company_main_prc": 10.0, "company_mkt_cap_musd": 400.0, "company_has_adr": False,
                       "ticker": "T", "security_name": "N", "n_share_classes": 1})
+    u = pd.concat([u, u.iloc[[0]].assign(permno=2, permco=99)], ignore_index=True)   # no company-month for it
     out, audit = s07.add_company_cap(u, firm)
-    assert out["company_mkt_cap_musd"].tolist() == [400.0, 400.0, 600.0, 600.0, 600.0, 600.0]
+    assert out["company_mkt_cap_musd"].tolist() == [400.0, 400.0, 600.0, 600.0, 600.0, 600.0, 400.0]
+    assert not out["company_cap_from_compustat"].iloc[-1] and audit["months_used"].dtype.kind in "iu"
     assert out["company_mkt_cap_crsp_musd"].eq(400.0).all()
     a = audit.set_index("permco").loc[10]
     assert a["months_above_5pct"] == 6 and a["months_used"] == 4 and a["months_waiting"] == 2
