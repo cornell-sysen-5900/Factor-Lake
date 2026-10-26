@@ -1,16 +1,16 @@
 """
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: pipeline/stages/s08_export.py
-PURPOSE: Stage s08_export: the final files in processed/final/ with standard types, manifest.json,
-         DATA_DICTIONARY.md and UPLOAD.md. Nothing is uploaded.
+PURPOSE: Stage s08_export: the final files in processed/final/ with standard types, manifest.json and UPLOAD.md,
+         and processed/DATA_DICTIONARY.md. Nothing is uploaded.
 
 In:  the outputs of s01-s07; processed/s00_inventory/inventory.json (raw checksums and date ranges)
 Out: processed/final/factor_panel_monthly.parquet, universe_periods.parquet, returns_monthly.parquet,
      prices_daily/year=YYYY/data.parquet + prices_daily/_manifest.json, market_daily.parquet, market_monthly.parquet,
      rv_multiples_monthly.parquet, rv_peer_stats_monthly.parquet, dcf_inputs_annual.parquet,
      estimates_consensus.parquet, fundamentals_quarterly.parquet, security_master.parquet, column_stats.parquet,
-     manifest.json, DATA_DICTIONARY.md, UPLOAD.md (exactly these files);
-     processed/s08_export/summary.json (kept out of final/)
+     manifest.json, UPLOAD.md (exactly these files);
+     processed/DATA_DICTIONARY.md (next to final/, not uploaded); processed/s08_export/summary.json
 
 Rules (pipeline/PLAN.md, s08_export): permno int32, dates datetime64[ns] without time zone, floats float64; only
 the columns documented in pipeline/dictionary.py (undocumented helper columns are dropped by name, so a new column
@@ -60,7 +60,8 @@ SOURCES = {
     "fundamentals_quarterly.parquet": ("s03_fundamentals_q", "fundamentals_quarterly.parquet", "period_end", ()),
     "security_master.parquet": ("s07_panel", "security_master.parquet", None, ()),
 }
-DOCS = ("manifest.json", "DATA_DICTIONARY.md", "UPLOAD.md")
+DOCS = ("manifest.json", "UPLOAD.md")
+DICTIONARY = "DATA_DICTIONARY.md"   # written to processed/, next to final/
 STATS = "column_stats.parquet"
 
 
@@ -245,110 +246,168 @@ def s3_folder(version: str) -> str:
 
 # ---------- UPLOAD.md ----------
 
-def upload_md(version: str, outputs: dict) -> str:
-    folder = s3_folder(version)
-    total = sum(o["size_mb"] for o in outputs.values())
-    n_files = sum(o["files"] for o in outputs.values()) + 1 + len(DOCS)
-    return f"""# Uploading the WRDS data (version {version}) to S3
-
-For a teammate with the Factor-Lake repo and its `.env` holding the AWS keys (`AWS_ACCESS_KEY_ID`,
-`AWS_SECRET_ACCESS_KEY`, optionally `AWS_DEFAULT_REGION`). The target is a new folder,
-
-    s3://{S3_BUCKET}/{S3_PREFIX}/{folder}/
-
-next to the files the live app reads (`{S3_PREFIX}/full_precision_test.parquet`, `{S3_PREFIX}/daily_prices/`, ...),
-so nothing the app reads today is overwritten. The app does not read the new folder until someone points it there.
-
-What goes up: everything in this `final/` folder, {n_files} files, about {total:,.0f} MB. `manifest.json` goes last, so
-a reader that finds it knows every other file is complete.
-
-## 1. Save the script
-
-Save this as `upload_wrds.py` in the Factor-Lake repo root. It uses boto3 and python-dotenv, which the repo already
-depends on. It never prints the AWS keys, only the S3 object keys (file paths in the bucket).
-
-```python
-\"\"\"Upload processed/final/ to s3://{S3_BUCKET}/{S3_PREFIX}/{folder}/. Dry run unless --upload.\"\"\"
+UPLOAD_SCRIPT = '''"""Upload the Parquet files of processed/final/ to s3://@BUCKET@/<prefix>/. Dry run unless --upload."""
 import argparse
-import os
+import hashlib
 import sys
+import tempfile
 from pathlib import Path
 
 import boto3
-from dotenv import load_dotenv
+from boto3.s3.transfer import TransferConfig
 
-BUCKET = "{S3_BUCKET}"
-PREFIX = "{S3_PREFIX}/{folder}"
-TYPES = {{".parquet": "application/vnd.apache.parquet", ".json": "application/json", ".md": "text/markdown"}}
+try:
+    import tomllib                                   # Python 3.11+
+except ImportError:
+    import tomli as tomllib                          # Python 3.10: installed with the repo's dev group
+
+BUCKET = "@BUCKET@"
+PREFIX = "@PREFIX@"
+CHUNK = 64 * 1024 * 1024                             # multipart part size; also predicts the S3 ETag
+APP = ("@APP_PREFIX@/full_precision_test.parquet", "@APP_PREFIX@/last_price_mapping.parquet",
+       "@APP_PREFIX@/daily_last_prices.parquet", "@APP_PREFIX@/daily_prices/", "@APP_PREFIX@/backtest-results/",
+       "@APP_PREFIX@/archive/", "@APP_PREFIX@/_deploy/")   # what the live app and its scripts read or write
 
 parser = argparse.ArgumentParser()
 parser.add_argument("final_dir", type=Path, help="the processed/final folder")
+parser.add_argument("--prefix", default=PREFIX, help=f"target prefix in the bucket (default {PREFIX})")
+parser.add_argument("--secrets", type=Path, default=Path(__file__).resolve().parent / ".streamlit" / "secrets.toml",
+                    help="Streamlit secrets with AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY (default: the repo's)")
 parser.add_argument("--upload", action="store_true", help="really upload (default: dry run)")
-parser.add_argument("--check", action="store_true", help="list the S3 folder and compare with the local files")
-parser.add_argument("--overwrite", action="store_true", help="allow replacing objects already in the folder")
-parser.add_argument("--offline", action="store_true", help="dry run without credentials or network: only list keys")
+parser.add_argument("--check", action="store_true", help="compare the S3 folder with the local files")
+parser.add_argument("--overwrite", action="store_true", help="replace objects in the prefix that differ")
+parser.add_argument("--offline", action="store_true", help="dry run without credentials or network: list the keys")
 args = parser.parse_args()
+prefix = args.prefix.strip("/")
 if args.offline and (args.upload or args.check):
     sys.exit("--offline is a dry run only")
-if not PREFIX.startswith("{S3_PREFIX}/wrds_"):
-    sys.exit("Refusing a prefix outside {S3_PREFIX}/wrds_*: the live app's files must not be touched")
+if not prefix.startswith("@APP_PREFIX@/wrds_") or any(prefix.startswith(a.rstrip("/")) for a in APP):
+    sys.exit(f"Refusing prefix {prefix!r}: it must be a new @APP_PREFIX@/wrds_* folder, apart from the app's files")
 
 final = args.final_dir.resolve()
 if not (final / "manifest.json").is_file():
-    sys.exit(f"{{final}} has no manifest.json; pass the processed/final folder")
-files = sorted((p for p in final.rglob("*") if p.is_file()), key=lambda p: p.name == "manifest.json")
-local = {{f"{{PREFIX}}/{{p.relative_to(final).as_posix()}}": p for p in files}}
+    sys.exit(f"{final} has no manifest.json; pass the processed/final folder")
+local = {f"{prefix}/{p.relative_to(final).as_posix()}": p for p in sorted(final.rglob("*.parquet"))}
+
+
+def etag(path: Path) -> str:
+    """The ETag S3 gives this file when uploaded with CHUNK-sized parts (plain MD5 below one part)."""
+    parts = []
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(CHUNK), b""):
+            parts.append(hashlib.md5(block).digest())
+    if path.stat().st_size < CHUNK:
+        return parts[0].hex() if parts else hashlib.md5(b"").hexdigest()
+    return f"{hashlib.md5(b''.join(parts)).hexdigest()}-{len(parts)}"
+
+
+def sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1 << 22), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
 if args.offline:
     for key, path in local.items():
-        print(f"would upload s3://{{BUCKET}}/{{key}} ({{path.stat().st_size / 1e6:,.1f}} MB)")
-    print(f"{{len(local)}} files, {{sum(p.stat().st_size for p in local.values()) / 1e6:,.0f}} MB (offline dry run)")
+        print(f"would upload s3://{BUCKET}/{key} ({path.stat().st_size / 1e6:,.1f} MB)")
+    print(f"{len(local)} files, {sum(p.stat().st_size for p in local.values()) / 1e6:,.0f} MB (offline dry run)")
     sys.exit(0)
 
-load_dotenv(Path(__file__).resolve().parent / ".env")          # the repo's .env
-missing = [k for k in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY") if not os.environ.get(k)]
+with open(args.secrets, "rb") as f:
+    secrets = tomllib.load(f)
+found = {k: v for k, v in secrets.items() if isinstance(v, str)}
+for table in (v for v in secrets.values() if isinstance(v, dict)):  # also a section such as [aws]
+    found.update({k.upper(): v for k, v in table.items() if isinstance(v, str)})
+missing = [k for k in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY") if not found.get(k)]
 if missing:
-    sys.exit(f"Not set in .env: {{', '.join(missing)}}")
-s3 = boto3.client("s3", region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
+    sys.exit(f"Not in {args.secrets}: {', '.join(missing)}")
+s3 = boto3.client("s3", aws_access_key_id=found["AWS_ACCESS_KEY_ID"],
+                  aws_secret_access_key=found["AWS_SECRET_ACCESS_KEY"],
+                  region_name=found.get("AWS_DEFAULT_REGION") or "us-east-1")
+del secrets, found
+config = TransferConfig(multipart_threshold=CHUNK, multipart_chunksize=CHUNK)
 
-
-def remote_objects():
-    out = {{}}
-    for page in s3.get_paginator("list_objects_v2").paginate(Bucket=BUCKET, Prefix=PREFIX + "/"):
-        out.update({{o["Key"]: o["Size"] for o in page.get("Contents", [])}})
-    return out
-
+remote = {}
+for page in s3.get_paginator("list_objects_v2").paginate(Bucket=BUCKET, Prefix=prefix + "/"):
+    remote.update({o["Key"]: (o["Size"], o["ETag"].strip('"')) for o in page.get("Contents", [])})
+same = {k for k, p in local.items() if remote.get(k) == (p.stat().st_size, etag(p))}
 
 if args.check:
-    remote = remote_objects()
-    bad = 0
     for key, path in local.items():
-        size = path.stat().st_size
-        status = "ok" if remote.get(key) == size else ("MISSING" if key not in remote else "SIZE DIFFERS")
-        bad += status != "ok"
-        print(f"{{status:12}} s3://{{BUCKET}}/{{key}} ({{size / 1e6:,.1f}} MB)")
+        status = "ok" if key in same else ("MISSING" if key not in remote else "DIFFERS")
+        print(f"{status:8} s3://{BUCKET}/{key} ({path.stat().st_size / 1e6:,.1f} MB)")
     extra = sorted(set(remote) - set(local))
     for key in extra:
-        print(f"{{'NOT LOCAL':12}} s3://{{BUCKET}}/{{key}}")
-    print(f"{{len(local) - bad}} of {{len(local)}} files match; {{len(extra)}} objects in S3 not in the local folder")
-    sys.exit(1 if bad else 0)
+        print(f"{'EXTRA':8} s3://{BUCKET}/{key}")
+    key, path = min(((k, p) for k, p in local.items() if k in same), key=lambda kp: kp[1].stat().st_size,
+                    default=(None, None))
+    sha_ok = None
+    if key:
+        with tempfile.TemporaryDirectory() as tmp:
+            back = Path(tmp) / "back.parquet"
+            s3.download_file(BUCKET, key, str(back))
+            sha_ok = sha256(back) == sha256(path)
+        print(f"downloaded {key} back: sha256 {'matches' if sha_ok else 'DIFFERS'}")
+    mb = sum(remote[k][0] for k in same) / 1e6
+    print(f"{len(same)} of {len(local)} files match (size and ETag), {mb:,.0f} MB; {len(extra)} objects not local")
+    sys.exit(0 if len(same) == len(local) and not extra and sha_ok else 1)
 
-existing = remote_objects()
-clash = sorted(set(existing) & set(local))
-if clash and not args.overwrite:
-    sys.exit(f"{{len(clash)}} objects already exist under s3://{{BUCKET}}/{{PREFIX}}/ (e.g. {{clash[0]}}); "
+differ = sorted(k for k in local if k in remote and k not in same)
+if differ and not args.overwrite:
+    sys.exit(f"{len(differ)} objects in s3://{BUCKET}/{prefix}/ differ from the local files (e.g. {differ[0]}); "
              "rerun with --overwrite to replace them")
 for key, path in local.items():
     size = path.stat().st_size
-    if not args.upload:
-        print(f"would upload s3://{{BUCKET}}/{{key}} ({{size / 1e6:,.1f}} MB)")
-        continue
-    s3.upload_file(str(path), BUCKET, key, ExtraArgs={{"ContentType": TYPES.get(path.suffix, "binary/octet-stream")}})
-    if s3.head_object(Bucket=BUCKET, Key=key)["ContentLength"] != size:
-        sys.exit(f"Size mismatch after uploading {{key}}")
-    print(f"uploaded s3://{{BUCKET}}/{{key}} ({{size / 1e6:,.1f}} MB)")
-print(f"{{len(local)}} files, {{sum(p.stat().st_size for p in local.values()) / 1e6:,.0f}} MB"
+    if key in same:
+        print(f"skip      s3://{BUCKET}/{key} (same size and ETag)")
+    elif not args.upload:
+        print(f"would upload s3://{BUCKET}/{key} ({size / 1e6:,.1f} MB)")
+    else:
+        s3.upload_file(str(path), BUCKET, key, Config=config,
+                       ExtraArgs={"ContentType": "application/vnd.apache.parquet"})
+        head = s3.head_object(Bucket=BUCKET, Key=key)
+        if head["ContentLength"] != size or head["ETag"].strip('"') != etag(path):
+            sys.exit(f"Size or ETag mismatch after uploading {key}")
+        print(f"uploaded  s3://{BUCKET}/{key} ({size / 1e6:,.1f} MB)")
+print(f"{len(local)} files, {sum(p.stat().st_size for p in local.values()) / 1e6:,.0f} MB"
       + ("" if args.upload else " (dry run: nothing uploaded)"))
-```
+'''
+
+
+def upload_md(version: str, outputs: dict) -> str:
+    """UPLOAD.md: the script above and how to run it. Only the Parquet files go up."""
+    folder = s3_folder(version)
+    prefix = f"{S3_PREFIX}/{folder}"
+    n_files = sum(o["files"] for o in outputs.values())
+    total = sum(o["size_mb"] for o in outputs.values())
+    script = (UPLOAD_SCRIPT.replace("@BUCKET@", S3_BUCKET).replace("@PREFIX@", prefix)
+              .replace("@APP_PREFIX@", S3_PREFIX))
+    return f"""# Uploading the WRDS data (version {version}) to S3
+
+For a teammate with the Factor-Lake repo and its Streamlit secrets (`.streamlit/secrets.toml`, which holds
+`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_DEFAULT_REGION` at the top level; the file is in .gitignore).
+The script reads them with tomllib and passes them to boto3; it never prints them. The target is a new folder,
+
+    s3://{S3_BUCKET}/{prefix}/
+
+next to the files the live app reads (`{S3_PREFIX}/full_precision_test.parquet`, `{S3_PREFIX}/daily_prices/`, ...),
+so nothing the app reads today is touched. The script refuses any other prefix.
+
+What goes up: only the {n_files} Parquet files of this `final/` folder (about {total:,.0f} MB), with the same relative
+paths: the tables at the top level and `prices_daily/year=YYYY/data.parquet`. `manifest.json`,
+`prices_daily/_manifest.json` and this file stay local; DATA_DICTIONARY.md is next to `final/`, in `processed/`.
+Note: the app's current daily reader (`src/s3_client.py`) lists the years from `daily_prices/_manifest.json`, so it
+cannot read `prices_daily/` without that manifest or a code change.
+
+## 1. Save the script
+
+Save this as `upload_wrds.py` in the Factor-Lake repo root (it finds `.streamlit/secrets.toml` next to itself; pass
+`--secrets` for another file). It uses boto3, which the repo depends on, and tomllib (tomli on Python 3.10).
+
+```python
+{script}```
 
 ## 2. Dry run (uploads nothing)
 
@@ -356,26 +415,23 @@ From the repo root, with the path of this `final/` folder:
 
     uv run python upload_wrds.py "C:/path/to/WRDS FA26/processed/final"
 
-It loads the keys from the repo's `.env`, lists what is already in the target folder (this checks that the keys
-work), and prints every S3 object key it would upload with its size. Add `--offline` to only print the keys, with
-no credentials and no network. Check that every line starts with
-`s3://{S3_BUCKET}/{S3_PREFIX}/{folder}/`.
+It reads the keys, lists what is already in the target folder (this checks that the keys work), and prints every
+S3 key it would upload. `--offline` prints the keys without credentials or network.
 
 ## 3. Upload
 
     uv run python upload_wrds.py "C:/path/to/WRDS FA26/processed/final" --upload
 
-Each file is uploaded and its size in S3 compared with the local file; the script stops on the first mismatch. If
-the folder already has files from an earlier attempt it refuses to continue; add `--overwrite` only when you mean to
-replace them.
+Files whose size and ETag already match in S3 are skipped. Each upload is checked against the local size and the
+expected ETag. If an object in the folder differs from the local file the script stops before uploading anything;
+add `--overwrite` only when you mean to replace it. Nothing outside the folder is written or deleted.
 
 ## 4. Check afterwards
 
     uv run python upload_wrds.py "C:/path/to/WRDS FA26/processed/final" --check
 
-Lists the S3 folder and compares every object with the local file (name and size). It should end with
-`{n_files} of {n_files} files match; 0 objects in S3 not in the local folder` and exit with code 0.
-The same listing with the AWS CLI, if you have it: `aws s3 ls s3://{S3_BUCKET}/{S3_PREFIX}/{folder}/ --recursive`.
+Compares every key's size and ETag with the local file, downloads the smallest file back and compares its sha256.
+It should end with `{n_files} of {n_files} files match` and exit with code 0.
 """
 
 
@@ -432,7 +488,7 @@ def run_checks(paths: DataPaths, out: Path, exported: dict, outputs: dict, manif
     bad_types = {k: v for k, v in bad_types.items() if v}
     checks.append(check("permno is int32 and every date datetime64[ns] without time zone", not bad_types,
                         str(bad_types) if bad_types else "all files"))
-    md = (out / "DATA_DICTIONARY.md").read_text(encoding="utf-8")
+    md = (paths.processed / DICTIONARY).read_text(encoding="utf-8")
     checks += dictionary_checks(md, outputs)
     checks += stats_checks(md, pd.read_parquet(out / STATS), outputs)
     expected = {o["path"] for n, o in outputs.items() if n != DAILY} | set(DOCS) | {"prices_daily/_manifest.json"}
@@ -472,8 +528,9 @@ def run(paths: DataPaths) -> dict:
     manifest = build_manifest(paths, out, version, outputs, inventory)
     manifest["factor_coverage_by_year_pct"] = {c: {str(y): round(float(v), 1) for y, v in row.items()}
                                                for c, row in coverage.iterrows()}
+    manifest["data_dictionary"] = f"processed/{DICTIONARY} (next to final/; not uploaded)"
     write_json(manifest, out / "manifest.json")
-    (out / "DATA_DICTIONARY.md").write_text(dictionary.render(manifest, stats, coverage), encoding="utf-8")
+    (paths.processed / DICTIONARY).write_text(dictionary.render(manifest, stats, coverage), encoding="utf-8")
     (out / "UPLOAD.md").write_text(upload_md(version, outputs), encoding="utf-8")
 
     checks = run_checks(paths, out, exported, outputs, manifest)

@@ -349,6 +349,9 @@ def check_reproducible(paths: DataPaths, out: Path) -> tuple[list[Check], dict]:
                           f"{proc.stderr[-300:]}", level=WARN)], {"stage_seconds": seconds}
     total = round(time.time() - started)
     files = compare_finals(paths.processed / "final", tmp / "final")
+    dic = "DATA_DICTIONARY.md"
+    files[f"../{dic}"] = {"same": (tmp / dic).is_file() and (paths.processed / dic).read_text(encoding="utf-8")
+                          == (tmp / dic).read_text(encoding="utf-8")}
     shutil.rmtree(tmp, ignore_errors=True)
     differ = [k for k, v in files.items() if not v["same"]]
     res = {"total_seconds": total, "stage_seconds": seconds, "files_compared": len(files), "differ": differ,
@@ -397,16 +400,16 @@ def check_upload(final: Path, out: Path, manifest: dict) -> tuple[list[Check], d
                           capture_output=True, text=True, env=env, cwd=out)
     keys = re.findall(r"would upload s3://[^/]+/(\S+)", proc.stdout)
     prefix = manifest["s3_target"].split("/", 3)[3]
-    n_files = sum(1 for f in final.rglob("*") if f.is_file())
-    bad = [k for k in keys if not k.startswith(prefix)]
+    n_files = sum(1 for f in final.rglob("*.parquet"))
+    bad = [k for k in keys if not k.startswith(prefix) or not k.endswith(".parquet")]
     res = {"exit_code": proc.returncode, "keys": len(keys), "files_in_final": n_files, "prefix": prefix,
            "outside_prefix": bad, "first_keys": keys[:3], "last_key": keys[-1] if keys else None,
            "stderr": proc.stderr[-300:]}
-    planned = sum(o["files"] for o in manifest["outputs"].values()) + 4    # + daily _manifest.json and 3 documents
+    planned = sum(o["files"] for o in manifest["outputs"].values())          # the Parquet files only
     res["planned_files"] = planned
     ok = proc.returncode == 0 and len(keys) == n_files == planned and not bad
-    return [check(f"upload dry run offline: one key per planned file ({planned}) under {prefix}", ok,
-                  f"{len(keys)} keys, {n_files} files, exit code {proc.returncode}", level=WARN)], res
+    return [check(f"upload dry run offline: one key per Parquet file ({planned}) under {prefix}", ok,
+                  f"{len(keys)} keys, {n_files} Parquet files, exit code {proc.returncode}", level=WARN)], res
 
 
 # ---------- VALIDATION.md ----------
@@ -540,8 +543,8 @@ def render(r: dict, checks: list[Check], manifest: dict) -> str:
            f"tier has about {mem['app_limit_mb']:,} MB for the whole app.", ""]
     up = r["upload"]
     md += [verdict_line(checks, "app memory"), "", "## 7. Upload dry run", "",
-           f"The script in UPLOAD.md run with `--offline`, without AWS variables and with network connections "
-           f"blocked: exit code {up['exit_code']}, {up['keys']} S3 keys for {up['files_in_final']} files, all under "
+           f"The script in UPLOAD.md run with `--offline`, without credentials and with network connections "
+           f"blocked: exit code {up['exit_code']}, {up['keys']} S3 keys for {up['files_in_final']} Parquet files, all under "
            f"`{up['prefix']}`" + (f" except {up['outside_prefix']}" if up["outside_prefix"] else "") + ".", "",
            verdict_line(checks, "upload"), ""]
     return "\n".join(md)

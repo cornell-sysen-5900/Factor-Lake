@@ -84,4 +84,7 @@ def test_upload_instructions_target_a_new_folder_and_the_script_compiles():
     assert "s3://sysen-5900-factor-lake/factor-lake-data/wrds_2026_10/" in md
     code = md.split("```python\n")[1].split("```")[0]
     compile(code, "upload_wrds.py", "exec")
-    assert "print(os.environ" not in code and "AWS_SECRET_ACCESS_KEY\"]" not in code
+    # keys from the Streamlit secrets with tomllib, never printed; only Parquet files are selected
+    assert "tomllib" in code and "dotenv" not in code and 'rglob("*.parquet")' in code
+    prints = [l for l in code.splitlines() if "print(" in l or "sys.exit(" in l]
+    assert not any(w in l for l in prints for w in ("found[", "secrets[", "aws_secret", "aws_access_key_id"))

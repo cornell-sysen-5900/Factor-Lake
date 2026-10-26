@@ -7,7 +7,7 @@ answers are in [Decisions](#decisions) and are written into the stage rules belo
 ## Final outputs
 
 s08_export writes these files to `processed/final/` (Parquet, pyarrow, zstd; its summary.json goes to
-`processed/s08_export/`). The columns as built are in `processed/final/DATA_DICTIONARY.md`; the table below is the plan. Every factor
+`processed/s08_export/`). The columns as built are in `processed/DATA_DICTIONARY.md`; the table below is the plan. Every factor
 and multiple is a raw value; the app z-scores or ranks at each rebalance.
 
 | file | one row per | key columns | built in | used by |
@@ -631,8 +631,8 @@ announcement.
 | fundamentals_quarterly.parquet | s03 |
 | column_stats.parquet | computed by s08 from the other final tables (prices_daily's years combined): numeric dtype, rows, non-null %, min, p1, p25, median, mean, p75, p99, max; dates non-null %, min, max, unique; text non-null %, unique, top 5 with their share of rows; booleans non-null %, share True |
 | manifest.json | data_version (build date), created_at, pipeline git commit (and whether the tree was dirty), sha256 of every raw file (from s00), per output file path, rows, MB, date range, permnos, column types; units, sectors (GICS and the SIC fallback), delisting fill rule, month-end convention, which market cap to use for what, point-in-time note, known gaps (the 72 unmatched IWM holdings, unlisted share classes, where each source ends) |
-| DATA_DICTIONARY.md | rendered from `pipeline/dictionary.py`: per file what it is, its key and rows, every column with type, meaning, unit, source and stage, a Stats table from column_stats.parquet (non-null %, min, median, mean, max, and p1 / p99 for factors and multiples; 4 significant figures), and for factor_panel_monthly the non-null % of every factor by year |
-| UPLOAD.md | dry run, upload and listing check against `s3://sysen-5900-factor-lake/factor-lake-data/wrds_YYYY_MM/` for a teammate with the repo's .env AWS keys. **Nothing is uploaded by the pipeline.** |
+| processed/DATA_DICTIONARY.md (next to final/, not uploaded) | rendered from `pipeline/dictionary.py`: per file what it is, its key and rows, every column with type, meaning, unit, source and stage, a Stats table from column_stats.parquet (non-null %, min, median, mean, max, and p1 / p99 for factors and multiples; 4 significant figures), and for factor_panel_monthly the non-null % of every factor by year |
+| UPLOAD.md | dry run, upload and listing check against `s3://sysen-5900-factor-lake/factor-lake-data/wrds_YYYY_MM/` for a teammate with the repo's Streamlit secrets (`.streamlit/secrets.toml`, read with tomllib and passed to boto3). Only the Parquet files are uploaded (33); identical objects (size and ETag) are skipped; the check downloads one file back and compares its sha256. **Nothing is uploaded by the pipeline.** |
 
 **Rules:** permno int32, permco nullable int32, dates datetime64[ns] without time zone, floats float64, market cap in
 $ millions, returns and yields as decimals. Helper columns are dropped by name (`SOURCES` in s08_export.py), so a
@@ -671,8 +671,8 @@ ROA each June, equal weight, held July-June, on the new and the old panel vs IWM
 (no pipeline imports): B/P, ROA, 12-1 momentum, E/P, EV/EBITDA, the month's return within 1e-6 relative; (5) every
 stage rerun into a temporary folder (`--processed-dir`), each final file compared by rows and a hash of the data
 sorted by its key, full run time; (6) memory of factor_panel_monthly in pandas, full and with 9 columns, vs the
-~1 GB Streamlit free tier (WARN above half); (7) the UPLOAD.md script with `--offline`, no AWS variables and
-network blocked: one key per planned file (37 with column_stats.parquet) under factor-lake-data/wrds_YYYY_MM/.
+~1 GB Streamlit free tier (WARN above half); (7) the UPLOAD.md script with `--offline`, no credentials and
+network blocked: one key per Parquet file (33), nothing else, under factor-lake-data/wrds_YYYY_MM/.
 
 **Tests:** cap-weighted next-month returns, tracking statistics, long-short sorts both ways, the June portfolio,
 the rerun comparison (changed data found, row order and created_at ignored), the offline dry run, the recompute

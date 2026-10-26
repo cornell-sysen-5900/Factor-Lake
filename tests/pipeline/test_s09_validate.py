@@ -91,11 +91,11 @@ def test_upload_dry_run_works_offline(tmp_path, monkeypatch):
     (final / "manifest.json").write_text("{}")
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "should-not-be-needed")
     manifest = {"s3_target": "s3://sysen-5900-factor-lake/factor-lake-data/wrds_2026_10/",
-                "outputs": {"tables": {"files": 32}}}                       # + daily manifest + 3 documents
+                "outputs": {"tables": {"files": 34}}}                       # Parquet files only
     checks, res = s09.check_upload(final, out, manifest)
     assert res["exit_code"] == 0, res["stderr"]
-    assert res["keys"] == 36 and not res["outside_prefix"] and checks[0].status == "PASS"
-    assert res["last_key"].endswith("manifest.json")                 # the manifest goes last
+    assert res["keys"] == 34 and not res["outside_prefix"] and checks[0].status == "PASS"
+    assert all(k.endswith(".parquet") for k in res["first_keys"])     # no JSON or Markdown
 
 
 def test_independent_recompute_script_on_tiny_raw_files(tmp_path):
