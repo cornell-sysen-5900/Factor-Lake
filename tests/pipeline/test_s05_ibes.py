@@ -116,3 +116,24 @@ def test_scale_rule_uses_company_size_known_at_statpers():
     assert not out.loc[4, "suspect_scale"]            # per-share measures are not totals
     assert not out.loc[5, "suspect_scale"]            # permno 2: no size known
     assert info["estimates_by_measure"] == {"EBI": 1, "SAL": 1} and info["no_size_known_rows"] == 2
+
+
+def test_margin_rule_catches_ebit_and_capex_far_above_revenue_but_spares_losses_and_biotechs():
+    # size is large (cap $50B), so the scale rule never fires here; only the margin rule can
+    est = [("BIG", 1, "EBI", 5_000.0),      # 50x revenue of $100M: margin
+           ("BIG", 1, "EBT", 1_500.0),      # 15x: kept
+           ("BIG", 1, "CPX", 3_000.0),      # capex 30x revenue: margin
+           ("BIG", 1, "EBI", -5_000.0),     # a loss far beyond revenue: never touched
+           ("BIG", 1, "SAL", 5_000.0),      # sales are not in the margin rule
+           ("BIO", 2, "EBT", 1_000.0)]      # pre-revenue biotech ($0.5M revenue): kept
+    ib = pd.DataFrame([{"ticker": t, "permno": p, "measure": m, "fpi": 2, "statpers": pd.Timestamp("2021-03-18"),
+                        "meanest": v, "medest": v, "stdev": 1.0, "highest": v, "lowest": v, "actual": np.nan}
+                       for t, p, m, v in est])
+    fund = pd.DataFrame({"permno": [1, 2], "report_date": pd.Timestamp("2021-02-10"), "revenue_ttm": [100.0, 0.5],
+                         "atq": [400.0, 300.0]})
+    caps = pd.DataFrame({"permno": [1, 2], "date": pd.Timestamp("2021-03-17"), "company_mkt_cap_musd": 50_000.0})
+    out, info = s05.apply_scale_rule(ib, fund, caps)
+    assert out["suspect_scale_reason"].tolist() == ["margin", None, "margin", None, None, None]
+    assert np.isnan(out.loc[0, "meanest"]) and np.isnan(out.loc[2, "highest"])
+    assert out.loc[3, "meanest"] == -5_000.0 and out.loc[5, "meanest"] == 1_000.0 and out.loc[1, "meanest"] == 1_500
+    assert info["margin_by_measure"] == {"CPX": 1, "EBI": 1} and not info["estimates_by_measure"]

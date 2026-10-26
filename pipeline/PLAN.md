@@ -53,7 +53,7 @@ cite them. "Last run" numbers are the notebook's; they become the expected value
 
 ## Decisions
 
-Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the fourth, 21-23 and the s07 choices (24) from the fifth, 25-27 from the sixth, 28-29 from the seventh, 30-31 and the new 29 from the eighth (all 2026-10-25).
+Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the fourth, 21-23 and the s07 choices (24) from the fifth, 25-27 from the sixth, 28-29 from the seventh, 30-31 and the new 29 from the eighth, 32 from the ninth (all 2026-10-25).
 
 | # | decision | where |
 |---|---|---|
@@ -87,6 +87,7 @@ Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the 
 | 29 | The Compustat share count is used at month end t only when the gap (more than 5%, no ADR) has held at t and at each of the 2 calendar month ends before it, checked on every month with CRSP rows, in or out of the universe; otherwise CRSP's count. Causal: nothing after t is used. (Replaces the first version, which used how long the flag lasted, known only afterwards.) | s07 rule 3 |
 | 30 | IBES scale rule: a total (SAL, EBT, EBI, CPX) estimate or actual more than 100x the largest of the company's Compustat TTM revenue, total assets and company market cap known at statpers (latest report_date <= statpers; market cap on the last trading day <= statpers, at most 7 days back) is NaN (suspect_scale); skipped when none of the three is known. | s05 rule 8 |
 | 31 | estimates_consensus drops cfacpr_last (always 1.0 in CIZ); crsp_basis_factor stays. s07 takes each permno's last cfacpr from the daily prices. | s05, s07 |
+| 32 | IBES margin rule, on top of the scale rule: with Compustat TTM revenue >= $50M known at statpers, a positive EBIT or EBITDA estimate (EBI, EBT) or a capex estimate (CPX) more than 20x that revenue is NaN. Negative EBIT and EBITDA are never touched; pre-revenue companies (< $50M) are skipped. Both rules set suspect_scale; suspect_scale_reason says which (scale or margin). | s05 rule 9 |
 | 27 | Panel yield caps: f_forward_ep, f_forward_ep_fy2, f_forward_cfp NaN beyond +-5, f_analyst_surprise NaN beyond +-1 (counted). The median-multiples check is informational. | s07 rules 8-9, checks |
 
 ## What s00 found in raw/
@@ -436,7 +437,10 @@ cfacpr), `raw/query_inputs/ibes_tickers.txt` (only to compare).
    when no size is known (39,662 rows). Today 402 estimates (CPX 93, EBI 126, EBT 117, SAL 66) and 6 actuals (CPX
    4, SAL 2). It catches FMPN, KVPH, DINE, ABX and CIBR. CNTE is real (Centene, $203B revenue). AEI (EBI $241B
    against $1.5B revenue but $49B of assets) and a few others with large balance sheets stay; see Phase 3b.
-9. The analyst factors (forward E/P, revision, dispersion, surprise, and the yields of decision 5) are computed in
+9. **Margin rule** (decision 32): with TTM revenue >= $50M known at statpers, a positive EBI or EBT estimate, or a CPX
+   estimate, above 20x that revenue is NaN; suspect_scale with suspect_scale_reason = margin (scale when the scale
+   rule also hit it).
+10. The analyst factors (forward E/P, revision, dispersion, surprise, and the yields of decision 5) are computed in
    s07 from this table, at the month end, so they use the month-end price and market cap (decision 15 included).
 
 **Checks:** only USD and FPI 0-3 (FAIL); unique (permno, statpers, measure, fpi) (FAIL); every measure present

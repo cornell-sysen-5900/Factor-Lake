@@ -25,7 +25,11 @@ Rules (pipeline/PLAN.md, s05_ibes):
        value x crsp_basis_factor (= cfacpr_statpers / the permno's last cfacpr) is on the basis of the CRSP price at
        statpers
     7. scale rule: a total (estimate or actual) more than 100x the largest of the company's Compustat TTM revenue,
-       total assets and company market cap, as known at statpers, is NaN (suspect_scale); skipped when none is known
+       total assets and company market cap, as known at statpers, is NaN (suspect_scale, reason "scale"); skipped
+       when none is known
+    8. margin rule: with Compustat TTM revenue >= $50M known at statpers, a positive EBIT or EBITDA estimate (EBI,
+       EBT) or a capex estimate (CPX) more than 20x that revenue is NaN (suspect_scale, reason "margin"); negative
+       EBIT and EBITDA are never touched
 """
 
 from __future__ import annotations
@@ -36,7 +40,8 @@ import pyarrow as pa
 import pyarrow.csv as pacsv
 
 from pipeline.checks import PASS, WARN, Check, check, vs_last_run
-from pipeline.config import (IBES_CURRENCY, IBES_FPI, IBES_LINK_SCORES, IBES_MEASURES, IBES_OPEN_LINK_END,
+from pipeline.config import (IBES_CURRENCY, IBES_FPI, IBES_LINK_SCORES, IBES_MARGIN_MEASURES,
+                             IBES_MARGIN_MIN_REVENUE_MUSD, IBES_MARGIN_MULTIPLE, IBES_MEASURES, IBES_OPEN_LINK_END,
                              IBES_PER_SHARE, IBES_TOTAL_OUTLIER_MULTIPLE, IBES_TOTALS, PRICE_ASOF_DAYS, DataPaths)
 from pipeline.outputs import fresh_stage_dir, table_info, write_parquet, write_summary
 from pipeline.stages.s00_inventory import read_header
@@ -51,7 +56,7 @@ _TYPES = {"ticker": pa.string(), "statpers": pa.date32(), "measure": pa.string()
           **{c: pa.float64() for c in ("numest", "numup", "numdown", "actual", *VALUES)}}
 OUT_COLS = ("permno", "ibes_ticker", "statpers", "measure", "fpi", "fpedats", "numest", "numup", "numdown",
             *VALUES, "actual", "anndats_act", "price_statpers", "cfacpr_statpers", "crsp_basis_factor",
-            "suspect_total", "suspect_scale")
+            "suspect_total", "suspect_scale", "suspect_scale_reason")
 
 
 def read_estimates(path) -> pd.DataFrame:
@@ -170,7 +175,7 @@ def scale_outliers(ib: pd.DataFrame, fund: pd.DataFrame, caps: pd.DataFrame) -> 
     """Rule 7: per total-measure row, the company size known at statpers (latest report_date <= statpers; market cap
     on the last trading day <= statpers, at most 7 days earlier) and whether the estimate or the actual is more than
     100x it. Returns the size columns and the two hit flags, indexed like ib."""
-    tot = ib.loc[ib["measure"].isin(IBES_TOTALS), ["permno", "statpers", "meanest", "actual"]]
+    tot = ib.loc[ib["measure"].isin(IBES_TOTALS), ["permno", "statpers", "measure", "meanest", "actual"]]
     tot = tot.assign(statpers=tot["statpers"].astype("datetime64[ns]"), _i=tot.index).sort_values("statpers")
     f = fund.assign(report_date=fund["report_date"].astype("datetime64[ns]")).sort_values("report_date",
                                                                                           kind="stable")
@@ -180,23 +185,34 @@ def scale_outliers(ib: pd.DataFrame, fund: pd.DataFrame, caps: pd.DataFrame) -> 
                         tolerance=pd.Timedelta(days=PRICE_ASOF_DAYS))
     size = tot[["revenue_ttm", "atq", "company_mkt_cap_musd"]].where(lambda x: x > 0).max(axis=1)
     m = IBES_TOTAL_OUTLIER_MULTIPLE
-    out = pd.DataFrame({"size_musd": size.to_numpy(), "revenue_ttm": tot["revenue_ttm"].to_numpy(),
+    rev, est = tot["revenue_ttm"], tot["meanest"]
+    big = (rev >= IBES_MARGIN_MIN_REVENUE_MUSD) & (est > IBES_MARGIN_MULTIPLE * rev)       # rule 8
+    margin = big & (tot["measure"].isin(IBES_MARGIN_MEASURES) & (est > 0) | tot["measure"].eq("CPX"))
+    out = pd.DataFrame({"size_musd": size.to_numpy(), "revenue_ttm": rev.to_numpy(),
                         "atq": tot["atq"].to_numpy(), "company_mkt_cap_musd": tot["company_mkt_cap_musd"].to_numpy(),
-                        "estimate_hit": (tot["meanest"].abs() > m * size).to_numpy(),
-                        "actual_hit": (tot["actual"].abs() > m * size).to_numpy()}, index=tot["_i"].to_numpy())
+                        "estimate_hit": (est.abs() > m * size).to_numpy(),
+                        "actual_hit": (tot["actual"].abs() > m * size).to_numpy(),
+                        "margin_hit": margin.to_numpy()}, index=tot["_i"].to_numpy())
     return out.sort_index()
 
 
 def apply_scale_rule(ib: pd.DataFrame, fund: pd.DataFrame, caps: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    """Rules 7 and 8. suspect_scale_reason is "scale" when the scale rule hit the row, else "margin"."""
     s = scale_outliers(ib, fund, caps)
     est_hit, act_hit = s.index[s["estimate_hit"]], s.index[s["actual_hit"]]
+    scale = est_hit.union(act_hit)
+    margin = s.index[s["margin_hit"]].difference(scale)
     info = {"estimates_by_measure": ib.loc[est_hit].groupby("measure").size().to_dict(),
             "actuals_by_measure": ib.loc[act_hit].groupby("measure").size().to_dict(),
+            "margin_by_measure": ib.loc[margin].groupby("measure").size().to_dict(),
             "no_size_known_rows": int(s["size_musd"].isna().sum()),
-            "tickers_caught": sorted(ib.loc[est_hit.union(act_hit), "ticker"].unique().tolist())}
-    ib.loc[est_hit, list(VALUES)] = np.nan
+            "tickers_caught": sorted(ib.loc[scale, "ticker"].unique().tolist()),
+            "margin_tickers_caught": sorted(ib.loc[margin, "ticker"].unique().tolist())}
+    ib.loc[est_hit.union(margin), list(VALUES)] = np.nan
     ib.loc[act_hit, "actual"] = np.nan
-    ib["suspect_scale"] = ib.index.isin(est_hit.union(act_hit))
+    ib["suspect_scale"] = ib.index.isin(scale.union(margin))
+    ib["suspect_scale_reason"] = pd.Series(np.where(ib.index.isin(scale), "scale", np.where(
+        ib.index.isin(margin), "margin", None)), index=ib.index, dtype=object)
     left = ib.loc[s.index].join(s[["size_musd", "revenue_ttm", "atq", "company_mkt_cap_musd"]])
     left = left.dropna(subset=["meanest"]).sort_values("meanest", key=abs, ascending=False)
     left = left.drop_duplicates(["ticker", "measure"]).head(10)
@@ -293,7 +309,8 @@ def run(paths: DataPaths) -> dict:
     print(f"  {info['raw_rows']:,} raw rows -> {len(out):,} linked rows, {out['permno'].nunique():,} permnos | "
           f"non-USD {info['non_usd_dropped']:,}, duplicates {info['duplicates_dropped']:,}, "
           f"two tickers {info['two_tickers_dropped']}, suspect totals {suspects}, scale rule estimates "
-          f"{scale['estimates_by_measure']} actuals {scale['actuals_by_measure']}")
+          f"{scale['estimates_by_measure']} actuals {scale['actuals_by_measure']}, margin rule "
+          f"{scale['margin_by_measure']}")
     for c in checks:
         if c.status != PASS:
             print(f"  {c.status}  {c.name}: {c.detail}")

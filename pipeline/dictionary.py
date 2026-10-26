@@ -432,8 +432,11 @@ FILES["estimates_consensus.parquet"] = {
         "suspect_total": ("a total (SAL, EBT, EBI, CPX) more than 100x both its previous and next estimate; its "
                           "values are NaN", FLAG, DERIVED),
         "suspect_scale": ("a total estimate or actual more than 100x the largest of the company's Compustat TTM "
-                          "revenue, total assets and market cap known at statpers; that value is NaN", FLAG,
-                          DERIVED),
+                          "revenue, total assets and market cap known at statpers (scale rule), or, with TTM revenue "
+                          ">= $50M, a positive EBIT/EBITDA or a capex estimate above 20x that revenue (margin rule); "
+                          "those values are NaN", FLAG, DERIVED),
+        "suspect_scale_reason": ("which rule set suspect_scale: scale or margin (scale when both); empty otherwise",
+                                 TEXT, DERIVED),
     },
 }
 
