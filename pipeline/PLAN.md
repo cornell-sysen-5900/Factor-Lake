@@ -812,6 +812,10 @@ s09 WARN (7 min; 9 PASS, 2 WARN): tracking vs IWM correlation 0.998, tracking er
 
 Margin rule (decision 32): 1,228 more estimates set to NaN (CPX 862, EBI 281, EBT 85; 133 tickers); AEI, CODI, FFSM and FFG caught by it, COWN by both rules. The 10 largest remaining totals are all large companies with estimates 1-2x their revenue (Exxon, Centene, AMD, TD Synnex, United Airlines, ...). Known false positive: Strategy Inc (MCST, 43 EBIT/EBITDA estimates of $16-20B on ~$500M revenue), whose operating income includes bitcoin fair-value gains. s09 unchanged (37 of 37 identical files; final/ 37 files, 831 MB).
 
+## Upload (2026-10-26)
+
+The 33 Parquet files of processed/final/ and prices_daily/_manifest.json (last) are in `s3://sysen-5900-factor-lake/factor-lake-data/wrds_2026_10/`: 34 keys, 831 MB, every size and ETag equal to the local file, the daily manifest and the smallest Parquet downloaded back with equal sha256. Nothing outside the prefix was written; nothing was deleted. `scripts/s3_inspect.py` lists and previews the bucket read-only. The repo has the schema-only `pipeline/DATA_DICTIONARY.md`; the version with stats stays in processed/.
+
 ## Open questions
 
 None.

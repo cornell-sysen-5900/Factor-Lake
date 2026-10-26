@@ -57,6 +57,24 @@ The data never goes in the repo (`.gitignore` blocks `*.csv`, `*.parquet`, `*.zi
     DATA_DICTIONARY.md  every final column with meaning, unit, source and stats (written by s08, not uploaded)
 ```
 
+## How to inspect S3
+
+`scripts/s3_inspect.py` shows what is in the bucket without changing anything (it makes no put, copy or delete
+calls) and without downloading whole files: a tree with sizes and dates, and the head of each file (Parquet: rows,
+columns, types and the first rows from the footer and the first row group, read with ranged GETs; text files: the
+first 10 lines).
+
+    uv run python scripts/s3_inspect.py --no-head                                     # the whole factor-lake-data/ tree
+    uv run python scripts/s3_inspect.py --prefix factor-lake-data/wrds_2026_10/        # with heads
+    uv run python scripts/s3_inspect.py --prefix factor-lake-data/wrds_2026_10/ --all-partitions --rows 3
+
+Options: `--prefix` (default `factor-lake-data/`), `--rows` (default 5), `--max-files`, `--no-head`,
+`--all-partitions` (every `year=YYYY` head, not only the newest), `--head-mb` (column data read per head, default 8).
+
+The AWS keys come from `.streamlit/secrets.toml` in the repo root (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
+`AWS_DEFAULT_REGION`), read with tomllib and never printed. That file is local only: it is in .gitignore and has
+never been on GitHub, so each teammate needs their own copy at the same path.
+
 ## Rules every stage follows
 
 1. **Inputs:** read only from `raw/` or from earlier stages' folders in `processed/`. Never write to `raw/`.
