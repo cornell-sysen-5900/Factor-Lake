@@ -22,6 +22,9 @@ tests/
 │   ├── test_portfolio.py      # Portfolio object CRUD and valuation
 │   ├── test_s3_data.py        # S3 data source, source selection, publish script
 │   └── test_saved_runs.py     # Saved-run helpers + AppTest of Results run tabs
+├── pipeline/                  # WRDS data pipeline (pipeline/), synthetic data only
+│   ├── test_run.py            # CLI stage selection, stage folders, Parquet/summary helpers, checks
+│   └── test_s00_inventory.py  # Raw file inventory: counts, dates, checks, reruns
 └── integration/               # Require Supabase or AWS credentials
     ├── test_backtest_regression.py  # Regression: known-good portfolio values
     ├── test_s3_data.py              # Loads the real S3 data (needs AWS creds)
