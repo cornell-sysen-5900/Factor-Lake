@@ -175,13 +175,15 @@ IDENTIFIERS = ("ticker", "ibes_ticker", "tic", "conm", "security_name", "gvkey",
 
 def distinctive_values(stats: pd.DataFrame) -> set[str]:
     """Values of the data that should never appear in the public schema dictionary: every numeric stat as printed
-    (4 significant figures) with at least 4 significant digits, and the most common values of identifier columns
-    (tickers, names)."""
+    (4 significant figures) with at least 4 significant digits and a decimal point or exponent, or with 5 or more
+    digits (4-digit integers are codes and years, e.g. the SIC ranges of the sector rules), and the most common
+    values of identifier columns (tickers, names)."""
     out = set()
     for c in NUMERIC_STATS:
         for v in stats[c].dropna():
             s = fmt(v)
-            if sum(ch.isdigit() for ch in s.split("e")[0].lstrip("-0.")) >= 4:
+            digits = sum(ch.isdigit() for ch in s.split("e")[0].lstrip("-0."))
+            if (digits >= 4 and ("." in s or "e" in s)) or digits >= 5:
                 out.add(s)
     for col, top in zip(stats["column"], stats["top_values"]):
         if col in IDENTIFIERS and isinstance(top, str):
