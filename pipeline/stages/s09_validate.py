@@ -409,7 +409,7 @@ def check_upload(final: Path, out: Path, manifest: dict) -> tuple[list[Check], d
     ok = proc.returncode == 0 and len(keys) == n_files == planned and not bad
     return [check(f"upload dry run offline: the Parquet files and the daily manifest last ({planned}) under {prefix}",
                   ok,
-                  f"{len(keys)} keys, {n_files} Parquet files, exit code {proc.returncode}", level=WARN)], res
+                  f"{len(keys)} keys, {n_files} files to upload (the Parquet files and the daily manifest), exit code {proc.returncode}", level=WARN)], res
 
 
 # ---------- VALIDATION.md ----------
@@ -544,7 +544,7 @@ def render(r: dict, checks: list[Check], manifest: dict) -> str:
     up = r["upload"]
     md += [verdict_line(checks, "app memory"), "", "## 7. Upload dry run", "",
            f"`scripts/upload_wrds.py` run with `--offline`, without credentials and with network connections "
-           f"blocked: exit code {up['exit_code']}, {up['keys']} S3 keys for {up['files_in_final']} Parquet files, all under "
+           f"blocked: exit code {up['exit_code']}, {up['keys']} S3 keys for {up['files_in_final']} files (the Parquet files and the daily manifest, last), all under "
            f"`{up['prefix']}`" + (f" except {up['outside_prefix']}" if up["outside_prefix"] else "") + ".", "",
            verdict_line(checks, "upload"), ""]
     return "\n".join(md)
