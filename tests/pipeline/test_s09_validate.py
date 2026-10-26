@@ -88,14 +88,17 @@ def test_upload_dry_run_works_offline(tmp_path, monkeypatch):
     (final / "UPLOAD.md").write_text(s08.upload_md("2026-10-25", outputs), encoding="utf-8")
     for i in range(34):
         (final / f"f{i}.parquet").write_bytes(b"x")
+    (final / "prices_daily").mkdir()
+    (final / "prices_daily" / "_manifest.json").write_text("{}")
     (final / "manifest.json").write_text("{}")
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "should-not-be-needed")
     manifest = {"s3_target": "s3://sysen-5900-factor-lake/factor-lake-data/wrds_2026_10/",
                 "outputs": {"tables": {"files": 34}}}                       # Parquet files only
     checks, res = s09.check_upload(final, out, manifest)
     assert res["exit_code"] == 0, res["stderr"]
-    assert res["keys"] == 34 and not res["outside_prefix"] and checks[0].status == "PASS"
-    assert all(k.endswith(".parquet") for k in res["first_keys"])     # no JSON or Markdown
+    assert res["keys"] == 35 and not res["outside_prefix"] and checks[0].status == "PASS"
+    assert all(k.endswith(".parquet") for k in res["first_keys"])     # no other JSON, no Markdown
+    assert res["last_key"].endswith("prices_daily/_manifest.json")   # the daily manifest goes last
 
 
 def test_independent_recompute_script_on_tiny_raw_files(tmp_path):

@@ -33,6 +33,8 @@ written yet.
 | s08_export | final Parquet set in processed/final/ with manifest.json and UPLOAD.md; processed/DATA_DICTIONARY.md | done |
 | s09_validate | validation against IWM, Fama-French, the old panel and the raw CSVs; full rerun; VALIDATION.md | done |
 
+Every exported file and column (meaning, unit, source, stage) is described in [DATA_DICTIONARY.md](DATA_DICTIONARY.md), written by s08 from `dictionary.py`. That version is schema only, because the repo is public and the data is licensed; the full one with statistics is `processed/DATA_DICTIONARY.md` next to the data.
+
 Tests use small synthetic data only: `uv run pytest tests/pipeline`.
 
 ## Data folder

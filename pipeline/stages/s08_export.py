@@ -61,7 +61,8 @@ SOURCES = {
     "security_master.parquet": ("s07_panel", "security_master.parquet", None, ()),
 }
 DOCS = ("manifest.json", "UPLOAD.md")
-DICTIONARY = "DATA_DICTIONARY.md"   # written to processed/, next to final/
+DICTIONARY = "DATA_DICTIONARY.md"   # written to processed/, next to final/ (with stats)
+REPO_DICTIONARY = Path(__file__).resolve().parents[1] / DICTIONARY   # pipeline/DATA_DICTIONARY.md: schema only
 STATS = "column_stats.parquet"
 
 
@@ -254,7 +255,9 @@ import tempfile
 from pathlib import Path
 
 import boto3
+from boto3.exceptions import S3UploadFailedError
 from boto3.s3.transfer import TransferConfig
+from botocore.exceptions import BotoCoreError, ClientError
 
 try:
     import tomllib                                   # Python 3.11+
@@ -288,6 +291,13 @@ final = args.final_dir.resolve()
 if not (final / "manifest.json").is_file():
     sys.exit(f"{final} has no manifest.json; pass the processed/final folder")
 local = {f"{prefix}/{p.relative_to(final).as_posix()}": p for p in sorted(final.rglob("*.parquet"))}
+# the daily manifest is the one non-Parquet file; it goes last, after every year file is verified, as in
+# scripts/publish_daily_data_to_s3.py, so a reader that finds it knows the years are complete
+LAST = f"{prefix}/prices_daily/_manifest.json"
+local[LAST] = final / "prices_daily" / "_manifest.json"
+if not local[LAST].is_file():
+    sys.exit(f"{local[LAST]} is missing; rerun s08")
+TYPES = {".parquet": "application/vnd.apache.parquet", ".json": "application/json"}
 
 
 def etag(path: Path) -> str:
@@ -341,15 +351,17 @@ if args.check:
     extra = sorted(set(remote) - set(local))
     for key in extra:
         print(f"{'EXTRA':8} s3://{BUCKET}/{key}")
-    key, path = min(((k, p) for k, p in local.items() if k in same), key=lambda kp: kp[1].stat().st_size,
-                    default=(None, None))
-    sha_ok = None
-    if key:
-        with tempfile.TemporaryDirectory() as tmp:
-            back = Path(tmp) / "back.parquet"
-            s3.download_file(BUCKET, key, str(back))
-            sha_ok = sha256(back) == sha256(path)
-        print(f"downloaded {key} back: sha256 {'matches' if sha_ok else 'DIFFERS'}")
+    small = min((k for k in local if k in same and k.endswith(".parquet")), key=lambda k: local[k].stat().st_size,
+                default=None)
+    sha_ok = bool(small) and LAST in same
+    for key in (LAST, small):
+        if key in same:
+            with tempfile.TemporaryDirectory() as tmp:
+                back = Path(tmp) / "back"
+                s3.download_file(BUCKET, key, str(back))
+                ok = sha256(back) == sha256(local[key])
+            sha_ok &= ok
+            print(f"downloaded {key} back: sha256 {'matches' if ok else 'DIFFERS'}")
     mb = sum(remote[k][0] for k in same) / 1e6
     print(f"{len(same)} of {len(local)} files match (size and ETag), {mb:,.0f} MB; {len(extra)} objects not local")
     sys.exit(0 if len(same) == len(local) and not extra and sha_ok else 1)
@@ -358,18 +370,21 @@ differ = sorted(k for k in local if k in remote and k not in same)
 if differ and not args.overwrite:
     sys.exit(f"{len(differ)} objects in s3://{BUCKET}/{prefix}/ differ from the local files (e.g. {differ[0]}); "
              "rerun with --overwrite to replace them")
-for key, path in local.items():
+for key, path in local.items():                      # LAST is the last item
     size = path.stat().st_size
     if key in same:
         print(f"skip      s3://{BUCKET}/{key} (same size and ETag)")
     elif not args.upload:
         print(f"would upload s3://{BUCKET}/{key} ({size / 1e6:,.1f} MB)")
     else:
-        s3.upload_file(str(path), BUCKET, key, Config=config,
-                       ExtraArgs={"ContentType": "application/vnd.apache.parquet"})
-        head = s3.head_object(Bucket=BUCKET, Key=key)
+        try:
+            s3.upload_file(str(path), BUCKET, key, Config=config, ExtraArgs={"ContentType": TYPES[path.suffix]})
+            head = s3.head_object(Bucket=BUCKET, Key=key)
+        except (ClientError, S3UploadFailedError, BotoCoreError) as e:   # stop: no retry another way
+            sys.exit(f"FAILED on {path.relative_to(final).as_posix()} -> s3://{BUCKET}/{key}: {type(e).__name__}: {e}")
         if head["ContentLength"] != size or head["ETag"].strip('"') != etag(path):
-            sys.exit(f"Size or ETag mismatch after uploading {key}")
+            sys.exit(f"Size or ETag mismatch after uploading {key}: S3 {head['ContentLength']} bytes, "
+                     f"ETag {head['ETag']}; local {size} bytes, ETag {etag(path)}")
         print(f"uploaded  s3://{BUCKET}/{key} ({size / 1e6:,.1f} MB)")
 print(f"{len(local)} files, {sum(p.stat().st_size for p in local.values()) / 1e6:,.0f} MB"
       + ("" if args.upload else " (dry run: nothing uploaded)"))
@@ -395,11 +410,12 @@ The script reads them with tomllib and passes them to boto3; it never prints the
 next to the files the live app reads (`{S3_PREFIX}/full_precision_test.parquet`, `{S3_PREFIX}/daily_prices/`, ...),
 so nothing the app reads today is touched. The script refuses any other prefix.
 
-What goes up: only the {n_files} Parquet files of this `final/` folder (about {total:,.0f} MB), with the same relative
-paths: the tables at the top level and `prices_daily/year=YYYY/data.parquet`. `manifest.json`,
-`prices_daily/_manifest.json` and this file stay local; DATA_DICTIONARY.md is next to `final/`, in `processed/`.
-Note: the app's current daily reader (`src/s3_client.py`) lists the years from `daily_prices/_manifest.json`, so it
-cannot read `prices_daily/` without that manifest or a code change.
+What goes up: the {n_files} Parquet files of this `final/` folder (about {total:,.0f} MB), with the same relative
+paths (the tables at the top level and `prices_daily/year=YYYY/data.parquet`), and `prices_daily/_manifest.json` as
+the only other file, uploaded last, once every year file is verified ({n_files + 1} keys). `manifest.json` and this
+file stay local; DATA_DICTIONARY.md is next to `final/`, in `processed/` (the schema-only version is
+`pipeline/DATA_DICTIONARY.md` in the repo). The app's current daily reader (`src/s3_client.py`) reads
+`daily_prices/` with `mkt_cap` in $ thousands, so it needs a code change before it can read `prices_daily/`.
 
 ## 1. Save the script
 
@@ -424,14 +440,16 @@ S3 key it would upload. `--offline` prints the keys without credentials or netwo
 
 Files whose size and ETag already match in S3 are skipped. Each upload is checked against the local size and the
 expected ETag. If an object in the folder differs from the local file the script stops before uploading anything;
-add `--overwrite` only when you mean to replace it. Nothing outside the folder is written or deleted.
+add `--overwrite` only when you mean to replace it. Any AWS error stops the run with the error and the file it
+failed on. Nothing outside the folder is written, and nothing is ever deleted.
 
 ## 4. Check afterwards
 
     uv run python upload_wrds.py "C:/path/to/WRDS FA26/processed/final" --check
 
-Compares every key's size and ETag with the local file, downloads the smallest file back and compares its sha256.
-It should end with `{n_files} of {n_files} files match` and exit with code 0.
+Compares every key's size and ETag with the local file, downloads `prices_daily/_manifest.json` and the smallest
+Parquet file back and compares their sha256. It should end with `{n_files + 1} of {n_files + 1} files match` and exit
+with code 0.
 """
 
 
@@ -464,6 +482,18 @@ def stats_checks(md: str, stats: pd.DataFrame, outputs: dict) -> list[Check]:
                   ", ".join(differ) or f"{len(outputs) - 1} Stats tables")]
 
 
+def schema_checks(full_md: str, schema_md: str, stats: pd.DataFrame) -> list[Check]:
+    """The repo's schema-only dictionary lists the same files and columns as the full one, and holds no value of
+    the data (the repo is public; the data is licensed)."""
+    full, schema = dictionary.parse_columns(full_md), dictionary.parse_columns(schema_md)
+    differ = sorted(n for n in set(full) | set(schema) if full.get(n) != schema.get(n))
+    leaks = cs.leaked(schema_md, cs.distinctive_values(stats))
+    return [check("pipeline/DATA_DICTIONARY.md lists the same files and columns as processed/DATA_DICTIONARY.md",
+                  not differ, ", ".join(differ) or f"{len(schema)} files, {sum(map(len, schema.values()))} columns"),
+            check("pipeline/DATA_DICTIONARY.md holds no value from column_stats.parquet", not leaks,
+                  f"{len(leaks)} found: {leaks[:5]}" if leaks else "no stats, counts or top values")]
+
+
 def run_checks(paths: DataPaths, out: Path, exported: dict, outputs: dict, manifest: dict) -> list[Check]:
     checks = []
     for name, e in exported.items():
@@ -490,7 +520,9 @@ def run_checks(paths: DataPaths, out: Path, exported: dict, outputs: dict, manif
                         str(bad_types) if bad_types else "all files"))
     md = (paths.processed / DICTIONARY).read_text(encoding="utf-8")
     checks += dictionary_checks(md, outputs)
-    checks += stats_checks(md, pd.read_parquet(out / STATS), outputs)
+    stats = pd.read_parquet(out / STATS)
+    checks += stats_checks(md, stats, outputs)
+    checks += schema_checks(md, REPO_DICTIONARY.read_text(encoding="utf-8"), stats)
     expected = {o["path"] for n, o in outputs.items() if n != DAILY} | set(DOCS) | {"prices_daily/_manifest.json"}
     expected |= {f"prices_daily/year={y}/data.parquet" for y in exported[DAILY]["years"]}
     found = {f.relative_to(out).as_posix() for f in out.rglob("*") if f.is_file()}
@@ -531,6 +563,7 @@ def run(paths: DataPaths) -> dict:
     manifest["data_dictionary"] = f"processed/{DICTIONARY} (next to final/; not uploaded)"
     write_json(manifest, out / "manifest.json")
     (paths.processed / DICTIONARY).write_text(dictionary.render(manifest, stats, coverage), encoding="utf-8")
+    REPO_DICTIONARY.write_bytes(dictionary.render_schema().encode("utf-8"))
     (out / "UPLOAD.md").write_text(upload_md(version, outputs), encoding="utf-8")
 
     checks = run_checks(paths, out, exported, outputs, manifest)

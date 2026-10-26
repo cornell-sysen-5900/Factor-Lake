@@ -170,5 +170,30 @@ def parse_stats(md: str) -> dict[str, list[str]]:
     return out
 
 
+IDENTIFIERS = ("ticker", "ibes_ticker", "tic", "conm", "security_name", "gvkey", "cusip")
+
+
+def distinctive_values(stats: pd.DataFrame) -> set[str]:
+    """Values of the data that should never appear in the public schema dictionary: every numeric stat as printed
+    (4 significant figures) with at least 4 significant digits, and the most common values of identifier columns
+    (tickers, names)."""
+    out = set()
+    for c in NUMERIC_STATS:
+        for v in stats[c].dropna():
+            s = fmt(v)
+            if sum(ch.isdigit() for ch in s.split("e")[0].lstrip("-0.")) >= 4:
+                out.add(s)
+    for col, top in zip(stats["column"], stats["top_values"]):
+        if col in IDENTIFIERS and isinstance(top, str):
+            out |= {str(v) for v, _ in json.loads(top) if len(str(v)) >= 2}
+    return out
+
+
+def leaked(md: str, values: set[str]) -> list[str]:
+    """The values that appear in md as whole tokens."""
+    import re
+    return sorted(v for v in values if re.search(rf"(?<![\w.]){re.escape(v)}(?![\w])", md))
+
+
 def stats_rows(stats: pd.DataFrame, name: str) -> list[str]:
     return [line for line in stats_table(stats, name) if line.startswith("| `")]

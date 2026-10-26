@@ -400,15 +400,19 @@ def check_upload(final: Path, out: Path, manifest: dict) -> tuple[list[Check], d
                           capture_output=True, text=True, env=env, cwd=out)
     keys = re.findall(r"would upload s3://[^/]+/(\S+)", proc.stdout)
     prefix = manifest["s3_target"].split("/", 3)[3]
-    n_files = sum(1 for f in final.rglob("*.parquet"))
-    bad = [k for k in keys if not k.startswith(prefix) or not k.endswith(".parquet")]
+    n_files = sum(1 for f in final.rglob("*.parquet")) + 1                  # + prices_daily/_manifest.json
+    daily = f"{prefix}prices_daily/_manifest.json"
+    bad = [k for k in keys if not k.startswith(prefix) or not (k.endswith(".parquet") or k == daily)]
+    if keys and keys[-1] != daily:
+        bad.append(f"{daily} is not last")
     res = {"exit_code": proc.returncode, "keys": len(keys), "files_in_final": n_files, "prefix": prefix,
            "outside_prefix": bad, "first_keys": keys[:3], "last_key": keys[-1] if keys else None,
            "stderr": proc.stderr[-300:]}
-    planned = sum(o["files"] for o in manifest["outputs"].values())          # the Parquet files only
+    planned = sum(o["files"] for o in manifest["outputs"].values()) + 1      # the Parquet files + daily manifest
     res["planned_files"] = planned
     ok = proc.returncode == 0 and len(keys) == n_files == planned and not bad
-    return [check(f"upload dry run offline: one key per Parquet file ({planned}) under {prefix}", ok,
+    return [check(f"upload dry run offline: the Parquet files and the daily manifest last ({planned}) under {prefix}",
+                  ok,
                   f"{len(keys)} keys, {n_files} Parquet files, exit code {proc.returncode}", level=WARN)], res
 
 

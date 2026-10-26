@@ -573,20 +573,9 @@ def render(manifest: dict, stats=None, coverage=None) -> str:
     md = [f"# Factor-Lake WRDS data: data dictionary (version {manifest['data_version']})", "",
           "Built by the WRDS pipeline in the Factor-Lake repo (`pipeline/`, commit "
           f"`{manifest['pipeline_git_commit'][:12]}`) from the WRDS, Fama-French and FRED downloads listed in "
-          "manifest.json. All files are Parquet; read them with `pandas.read_parquet`.", "",
-          "## Conventions", "",
-          "- **Keys:** `permno` is CRSP's security id (one share class, int32); `permco` the company; `gvkey` "
-          "Compustat's company id (text). Panels are keyed by a date plus permno.",
-          "- **Dates** are `datetime64[ns]` without a time zone. A *month end* is the last CRSP trading day of the "
-          "month, not the calendar month end.",
-          "- **Units:** returns, yields and most factors are decimals (0.05 = 5%). Money is $ millions unless the "
-          "column says per share. Compustat shares are millions, CRSP `shrout` thousands.",
-          "- **Point in time:** in factor_panel_monthly every value at date t was public by t (IWM snapshot "
-          "effective date, Compustat report date, IBES statistics date, announcement date). The other tables are "
-          "not lagged: filter on their report_date / statpers yourself.",
-          "- **Which market cap:** `mkt_cap_musd` (the listed security) for portfolio weights; "
-          "`company_mkt_cap_musd` (all share classes, unlisted ones from Compustat) for valuation ratios.",
-          "- **Missing values** are NaN / null, never 0.", "",
+          "manifest.json. All files are Parquet; read them with `pandas.read_parquet`. The schema-only version is "
+          "`pipeline/DATA_DICTIONARY.md` in the repo; this one adds the stats of the data.", "",
+          *CONVENTIONS,
           "## Files", "", "| file | one row per | key | rows | MB |", "|---|---|---|---|---|"]
     for name, f in FILES.items():
         o = out[name]
@@ -610,7 +599,52 @@ def render(manifest: dict, stats=None, coverage=None) -> str:
                    "and the 3 most common with their share of rows (5 in column_stats.parquet).", ""]
         if coverage is not None and name == "factor_panel_monthly.parquet":
             md += [*column_stats.coverage_table(coverage), ""]
-    md += ["## Sectors", "", "`gsector` and `gsector_name` are Compustat GICS (the current classification, applied to "
+    md += sectors()
+    return "\n".join(md)
+
+
+def render_schema() -> str:
+    """pipeline/DATA_DICTIONARY.md for the (public) repo: the schema only. Every file and column with meaning, unit,
+    source and stage, from this module alone: nothing here comes from the data (no stats, counts or values)."""
+    md = ["# Factor-Lake WRDS data: data dictionary (schema)", "",
+          "Written by stage `s08_export` from `pipeline/dictionary.py`. It describes every file the pipeline exports "
+          "to `processed/final/` and every column in it. It holds no numbers from the data: the full version with "
+          "statistics and coverage by year (`processed/DATA_DICTIONARY.md`) stays next to the data, because the data "
+          "is licensed from WRDS. All files are Parquet; read them with `pandas.read_parquet`.", "",
+          *CONVENTIONS,
+          "## Files", "", "| file | one row per | key | built by |", "|---|---|---|---|"]
+    for name, f in FILES.items():
+        md.append(f"| [{name}](#{_anchor(name)}) | {f['row']} | {', '.join(f['key'])} | `{f['stage']}` |")
+    md.append("")
+    for name, f in FILES.items():
+        md += [f"## {name}", "", f["about"], "",
+               f"One row per {f['row']}; key {', '.join(f['key'])}. Built by stage `{f['stage']}`.", "",
+               "| column | meaning | unit | source | stage |", "|---|---|---|---|---|"]
+        for c, (meaning, unit, source, stage) in columns(name).items():
+            md.append(f"| `{c}` | {meaning} | {unit} | {source} | {stage} |")
+        md.append("")
+    md += sectors()
+    return "\n".join(md)
+
+
+CONVENTIONS = [
+          "## Conventions", "",
+          "- **Keys:** `permno` is CRSP's security id (one share class, int32); `permco` the company; `gvkey` "
+          "Compustat's company id (text). Panels are keyed by a date plus permno.",
+          "- **Dates** are `datetime64[ns]` without a time zone. A *month end* is the last CRSP trading day of the "
+          "month, not the calendar month end.",
+          "- **Units:** returns, yields and most factors are decimals (0.05 = 5%). Money is $ millions unless the "
+          "column says per share. Compustat shares are millions, CRSP `shrout` thousands.",
+          "- **Point in time:** in factor_panel_monthly every value at date t was public by t (IWM snapshot "
+          "effective date, Compustat report date, IBES statistics date, announcement date). The other tables are "
+          "not lagged: filter on their report_date / statpers yourself.",
+          "- **Which market cap:** `mkt_cap_musd` (the listed security) for portfolio weights; "
+          "`company_mkt_cap_musd` (all share classes, unlisted ones from Compustat) for valuation ratios.",
+          "- **Missing values** are NaN / null, never 0.", ""]
+
+
+def sectors() -> list[str]:
+    md = ["## Sectors", "", "`gsector` and `gsector_name` are Compustat GICS (the current classification, applied to "
            "all history). Where GICS is missing, `sector_name` maps the CRSP SIC code to a GICS sector name, first "
            "match wins:", "", "| GICS sector | SIC ranges |", "|---|---|",
            "| Unclassified | missing, 0, 9900-9999 |"]
@@ -618,7 +652,7 @@ def render(manifest: dict, stats=None, coverage=None) -> str:
         md.append(f"| {name} | {', '.join(f'{lo}-{hi}' if lo != hi else str(lo) for lo, hi in ranges)} |")
     md += ["| Industrials | every other SIC code |", "",
            "GICS sector codes: " + ", ".join(f"{k} {v}" for k, v in GICS_SECTORS.items()) + ".", ""]
-    return "\n".join(md)
+    return md
 
 
 def _anchor(name: str) -> str:

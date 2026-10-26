@@ -61,3 +61,26 @@ def test_stats_checks_catch_a_missing_row_and_a_changed_number():
 
 def test_column_stats_file_is_documented():
     assert set(dictionary.columns("column_stats.parquet")) == set(cs.COLUMNS)
+
+
+def test_schema_dictionary_holds_nothing_from_the_data():
+    import pyarrow as pa
+    stats = cs.stats_frame([cs.column_stat("t.parquet", "x", pa.chunked_array([[1.23456, 98765.4321, 3.0]])),
+                            cs.column_stat("t.parquet", "ticker", pa.chunked_array([["ZZQX", "ZZQX", "AB"]]))])
+    values = cs.distinctive_values(stats)
+    assert {"1.235", "9.877e+04", "ZZQX", "AB"} <= values and "3" not in values      # short numbers are not tested
+    schema = dictionary.render_schema()
+    assert not cs.leaked(schema, values)
+    assert cs.leaked(schema + "\n| x | 1.235 |", values) == ["1.235"]
+    assert "### Stats" not in schema and "Coverage by year" not in schema and "rows" not in schema.split("## Files")[1].split("\n")[2]
+
+
+def test_schema_and_full_dictionaries_list_the_same_columns():
+    outputs = {n: {"rows": 10, "size_mb": 1.0, "files": 1, "date_range": None,
+                   "columns": {c: "double" for c in dictionary.columns(n)}} for n in dictionary.FILES}
+    full = dictionary.render({"data_version": "2026-10-25", "pipeline_git_commit": "abc", "outputs": outputs})
+    stats = cs.stats_frame([])
+    checks = s08.schema_checks(full, dictionary.render_schema(), stats)
+    assert [c.status for c in checks] == ["PASS", "PASS"]
+    broken = dictionary.render_schema().replace("| `permno` |", "| `permno_x` |", 1)
+    assert s08.schema_checks(full, broken, stats)[0].status == "FAIL"
