@@ -808,6 +808,10 @@ s09 WARN (7 min; 9 PASS, 2 WARN): tracking vs IWM correlation 0.998, tracking er
 - **IBES scale rule (decision 30):** 402 estimates (CPX 93, EBI 126, EBT 117, SAL 66) and 6 actuals set to NaN; FMPN, KVPH, DINE, ABX, CIBR caught. Not caught: CNTE (real: Centene), AEI (EBI $241B, revenue $1.5B, assets $49B), COWN, CODI, FFSM, FFG (EBIT, EBITDA or capex estimates 12-95x their total assets).
 - **s09:** unchanged (tracking 0.9977 / 1.43%, factor correlations, backtest, 600 of 600 recomputed values, 37 of 37 identical files after a 6 min rerun); final/ holds 37 files, 831 MB.
 
+## Phase 3c results (IBES margin rule)
+
+Margin rule (decision 32): 1,228 more estimates set to NaN (CPX 862, EBI 281, EBT 85; 133 tickers); AEI, CODI, FFSM and FFG caught by it, COWN by both rules. The 10 largest remaining totals are all large companies with estimates 1-2x their revenue (Exxon, Centene, AMD, TD Synnex, United Airlines, ...). Known false positive: Strategy Inc (MCST, 43 EBIT/EBITDA estimates of $16-20B on ~$500M revenue), whose operating income includes bitcoin fair-value gains. s09 unchanged (37 of 37 identical files; final/ 37 files, 831 MB).
+
 ## Open questions
 
 None.
