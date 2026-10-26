@@ -171,26 +171,28 @@ SNAPSHOT_WEIGHT_RANGE = (90.0, 110.0)          # percent of the fund
 KNOWN_MISSING_MONTHS = ("2009-04", "2009-05", "2009-06")
 NEIGHBOUR_MISSING_MAX = 20
 
-# Counts of the notebook's last run (2026-10-22); checks WARN when a stage is more than LAST_RUN_TOLERANCE away
-LAST_RUN = {
-    "snapshots": 218, "snapshot_rows": 428_354, "permnos": 5_918, "periods": 7_576, "known_gaps": 72,
-    "cusip_fill_lines": 1_569, "price_duplicates": 1_801, "daily_rows": 15_309_394, "monthly_rows": 733_698,
-    "delisting_fills": 49,
-    # notebook FUNDAMENTALS cell rerun on the 2026-10-25 pull (fundamentals_raw.csv was re-pulled with more columns)
-    "fundamentals_rows": 257_447, "fundamentals_duplicates": 81,
-    # notebook IBES LINK + IBES FACTORS cells rerun on the 2026-10-25 pull (EPS FY1, USD, linked)
-    "ibes_eps_fy1_rows": 683_325, "ibes_eps_fy1_permnos": 5_751,
-}
+# Counts and factor coverage of the notebook's last run, which the stages compare with. They describe the licensed
+# data, so they live next to it (<data-dir>/pipeline_last_run.json: {"counts": {...}, "coverage_2015": {...}}), not in
+# this public repo; run.py loads them. Without the file the comparisons report "no last-run value".
+LAST_RUN_FILE = "pipeline_last_run.json"
+LAST_RUN: dict[str, int] = {}
+LAST_RUN_COVERAGE_2015: dict[str, float] = {}
 LAST_RUN_TOLERANCE = 0.02
-# Factor coverage (share of rows with a value) for fiscal quarters ending 2015 or later, notebook's last run
-LAST_RUN_COVERAGE_2015 = {
-    "f_book_to_price": 0.93, "f_earnings_to_price": 0.95, "f_sales_to_price": 0.95, "f_ebitda_to_ev": 0.86,
-    "f_dividend_yield": 0.96, "f_roe": 0.89, "f_roa": 0.95, "f_gross_profitability": 0.85,
-    "f_accruals_to_assets": 0.93, "f_leverage": 1.00, "f_current_ratio": 0.78, "f_rd_to_sales": 0.90,
-    # capex growth: 78% in the notebook; 66% since the $1M prior-capex floor (phase 2c)
-    "f_asset_growth_1yr": 0.94, "f_sales_growth_1yr": 0.84, "f_capex_growth_1yr": 0.66,
-    "f_net_share_issuance": 0.94, "f_sue": 0.85,
-}
+
+
+def load_last_run(path: Path) -> bool:
+    """Fill LAST_RUN and LAST_RUN_COVERAGE_2015 in place from the data folder's file; False when it is missing."""
+    import json
+    if not path.is_file():
+        return False
+    data = json.loads(path.read_text(encoding="utf-8"))
+    LAST_RUN.clear()
+    LAST_RUN.update(data.get("counts", {}))
+    LAST_RUN_COVERAGE_2015.clear()
+    LAST_RUN_COVERAGE_2015.update(data.get("coverage_2015", {}))
+    return True
+
+
 COVERAGE_TOLERANCE = 0.05
 
 # Delisting returns: CIZ dlyret on the flagged row (DlyDelFlg = Y) already includes delret, so it is never added
@@ -275,7 +277,6 @@ STATUTORY_TAX_RATE_FROM_2018 = 0.21
 DCF_EXCLUDED_SECTORS = (40, 60)     # Financials and Real Estate: FCFF-based DCF does not apply
 
 # IBES
-IBES_PER_SHARE = ("EPS", "CPS", "DPS")          # $ per share, restated by IBES to the latest share basis
 IBES_TOTALS = ("SAL", "EBT", "EBI", "CPX")       # $ millions, no share basis
 IBES_TOTAL_OUTLIER_MULTIPLE = 100               # a total above 100x both neighbouring estimates is NaN
 IBES_MARGIN_MULTIPLE = 20                       # margin rule: EBIT/EBITDA (> 0) or capex above 20x TTM revenue ...
@@ -334,7 +335,6 @@ FORWARD_YIELD_MAX_ABS = 5.0         # f_forward_ep, f_forward_ep_fy2, f_forward_
 SURPRISE_MAX_ABS = 1.0              # f_analyst_surprise beyond +-1: NaN (counted)
 SANITY_MEDIAN_RANGES = {"pe": (15, 25), "pb": (1, 3), "ev_ebitda": (8, 15)}
 
-FOSSIL_SIC_RANGES = ((1200, 1299), (1300, 1399), (2900, 2999), (4920, 4929), (5170, 5179))
 
 UNITS = {
     "returns": "decimals (0.01 = 1%)",

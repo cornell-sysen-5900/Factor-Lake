@@ -53,7 +53,10 @@ def check(name: str, ok: bool, detail: str = "", level: str = FAIL) -> Check:
 
 
 def vs_last_run(name: str, value: int, key: str) -> Check:
-    """WARN when a count is more than LAST_RUN_TOLERANCE away from the notebook's last run."""
+    """WARN when a count is more than LAST_RUN_TOLERANCE away from the notebook's last run, or when there is no
+    last-run value (pipeline_last_run.json missing from the data folder)."""
+    if key not in LAST_RUN:
+        return Check(f"{name} vs last run", WARN, f"{value:,} (no last-run value: pipeline_last_run.json not loaded)")
     expected = LAST_RUN[key]
     off = abs(value - expected) / expected if expected else float(value != 0)
     return Check(f"{name} vs last run", WARN if off > LAST_RUN_TOLERANCE else PASS,

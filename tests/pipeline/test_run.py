@@ -80,3 +80,20 @@ def test_shared_checks():
     assert columns_present("f", ["a"], ["a", "c"]).detail == "missing c"
     assert [c.status for c in values_present("f", "tic", ["x", "y", "z"], ["x", "y"])] == ["PASS", "WARN"]
     assert values_present("f", "tic", ["x"], ["x", "y"])[0].status == "FAIL"
+
+
+def test_last_run_values_come_from_the_data_folder(tmp_path):
+    from pipeline import config
+    from pipeline.checks import vs_last_run
+    saved = (dict(config.LAST_RUN), dict(config.LAST_RUN_COVERAGE_2015))
+    try:
+        config.LAST_RUN.clear()
+        assert vs_last_run("rows", 100, "rows").status == "WARN"                 # no value: a WARN, not a crash
+        assert not config.load_last_run(tmp_path / "pipeline_last_run.json")
+        (tmp_path / "pipeline_last_run.json").write_text(json.dumps({"counts": {"rows": 101},
+                                                                     "coverage_2015": {"f_roa": 0.9}}))
+        assert config.load_last_run(tmp_path / "pipeline_last_run.json")
+        assert vs_last_run("rows", 100, "rows").status == "PASS" and config.LAST_RUN_COVERAGE_2015 == {"f_roa": 0.9}
+    finally:
+        config.LAST_RUN.clear(), config.LAST_RUN.update(saved[0])
+        config.LAST_RUN_COVERAGE_2015.clear(), config.LAST_RUN_COVERAGE_2015.update(saved[1])

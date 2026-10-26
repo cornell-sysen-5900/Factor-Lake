@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pipeline.stages import s08_export as s08
 from pipeline.stages import s09_validate as s09
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -84,13 +83,11 @@ def test_upload_dry_run_works_offline(tmp_path, monkeypatch):
     final, out = tmp_path / "final", tmp_path / "out"
     final.mkdir()
     out.mkdir()
-    outputs = {"x.parquet": {"size_mb": 0.1, "files": 32}}
-    (final / "UPLOAD.md").write_text(s08.upload_md("2026-10-25", outputs), encoding="utf-8")
     for i in range(34):
         (final / f"f{i}.parquet").write_bytes(b"x")
     (final / "prices_daily").mkdir()
     (final / "prices_daily" / "_manifest.json").write_text("{}")
-    (final / "manifest.json").write_text("{}")
+    (final / "manifest.json").write_text('{"s3_target": "s3://sysen-5900-factor-lake/factor-lake-data/wrds_2026_10/"}')
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "should-not-be-needed")
     manifest = {"s3_target": "s3://sysen-5900-factor-lake/factor-lake-data/wrds_2026_10/",
                 "outputs": {"tables": {"files": 34}}}                       # Parquet files only

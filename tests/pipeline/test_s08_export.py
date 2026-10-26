@@ -79,12 +79,9 @@ def test_daily_files_keep_the_publish_layout(tmp_path):
     assert info["source_rows"] == {"2019": 3, "2020": 3}
 
 
-def test_upload_instructions_target_a_new_folder_and_the_script_compiles():
+def test_upload_instructions_point_at_the_repo_script_and_a_new_folder():
     md = s08.upload_md("2026-10-25", fake_outputs())
     assert "s3://sysen-5900-factor-lake/factor-lake-data/wrds_2026_10/" in md
-    code = md.split("```python\n")[1].split("```")[0]
-    compile(code, "upload_wrds.py", "exec")
-    # keys from the Streamlit secrets with tomllib, never printed; only Parquet files are selected
-    assert "tomllib" in code and "dotenv" not in code and 'rglob("*.parquet")' in code
-    prints = [l for l in code.splitlines() if "print(" in l or "sys.exit(" in l]
-    assert not any(w in l for l in prints for w in ("found[", "secrets[", "aws_secret", "aws_access_key_id"))
+    assert "scripts/upload_wrds.py" in md and "```python" not in md          # instructions only, no code
+    n = sum(o["files"] for o in fake_outputs().values())
+    assert f"{n + 1} of {n + 1} files match" in md and ".streamlit/secrets.toml" in md

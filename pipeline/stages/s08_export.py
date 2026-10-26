@@ -34,7 +34,7 @@ from pipeline import dictionary
 from pipeline.checks import PASS, Check, check
 from pipeline.config import (DELISTING_FILL, DELISTING_FILL_DEFAULT, GICS_SECTORS, PARQUET_COMPRESSION,
                              SIC_TO_GICS_SECTOR, SIC_UNCLASSIFIED, UNITS, DataPaths)
-from pipeline.outputs import fresh_stage_dir, table_info, utc_now, write_json, write_parquet, write_summary
+from pipeline.outputs import fresh_stage_dir, utc_now, write_json, write_parquet, write_summary
 
 STAGE = "s08_export"
 FINAL = "final"                     # processed/final/; the stage's own folder holds only summary.json
@@ -234,8 +234,8 @@ def build_manifest(paths: DataPaths, out: Path, version: str, outputs: dict, inv
                                             for r in gaps.itertuples()]},
             "unlisted_share_classes": {"company_months_from_compustat": int(panel["company_cap_from_compustat"].sum()),
                                        "note": "share classes without a CRSP listing are added from Compustat cshoq "
-                                               "(decision 25); ADRs where Compustat counts ordinary shares can be "
-                                               "overstated (CSR 2011, Nexxen 2025)"},
+                                               "(decision 25), never for ADRs (decision 28), and only once the gap "
+                                               "held at 3 month ends (decision 29)"},
             "sources_end": source_ends(inventory),
         },
     }
@@ -247,227 +247,45 @@ def s3_folder(version: str) -> str:
 
 # ---------- UPLOAD.md ----------
 
-UPLOAD_SCRIPT = '''"""Upload the Parquet files of processed/final/ to s3://@BUCKET@/<prefix>/. Dry run unless --upload."""
-import argparse
-import hashlib
-import sys
-import tempfile
-from pathlib import Path
-
-import boto3
-from boto3.exceptions import S3UploadFailedError
-from boto3.s3.transfer import TransferConfig
-from botocore.exceptions import BotoCoreError, ClientError
-
-try:
-    import tomllib                                   # Python 3.11+
-except ImportError:
-    import tomli as tomllib                          # Python 3.10: installed with the repo's dev group
-
-BUCKET = "@BUCKET@"
-PREFIX = "@PREFIX@"
-CHUNK = 64 * 1024 * 1024                             # multipart part size; also predicts the S3 ETag
-APP = ("@APP_PREFIX@/full_precision_test.parquet", "@APP_PREFIX@/last_price_mapping.parquet",
-       "@APP_PREFIX@/daily_last_prices.parquet", "@APP_PREFIX@/daily_prices/", "@APP_PREFIX@/backtest-results/",
-       "@APP_PREFIX@/archive/", "@APP_PREFIX@/_deploy/")   # what the live app and its scripts read or write
-
-parser = argparse.ArgumentParser()
-parser.add_argument("final_dir", type=Path, help="the processed/final folder")
-parser.add_argument("--prefix", default=PREFIX, help=f"target prefix in the bucket (default {PREFIX})")
-parser.add_argument("--secrets", type=Path, default=Path(__file__).resolve().parent / ".streamlit" / "secrets.toml",
-                    help="Streamlit secrets with AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY (default: the repo's)")
-parser.add_argument("--upload", action="store_true", help="really upload (default: dry run)")
-parser.add_argument("--check", action="store_true", help="compare the S3 folder with the local files")
-parser.add_argument("--overwrite", action="store_true", help="replace objects in the prefix that differ")
-parser.add_argument("--offline", action="store_true", help="dry run without credentials or network: list the keys")
-args = parser.parse_args()
-prefix = args.prefix.strip("/")
-if args.offline and (args.upload or args.check):
-    sys.exit("--offline is a dry run only")
-if not prefix.startswith("@APP_PREFIX@/wrds_") or any(prefix.startswith(a.rstrip("/")) for a in APP):
-    sys.exit(f"Refusing prefix {prefix!r}: it must be a new @APP_PREFIX@/wrds_* folder, apart from the app's files")
-
-final = args.final_dir.resolve()
-if not (final / "manifest.json").is_file():
-    sys.exit(f"{final} has no manifest.json; pass the processed/final folder")
-local = {f"{prefix}/{p.relative_to(final).as_posix()}": p for p in sorted(final.rglob("*.parquet"))}
-# the daily manifest is the one non-Parquet file; it goes last, after every year file is verified, as in
-# scripts/publish_daily_data_to_s3.py, so a reader that finds it knows the years are complete
-LAST = f"{prefix}/prices_daily/_manifest.json"
-local[LAST] = final / "prices_daily" / "_manifest.json"
-if not local[LAST].is_file():
-    sys.exit(f"{local[LAST]} is missing; rerun s08")
-TYPES = {".parquet": "application/vnd.apache.parquet", ".json": "application/json"}
-
-
-def etag(path: Path) -> str:
-    """The ETag S3 gives this file when uploaded with CHUNK-sized parts (plain MD5 below one part)."""
-    parts = []
-    with open(path, "rb") as f:
-        for block in iter(lambda: f.read(CHUNK), b""):
-            parts.append(hashlib.md5(block).digest())
-    if path.stat().st_size < CHUNK:
-        return parts[0].hex() if parts else hashlib.md5(b"").hexdigest()
-    return f"{hashlib.md5(b''.join(parts)).hexdigest()}-{len(parts)}"
-
-
-def sha256(path: Path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for block in iter(lambda: f.read(1 << 22), b""):
-            h.update(block)
-    return h.hexdigest()
-
-
-if args.offline:
-    for key, path in local.items():
-        print(f"would upload s3://{BUCKET}/{key} ({path.stat().st_size / 1e6:,.1f} MB)")
-    print(f"{len(local)} files, {sum(p.stat().st_size for p in local.values()) / 1e6:,.0f} MB (offline dry run)")
-    sys.exit(0)
-
-with open(args.secrets, "rb") as f:
-    secrets = tomllib.load(f)
-found = {k: v for k, v in secrets.items() if isinstance(v, str)}
-for table in (v for v in secrets.values() if isinstance(v, dict)):  # also a section such as [aws]
-    found.update({k.upper(): v for k, v in table.items() if isinstance(v, str)})
-missing = [k for k in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY") if not found.get(k)]
-if missing:
-    sys.exit(f"Not in {args.secrets}: {', '.join(missing)}")
-s3 = boto3.client("s3", aws_access_key_id=found["AWS_ACCESS_KEY_ID"],
-                  aws_secret_access_key=found["AWS_SECRET_ACCESS_KEY"],
-                  region_name=found.get("AWS_DEFAULT_REGION") or "us-east-1")
-del secrets, found
-config = TransferConfig(multipart_threshold=CHUNK, multipart_chunksize=CHUNK)
-
-remote = {}
-for page in s3.get_paginator("list_objects_v2").paginate(Bucket=BUCKET, Prefix=prefix + "/"):
-    remote.update({o["Key"]: (o["Size"], o["ETag"].strip('"')) for o in page.get("Contents", [])})
-same = {k for k, p in local.items() if remote.get(k) == (p.stat().st_size, etag(p))}
-
-if args.check:
-    for key, path in local.items():
-        status = "ok" if key in same else ("MISSING" if key not in remote else "DIFFERS")
-        print(f"{status:8} s3://{BUCKET}/{key} ({path.stat().st_size / 1e6:,.1f} MB)")
-    extra = sorted(set(remote) - set(local))
-    for key in extra:
-        print(f"{'EXTRA':8} s3://{BUCKET}/{key}")
-    small = min((k for k in local if k in same and k.endswith(".parquet")), key=lambda k: local[k].stat().st_size,
-                default=None)
-    sha_ok = bool(small) and LAST in same
-    for key in (LAST, small):
-        if key in same:
-            with tempfile.TemporaryDirectory() as tmp:
-                back = Path(tmp) / "back"
-                s3.download_file(BUCKET, key, str(back))
-                ok = sha256(back) == sha256(local[key])
-            sha_ok &= ok
-            print(f"downloaded {key} back: sha256 {'matches' if ok else 'DIFFERS'}")
-    mb = sum(remote[k][0] for k in same) / 1e6
-    print(f"{len(same)} of {len(local)} files match (size and ETag), {mb:,.0f} MB; {len(extra)} objects not local")
-    sys.exit(0 if len(same) == len(local) and not extra and sha_ok else 1)
-
-differ = sorted(k for k in local if k in remote and k not in same)
-if differ and not args.overwrite:
-    sys.exit(f"{len(differ)} objects in s3://{BUCKET}/{prefix}/ differ from the local files (e.g. {differ[0]}); "
-             "rerun with --overwrite to replace them")
-for key, path in local.items():                      # LAST is the last item
-    size = path.stat().st_size
-    if key in same:
-        print(f"skip      s3://{BUCKET}/{key} (same size and ETag)")
-    elif not args.upload:
-        print(f"would upload s3://{BUCKET}/{key} ({size / 1e6:,.1f} MB)")
-    else:
-        try:
-            s3.upload_file(str(path), BUCKET, key, Config=config, ExtraArgs={"ContentType": TYPES[path.suffix]})
-            head = s3.head_object(Bucket=BUCKET, Key=key)
-        except (ClientError, S3UploadFailedError, BotoCoreError) as e:   # stop: no retry another way
-            sys.exit(f"FAILED on {path.relative_to(final).as_posix()} -> s3://{BUCKET}/{key}: {type(e).__name__}: {e}")
-        if head["ContentLength"] != size or head["ETag"].strip('"') != etag(path):
-            sys.exit(f"Size or ETag mismatch after uploading {key}: S3 {head['ContentLength']} bytes, "
-                     f"ETag {head['ETag']}; local {size} bytes, ETag {etag(path)}")
-        print(f"uploaded  s3://{BUCKET}/{key} ({size / 1e6:,.1f} MB)")
-print(f"{len(local)} files, {sum(p.stat().st_size for p in local.values()) / 1e6:,.0f} MB"
-      + ("" if args.upload else " (dry run: nothing uploaded)"))
-'''
-
-
 def upload_md(version: str, outputs: dict) -> str:
-    """UPLOAD.md: the script above and how to run it. Only the Parquet files go up."""
-    folder = s3_folder(version)
-    prefix = f"{S3_PREFIX}/{folder}"
+    """UPLOAD.md: how to run scripts/upload_wrds.py on this folder. Only the Parquet files and the daily manifest go up."""
+    prefix = f"{S3_PREFIX}/{s3_folder(version)}"
     n_files = sum(o["files"] for o in outputs.values())
     total = sum(o["size_mb"] for o in outputs.values())
-    script = (UPLOAD_SCRIPT.replace("@BUCKET@", S3_BUCKET).replace("@PREFIX@", prefix)
-              .replace("@APP_PREFIX@", S3_PREFIX))
     return f"""# Uploading the WRDS data (version {version}) to S3
 
-For a teammate with the Factor-Lake repo and its Streamlit secrets (`.streamlit/secrets.toml`, which holds
-`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_DEFAULT_REGION` at the top level; the file is in .gitignore).
-The script reads them with tomllib and passes them to boto3; it never prints them. The target is a new folder,
+The upload script is `scripts/upload_wrds.py` in the Factor-Lake repo. It sends this folder to
 
     s3://{S3_BUCKET}/{prefix}/
 
-next to the files the live app reads (`{S3_PREFIX}/full_precision_test.parquet`, `{S3_PREFIX}/daily_prices/`, ...),
-so nothing the app reads today is touched. The script refuses any other prefix.
+a new folder next to the files the live app reads (`{S3_PREFIX}/full_precision_test.parquet`, `{S3_PREFIX}/daily_prices/`,
+...), so nothing the app reads is touched. It refuses any other prefix and never deletes anything.
 
-What goes up: the {n_files} Parquet files of this `final/` folder (about {total:,.0f} MB), with the same relative
-paths (the tables at the top level and `prices_daily/year=YYYY/data.parquet`), and `prices_daily/_manifest.json` as
-the only other file, uploaded last, once every year file is verified ({n_files + 1} keys). `manifest.json` and this
-file stay local; DATA_DICTIONARY.md is next to `final/`, in `processed/` (the schema-only version is
-`pipeline/DATA_DICTIONARY.md` in the repo). The app's current daily reader (`src/s3_client.py`) reads
-`daily_prices/` with `mkt_cap` in $ thousands, so it needs a code change before it can read `prices_daily/`.
+What goes up: the {n_files} Parquet files (about {total:,.0f} MB) with their relative paths (the tables at the top level
+and `prices_daily/year=YYYY/data.parquet`), then `prices_daily/_manifest.json` last, once every year file is
+verified: {n_files + 1} keys. `manifest.json` and this file stay local. The full DATA_DICTIONARY.md is next to `final/`
+in `processed/`; the schema-only version is `pipeline/DATA_DICTIONARY.md` in the repo.
 
-## 1. Save the script
-
-Save this as `upload_wrds.py` in the Factor-Lake repo root (it finds `.streamlit/secrets.toml` next to itself; pass
-`--secrets` for another file). It uses boto3, which the repo depends on, and tomllib (tomli on Python 3.10).
-
-```python
-{script}```
-
-## 2. Dry run (uploads nothing)
+The AWS keys come from `.streamlit/secrets.toml` in the repo root (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
+`AWS_DEFAULT_REGION`), read with tomllib and never printed. The file is local only (it is in .gitignore and has never
+been on GitHub), so each teammate needs their own copy at that path.
 
 From the repo root, with the path of this `final/` folder:
 
-    uv run python upload_wrds.py "C:/path/to/WRDS FA26/processed/final"
+    uv run python scripts/upload_wrds.py "C:/path/to/WRDS FA26/processed/final"              # 1. dry run
+    uv run python scripts/upload_wrds.py "C:/path/to/WRDS FA26/processed/final" --upload     # 2. upload
+    uv run python scripts/upload_wrds.py "C:/path/to/WRDS FA26/processed/final" --check      # 3. check
 
-It reads the keys, lists what is already in the target folder (this checks that the keys work), and prints every
-S3 key it would upload. `--offline` prints the keys without credentials or network.
+1. The dry run reads the keys, lists the target folder (this checks that the keys work) and prints every key it
+   would upload. `--offline` prints the keys without credentials or network.
+2. The upload skips objects that are already the same (Parquet: size and ETag; JSON: content without created_at),
+   checks every uploaded file's size and ETag, and stops on the first AWS error with the error and the file. An
+   object that differs stops the run before anything is uploaded; add `--overwrite` only to replace it.
+3. The check compares every key with the local file, downloads the daily manifest and the smallest Parquet file
+   back, and should end with `{n_files + 1} of {n_files + 1} files match` (exit code 0).
 
-## 3. Upload
-
-    uv run python upload_wrds.py "C:/path/to/WRDS FA26/processed/final" --upload
-
-Files whose size and ETag already match in S3 are skipped. Each upload is checked against the local size and the
-expected ETag. If an object in the folder differs from the local file the script stops before uploading anything;
-add `--overwrite` only when you mean to replace it. Any AWS error stops the run with the error and the file it
-failed on. Nothing outside the folder is written, and nothing is ever deleted.
-
-## 4. Check afterwards
-
-    uv run python upload_wrds.py "C:/path/to/WRDS FA26/processed/final" --check
-
-Compares every key's size and ETag with the local file, downloads `prices_daily/_manifest.json` and the smallest
-Parquet file back and compares their sha256. It should end with `{n_files + 1} of {n_files + 1} files match` and exit
-with code 0.
-
-## 5. How to inspect S3
-
-`scripts/s3_inspect.py` shows what is in the bucket without changing anything (it makes no put, copy or delete
-calls) and without downloading whole files: a tree with sizes and dates, and the head of each file (Parquet: rows,
-columns, types and the first rows from the footer and the first row group, read with ranged GETs; text files: the
-first 10 lines).
-
-    uv run python scripts/s3_inspect.py --no-head                                     # the whole factor-lake-data/ tree
-    uv run python scripts/s3_inspect.py --prefix factor-lake-data/wrds_2026_10/        # with heads
-    uv run python scripts/s3_inspect.py --prefix factor-lake-data/wrds_2026_10/ --all-partitions --rows 3
-
-Options: `--prefix` (default `factor-lake-data/`), `--rows` (default 5), `--max-files`, `--no-head`,
-`--all-partitions` (every `year=YYYY` head, not only the newest), `--head-mb` (column data read per head, default 8).
-
-The AWS keys come from `.streamlit/secrets.toml` in the repo root (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
-`AWS_DEFAULT_REGION`), read with tomllib and never printed. That file is local only: it is in .gitignore and has
-never been on GitHub, so each teammate needs their own copy at the same path.
+To look at what is in the bucket, read-only: `uv run python scripts/s3_inspect.py --prefix {prefix}/` (see
+pipeline/README.md, "How to inspect S3").
 """
 
 

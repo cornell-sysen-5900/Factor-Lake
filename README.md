@@ -136,6 +136,36 @@ uv run streamlit run app/streamlit_app.py
 
 The app reads its data from Parquet files in AWS S3 (`s3://sysen-5900-factor-lake/factor-lake-data/`). Publish new data with `scripts/publish_data_to_s3.py` and the daily CRSP prices with `scripts/publish_daily_data_to_s3.py`, and check the live app with 5 simultaneous sessions using `scripts/load_test_sessions.py` (or on demand from the Load Test workflow in GitHub Actions). See `DOCS/AWS_S3_DATA.md`.
 
+### Latest WRDS data
+
+The newest data version is **`s3://sysen-5900-factor-lake/factor-lake-data/wrds_2026_10/`** (data version
+2026-10-25), built by the WRDS pipeline in [`pipeline/`](pipeline/README.md) from the October 2026 WRDS, Fama-French
+and FRED pulls. Every column is described in [`pipeline/DATA_DICTIONARY.md`](pipeline/DATA_DICTIONARY.md).
+
+| key under wrds_2026_10/ | contents |
+|---|---|
+| `factor_panel_monthly.parquet` | point-in-time factor panel: every Russell 2000 member (IWM holding) at each month end, with fundamental, price and analyst factors, betas and next-month return |
+| `universe_periods.parquet` | each stock's Russell 2000 membership periods |
+| `returns_monthly.parquet` | monthly returns of every stock ever in the index, delisting returns included |
+| `prices_daily/year=YYYY/data.parquet` | daily CRSP prices, returns, shares and market cap, one file per year |
+| `prices_daily/_manifest.json` | the years, rows and columns of the daily files (uploaded last) |
+| `market_daily.parquet`, `market_monthly.parquet` | Russell 2000 index and ETF returns, Fama-French factors, Treasury and Moody's yields |
+| `rv_multiples_monthly.parquet` | valuation multiples with their GICS industry and sector percentile ranks |
+| `rv_peer_stats_monthly.parquet` | peer percentiles of every multiple by GICS industry and month |
+| `dcf_inputs_annual.parquet` | annual statements and FCFF for DCF valuation |
+| `estimates_consensus.parquet` | the full IBES consensus (7 measures, FY1-FY3 and long-term growth), linked to permno |
+| `fundamentals_quarterly.parquet` | quarterly Compustat statements, TTM sums and quarter-end factors |
+| `security_master.parquet` | ids, names and GICS classification of every stock |
+| `column_stats.parquet` | statistics of every column of the other files |
+
+Where each source ends: CRSP prices 2026-09-30, IWM holdings 2026-06-30, Compustat 2026-09-30, IBES 2026-08-20,
+Fama-French 2026-08-31, FRED 2026-10-22.
+
+**The live app still reads the older files** (`full_precision_test.parquet`, `last_price_mapping.parquet`,
+`daily_prices/`) until the "switch app to new data" story moves it to this folder. Each new data pull gets its own
+`wrds_YYYY_MM/` folder, and this section is updated to point at it. How the folder is built, uploaded and inspected:
+[`pipeline/README.md`](pipeline/README.md); the S3 setup: [`DOCS/AWS_S3_DATA.md`](DOCS/AWS_S3_DATA.md).
+
 ## Supabase Archiver
 
 The `scripts/archive_supabase_tables.py` script automatically discovers, downloads, and archives all of your Supabase tables to Parquet format. It creates a GitHub Release to store the large `.parquet` binary files efficiently without bloating your repository history.

@@ -5,8 +5,7 @@ PURPOSE: Stage s09_validate: final validation of processed/final/ against indepe
 
 In:  processed/final/ (never written), raw/ (benchmarks, Fama-French, the raw CSVs for the recompute);
      the old notebook panel for the old-vs-new backtest (config.OLD_PANEL_PATHS, first one found)
-Out: processed/s09_validation/summary.json, VALIDATION.md, recompute_sample.csv, recompute_raw.csv,
-     upload_wrds.py (extracted from final/UPLOAD.md for the offline dry run)
+Out: processed/s09_validation/summary.json, VALIDATION.md, recompute_sample.csv, recompute_raw.csv
 
 Checks (all WARN, pipeline/PLAN.md s09_validate):
     1. index tracking: universe at t weighted by mkt_cap_musd, next-month returns, vs IWM and the Russell 2000
@@ -16,7 +15,7 @@ Checks (all WARN, pipeline/PLAN.md s09_validate):
        which imports no pipeline code)
     5. reproducibility: every stage rerun into a temporary folder, final files compared by rows and data hash
     6. app memory of factor_panel_monthly, full and with 9 columns
-    7. UPLOAD.md dry run offline: every S3 key without credentials or network
+    7. upload dry run offline (scripts/upload_wrds.py --offline): every S3 key without credentials or network
 """
 
 from __future__ import annotations
@@ -60,6 +59,7 @@ RECOMPUTE = {  # script column -> (final file, column)
     "e_p": ("factor_panel_monthly.parquet", "f_earnings_to_price"),
     "ev_ebitda": ("rv_multiples_monthly.parquet", "ev_ebitda"), "ret_m": ("returns_monthly.parquet", "ret_m")}
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "wrds_independent_recompute.py"
+UPLOAD_SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "upload_wrds.py"
 
 
 # ---------- Benchmarks from raw ----------
@@ -222,7 +222,7 @@ def check_backtest(paths: DataPaths, panel, rets, raw) -> tuple[list[Check], dic
     y = {k: yearly(s.reindex(months)) for k, s in (("new", new_a), ("old", old_a), ("new_full_holding", new_b),
                                                     ("iwm", iwm))}
     by_year = {int(yr): {k: round(float(v[yr]), 4) for k, v in y.items()} for yr in y["new"].index}
-    for yr, v in by_year.items():
+    for v in by_year.values():
         v["new_minus_old_pp"] = round((v["new"] - v["old"]) * 100, 2)
     off = {yr: v for yr, v in by_year.items() if abs(v["new_minus_old_pp"]) > 3}
     explain = {}
@@ -391,12 +391,8 @@ runpy.run_path(sys.argv[0], run_name="__main__")
 
 
 def check_upload(final: Path, out: Path, manifest: dict) -> tuple[list[Check], dict]:
-    md = (final / "UPLOAD.md").read_text(encoding="utf-8")
-    code = re.search(r"```python\n(.*?)```", md, re.S).group(1)
-    script = out / "upload_wrds.py"
-    script.write_text(code, encoding="utf-8")
     env = {k: v for k, v in os.environ.items() if not k.startswith("AWS_")}
-    proc = subprocess.run([sys.executable, "-c", NO_NETWORK, str(script), str(final), "--offline"],
+    proc = subprocess.run([sys.executable, "-c", NO_NETWORK, str(UPLOAD_SCRIPT), str(final), "--offline"],
                           capture_output=True, text=True, env=env, cwd=out)
     keys = re.findall(r"would upload s3://[^/]+/(\S+)", proc.stdout)
     prefix = manifest["s3_target"].split("/", 3)[3]
@@ -547,7 +543,7 @@ def render(r: dict, checks: list[Check], manifest: dict) -> str:
            f"tier has about {mem['app_limit_mb']:,} MB for the whole app.", ""]
     up = r["upload"]
     md += [verdict_line(checks, "app memory"), "", "## 7. Upload dry run", "",
-           f"The script in UPLOAD.md run with `--offline`, without credentials and with network connections "
+           f"`scripts/upload_wrds.py` run with `--offline`, without credentials and with network connections "
            f"blocked: exit code {up['exit_code']}, {up['keys']} S3 keys for {up['files_in_final']} Parquet files, all under "
            f"`{up['prefix']}`" + (f" except {up['outside_prefix']}" if up["outside_prefix"] else "") + ".", "",
            verdict_line(checks, "upload"), ""]

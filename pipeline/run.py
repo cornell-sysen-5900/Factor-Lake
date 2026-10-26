@@ -18,7 +18,7 @@ import importlib
 import sys
 import time
 
-from pipeline.config import DataPaths
+from pipeline.config import LAST_RUN_FILE, DataPaths, load_last_run
 from pipeline.stages import STAGES
 
 
@@ -40,6 +40,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     paths = DataPaths.from_data_dir(args.data_dir, args.processed_dir)
+    if not load_last_run(paths.root / LAST_RUN_FILE):
+        print(f"(no {LAST_RUN_FILE} in {paths.root}: the last-run comparisons will WARN)")
     for stage in resolve_stages(args.stage):
         print(f"== {stage}", flush=True)
         started = time.time()

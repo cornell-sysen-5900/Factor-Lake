@@ -3,9 +3,15 @@
 Turns the yearly WRDS and FRED downloads into the cleaned Parquet files the Factor-Lake app uses
 (monthly point-in-time panel, monthly returns, daily prices, fundamentals, IBES, benchmarks, rates).
 It replaces `WRDS_Cleaning.ipynb`; the notebook's rules are ported stage by stage (see [PLAN.md](PLAN.md)).
+Every exported file and column is described in [DATA_DICTIONARY.md](DATA_DICTIONARY.md); where the latest data is in
+S3 is in [DOCS/AWS_S3_DATA.md](../DOCS/AWS_S3_DATA.md#latest-wrds-data).
 
 The pipeline is not part of the app. Its dependencies are in the `pipeline` uv group, which Streamlit Cloud
-does not install, and it never uploads anything.
+does not install, and it never uploads anything: the upload is a separate script, run by hand.
+
+**Each new data pull gets its own folder**, `s3://sysen-5900-factor-lake/factor-lake-data/wrds_YYYY_MM/`
+(year and month of the pull), next to the files the app reads; nothing older is overwritten. After an upload, update
+"Latest WRDS data" in the root README.md and DOCS/AWS_S3_DATA.md to point at the new folder.
 
 ## Run it
 
@@ -17,8 +23,9 @@ uv run --group pipeline python -m pipeline.run --data-dir "C:/path/to/WRDS FA26"
 ```
 
 `--stage` takes a full name (`s02_prices`), a number (`s02`), a short name (`prices`) or `all` (every stage in
-order, stopping at the first FAIL). Exit code 0 = all checks PASS or WARN, 1 = a check FAILed, 2 = a stage is not
-written yet.
+order, stopping at the first FAIL). Exit code 0 = all checks PASS or WARN, 1 = a check FAILed. A full run takes
+about 10 minutes; s09_validate reruns every stage into a temporary folder to check the run is reproducible
+(`S09_SKIP_REPRO=1` skips that part).
 
 | stage | what it does | status |
 |---|---|---|
@@ -33,9 +40,16 @@ written yet.
 | s08_export | final Parquet set in processed/final/ with manifest.json and UPLOAD.md; processed/DATA_DICTIONARY.md | done |
 | s09_validate | validation against IWM, Fama-French, the old panel and the raw CSVs; full rerun; VALIDATION.md | done |
 
-Every exported file and column (meaning, unit, source, stage) is described in [DATA_DICTIONARY.md](DATA_DICTIONARY.md), written by s08 from `dictionary.py`. That version is schema only, because the repo is public and the data is licensed; the full one with statistics is `processed/DATA_DICTIONARY.md` next to the data.
+Every exported file and column (meaning, unit, source, stage) is described in
+[DATA_DICTIONARY.md](DATA_DICTIONARY.md), written by s08 from `dictionary.py`. That version is schema only, because
+the repo is public and the data is licensed from WRDS; the full one with statistics is `processed/DATA_DICTIONARY.md`
+next to the data. **No statistics of the data go into the repo** (code, docs, PR text or commit messages).
 
-Tests use small synthetic data only: `uv run pytest tests/pipeline`.
+Tests use small synthetic data only: `uv run pytest tests/pipeline`. `tests/pipeline/test_real_data.py` checks a
+finished run read-only when `FACTOR_LAKE_DATA_DIR` points at the data folder, and is skipped otherwise (as in CI).
+
+**Windows:** if `uv sync` fails with "Access is denied" on a `.pyd` file, a running Python still has it open: stop
+the running app, Jupyter kernels or the IDE's Python first, then sync again.
 
 ## Data folder
 
@@ -47,6 +61,7 @@ The data never goes in the repo (`.gitignore` blocks `*.csv`, `*.parquet`, `*.zi
   raw/                  WRDS and FRED downloads, exactly as downloaded. Read only.
     query_inputs/       permno_list.txt, ibes_tickers.txt: the upload lists the WRDS queries were run with
   archive/              old notebook and its outputs. Reference only; the pipeline never reads it.
+  pipeline_last_run.json  the notebook's last-run counts the "vs last run" checks compare with (kept out of git)
   processed/
     s00_inventory/      one folder per stage, written only by that stage
     s01_membership/
@@ -56,6 +71,21 @@ The data never goes in the repo (`.gitignore` blocks `*.csv`, `*.parquet`, `*.zi
     final/              what s08 exports: the files to share and upload (see final/UPLOAD.md)
     DATA_DICTIONARY.md  every final column with meaning, unit, source and stats (written by s08, not uploaded)
 ```
+
+## Upload
+
+`scripts/upload_wrds.py` uploads `processed/final/` to `factor-lake-data/wrds_YYYY_MM/` (from final/manifest.json):
+the Parquet files with their relative paths, then `prices_daily/_manifest.json` last, once every year file is
+verified. It refuses any other prefix, never deletes, skips objects that are already the same, and stops on the
+first AWS error.
+
+    uv run python scripts/upload_wrds.py "C:/path/to/WRDS FA26/processed/final"            # dry run
+    uv run python scripts/upload_wrds.py "C:/path/to/WRDS FA26/processed/final" --offline  # no keys, no network
+    uv run python scripts/upload_wrds.py "C:/path/to/WRDS FA26/processed/final" --upload
+    uv run python scripts/upload_wrds.py "C:/path/to/WRDS FA26/processed/final" --check    # every key vs the local file
+
+`--check` compares Parquet files by size and ETag and JSON files by content (created_at ignored), and downloads the
+daily manifest and the smallest Parquet file back. final/UPLOAD.md repeats this for the folder at hand.
 
 ## How to inspect S3
 

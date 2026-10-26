@@ -48,6 +48,7 @@ raw/
 processed/
 scratch/
 **/data_audit/
+pipeline_last_run.json
 peek_output.txt
 permno_list.txt
 ibes_tickers.txt

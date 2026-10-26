@@ -256,9 +256,12 @@ def run_checks(fq: pd.DataFrame, info: dict, seed: int = 7) -> list[Check]:
     recent = fq[fq["period_end"] >= "2015-01-01"]
     cov = {c: float(recent[c].notna().mean()) for c in FACTORS}
     off = {c: f"{cov[c]:.0%} (last run {LAST_RUN_COVERAGE_2015[c]:.0%})" for c in FACTORS
-           if abs(cov[c] - LAST_RUN_COVERAGE_2015[c]) > COVERAGE_TOLERANCE}
-    checks.append(check(f"factor coverage 2015+ within {COVERAGE_TOLERANCE:.0%} of the last run", not off,
-                        "; ".join(f"{k}: {v}" for k, v in off.items()) or "all 17 within", level=WARN))
+           if c in LAST_RUN_COVERAGE_2015 and abs(cov[c] - LAST_RUN_COVERAGE_2015[c]) > COVERAGE_TOLERANCE}
+    known = all(c in LAST_RUN_COVERAGE_2015 for c in FACTORS)
+    checks.append(check(f"factor coverage 2015+ within {COVERAGE_TOLERANCE:.0%} of the last run", known and not off,
+                        "; ".join(f"{k}: {v}" for k, v in off.items())
+                        or ("all 17 within" if known else "no last-run coverage: pipeline_last_run.json not loaded"),
+                        level=WARN))
     unnamed = sorted(int(g) for g in fq.loc[fq["gind"].notna() & fq["gind_name"].isna(), "gind"].unique())
     checks.append(check("every GICS industry code has a name", not unnamed,
                         f"no name for {unnamed} ({int(fq['gind'].isin(unnamed).sum())} rows)", level=WARN))

@@ -42,7 +42,7 @@ import pyarrow.csv as pacsv
 from pipeline.checks import PASS, WARN, Check, check, vs_last_run
 from pipeline.config import (IBES_CURRENCY, IBES_FPI, IBES_LINK_SCORES, IBES_MARGIN_MEASURES,
                              IBES_MARGIN_MIN_REVENUE_MUSD, IBES_MARGIN_MULTIPLE, IBES_MEASURES, IBES_OPEN_LINK_END,
-                             IBES_PER_SHARE, IBES_TOTAL_OUTLIER_MULTIPLE, IBES_TOTALS, PRICE_ASOF_DAYS, DataPaths)
+                             IBES_TOTAL_OUTLIER_MULTIPLE, IBES_TOTALS, PRICE_ASOF_DAYS, DataPaths)
 from pipeline.outputs import fresh_stage_dir, table_info, write_parquet, write_summary
 from pipeline.stages.s00_inventory import read_header
 

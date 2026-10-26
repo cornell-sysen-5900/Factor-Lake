@@ -164,7 +164,7 @@ def main(raw_dir: str, sample_csv: str, out_csv: str) -> None:
         permco = me["permco"]
         rows = company_shares(end, permco, month)
         cap = (rows["prc"] * rows["shrout"]).sum(min_count=1) / 1000
-        flag, extra, main_prc, ratio = compustat_flag(end, fq, s.permno, permco, month, t)
+        flag, extra, main_prc, _ = compustat_flag(end, fq, s.permno, permco, month, t)
         for k in (1, 2):                              # the gap must also hold at the 2 month ends before t
             if not flag:
                 break
