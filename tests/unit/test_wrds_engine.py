@@ -11,10 +11,10 @@ import pytest
 from src.backtest_engine import rebalance_portfolio
 from src.performance_metrics import compute_comprehensive_metrics
 from src.wrds_calendar import FIRST_MONTH, LAST_MONTH, PERIODS_PER_YEAR
-from src.wrds_engine import (eligible_universe, factor_zscores, holding_period_growth, run_periods,
+from src.wrds_engine import (eligible_universe, factor_zscores, run_periods,
                              run_wrds_backtest)
 from src.factor_utils import normalize_series
-from tests.unit.wrds_fixtures import Frames, month_ends, synthetic_frames
+from tests.unit.wrds_fixtures import month_ends, synthetic_frames
 
 FACTORS = ['f_roe', 'mom_12_1', 'f_book_to_price']
 DIRECTIONS = {'f_roe': 'top', 'mom_12_1': 'bottom', 'f_book_to_price': 'top'}

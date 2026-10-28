@@ -51,6 +51,7 @@ Then open http://localhost:8501
 - Sector filtering (configurable sector universe)
 - Market data loaded from AWS S3 (Parquet), shared by all sessions, with Supabase as a fallback
 - Annual rebalancing backtest (configurable period, currently 2002-2024 in UI)
+- WRDS mode: point-in-time WRDS data with semi-annual, quarterly or monthly rebalancing, run in AWS Lambda (user guide section 15; design in `DOCS/WRDS_MODE_DESIGN.md`)
 - Benchmark comparison vs Russell 2000, Growth, and Value
 - Performance metrics: CAGR, yearly returns, drawdown, Sharpe, Information Ratio, win rate
 - Ranked-stock table and top-vs-bottom cohort analysis

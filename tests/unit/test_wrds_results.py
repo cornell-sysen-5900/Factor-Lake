@@ -13,8 +13,6 @@ import pytest
 from app.wrds_tables import (benchmark_label, calendar_year_table, drawdowns, factor_header,
                              frequency_caption, holdings_display_table, metrics_table, period_table,
                              ranked_display_table, result_notes, table_number_formats)
-from src.backtest_service import BacktestService
-from src.s3_client import S3DataManager
 from src.wrds_engine import rank_stocks, run_wrds_backtest
 from tests.unit.results_snapshot import legacy_results_snapshot, without_clock_times
 from tests.unit.test_backtest_lambda import DELISTING_FILE, UNIVERSE_FILE, _delisting, _parquet, _raw_universe
@@ -231,7 +229,7 @@ def test_every_view_of_a_wrds_run(new_session):
     other = results['rebalance_dates'][3]
     at.selectbox(key=f"wrds_date_{run['id']}").set_value(other).run()
     _assert_clean(at)
-    assert any(c.value.startswith(f"**Method:** Mixing | **Holdings:** ") and f"({other} to" in c.value
+    assert any(c.value.startswith("**Method:** Mixing | **Holdings:** ") and f"({other} to" in c.value
                for c in at.caption)
 
     # Ranked stocks on that date, with the same names and its own CSV

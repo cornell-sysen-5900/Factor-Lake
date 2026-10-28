@@ -8,7 +8,7 @@ VERSION: 3.8.0
 import streamlit as st
 import pandas as pd
 import numpy as np
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Optional
 
 from Visualizations.portfolio_growth_plot import plot_portfolio_growth
 from Visualizations.top_bottom_portfolio_plot import plot_top_bottom_percent

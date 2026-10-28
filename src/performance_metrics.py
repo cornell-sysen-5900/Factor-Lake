@@ -6,7 +6,6 @@ VERSION: 1.3.0
 """
 
 import numpy as np
-import pandas as pd
 from typing import Dict, List, Any
 
 def compute_comprehensive_metrics(p_ret: np.ndarray, b_ret: np.ndarray, g_ret: np.ndarray,

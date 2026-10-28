@@ -23,6 +23,8 @@ Factor Lake lets you choose a group of stock-selection factors, rank stocks by t
 
 ## 4. Set the sidebar first
 
+The steps below are for the default **Legacy** data source. For WRDS data with semi-annual, quarterly or monthly rebalancing, see [15. Use WRDS mode](#15-use-wrds-mode).
+
 1. Decide whether to restrict fossil fuel companies.
 2. Choose equal weight or market cap weight.
 3. Choose how multiple factors are combined:
@@ -141,3 +143,41 @@ Use this section if you want a quick understanding of what the app is doing behi
 4. Returns come from the dataset's next-year return field.
 5. Delisting behavior changes the outcome, so keep that setting recorded in every experiment.
 6. The **Factor Lake Supabase Project** is the backing data source.
+
+## 15. Use WRDS mode
+
+WRDS mode is a second data source next to Legacy. It backtests on point-in-time data built from WRDS (CRSP, Compustat, IBES and the Russell 2000 holdings of the IWM fund), and rebalances **semi-annually** (June, December), **quarterly** (March, June, September, December) or **monthly**, at month ends. Legacy is unchanged: annual rebalancing on the 9/30 data, with the same results as before.
+
+**Point in time.** At each rebalance date the universe is the Russell 2000 members known on that date, the factors use only data public by then, and returns start after the date. Each holding period is buy and hold until the next rebalance.
+
+### Run a WRDS backtest
+
+1. In the sidebar, set **Data Source** to **WRDS**. It is only available when the app is connected to AWS Lambda, because WRDS backtests run there; otherwise it is greyed out with a note.
+2. Switching the data source clears the selected factors, because the two modes offer different factors.
+3. Pick the **rebalancing frequency** (Quarterly by default) and the start and end years (2008 to 2026). The backtest covers those calendar years, and the caption under the years shows the rebalances, for example "12 quarterly rebalances, 2009-12 to 2012-09; holds to 2012-12".
+4. Weighting, factor combination, sector filter, fossil fuel filter and initial AUM work as in Legacy. The portfolio buys the top 10%, as in Legacy. There is no delisting option (see below).
+5. Add factors on the Analysis tab. They are grouped as **Momentum, Value, Profitability, Quality, Growth, Risk, Analyst and Size**, and each has a default direction and a tooltip. Factors that default to "Lower is better" say why.
+6. Click **Run Portfolio Analysis**. There is no Load Market Data step: the backtest reads the WRDS data in AWS.
+
+### Read WRDS results
+
+The results look like Legacy's, on dates instead of years:
+
+- The run's tab reads e.g. "Run 2: WRDS, Quarterly".
+- **Holdings and Ranks**: pick a rebalance date to see what was held from that date, with weights, returns and factor values in percent as in Legacy, and a CSV download. **All ranked stocks on this date** ranks every stock the strategy could buy on that date.
+- Charts of growth, period returns and drawdown, against **IWM** (Russell 2000), **IWN** (Value) and **IWO** (Growth).
+- A period table (switch to **By calendar year** for yearly returns), the cohort comparison, and the statistics, annualized by the frequency.
+- The Analysis ID shares a WRDS run exactly like a Legacy one.
+
+### How WRDS mode treats delistings and gaps
+
+- **Delistings**: CRSP delisting returns are included. After a stock delists, its money earns the risk-free rate until the next rebalance.
+- **Missing returns**: a month without a return (not a delisting) counts as 0%. The results say how many stock-months that was.
+- **Risk-free rate**: Fama-French one-month T-bill. A month it is not published yet is filled from the 3-month T-bill / 12, and the results list those months.
+
+### Limitations
+
+- **Sectors use today's GICS codes**, not the codes a company had at the time, so the sector filter is the one input that is not strictly point in time.
+- **The benchmarks are ETF total returns** (IWM, IWN, IWO): they include dividends and are net of the funds' fees. They differ slightly from the index returns Legacy uses, so do not compare Legacy and WRDS numbers directly.
+- **The data runs from April 2008 to September 2026.** A backtest ending in 2026 holds until September 2026 (semi-annual: June 2026), and one starting in 2008 starts with the first rebalance month in the data.
+- The Data Viewer shows Legacy data only.

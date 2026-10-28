@@ -374,7 +374,8 @@ def run_wrds_backtest(data: WrdsData, factors: List[str], factor_directions: Dic
         factor_directions: column -> 'top' (higher is better) or 'bottom'.
         frequency: 'semiannual', 'quarterly' or 'monthly'.
         factor_labels: column -> display name, for picked_by in the holdings.
-        first_month, last_month: the data's bounds (tests use shorter data).
+        first_month: the data's first month, 'YYYY-MM' (tests use shorter data).
+        last_month: the data's last month with returns, 'YYYY-MM'.
 
     Returns:
         (results, holdings). results has the keys of compute_comprehensive_metrics, with

@@ -109,3 +109,59 @@ Demo (about 2 minutes, after the steps in section 5):
 ## 8. Cost
 
 Each uncached backtest is one Lambda invocation of a few seconds. A cold start adds the time to download the 8 MB market data file. Cached repeats take well under a second, and saved results are small JSON files deleted after 90 days. Class use stays far inside the Lambda and S3 free tiers.
+
+## 9. WRDS mode
+
+WRDS backtests (see the user guide, section 15, and `DOCS/WRDS_MODE_DESIGN.md`) run in the same function. A job with `data_mode: "wrds"` goes to `src/wrds_service.py`; every other job is a Legacy job, handled exactly as before.
+
+- **Data.** The function reads three files under `factor-lake-data/wrds_2026_10/` (`factor_panel_monthly`, `returns_monthly`, `market_monthly`), only the columns it needs, once per container. The folder is set by the function's `FACTOR_LAKE_WRDS_DIR` variable (the deploy script's `--wrds-dir`). A new WRDS pull goes into a new folder.
+- **Cache.** The key hashes the job, the S3 ETags of the three files and a WRDS code version. Legacy keeps its own code version, so WRDS changes never recompute Legacy results.
+- **Holdings.** A WRDS backtest writes `backtest-results/<hash>.holdings.parquet` (one row group per rebalance date) **before** `backtest-results/<hash>.json`. The app reads one date at a time with its own S3 keys, in two ranged GETs. A cached result whose holdings file is missing is computed again.
+
+### Deploy a dev function
+
+Test changes on a separate function and leave the live one alone:
+
+```bash
+uv run python scripts/deploy_backtest_lambda.py --function-name sysen5900-factor-lake-backtest-dev \
+    --role-arn <the course role's ARN> --leave-lifecycle-rules
+```
+
+- `--leave-lifecycle-rules` does not write the bucket's lifecycle rules (a normal deploy rewrites them, and the bucket is shared with the live app). It only reads them and says whether `backtest-results/` expires.
+- `--wrds-dir wrds_YYYY_MM` points the function at another WRDS folder (default `wrds_2026_10`).
+
+To point a local app at the dev function, set the function name next to the AWS keys in `.streamlit/secrets.toml` (top level):
+
+```
+FACTOR_LAKE_BACKTEST_LAMBDA = "sysen5900-factor-lake-backtest-dev"
+```
+
+To check the WRDS engine locally on the pipeline's files (IWM tracking, run time and memory), run `uv run python scripts/check_wrds_engine.py "<path>/processed/final"`. It prints its results and stores none.
+
+### Validation on the dev function (2026-10-28)
+
+Lambda's own durations (from the invocation log tail), 3008 MB function, course role. All runs were computed (no cache) unless marked.
+
+| Job | Container | Duration | Max memory | Result JSON | Holdings Parquet | Result |
+|---|---|---|---|---|---|---|
+| Monthly, whole universe, cap weighted (IWM tracking check) | cold: init 2.5 s, plus loading the WRDS data | 10.2 s | 1154 MB | 85 KB | 47.9 MB | PASS (correlation ≥ 0.99, tracking error ≤ 3%) |
+| Monthly, Mixing, 3 factors | warm | 3.0 s | 1154 MB | 85 KB | 22.1 MB | |
+| Monthly, Integrating, 2 factors | warm | 1.5 s | 1154 MB | 85 KB | 6.0 MB | |
+| Monthly, Mixing, 3 factors, cap weighted | warm | 2.9 s | 1154 MB | 85 KB | 23.3 MB | |
+| Monthly, Mixing, 4 factors | warm | 3.5 s | 1154 MB | 85 KB | 27.6 MB | |
+| Monthly, Mixing, 10 factors | warm | 6.5 s | 1154 MB | 85 KB | 49.7 MB | |
+| The first one again | warm, cache hit | 0.11 s | 1154 MB | 85 KB | | |
+| 3 jobs at once: semi-annual / quarterly / monthly | 1 warm, 2 cold (init 2.6 s) | 0.5 / 6.9 / 8.6 s | 1154 / 890 / 996 MB | 16 / 29 / 84 KB | 2.3 / 5.1 / 16.8 MB | all finished, 9.6 s wall |
+| From the app: semi-annual / quarterly / monthly backtest | warm | 0.7 / 1.1 / 2.9 s | 996 MB | 16 / 30 / 85 KB | 3.3 / 7.0 / 22.1 MB | PASS |
+| From the app: cohort comparison (monthly, 10%) | warm | 3.6 s | 996 MB | 11 KB | | PASS |
+| From the app: ranked list, one date | warm | 0.3 s | 996 MB | 0.9 MB | | PASS |
+| From the app: Legacy backtest | warm | 2.4 s | 996 MB | 2.3 MB | | equals `main`'s result (≤ 1e-9 relative) |
+
+- **Warm repeats do not slow down on Linux.** Five different monthly jobs in a row on one container took time in line with their number of factors, not their order. (On Windows, repeated engine runs in one process did get slower.)
+- **Cold start** for WRDS: about 2.5 s of Lambda init, plus a few seconds the first WRDS job of a container spends loading the WRDS data.
+- **Memory**: at most about 1.15 GB of the function's 3008 MB, with the Legacy and WRDS data both loaded.
+- **Package**: 61.7 MB zipped, 199 MB unzipped (Lambda allows 250 MB).
+
+### Admin: confirm the 90-day rule
+
+Saved results and WRDS holdings both live under `factor-lake-data/backtest-results/`, so one lifecycle rule on that prefix expires both. The class keys cannot read the bucket's lifecycle rules, so **an AWS admin must confirm** that the rule `factor-lake-expire-backtest-results` (prefix `factor-lake-data/backtest-results/`, expire after 90 days) is enabled on `sysen-5900-factor-lake`.
