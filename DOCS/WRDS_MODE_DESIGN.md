@@ -187,7 +187,7 @@ At each rebalance date t:
 2. **Buyable.** A stock needs `prc > 0` and `mkt_cap_musd > 0` at t. Both are known at t.
 3. **Factors.** Only allowlisted columns (section 2.1), and only their values at t. The pipeline guarantees these were public by t (Compustat report date, IBES statistics date, announcement date). Z-scores use only the stocks at t.
 4. **Weights.** Market-cap weights use `mkt_cap_musd` at t.
-5. **Returns start after t.** A position bought at the close on t earns the stock's monthly returns for the months after t, up to and including the next rebalance date t'. These are `ret_next_1m` at t for one month, or `ret_m` from `returns_monthly.parquet` for each month in (t, t'] for longer periods. `returns_monthly` keeps a stock's rows after it leaves the index, so a stock that drops out mid-period is still held to t'.
+5. **Returns start after t.** A position bought at the close on t earns the stock's monthly returns for the months after t, up to and including the next rebalance date t'. These are `ret_m` from `returns_monthly.parquet` for each month in (t, t'], for every frequency. The panel's `ret_next_1m` holds the same values for one month, but the loader never reads it, so no column about the month after t is ever in memory next to the factors. `returns_monthly` keeps a stock's rows after it leaves the index, so a stock that drops out mid-period is still held to t'.
 6. **Delisting.** CRSP's delisting return is included in the delisting month's `ret_m`. A stock has no rows after it delists. For the rest of the period, its money is held as cash earning the risk-free rate until the next rebalance (decision 1), and the position is marked Delisted.
 7. **Missing return.** If a held stock has no return for a month and has not delisted (it stopped trading, or CRSP has no price), that month counts as 0% and the position is still held. The result reports how many stock-months that was (`missing_return_stock_months`; decision 8).
 8. **Benchmarks** compound over the same months (t, t'] (section 4).
@@ -345,6 +345,20 @@ Lambda at 3008 MB gets about 2 vCPUs, and pandas mostly uses one core. We assume
 | Cached repeat | under 0.5 s, as today |
 | Peak memory | about 0.8 GB for WRDS, about 1.0 to 1.2 GB with the Legacy universe also warm |
 
+### 6.4 Measured with the stage 3 engine
+
+`scripts/check_wrds_engine.py <processed/final folder>` runs each case in a fresh process, as a Lambda invocation would, on the same Windows desktop:
+
+| Case (monthly, 2008-2026) | Load | Run | Peak memory | Holdings table in memory |
+|---|---|---|---|---|
+| Whole universe, cap weighted (the IWM tracking check) | 0.4 s | 1.5 s | 0.95 GB | 41 MB |
+| Mixing, 3 factors, equal weight | 0.3 s | 1.4 s | 0.84 GB | 21 MB |
+| Mixing, 10 factors, equal weight | 0.4 s | 4.4 s | 1.05 GB | 57 MB |
+
+The tracking check passed (correlation at least 0.99, tracking error at most 3% a year; the values are printed, not stored). Peak memory is above the 0.8 GB estimate of 6.3, because the holdings table and its merges are built in memory, and still about a third of the function's 3008 MB.
+
+On Windows, repeated runs in one process get slower: after one engine run, even a plain numpy `argsort` benchmark in the same process is about 4 times slower, so the cause is the process's memory allocator, not the engine. Lambda runs Linux, and stage 6 measures warm repeats there.
+
 **Recommendation:** keep the function at 3008 MB and a 600 s timeout. The memory leaves plenty of headroom, and Lambda's CPU share grows with memory. Stage 6 replaces these estimates with real numbers from CloudWatch `REPORT` lines (Duration, Max Memory Used, Init Duration) for cold, warm and cached monthly runs, and records them in `DOCS/AWS_LAMBDA_BACKTESTS.md`.
 
 ---
@@ -361,6 +375,14 @@ Lambda at 3008 MB gets about 2 vCPUs, and pandas mostly uses one core. We assume
 4. **Weights.** Equal, or `mkt_cap_musd` share, within the portfolio (Integrating) or within each sleeve, with each sleeve given `1 / number of factors` of the money (Mixing).
 5. **Returns.** Each position's growth is the product of (1 + monthly return) over the period's months (section 3.3), with delisted money earning rf after the delisting month. The period return is `sum(weight * growth) - 1`: buy and hold within the period, rebalanced at each rebalance date.
 6. **Outputs.** Period returns, values, holdings rows (merged per stock as in Legacy), counts of delisted positions and missing-return months, and the metrics (section 4).
+
+As built in stage 3:
+
+- **Result.** It has the Legacy result keys (per-period returns in percent under `yearly_returns`, metrics annualized by frequency). `years` holds the period boundary dates as `YYYY-MM-DD` strings, and each `yearly_comparisons` entry also has `period_start`, `period_end` and the year of its end. The extras are `rebalance_dates`, `period_end_dates`, `cagr`, `rf_returns`, `benchmark_labels`, `rf_filled_months`, `total_delisted_positions`, `missing_return_stock_months` and `empty_rebalance_dates`. The Results tab still turns `years` into ints, so stage 5 renders WRDS runs with dates.
+- **Holdings DataFrame.** One row per stock per rebalance date. Weights, returns and contributions are decimals (Legacy's rows are percent), and ticker, name and sector are categoricals. Factor values are under their column names; stage 5 maps them to display names.
+- **A date with nothing to buy** (for example a narrow sector filter): the money earns the risk-free rate for that period, and the date is listed in `empty_rebalance_dates`.
+- **A holding period with a month without benchmark data** is refused with an error.
+- **Shared code.** `performance_metrics.compute_comprehensive_metrics` gained `periods_per_year` (default 1: Legacy unchanged, which the pinned Legacy test checks), and `S3DataManager` gained a public `read_bytes`. Both files are in `ENGINE_SOURCES`, so Legacy's code version changes, as the review allowed.
 
 The core (steps 2 to 5) does not depend on the frequency: it takes rows of (date, id, factor values, cap, return for the period), so it can also be run on Legacy's annual data. That is what the match test does.
 
@@ -419,9 +441,8 @@ for Mixing and Integrating, equal and cap weight, mixed directions, and `top_pct
 | `test_wrds_calendar.py` | the rebalance dates in the section 3.2 table for each frequency; data bounds; `start == end`; out-of-range years rejected; trading-day dates used, not calendar month ends (stage 3, when dates come from the panel) |
 | `test_wrds_factors.py` | the app's factor list and the Lambda allowlist match; keys, groups and tooltips; every Lower default says why; the 11 GICS sectors |
 | `test_wrds_lookahead.py` | changing any row dated after t leaves the holdings at t unchanged; changing returns changes returns only, never the selection; non-allowlisted columns (`ret_next_1m`, `delisted_next_month`, ...) are rejected as factors; a stock that joins later is never held earlier; a stock that leaves mid-period is held to t' with `returns_monthly` returns; a period's return uses exactly the months in (t, t'] |
-| `test_wrds_engine_matches_legacy.py` | section 7.3 |
-| `test_wrds_engine.py` | Mixing and Integrating, equal and cap weight, sectors, fossil fuel GICS and SIC codes, delisting mid-period then cash at rf, missing-return month at 0%, `permno` tie-break, at least one stock, duplicate tickers on one date |
-| `test_wrds_metrics.py` | with k = 1, every shared key equals `compute_comprehensive_metrics`; annualization for k = 2, 4, 12; CAGR in years; rf fill from `tbill_3m` |
+| `test_wrds_engine.py` | the Legacy match of section 7.3 (stocks, ranks, scores, weights, returns, Picked By) and per-date z-scores equal to `normalize_series`; drift within a period, delisting then cash at rf, missing-return months at 0% and counted, rf fill from `tbill_3m / 12`, benchmarks compounded; sectors, fossil fuel GICS and SIC codes, buyable stocks, `permno` tie-break, at least one stock; rebalance dates and holding periods per frequency from the 2008 start to the 2026 end; the metrics default equals Legacy and k annualizes volatility, Sharpe and IR |
+| `test_wrds_service.py` | the same data from a local folder and a fake S3, only the needed columns decoded; the runner equals the engine; data reused until a file is republished |
 | `test_wrds_jobs.py` | build and validate; unknown factor or frequency rejected; `ranked` needs a scheduled date; WRDS and Legacy hashes never collide; the app and Lambda allowlists match |
 | `test_wrds_service.py` | with a fake S3, as in `test_backtest_lambda.py`: dispatch on `data_mode`; data version from the WRDS ETags; holdings Parquet written before the JSON; cache hit returns the same result; one row group per date; the Legacy path still returns today's result |
 | `test_wrds_mode_switch.py` | with Streamlit AppTest: Legacy by default; switching resets factors; WRDS disabled without Lambda; WRDS hides delisting, Load Market Data and the Lambda switch; Legacy shows no WRDS control; the factor groups and defaults; Legacy settings and Lambda jobs exactly as on `main`, also after a visit to WRDS |
@@ -457,7 +478,7 @@ All eleven questions from the stage 1 review are decided; see [Decisions](#decis
 |---|---|---|---|
 | 1 | this design | `DOCS/WRDS_MODE_DESIGN.md` | |
 | 2 | mode switch and WRDS factor list | `src/wrds_factors.py`, `src/wrds_calendar.py`, `tests/unit/test_legacy_pinned.py` with `tests/fixtures/legacy_pinned_results.json`, `test_wrds_mode_switch.py`, `test_wrds_calendar.py`, `test_wrds_factors.py` | `app/components/sidebar.py`, `app/components/factor_selection.py`, `app/streamlit_config.py`, `app/streamlit_app.py` (WRDS Run shows a "coming in the next stage" note until stage 3); this design (decisions) |
-| 3 | WRDS engine in Lambda | `src/wrds_data.py`, `src/wrds_engine.py`, `src/wrds_metrics.py`, `test_wrds_engine*.py`, `test_wrds_lookahead.py`, `test_wrds_metrics.py` | `src/backtest_service.py` (dispatch), `scripts/deploy_backtest_lambda.py` (`FACTOR_LAKE_WRDS_DIR`) |
+| 3 | WRDS engine (not deployed) | `src/wrds_data.py`, `src/wrds_engine.py` (metrics included; no separate `wrds_metrics.py`), `src/wrds_service.py` (runner), `scripts/check_wrds_engine.py`, `tests/unit/wrds_fixtures.py`, `test_wrds_engine.py`, `test_wrds_lookahead.py`, `test_wrds_service.py` | `src/performance_metrics.py` (`periods_per_year`), `src/s3_client.py` (`read_bytes`); the dispatch in `src/backtest_service.py` and `FACTOR_LAKE_WRDS_DIR` in the deploy script move to stage 4 |
 | 4 | jobs and cache | `src/wrds_jobs.py`, `src/wrds_service.py`, `test_wrds_jobs.py`, `test_wrds_service.py` | `src/lambda_client.py`, `app/streamlit_utils.py` |
 | 5 | feature parity | `app/components/wrds_results.py`, `app/wrds_holdings.py`, `test_wrds_saved.py` | `app/components/results_tab.py` (one dispatch), `app/streamlit_utils.py` (open, cohort), `src/saved_analyses.py` (message wording) |
 | 6 | validation and docs | | `scripts/check_backtest_lambda.py` (`--wrds`), `DOCS/AWS_LAMBDA_BACKTESTS.md`, `DOCS/FACTOR_LAKE_USER_GUIDE.md`, `README.md` |
