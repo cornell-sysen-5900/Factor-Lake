@@ -351,9 +351,9 @@ def run_backtest_logic(user_settings: Dict[str, Any],
     return run
 
 def _wrds_run_label(run_id: int, factor_labels: List[str], frequency: str) -> str:
-    from app.saved_runs import build_run_label
-    frequency_label = {'semiannual': 'semi-annual'}.get(frequency, frequency)
-    return f"{build_run_label(run_id, factor_labels)} (WRDS, {frequency_label})"
+    """A WRDS run's tab label, e.g. "Run 2: WRDS, Quarterly" (the factors are in its header)."""
+    from app.wrds_tables import FREQUENCY_LABELS
+    return f"Run {run_id}: WRDS, {FREQUENCY_LABELS.get(frequency, frequency)}"
 
 
 def _run_wrds_job(run: Dict[str, Any], kind: str, cohort_pct: Optional[float] = None,

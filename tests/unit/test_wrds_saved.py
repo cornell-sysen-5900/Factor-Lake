@@ -112,19 +112,19 @@ def test_a_wrds_run_is_computed_in_lambda_cached_and_shows_its_summary_and_holdi
     at = new_session()
     run = _run_wrds(at, 'w_roe', 'w_mom_12_1')
     assert run['data_mode'] == 'wrds' and run['data'] is None
-    assert run['label'] == 'Run 1: 12-1 Mo Momentum +1 (WRDS, quarterly)'      # factors in catalog order
+    assert run['label'] == 'Run 1: WRDS, Quarterly'
     assert run['compute']['cached'] is False
     results = run['results']
     assert results['rebalance_dates'][0].startswith('2009-12') and len(results['rebalance_dates']) == 12
     assert any('Analysis complete' in s.value for s in at.success)
 
     # Summary and the newest date's holdings, read with ranged GETs
-    assert _metric(at, 'Rebalances') == '12'
+    assert '**Data Source:** WRDS | **Rebalancing:** Quarterly (12 rebalances)' in [c.value for c in at.caption]
     assert _metric(at, 'CAGR') == f"{results['cagr']:.2%}"
     newest = results['rebalance_dates'][-1]
     assert at.selectbox(key=f"wrds_date_{run['id']}").value == newest
     rows = results['holdings']['rows'][results['holdings']['dates'].index(newest)]
-    assert any(c.value == f"**Holdings:** {rows} (read from S3 for this date only)" for c in at.caption)
+    assert any(c.value.startswith(f"**Method:** Mixing | **Holdings:** {rows} |") for c in at.caption)
     holdings_gets = [r for k, r in s3.gets if k.endswith('.holdings.parquet')]
     assert holdings_gets and all(r is not None for r in holdings_gets)
 
@@ -160,13 +160,13 @@ def test_a_wrds_id_opens_in_another_session_with_the_same_results_and_holdings(n
     theirs.button(key='open_analysis_btn').click().run()
     _assert_clean(theirs)
     opened = theirs.session_state['saved_runs'][0]
-    assert opened['label'] == 'Run 1: Book/Price +1 (WRDS, quarterly) (opened)'
+    assert opened['label'] == 'Run 1: WRDS, Quarterly (opened)'
     assert opened['data_mode'] == 'wrds' and opened['compute']['opened'] is True
     assert opened['results'] == json.loads(json.dumps(run['results']))
     assert opened['factor_directions'] == run['factor_directions']
     _open_tab(theirs, opened['label'])
     assert _metric(theirs, 'CAGR') == f"{run['results']['cagr']:.2%}"
-    assert any(c.value.startswith('**Holdings:**') for c in theirs.caption)
+    assert any(c.value.startswith('**Method:** Mixing | **Holdings:**') for c in theirs.caption)
     assert theirs.fake_lambda.invocations == 1               # opening never reruns it
 
 

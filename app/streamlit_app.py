@@ -184,6 +184,9 @@ def main():
     if tab_viewer.open:
         with tab_viewer:
             # Raw data inspection and CSV export (reuses the data loaded in Analysis)
+            if data_mode == 'wrds':
+                st.caption(":material/info: The Data Viewer shows the Legacy data, not WRDS: switch the data "
+                           "source to Legacy and click Load Market Data to use it.")
             render_data_viewer_tab()
 
     if tab_about.open:

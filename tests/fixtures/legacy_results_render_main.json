@@ -1,0 +1,5130 @@
+{
+ "run1": {
+  "button": [
+   "12-Mo Momentum %",
+   "6-Mo Momentum %",
+   "1-Mo Momentum %",
+   "Price to Book Using 9/30 Data",
+   "Book/Price",
+   "Next FY Earns/P",
+   "ROA using 9/30 Data",
+   "Accruals/Assets",
+   "1-Yr Price Vol %",
+   "1-Yr Asset Growth %",
+   "1-Yr CapEX Growth %",
+   "",
+   "",
+   "Load Market Data",
+   "Run Portfolio Analysis",
+   "Open analysis",
+   "Remove this run",
+   "Generate Comparison"
+  ],
+  "caption": [
+   ":material/lightbulb: Tip: hover over a factor to see its full description.",
+   "Profitability",
+   "Profitability",
+   "Paste an analysis ID from your history or from a colleague to see that analysis with its original results, factors and settings.",
+   "Only analyses run or opened in this browser session. Copy an ID to reopen or share it.",
+   "Not saved (computed in this app), so it has no ID.",
+   "Each analysis run is saved as its own tab (newest first). Only the last 5 runs are kept, and they are cleared when you refresh the page.",
+   "**Factors:** ROE using 9/30 Data (Higher is better), ROA % (Higher is better)",
+   "**Period:** 2002-2024 | **Initial AUM:** $1,000",
+   "**Universe:** All sectors | Fossil fuels included",
+   "**Factor Combination:** Mixing (one sleeve per factor)",
+   "**Weighting:** Equal Weighted",
+   "**Delisting Strategy:** Zero Return",
+   "**Method:** Mixing | **Holdings:** 6 | **Portfolio return (2023 to 2024):** 12.48%"
+  ],
+  "code": [],
+  "dataframe": [
+   "Rank,Ticker,Sector,Picked By,Score,ROE using 9/30 Data,ROA %,Weight %,Shares,Buy Price,Dollar Value,Period Return %,Contribution %,Delisted\r\n1,T26,Technology,ROA %,2.714323516424886,0.1324249475102165,0.1530442265840798,16.666666666666664,33.03062341405863,20.771667705007623,686.1011336460703,-5.28341439657763,-0.8805690660962716,False\r\n1,T11,Technology,ROE using 9/30 Data,1.8657625490029999,0.20147456899601934,0.059893988859627684,16.666666666666664,24.700109603023375,27.7772505739039,686.1011336460703,25.36199676223608,4.22699946037268,False\r\n2,T05,Technology,ROE using 9/30 Data,1.6418037241215384,0.1862161120249647,0.0286126622091627,16.666666666666664,26.218753073320276,26.168335760568045,686.1011336460703,1.1088841603941848,0.18481402673236413,False\r\n2,T00,Technology,ROA %,1.4342071186597714,0.15557889161399985,0.09919244413403805,16.666666666666664,9.538422848367208,71.93024932455342,686.1011336460703,36.9367718736846,6.156128645614099,False\r\n3,T16,Technology,ROE using 9/30 Data,1.5275396472684115,0.180688844297713,0.046146267075815844,16.666666666666664,50.396911528644644,13.613951983071491,686.1011336460703,2.616182414651541,0.4360304024419235,False\r\n3,T14,Technology,ROA %,1.3537365603667642,0.055279332270841246,0.09678893384814549,16.666666666666664,10.566763075735336,64.93011423920137,686.1011336460703,14.15177254049552,2.358628756749253,False\r\n",
+   "Year,Portfolio Value,YoY Return,Benchmark Returns,Growth Returns,Value Returns\r\n2002,\"$1,232.41\",23.24%,36.50%,41.73%,31.65%\r\n2003,\"$1,437.84\",16.67%,18.76%,11.92%,25.67%\r\n2004,\"$1,526.96\",6.20%,17.95%,17.96%,17.75%\r\n2005,\"$1,961.89\",28.48%,9.92%,5.88%,14.01%\r\n2006,\"$1,820.40\",-7.21%,12.34%,18.95%,6.08%\r\n2007,\"$1,929.90\",6.02%,-14.49%,-17.08%,-12.27%\r\n2008,\"$1,953.63\",1.23%,-9.54%,-6.32%,-12.61%\r\n2009,\"$1,973.15\",1.00%,13.35%,14.78%,11.84%\r\n2010,\"$2,292.85\",16.20%,-3.54%,-1.12%,-5.99%\r\n2011,\"$2,427.96\",5.89%,31.91%,31.18%,32.63%\r\n2012,\"$2,532.60\",4.31%,30.04%,33.07%,27.03%\r\n2013,\"$2,413.20\",-4.71%,3.93%,3.78%,4.12%\r\n2014,\"$2,687.62\",11.37%,1.25%,4.05%,-1.60%\r\n2015,\"$3,091.61\",15.03%,15.46%,12.12%,18.82%\r\n2016,\"$3,507.19\",13.44%,20.74%,20.99%,20.55%\r\n2017,\"$3,128.71\",-10.79%,15.24%,21.06%,9.32%\r\n2018,\"$2,991.07\",-4.40%,-8.89%,-9.63%,-8.24%\r\n2019,\"$3,141.85\",5.04%,0.40%,15.72%,-14.87%\r\n2020,\"$3,729.30\",18.70%,47.67%,33.28%,63.93%\r\n2021,\"$3,718.66\",-0.29%,-23.51%,-29.27%,-17.69%\r\n2022,\"$4,116.61\",10.70%,8.94%,9.58%,7.84%\r\n2023,\"$4,630.44\",12.48%,26.76%,27.66%,25.89%\r\n",
+   "Year,Portfolio Return,Benchmark Return,Outperformed Benchmark,Growth Index Return,Outperformed Growth,Value Index Return,Outperformed Value\r\n2002,23.24%,36.50%,\u274c,41.73%,\u274c,31.65%,\u274c\r\n2003,16.67%,18.76%,\u274c,11.92%,\u2705,25.67%,\u274c\r\n2004,6.20%,17.95%,\u274c,17.96%,\u274c,17.75%,\u274c\r\n2005,28.48%,9.92%,\u2705,5.88%,\u2705,14.01%,\u2705\r\n2006,-7.21%,12.34%,\u274c,18.95%,\u274c,6.08%,\u274c\r\n2007,6.02%,-14.49%,\u2705,-17.08%,\u2705,-12.27%,\u2705\r\n2008,1.23%,-9.54%,\u2705,-6.32%,\u2705,-12.61%,\u2705\r\n2009,1.00%,13.35%,\u274c,14.78%,\u274c,11.84%,\u274c\r\n2010,16.20%,-3.54%,\u2705,-1.12%,\u2705,-5.99%,\u2705\r\n2011,5.89%,31.91%,\u274c,31.18%,\u274c,32.63%,\u274c\r\n2012,4.31%,30.04%,\u274c,33.07%,\u274c,27.03%,\u274c\r\n2013,-4.71%,3.93%,\u274c,3.78%,\u274c,4.12%,\u274c\r\n2014,11.37%,1.25%,\u2705,4.05%,\u2705,-1.60%,\u2705\r\n2015,15.03%,15.46%,\u274c,12.12%,\u2705,18.82%,\u274c\r\n2016,13.44%,20.74%,\u274c,20.99%,\u274c,20.55%,\u274c\r\n2017,-10.79%,15.24%,\u274c,21.06%,\u274c,9.32%,\u274c\r\n2018,-4.40%,-8.89%,\u2705,-9.63%,\u2705,-8.24%,\u2705\r\n2019,5.04%,0.40%,\u2705,15.72%,\u274c,-14.87%,\u2705\r\n2020,18.70%,47.67%,\u274c,33.28%,\u274c,63.93%,\u274c\r\n2021,-0.29%,-23.51%,\u2705,-29.27%,\u2705,-17.69%,\u2705\r\n2022,10.70%,8.94%,\u2705,9.58%,\u2705,7.84%,\u2705\r\n2023,12.48%,26.76%,\u274c,27.66%,\u274c,25.89%,\u274c\r\n"
+  ],
+  "error": [],
+  "expander": [
+   "Open a saved analysis",
+   "This session's analyses (1)",
+   "Run Cohort Comparison"
+  ],
+  "header": [
+   "Factor Selection",
+   "Portfolio Performance Results",
+   "Advanced Backtest Statistics",
+   "Yearly Win/Loss Summary"
+  ],
+  "info": [],
+  "markdown": [
+   "<style>\n    /* Header container with icon */\n    .main-header-container {\n        display: flex;\n        align-items: center;\n        justify-content: center;\n        position: relative;\n        margin-bottom: 2rem;\n    }\n\n    /* Typography and header styling */\n    .main-header {\n        font-size: 2.5rem;\n        font-weight: bold;\n        color: #1f77b4;\n        text-align: center;\n        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);\n    }\n\n    /* Documentation icon link */\n    .docs-icon-link {\n        font-size: 2rem;\n        margin-left: 1.5rem;\n        text-decoration: none;\n        cursor: pointer;\n        transition: transform 0.3s ease, opacity 0.3s ease;\n        opacity: 0.7;\n    }\n\n    .docs-icon-link:hover {\n        transform: scale(1.2) rotate(5deg);\n        opacity: 1;\n    }\n\n    /* Global component styling */\n    .stAlert {\n        margin-top: 1rem;\n        border-radius: 10px;\n    }\n\n    /* Interactive element transitions */\n    .stButton>button {\n        border-radius: 8px;\n        font-weight: 600;\n        transition: all 0.3s ease;\n    }\n\n    .stButton>button:hover {\n        transform: translateY(-2px);\n        box-shadow: 0 4px 12px rgba(0,0,0,0.15);\n    }\n\n    /* Factor Selection: compact pill-style \"add factor\" buttons */\n    [class*=\"st-key-factor_add_\"] button {\n        min-height: 0;\n        padding: 0.2rem 0.75rem;\n        border-radius: 999px;\n        font-weight: 400;\n        white-space: nowrap;\n    }\n    [class*=\"st-key-factor_add_\"] button p {\n        font-size: 0.875rem;\n    }\n    [class*=\"st-key-factor_add_\"] {\n        margin-bottom: -0.5rem;\n    }\n\n    /* Navigation panel aesthetic (Grey with Cyan border) */\n    [data-testid=\"stSidebar\"] {\n        background-color: #DEDFE0;\n        border-right: 4px solid #3BD2E3;\n        padding-left: 8px;\n    }\n\n    [data-testid=\"stSidebar\"] h2 {\n        color: #1f77b4;\n    }\n\n    /* Financial KPI display formatting */\n    [data-testid=\"stMetricValue\"] {\n        font-size: 2rem;\n        font-weight: bold;\n    }\n\n    /* Information container cards */\n    .custom-card {\n        padding: 20px;\n        border-radius: 10px;\n        background-color: #ffffff;\n        box-shadow: 0 2px 8px rgba(0,0,0,0.1);\n        margin: 10px 0;\n        color: #31333F;\n    }\n\n    /* Branding: Hiding standard application headers and footers */\n    #MainMenu {visibility: hidden;}\n    footer {visibility: hidden;}\n\n    /* Responsive breakpoints */\n    @media (max-width: 768px) {\n        .main-header {\n            font-size: 1.8rem;\n        }\n\n        .main-header-container {\n            flex-direction: column;\n            gap: 0.5rem;\n        }\n\n        .docs-icon-link {\n            margin-left: 0;\n            font-size: 1.5rem;\n        }\n    }\n</style>",
+   "<div class=\"main-header-container\"><div class=\"main-header\">Factor-Lake Portfolio Analysis</div><a href=\"https://cornell-sysen-5900.github.io/Factor-Lake/\" target=\"_blank\" class=\"docs-icon-link\" title=\"View Documentation\">\ud83d\udcda</a></div>",
+   "Click the factors you want to add, then choose which direction the portfolio should favor.",
+   "**Momentum**",
+   "**Value**",
+   "**Profitability**",
+   "**Quality**",
+   "**Growth**",
+   "**ROE using 9/30 Data**",
+   "**ROA %**",
+   "---",
+   "---",
+   "**Run 1: ROE using 9/30 Data +1** \u00b7 computed in this app at 02:39:36",
+   "**Volatility (Raw)**",
+   "**Volatility (Excess)**",
+   "**RF Rate Source**\n\nFRED 4 Week T-Bill (Oct 1)"
+  ],
+  "metric": [
+   [
+    "Final Portfolio Value",
+    "$4,630.44",
+    ""
+   ],
+   [
+    "Total Return",
+    "363.04%",
+    ""
+   ],
+   [
+    "CAGR",
+    "7.22%",
+    ""
+   ],
+   [
+    "Cumulative Outperformance",
+    "-43.96%",
+    ""
+   ],
+   [
+    "Max Drawdown (Portfolio)",
+    "-14.72%",
+    ""
+   ],
+   [
+    "Max Drawdown (Benchmark)",
+    "-23.51%",
+    ""
+   ],
+   [
+    "Max Drawdown (Growth)",
+    "-29.27%",
+    ""
+   ],
+   [
+    "Max Drawdown (Value)",
+    "-23.33%",
+    ""
+   ],
+   [
+    "Sharpe (Portfolio)",
+    "0.6038",
+    "0.0460 vs bench"
+   ],
+   [
+    "Sharpe (Benchmark)",
+    "0.5578",
+    ""
+   ],
+   [
+    "Sharpe (Growth)",
+    "0.5869",
+    ""
+   ],
+   [
+    "Sharpe (Value)",
+    "0.4794",
+    ""
+   ],
+   [
+    "Portfolio",
+    "10.05%",
+    ""
+   ],
+   [
+    "Benchmark",
+    "17.48%",
+    ""
+   ],
+   [
+    "Growth",
+    "17.40%",
+    ""
+   ],
+   [
+    "Value",
+    "19.63%",
+    ""
+   ],
+   [
+    "Portfolio",
+    "10.19%",
+    ""
+   ],
+   [
+    "Benchmark",
+    "17.76%",
+    ""
+   ],
+   [
+    "Growth",
+    "17.58%",
+    ""
+   ],
+   [
+    "Value",
+    "19.97%",
+    ""
+   ],
+   [
+    "Beta vs R2000",
+    "0.235",
+    ""
+   ],
+   [
+    "Beta vs Growth",
+    "0.168",
+    ""
+   ],
+   [
+    "Beta vs Value",
+    "0.245",
+    ""
+   ],
+   [
+    "Yearly Win Rate (vs R2000)",
+    "40.91%",
+    ""
+   ],
+   [
+    "Yearly Win Rate (vs Growth)",
+    "45.45%",
+    ""
+   ],
+   [
+    "Yearly Win Rate (vs Value)",
+    "40.91%",
+    ""
+   ],
+   [
+    "Information Ratio",
+    "-0.2281",
+    ""
+   ],
+   [
+    "IR (vs Growth)",
+    "-0.2370",
+    ""
+   ],
+   [
+    "IR (vs Value)",
+    "-0.1953",
+    ""
+   ]
+  ],
+  "plotly": [
+   {
+    "data": [
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "legendrank": 2,
+      "line": {
+       "color": "#ff7f0e",
+       "dash": "dash",
+       "width": 2
+      },
+      "marker": {
+       "size": 4,
+       "symbol": "square"
+      },
+      "mode": "lines+markers",
+      "name": "Russell 2000",
+      "opacity": 0.8,
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1365.0,
+       1621.074,
+       1912.056783,
+       2101.7328158736,
+       2361.0866453524022,
+       2018.965190440839,
+       1826.355911272783,
+       2070.1744254276996,
+       1996.890250767559,
+       2634.097929787487,
+       3425.380947895648,
+       3559.9984191479466,
+       3604.4983993872956,
+       4161.753851932572,
+       5024.9016008233875,
+       5790.696604788872,
+       5275.903676623141,
+       5297.0072913296335,
+       7822.09066710647,
+       5983.117151269739,
+       6518.007824593254,
+       8262.226718454409
+      ]
+     },
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "legendrank": 3,
+      "line": {
+       "color": "#2ca02c",
+       "dash": "dot",
+       "width": 1.5
+      },
+      "marker": {
+       "size": 4,
+       "symbol": "triangle-up"
+      },
+      "mode": "lines+markers",
+      "name": "Value Index",
+      "opacity": 0.6,
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1316.5,
+       1654.44555,
+       1948.1096351249998,
+       2221.039795006012,
+       2356.0790145423775,
+       2066.9881194580275,
+       1806.3409175943702,
+       2020.2116822375438,
+       1899.201002471515,
+       2518.9102895779706,
+       3199.771740850896,
+       3331.602336573953,
+       3278.2966991887697,
+       3895.272137976096,
+       4695.750562330184,
+       5133.394514739357,
+       4710.402806724834,
+       4009.9659093648506,
+       6573.5371152217995,
+       5410.678399539062,
+       5834.875586062925,
+       7345.524875294617
+      ]
+     },
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "legendrank": 4,
+      "line": {
+       "color": "#d62728",
+       "dash": "dot",
+       "width": 1.5
+      },
+      "marker": {
+       "size": 4,
+       "symbol": "diamond"
+      },
+      "mode": "lines+markers",
+      "name": "Growth Index",
+      "opacity": 0.6,
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1417.3,
+       1586.24216,
+       1871.131251936,
+       1981.1537695498366,
+       2356.5824088795307,
+       1954.078133442907,
+       1830.5803954093153,
+       2101.140177850812,
+       2077.607407858883,
+       2725.405397629283,
+       3626.6969626252867,
+       3763.786107812523,
+       3916.21944517893,
+       4390.865241934616,
+       5312.507856216692,
+       6431.322010735927,
+       5811.985701102057,
+       6725.6298533153,
+       8963.919468498632,
+       6340.180240069083,
+       6947.569507067702,
+       8869.267232722628
+      ]
+     },
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "legendrank": 1,
+      "line": {
+       "color": "#1f77b4",
+       "width": 2.5
+      },
+      "marker": {
+       "size": 6,
+       "symbol": "circle"
+      },
+      "mode": "lines+markers",
+      "name": "Portfolio",
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1232.4053647734527,
+       1437.8368909394596,
+       1526.964049648896,
+       1961.8918010334905,
+       1820.4006875141586,
+       1929.8991105902633,
+       1953.629632743099,
+       1973.1549027808644,
+       2292.8503632688466,
+       2427.9563194651846,
+       2532.5995225664165,
+       2413.1972392699895,
+       2687.6203870404206,
+       3091.609875277812,
+       3507.1938513516006,
+       3128.7137029416836,
+       2991.0695831584953,
+       3141.845908904524,
+       3729.299959342064,
+       3718.658178202184,
+       4116.606801876422,
+       4630.44298949669
+      ]
+     }
+    ],
+    "layout": {
+     "height": 500,
+     "hovermode": "x unified",
+     "legend": {
+      "x": 0.01,
+      "xanchor": "left",
+      "y": 0.99,
+      "yanchor": "top"
+     },
+     "template": {
+      "data": {
+       "candlestick": [
+        {
+         "decreasing": {
+          "line": {
+           "color": "#000033"
+          }
+         },
+         "increasing": {
+          "line": {
+           "color": "#000032"
+          }
+         },
+         "type": "candlestick"
+        }
+       ],
+       "contour": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "contour"
+        }
+       ],
+       "contourcarpet": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "contourcarpet"
+        }
+       ],
+       "heatmap": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "heatmap"
+        }
+       ],
+       "histogram2d": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "histogram2d"
+        }
+       ],
+       "icicle": [
+        {
+         "textfont": {
+          "color": "white"
+         },
+         "type": "icicle"
+        }
+       ],
+       "sankey": [
+        {
+         "textfont": {
+          "color": "#000036"
+         },
+         "type": "sankey"
+        }
+       ],
+       "scatter": [
+        {
+         "marker": {
+          "line": {
+           "width": 0
+          }
+         },
+         "type": "scatter"
+        }
+       ],
+       "table": [
+        {
+         "cells": {
+          "fill": {
+           "color": "#000038"
+          },
+          "font": {
+           "color": "#000037"
+          },
+          "line": {
+           "color": "#000039"
+          }
+         },
+         "header": {
+          "fill": {
+           "color": "#000040"
+          },
+          "font": {
+           "color": "#000036"
+          },
+          "line": {
+           "color": "#000039"
+          }
+         },
+         "type": "table"
+        }
+       ],
+       "waterfall": [
+        {
+         "connector": {
+          "line": {
+           "color": "#000036",
+           "width": 2
+          }
+         },
+         "decreasing": {
+          "marker": {
+           "color": "#000033"
+          }
+         },
+         "increasing": {
+          "marker": {
+           "color": "#000032"
+          }
+         },
+         "totals": {
+          "marker": {
+           "color": "#000034"
+          }
+         },
+         "type": "waterfall"
+        }
+       ]
+      },
+      "layout": {
+       "coloraxis": {
+        "colorscale": [
+         [
+          0.0,
+          "#000011"
+         ],
+         [
+          0.1111111111111111,
+          "#000012"
+         ],
+         [
+          0.2222222222222222,
+          "#000013"
+         ],
+         [
+          0.3333333333333333,
+          "#000014"
+         ],
+         [
+          0.4444444444444444,
+          "#000015"
+         ],
+         [
+          0.5555555555555556,
+          "#000016"
+         ],
+         [
+          0.6666666666666666,
+          "#000017"
+         ],
+         [
+          0.7777777777777778,
+          "#000018"
+         ],
+         [
+          0.8888888888888888,
+          "#000019"
+         ],
+         [
+          1.0,
+          "#000020"
+         ]
+        ]
+       },
+       "colorscale": {
+        "diverging": [
+         [
+          0.0,
+          "#000021"
+         ],
+         [
+          0.1111111111111111,
+          "#000022"
+         ],
+         [
+          0.2222222222222222,
+          "#000023"
+         ],
+         [
+          0.3333333333333333,
+          "#000024"
+         ],
+         [
+          0.4444444444444444,
+          "#000025"
+         ],
+         [
+          0.5555555555555556,
+          "#000026"
+         ],
+         [
+          0.6666666666666666,
+          "#000027"
+         ],
+         [
+          0.7777777777777778,
+          "#000028"
+         ],
+         [
+          0.8888888888888888,
+          "#000029"
+         ],
+         [
+          1.0,
+          "#000030"
+         ]
+        ],
+        "sequential": [
+         [
+          0.0,
+          "#000011"
+         ],
+         [
+          0.1111111111111111,
+          "#000012"
+         ],
+         [
+          0.2222222222222222,
+          "#000013"
+         ],
+         [
+          0.3333333333333333,
+          "#000014"
+         ],
+         [
+          0.4444444444444444,
+          "#000015"
+         ],
+         [
+          0.5555555555555556,
+          "#000016"
+         ],
+         [
+          0.6666666666666666,
+          "#000017"
+         ],
+         [
+          0.7777777777777778,
+          "#000018"
+         ],
+         [
+          0.8888888888888888,
+          "#000019"
+         ],
+         [
+          1.0,
+          "#000020"
+         ]
+        ],
+        "sequentialminus": [
+         [
+          0.0,
+          "#000011"
+         ],
+         [
+          0.1111111111111111,
+          "#000012"
+         ],
+         [
+          0.2222222222222222,
+          "#000013"
+         ],
+         [
+          0.3333333333333333,
+          "#000014"
+         ],
+         [
+          0.4444444444444444,
+          "#000015"
+         ],
+         [
+          0.5555555555555556,
+          "#000016"
+         ],
+         [
+          0.6666666666666666,
+          "#000017"
+         ],
+         [
+          0.7777777777777778,
+          "#000018"
+         ],
+         [
+          0.8888888888888888,
+          "#000019"
+         ],
+         [
+          1.0,
+          "#000020"
+         ]
+        ]
+       },
+       "colorway": [
+        "#000001",
+        "#000002",
+        "#000003",
+        "#000004",
+        "#000005",
+        "#000006",
+        "#000007",
+        "#000008",
+        "#000009",
+        "#000010"
+       ]
+      }
+     },
+     "title": {
+      "font": {
+       "size": 14
+      },
+      "text": "<b>Cumulative Wealth: Roe Using 9/30 Data, Roa %</b>"
+     },
+     "xaxis": {
+      "dtick": 1,
+      "griddash": "dash",
+      "hoverformat": "d",
+      "showgrid": true,
+      "tickformat": "d",
+      "title": {
+       "font": {
+        "size": 12
+       },
+       "text": "Year"
+      }
+     },
+     "yaxis": {
+      "griddash": "dash",
+      "showgrid": true,
+      "tickformat": ",.0f",
+      "tickprefix": "$",
+      "title": {
+       "font": {
+        "size": 12
+       },
+       "text": "Portfolio Value (USD)"
+      }
+     }
+    }
+   }
+  ],
+  "selectbox": [
+   [
+    "Rebalance year",
+    [
+     "2002",
+     "2003",
+     "2004",
+     "2005",
+     "2006",
+     "2007",
+     "2008",
+     "2009",
+     "2010",
+     "2011",
+     "2012",
+     "2013",
+     "2014",
+     "2015",
+     "2016",
+     "2017",
+     "2018",
+     "2019",
+     "2020",
+     "2021",
+     "2022",
+     "2023"
+    ],
+    "2023"
+   ]
+  ],
+  "slider": [
+   [
+    "Cohort Percentage",
+    10
+   ]
+  ],
+  "subheader": [
+   "Performance Summary",
+   "Holdings and Ranks",
+   "Portfolio Growth Over Time",
+   "Year-by-Year Performance",
+   "Top vs Bottom Cohort Analysis"
+  ],
+  "success": [
+   "Selected 2 factor(s): ROE using 9/30 Data (Higher is better), ROA % (Higher is better)",
+   "Analysis complete. Saved as \"Run 1: ROE using 9/30 Data +1\" in the Results tab."
+  ],
+  "table": [],
+  "tabs": [
+   "Analysis",
+   "Results",
+   "Run 1: ROE using 9/30 Data +1",
+   "Data Viewer",
+   "About"
+  ],
+  "warning": []
+ },
+ "run1_2010": {
+  "button": [
+   "Open analysis",
+   "Remove this run",
+   "Generate Comparison"
+  ],
+  "caption": [
+   "Paste an analysis ID from your history or from a colleague to see that analysis with its original results, factors and settings.",
+   "Only analyses run or opened in this browser session. Copy an ID to reopen or share it.",
+   "Not saved (computed in this app), so it has no ID.",
+   "Not saved (computed in this app), so it has no ID.",
+   "Each analysis run is saved as its own tab (newest first). Only the last 5 runs are kept, and they are cleared when you refresh the page.",
+   "**Factors:** ROE using 9/30 Data (Higher is better), ROA % (Higher is better)",
+   "**Period:** 2002-2024 | **Initial AUM:** $1,000",
+   "**Universe:** All sectors | Fossil fuels included",
+   "**Factor Combination:** Mixing (one sleeve per factor)",
+   "**Weighting:** Equal Weighted",
+   "**Delisting Strategy:** Zero Return",
+   "**Method:** Mixing | **Holdings:** 5 | **Portfolio return (2010 to 2011):** 16.20%"
+  ],
+  "code": [],
+  "dataframe": [
+   "Rank,Ticker,Sector,Picked By,Score,ROE using 9/30 Data,ROA %,Weight %,Shares,Buy Price,Dollar Value,Period Return %,Contribution %,Delisted\r\n1,T08,Technology,ROE using 9/30 Data,1.7558673728224996,0.2008106708720667,0.04093544533200576,16.666666666666664,28.689374043772666,11.462750980963271,328.85915046347736,-8.1312957772463,-1.3552159628743832,False\r\n1,T27,Technology,\"ROE using 9/30 Data, ROA %\",1.5822667038724956,0.1842642307077013,0.09973240735768607,33.33333333333333,8.789648926369777,74.82873393881952,657.7183009269547,22.77522251114899,7.591740837049662,False\r\n2,T02,Technology,ROE using 9/30 Data,1.6754096004708403,0.19501548631890497,0.041635037878166914,16.666666666666664,6.38629415766772,51.494519723716735,328.85915046347736,6.059006361971945,1.0098343936619907,False\r\n2,T17,Technology,ROA %,1.5700232270421108,-0.0008063176963329505,0.09921990001619865,16.666666666666664,13.975286584568865,23.53147811842333,328.85915046347736,23.094767001711148,3.849127833618524,False\r\n3,T29,Technology,ROA %,1.5504008983883266,0.08456207219408826,0.0986367178679953,16.666666666666664,17.410650338725507,18.888389811149953,328.8591504634773,30.64056834549896,5.106761390916493,False\r\n",
+   "Year,Portfolio Value,YoY Return,Benchmark Returns,Growth Returns,Value Returns\r\n2002,\"$1,232.41\",23.24%,36.50%,41.73%,31.65%\r\n2003,\"$1,437.84\",16.67%,18.76%,11.92%,25.67%\r\n2004,\"$1,526.96\",6.20%,17.95%,17.96%,17.75%\r\n2005,\"$1,961.89\",28.48%,9.92%,5.88%,14.01%\r\n2006,\"$1,820.40\",-7.21%,12.34%,18.95%,6.08%\r\n2007,\"$1,929.90\",6.02%,-14.49%,-17.08%,-12.27%\r\n2008,\"$1,953.63\",1.23%,-9.54%,-6.32%,-12.61%\r\n2009,\"$1,973.15\",1.00%,13.35%,14.78%,11.84%\r\n2010,\"$2,292.85\",16.20%,-3.54%,-1.12%,-5.99%\r\n2011,\"$2,427.96\",5.89%,31.91%,31.18%,32.63%\r\n2012,\"$2,532.60\",4.31%,30.04%,33.07%,27.03%\r\n2013,\"$2,413.20\",-4.71%,3.93%,3.78%,4.12%\r\n2014,\"$2,687.62\",11.37%,1.25%,4.05%,-1.60%\r\n2015,\"$3,091.61\",15.03%,15.46%,12.12%,18.82%\r\n2016,\"$3,507.19\",13.44%,20.74%,20.99%,20.55%\r\n2017,\"$3,128.71\",-10.79%,15.24%,21.06%,9.32%\r\n2018,\"$2,991.07\",-4.40%,-8.89%,-9.63%,-8.24%\r\n2019,\"$3,141.85\",5.04%,0.40%,15.72%,-14.87%\r\n2020,\"$3,729.30\",18.70%,47.67%,33.28%,63.93%\r\n2021,\"$3,718.66\",-0.29%,-23.51%,-29.27%,-17.69%\r\n2022,\"$4,116.61\",10.70%,8.94%,9.58%,7.84%\r\n2023,\"$4,630.44\",12.48%,26.76%,27.66%,25.89%\r\n",
+   "Year,Portfolio Return,Benchmark Return,Outperformed Benchmark,Growth Index Return,Outperformed Growth,Value Index Return,Outperformed Value\r\n2002,23.24%,36.50%,\u274c,41.73%,\u274c,31.65%,\u274c\r\n2003,16.67%,18.76%,\u274c,11.92%,\u2705,25.67%,\u274c\r\n2004,6.20%,17.95%,\u274c,17.96%,\u274c,17.75%,\u274c\r\n2005,28.48%,9.92%,\u2705,5.88%,\u2705,14.01%,\u2705\r\n2006,-7.21%,12.34%,\u274c,18.95%,\u274c,6.08%,\u274c\r\n2007,6.02%,-14.49%,\u2705,-17.08%,\u2705,-12.27%,\u2705\r\n2008,1.23%,-9.54%,\u2705,-6.32%,\u2705,-12.61%,\u2705\r\n2009,1.00%,13.35%,\u274c,14.78%,\u274c,11.84%,\u274c\r\n2010,16.20%,-3.54%,\u2705,-1.12%,\u2705,-5.99%,\u2705\r\n2011,5.89%,31.91%,\u274c,31.18%,\u274c,32.63%,\u274c\r\n2012,4.31%,30.04%,\u274c,33.07%,\u274c,27.03%,\u274c\r\n2013,-4.71%,3.93%,\u274c,3.78%,\u274c,4.12%,\u274c\r\n2014,11.37%,1.25%,\u2705,4.05%,\u2705,-1.60%,\u2705\r\n2015,15.03%,15.46%,\u274c,12.12%,\u2705,18.82%,\u274c\r\n2016,13.44%,20.74%,\u274c,20.99%,\u274c,20.55%,\u274c\r\n2017,-10.79%,15.24%,\u274c,21.06%,\u274c,9.32%,\u274c\r\n2018,-4.40%,-8.89%,\u2705,-9.63%,\u2705,-8.24%,\u2705\r\n2019,5.04%,0.40%,\u2705,15.72%,\u274c,-14.87%,\u2705\r\n2020,18.70%,47.67%,\u274c,33.28%,\u274c,63.93%,\u274c\r\n2021,-0.29%,-23.51%,\u2705,-29.27%,\u2705,-17.69%,\u2705\r\n2022,10.70%,8.94%,\u2705,9.58%,\u2705,7.84%,\u2705\r\n2023,12.48%,26.76%,\u274c,27.66%,\u274c,25.89%,\u274c\r\n"
+  ],
+  "error": [],
+  "expander": [
+   "Open a saved analysis",
+   "This session's analyses (2)",
+   "Run Cohort Comparison"
+  ],
+  "header": [
+   "Portfolio Performance Results",
+   "Advanced Backtest Statistics",
+   "Yearly Win/Loss Summary"
+  ],
+  "info": [],
+  "markdown": [
+   "<style>\n    /* Header container with icon */\n    .main-header-container {\n        display: flex;\n        align-items: center;\n        justify-content: center;\n        position: relative;\n        margin-bottom: 2rem;\n    }\n\n    /* Typography and header styling */\n    .main-header {\n        font-size: 2.5rem;\n        font-weight: bold;\n        color: #1f77b4;\n        text-align: center;\n        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);\n    }\n\n    /* Documentation icon link */\n    .docs-icon-link {\n        font-size: 2rem;\n        margin-left: 1.5rem;\n        text-decoration: none;\n        cursor: pointer;\n        transition: transform 0.3s ease, opacity 0.3s ease;\n        opacity: 0.7;\n    }\n\n    .docs-icon-link:hover {\n        transform: scale(1.2) rotate(5deg);\n        opacity: 1;\n    }\n\n    /* Global component styling */\n    .stAlert {\n        margin-top: 1rem;\n        border-radius: 10px;\n    }\n\n    /* Interactive element transitions */\n    .stButton>button {\n        border-radius: 8px;\n        font-weight: 600;\n        transition: all 0.3s ease;\n    }\n\n    .stButton>button:hover {\n        transform: translateY(-2px);\n        box-shadow: 0 4px 12px rgba(0,0,0,0.15);\n    }\n\n    /* Factor Selection: compact pill-style \"add factor\" buttons */\n    [class*=\"st-key-factor_add_\"] button {\n        min-height: 0;\n        padding: 0.2rem 0.75rem;\n        border-radius: 999px;\n        font-weight: 400;\n        white-space: nowrap;\n    }\n    [class*=\"st-key-factor_add_\"] button p {\n        font-size: 0.875rem;\n    }\n    [class*=\"st-key-factor_add_\"] {\n        margin-bottom: -0.5rem;\n    }\n\n    /* Navigation panel aesthetic (Grey with Cyan border) */\n    [data-testid=\"stSidebar\"] {\n        background-color: #DEDFE0;\n        border-right: 4px solid #3BD2E3;\n        padding-left: 8px;\n    }\n\n    [data-testid=\"stSidebar\"] h2 {\n        color: #1f77b4;\n    }\n\n    /* Financial KPI display formatting */\n    [data-testid=\"stMetricValue\"] {\n        font-size: 2rem;\n        font-weight: bold;\n    }\n\n    /* Information container cards */\n    .custom-card {\n        padding: 20px;\n        border-radius: 10px;\n        background-color: #ffffff;\n        box-shadow: 0 2px 8px rgba(0,0,0,0.1);\n        margin: 10px 0;\n        color: #31333F;\n    }\n\n    /* Branding: Hiding standard application headers and footers */\n    #MainMenu {visibility: hidden;}\n    footer {visibility: hidden;}\n\n    /* Responsive breakpoints */\n    @media (max-width: 768px) {\n        .main-header {\n            font-size: 1.8rem;\n        }\n\n        .main-header-container {\n            flex-direction: column;\n            gap: 0.5rem;\n        }\n\n        .docs-icon-link {\n            margin-left: 0;\n            font-size: 1.5rem;\n        }\n    }\n</style>",
+   "<div class=\"main-header-container\"><div class=\"main-header\">Factor-Lake Portfolio Analysis</div><a href=\"https://cornell-sysen-5900.github.io/Factor-Lake/\" target=\"_blank\" class=\"docs-icon-link\" title=\"View Documentation\">\ud83d\udcda</a></div>",
+   "**Run 2: ROE using 9/30 Data +1** \u00b7 computed in this app at 02:39:36",
+   "**Run 1: ROE using 9/30 Data +1** \u00b7 computed in this app at 02:39:36",
+   "**Volatility (Raw)**",
+   "**Volatility (Excess)**",
+   "**RF Rate Source**\n\nFRED 4 Week T-Bill (Oct 1)"
+  ],
+  "metric": [
+   [
+    "Final Portfolio Value",
+    "$4,630.44",
+    ""
+   ],
+   [
+    "Total Return",
+    "363.04%",
+    ""
+   ],
+   [
+    "CAGR",
+    "7.22%",
+    ""
+   ],
+   [
+    "Cumulative Outperformance",
+    "-43.96%",
+    ""
+   ],
+   [
+    "Max Drawdown (Portfolio)",
+    "-14.72%",
+    ""
+   ],
+   [
+    "Max Drawdown (Benchmark)",
+    "-23.51%",
+    ""
+   ],
+   [
+    "Max Drawdown (Growth)",
+    "-29.27%",
+    ""
+   ],
+   [
+    "Max Drawdown (Value)",
+    "-23.33%",
+    ""
+   ],
+   [
+    "Sharpe (Portfolio)",
+    "0.6038",
+    "0.0460 vs bench"
+   ],
+   [
+    "Sharpe (Benchmark)",
+    "0.5578",
+    ""
+   ],
+   [
+    "Sharpe (Growth)",
+    "0.5869",
+    ""
+   ],
+   [
+    "Sharpe (Value)",
+    "0.4794",
+    ""
+   ],
+   [
+    "Portfolio",
+    "10.05%",
+    ""
+   ],
+   [
+    "Benchmark",
+    "17.48%",
+    ""
+   ],
+   [
+    "Growth",
+    "17.40%",
+    ""
+   ],
+   [
+    "Value",
+    "19.63%",
+    ""
+   ],
+   [
+    "Portfolio",
+    "10.19%",
+    ""
+   ],
+   [
+    "Benchmark",
+    "17.76%",
+    ""
+   ],
+   [
+    "Growth",
+    "17.58%",
+    ""
+   ],
+   [
+    "Value",
+    "19.97%",
+    ""
+   ],
+   [
+    "Beta vs R2000",
+    "0.235",
+    ""
+   ],
+   [
+    "Beta vs Growth",
+    "0.168",
+    ""
+   ],
+   [
+    "Beta vs Value",
+    "0.245",
+    ""
+   ],
+   [
+    "Yearly Win Rate (vs R2000)",
+    "40.91%",
+    ""
+   ],
+   [
+    "Yearly Win Rate (vs Growth)",
+    "45.45%",
+    ""
+   ],
+   [
+    "Yearly Win Rate (vs Value)",
+    "40.91%",
+    ""
+   ],
+   [
+    "Information Ratio",
+    "-0.2281",
+    ""
+   ],
+   [
+    "IR (vs Growth)",
+    "-0.2370",
+    ""
+   ],
+   [
+    "IR (vs Value)",
+    "-0.1953",
+    ""
+   ]
+  ],
+  "plotly": [
+   {
+    "data": [
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "legendrank": 2,
+      "line": {
+       "color": "#ff7f0e",
+       "dash": "dash",
+       "width": 2
+      },
+      "marker": {
+       "size": 4,
+       "symbol": "square"
+      },
+      "mode": "lines+markers",
+      "name": "Russell 2000",
+      "opacity": 0.8,
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1365.0,
+       1621.074,
+       1912.056783,
+       2101.7328158736,
+       2361.0866453524022,
+       2018.965190440839,
+       1826.355911272783,
+       2070.1744254276996,
+       1996.890250767559,
+       2634.097929787487,
+       3425.380947895648,
+       3559.9984191479466,
+       3604.4983993872956,
+       4161.753851932572,
+       5024.9016008233875,
+       5790.696604788872,
+       5275.903676623141,
+       5297.0072913296335,
+       7822.09066710647,
+       5983.117151269739,
+       6518.007824593254,
+       8262.226718454409
+      ]
+     },
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "legendrank": 3,
+      "line": {
+       "color": "#2ca02c",
+       "dash": "dot",
+       "width": 1.5
+      },
+      "marker": {
+       "size": 4,
+       "symbol": "triangle-up"
+      },
+      "mode": "lines+markers",
+      "name": "Value Index",
+      "opacity": 0.6,
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1316.5,
+       1654.44555,
+       1948.1096351249998,
+       2221.039795006012,
+       2356.0790145423775,
+       2066.9881194580275,
+       1806.3409175943702,
+       2020.2116822375438,
+       1899.201002471515,
+       2518.9102895779706,
+       3199.771740850896,
+       3331.602336573953,
+       3278.2966991887697,
+       3895.272137976096,
+       4695.750562330184,
+       5133.394514739357,
+       4710.402806724834,
+       4009.9659093648506,
+       6573.5371152217995,
+       5410.678399539062,
+       5834.875586062925,
+       7345.524875294617
+      ]
+     },
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "legendrank": 4,
+      "line": {
+       "color": "#d62728",
+       "dash": "dot",
+       "width": 1.5
+      },
+      "marker": {
+       "size": 4,
+       "symbol": "diamond"
+      },
+      "mode": "lines+markers",
+      "name": "Growth Index",
+      "opacity": 0.6,
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1417.3,
+       1586.24216,
+       1871.131251936,
+       1981.1537695498366,
+       2356.5824088795307,
+       1954.078133442907,
+       1830.5803954093153,
+       2101.140177850812,
+       2077.607407858883,
+       2725.405397629283,
+       3626.6969626252867,
+       3763.786107812523,
+       3916.21944517893,
+       4390.865241934616,
+       5312.507856216692,
+       6431.322010735927,
+       5811.985701102057,
+       6725.6298533153,
+       8963.919468498632,
+       6340.180240069083,
+       6947.569507067702,
+       8869.267232722628
+      ]
+     },
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "legendrank": 1,
+      "line": {
+       "color": "#1f77b4",
+       "width": 2.5
+      },
+      "marker": {
+       "size": 6,
+       "symbol": "circle"
+      },
+      "mode": "lines+markers",
+      "name": "Portfolio",
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1232.4053647734527,
+       1437.8368909394596,
+       1526.964049648896,
+       1961.8918010334905,
+       1820.4006875141586,
+       1929.8991105902633,
+       1953.629632743099,
+       1973.1549027808644,
+       2292.8503632688466,
+       2427.9563194651846,
+       2532.5995225664165,
+       2413.1972392699895,
+       2687.6203870404206,
+       3091.609875277812,
+       3507.1938513516006,
+       3128.7137029416836,
+       2991.0695831584953,
+       3141.845908904524,
+       3729.299959342064,
+       3718.658178202184,
+       4116.606801876422,
+       4630.44298949669
+      ]
+     }
+    ],
+    "layout": {
+     "height": 500,
+     "hovermode": "x unified",
+     "legend": {
+      "x": 0.01,
+      "xanchor": "left",
+      "y": 0.99,
+      "yanchor": "top"
+     },
+     "template": {
+      "data": {
+       "candlestick": [
+        {
+         "decreasing": {
+          "line": {
+           "color": "#000033"
+          }
+         },
+         "increasing": {
+          "line": {
+           "color": "#000032"
+          }
+         },
+         "type": "candlestick"
+        }
+       ],
+       "contour": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "contour"
+        }
+       ],
+       "contourcarpet": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "contourcarpet"
+        }
+       ],
+       "heatmap": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "heatmap"
+        }
+       ],
+       "histogram2d": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "histogram2d"
+        }
+       ],
+       "icicle": [
+        {
+         "textfont": {
+          "color": "white"
+         },
+         "type": "icicle"
+        }
+       ],
+       "sankey": [
+        {
+         "textfont": {
+          "color": "#000036"
+         },
+         "type": "sankey"
+        }
+       ],
+       "scatter": [
+        {
+         "marker": {
+          "line": {
+           "width": 0
+          }
+         },
+         "type": "scatter"
+        }
+       ],
+       "table": [
+        {
+         "cells": {
+          "fill": {
+           "color": "#000038"
+          },
+          "font": {
+           "color": "#000037"
+          },
+          "line": {
+           "color": "#000039"
+          }
+         },
+         "header": {
+          "fill": {
+           "color": "#000040"
+          },
+          "font": {
+           "color": "#000036"
+          },
+          "line": {
+           "color": "#000039"
+          }
+         },
+         "type": "table"
+        }
+       ],
+       "waterfall": [
+        {
+         "connector": {
+          "line": {
+           "color": "#000036",
+           "width": 2
+          }
+         },
+         "decreasing": {
+          "marker": {
+           "color": "#000033"
+          }
+         },
+         "increasing": {
+          "marker": {
+           "color": "#000032"
+          }
+         },
+         "totals": {
+          "marker": {
+           "color": "#000034"
+          }
+         },
+         "type": "waterfall"
+        }
+       ]
+      },
+      "layout": {
+       "coloraxis": {
+        "colorscale": [
+         [
+          0.0,
+          "#000011"
+         ],
+         [
+          0.1111111111111111,
+          "#000012"
+         ],
+         [
+          0.2222222222222222,
+          "#000013"
+         ],
+         [
+          0.3333333333333333,
+          "#000014"
+         ],
+         [
+          0.4444444444444444,
+          "#000015"
+         ],
+         [
+          0.5555555555555556,
+          "#000016"
+         ],
+         [
+          0.6666666666666666,
+          "#000017"
+         ],
+         [
+          0.7777777777777778,
+          "#000018"
+         ],
+         [
+          0.8888888888888888,
+          "#000019"
+         ],
+         [
+          1.0,
+          "#000020"
+         ]
+        ]
+       },
+       "colorscale": {
+        "diverging": [
+         [
+          0.0,
+          "#000021"
+         ],
+         [
+          0.1111111111111111,
+          "#000022"
+         ],
+         [
+          0.2222222222222222,
+          "#000023"
+         ],
+         [
+          0.3333333333333333,
+          "#000024"
+         ],
+         [
+          0.4444444444444444,
+          "#000025"
+         ],
+         [
+          0.5555555555555556,
+          "#000026"
+         ],
+         [
+          0.6666666666666666,
+          "#000027"
+         ],
+         [
+          0.7777777777777778,
+          "#000028"
+         ],
+         [
+          0.8888888888888888,
+          "#000029"
+         ],
+         [
+          1.0,
+          "#000030"
+         ]
+        ],
+        "sequential": [
+         [
+          0.0,
+          "#000011"
+         ],
+         [
+          0.1111111111111111,
+          "#000012"
+         ],
+         [
+          0.2222222222222222,
+          "#000013"
+         ],
+         [
+          0.3333333333333333,
+          "#000014"
+         ],
+         [
+          0.4444444444444444,
+          "#000015"
+         ],
+         [
+          0.5555555555555556,
+          "#000016"
+         ],
+         [
+          0.6666666666666666,
+          "#000017"
+         ],
+         [
+          0.7777777777777778,
+          "#000018"
+         ],
+         [
+          0.8888888888888888,
+          "#000019"
+         ],
+         [
+          1.0,
+          "#000020"
+         ]
+        ],
+        "sequentialminus": [
+         [
+          0.0,
+          "#000011"
+         ],
+         [
+          0.1111111111111111,
+          "#000012"
+         ],
+         [
+          0.2222222222222222,
+          "#000013"
+         ],
+         [
+          0.3333333333333333,
+          "#000014"
+         ],
+         [
+          0.4444444444444444,
+          "#000015"
+         ],
+         [
+          0.5555555555555556,
+          "#000016"
+         ],
+         [
+          0.6666666666666666,
+          "#000017"
+         ],
+         [
+          0.7777777777777778,
+          "#000018"
+         ],
+         [
+          0.8888888888888888,
+          "#000019"
+         ],
+         [
+          1.0,
+          "#000020"
+         ]
+        ]
+       },
+       "colorway": [
+        "#000001",
+        "#000002",
+        "#000003",
+        "#000004",
+        "#000005",
+        "#000006",
+        "#000007",
+        "#000008",
+        "#000009",
+        "#000010"
+       ]
+      }
+     },
+     "title": {
+      "font": {
+       "size": 14
+      },
+      "text": "<b>Cumulative Wealth: Roe Using 9/30 Data, Roa %</b>"
+     },
+     "xaxis": {
+      "dtick": 1,
+      "griddash": "dash",
+      "hoverformat": "d",
+      "showgrid": true,
+      "tickformat": "d",
+      "title": {
+       "font": {
+        "size": 12
+       },
+       "text": "Year"
+      }
+     },
+     "yaxis": {
+      "griddash": "dash",
+      "showgrid": true,
+      "tickformat": ",.0f",
+      "tickprefix": "$",
+      "title": {
+       "font": {
+        "size": 12
+       },
+       "text": "Portfolio Value (USD)"
+      }
+     }
+    }
+   }
+  ],
+  "selectbox": [
+   [
+    "Rebalance year",
+    [
+     "2002",
+     "2003",
+     "2004",
+     "2005",
+     "2006",
+     "2007",
+     "2008",
+     "2009",
+     "2010",
+     "2011",
+     "2012",
+     "2013",
+     "2014",
+     "2015",
+     "2016",
+     "2017",
+     "2018",
+     "2019",
+     "2020",
+     "2021",
+     "2022",
+     "2023"
+    ],
+    "2010"
+   ]
+  ],
+  "slider": [
+   [
+    "Cohort Percentage",
+    10
+   ]
+  ],
+  "subheader": [
+   "Performance Summary",
+   "Holdings and Ranks",
+   "Portfolio Growth Over Time",
+   "Year-by-Year Performance",
+   "Top vs Bottom Cohort Analysis"
+  ],
+  "success": [],
+  "table": [],
+  "tabs": [
+   "Analysis",
+   "Results",
+   "Run 2: ROE using 9/30 Data +1",
+   "Run 1: ROE using 9/30 Data +1",
+   "Data Viewer",
+   "About"
+  ],
+  "warning": []
+ },
+ "run2": {
+  "button": [
+   "12-Mo Momentum %",
+   "6-Mo Momentum %",
+   "1-Mo Momentum %",
+   "Price to Book Using 9/30 Data",
+   "Book/Price",
+   "Next FY Earns/P",
+   "ROA using 9/30 Data",
+   "Accruals/Assets",
+   "1-Yr Price Vol %",
+   "1-Yr Asset Growth %",
+   "1-Yr CapEX Growth %",
+   "",
+   "",
+   "Load Market Data",
+   "Run Portfolio Analysis",
+   "Open analysis",
+   "Remove this run",
+   "Generate Comparison"
+  ],
+  "caption": [
+   ":material/lightbulb: Tip: hover over a factor to see its full description.",
+   "Profitability",
+   "Profitability",
+   "Paste an analysis ID from your history or from a colleague to see that analysis with its original results, factors and settings.",
+   "Only analyses run or opened in this browser session. Copy an ID to reopen or share it.",
+   "Not saved (computed in this app), so it has no ID.",
+   "Not saved (computed in this app), so it has no ID.",
+   "Each analysis run is saved as its own tab (newest first). Only the last 5 runs are kept, and they are cleared when you refresh the page.",
+   "**Factors:** ROE using 9/30 Data (Higher is better), ROA % (Higher is better)",
+   "**Period:** 2002-2024 | **Initial AUM:** $1,000",
+   "**Universe:** All sectors | Fossil fuels included",
+   "**Factor Combination:** Integrating (top stocks by composite score)",
+   "**Weighting:** Market Cap Weighted",
+   "**Delisting Strategy:** Hold Cash (risk-free rate)",
+   "**Method:** Integrating | **Holdings:** 3 | **Portfolio return (2023 to 2024):** 25.52%"
+  ],
+  "code": [],
+  "dataframe": [
+   "Rank,Ticker,Sector,Score,ROE using 9/30 Data,ROA %,Weight %,Shares,Buy Price,Dollar Value,Period Return %,Contribution %,Delisted\r\n1,T26,Technology,1.6220567413384226,0.1324249475102165,0.1530442265840798,14.277989214437433,38.517773042923416,20.771667705007623,800.0783823845055,-5.28341439657763,-0.7543653376973886,False\r\n2,T00,Technology,1.2213269212390667,0.15557889161399985,0.09919244413403805,39.153351983127045,30.501617434156888,71.93024932455342,2193.98894684105,36.9367718736846,14.461984302908402,False\r\n3,T11,Technology,0.9921202400024878,0.20147456899601934,0.059893988859627684,46.56865880243552,93.94419738336603,27.7772505739039,2609.5115106820454,25.36199676223608,11.810741737690464,False\r\n",
+   "Year,Portfolio Value,YoY Return,Benchmark Returns,Growth Returns,Value Returns\r\n2002,\"$1,347.90\",34.79%,36.50%,41.73%,31.65%\r\n2003,\"$1,648.61\",22.31%,18.76%,11.92%,25.67%\r\n2004,\"$1,506.64\",-8.61%,17.95%,17.96%,17.75%\r\n2005,\"$2,073.62\",37.63%,9.92%,5.88%,14.01%\r\n2006,\"$1,906.59\",-8.06%,12.34%,18.95%,6.08%\r\n2007,\"$1,915.28\",0.46%,-14.49%,-17.08%,-12.27%\r\n2008,\"$2,027.06\",5.84%,-9.54%,-6.32%,-12.61%\r\n2009,\"$1,965.14\",-3.05%,13.35%,14.78%,11.84%\r\n2010,\"$2,093.92\",6.55%,-3.54%,-1.12%,-5.99%\r\n2011,\"$2,322.70\",10.93%,31.91%,31.18%,32.63%\r\n2012,\"$2,552.42\",9.89%,30.04%,33.07%,27.03%\r\n2013,\"$2,279.57\",-10.69%,3.93%,3.78%,4.12%\r\n2014,\"$2,701.20\",18.50%,1.25%,4.05%,-1.60%\r\n2015,\"$3,173.58\",17.49%,15.46%,12.12%,18.82%\r\n2016,\"$3,626.71\",14.28%,20.74%,20.99%,20.55%\r\n2017,\"$3,471.60\",-4.28%,15.24%,21.06%,9.32%\r\n2018,\"$4,232.95\",21.93%,-8.89%,-9.63%,-8.24%\r\n2019,\"$4,096.27\",-3.23%,0.40%,15.72%,-14.87%\r\n2020,\"$4,676.64\",14.17%,47.67%,33.28%,63.93%\r\n2021,\"$4,572.13\",-2.23%,-23.51%,-29.27%,-17.69%\r\n2022,\"$5,603.58\",22.56%,8.94%,9.58%,7.84%\r\n2023,\"$7,033.52\",25.52%,26.76%,27.66%,25.89%\r\n",
+   "Year,Portfolio Return,Benchmark Return,Outperformed Benchmark,Growth Index Return,Outperformed Growth,Value Index Return,Outperformed Value\r\n2002,34.79%,36.50%,\u274c,41.73%,\u274c,31.65%,\u2705\r\n2003,22.31%,18.76%,\u2705,11.92%,\u2705,25.67%,\u274c\r\n2004,-8.61%,17.95%,\u274c,17.96%,\u274c,17.75%,\u274c\r\n2005,37.63%,9.92%,\u2705,5.88%,\u2705,14.01%,\u2705\r\n2006,-8.06%,12.34%,\u274c,18.95%,\u274c,6.08%,\u274c\r\n2007,0.46%,-14.49%,\u2705,-17.08%,\u2705,-12.27%,\u2705\r\n2008,5.84%,-9.54%,\u2705,-6.32%,\u2705,-12.61%,\u2705\r\n2009,-3.05%,13.35%,\u274c,14.78%,\u274c,11.84%,\u274c\r\n2010,6.55%,-3.54%,\u2705,-1.12%,\u2705,-5.99%,\u2705\r\n2011,10.93%,31.91%,\u274c,31.18%,\u274c,32.63%,\u274c\r\n2012,9.89%,30.04%,\u274c,33.07%,\u274c,27.03%,\u274c\r\n2013,-10.69%,3.93%,\u274c,3.78%,\u274c,4.12%,\u274c\r\n2014,18.50%,1.25%,\u2705,4.05%,\u2705,-1.60%,\u2705\r\n2015,17.49%,15.46%,\u2705,12.12%,\u2705,18.82%,\u274c\r\n2016,14.28%,20.74%,\u274c,20.99%,\u274c,20.55%,\u274c\r\n2017,-4.28%,15.24%,\u274c,21.06%,\u274c,9.32%,\u274c\r\n2018,21.93%,-8.89%,\u2705,-9.63%,\u2705,-8.24%,\u2705\r\n2019,-3.23%,0.40%,\u274c,15.72%,\u274c,-14.87%,\u2705\r\n2020,14.17%,47.67%,\u274c,33.28%,\u274c,63.93%,\u274c\r\n2021,-2.23%,-23.51%,\u2705,-29.27%,\u2705,-17.69%,\u2705\r\n2022,22.56%,8.94%,\u2705,9.58%,\u2705,7.84%,\u2705\r\n2023,25.52%,26.76%,\u274c,27.66%,\u274c,25.89%,\u274c\r\n"
+  ],
+  "error": [],
+  "expander": [
+   "Open a saved analysis",
+   "This session's analyses (2)",
+   "Run Cohort Comparison"
+  ],
+  "header": [
+   "Factor Selection",
+   "Portfolio Performance Results",
+   "Advanced Backtest Statistics",
+   "Yearly Win/Loss Summary"
+  ],
+  "info": [],
+  "markdown": [
+   "<style>\n    /* Header container with icon */\n    .main-header-container {\n        display: flex;\n        align-items: center;\n        justify-content: center;\n        position: relative;\n        margin-bottom: 2rem;\n    }\n\n    /* Typography and header styling */\n    .main-header {\n        font-size: 2.5rem;\n        font-weight: bold;\n        color: #1f77b4;\n        text-align: center;\n        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);\n    }\n\n    /* Documentation icon link */\n    .docs-icon-link {\n        font-size: 2rem;\n        margin-left: 1.5rem;\n        text-decoration: none;\n        cursor: pointer;\n        transition: transform 0.3s ease, opacity 0.3s ease;\n        opacity: 0.7;\n    }\n\n    .docs-icon-link:hover {\n        transform: scale(1.2) rotate(5deg);\n        opacity: 1;\n    }\n\n    /* Global component styling */\n    .stAlert {\n        margin-top: 1rem;\n        border-radius: 10px;\n    }\n\n    /* Interactive element transitions */\n    .stButton>button {\n        border-radius: 8px;\n        font-weight: 600;\n        transition: all 0.3s ease;\n    }\n\n    .stButton>button:hover {\n        transform: translateY(-2px);\n        box-shadow: 0 4px 12px rgba(0,0,0,0.15);\n    }\n\n    /* Factor Selection: compact pill-style \"add factor\" buttons */\n    [class*=\"st-key-factor_add_\"] button {\n        min-height: 0;\n        padding: 0.2rem 0.75rem;\n        border-radius: 999px;\n        font-weight: 400;\n        white-space: nowrap;\n    }\n    [class*=\"st-key-factor_add_\"] button p {\n        font-size: 0.875rem;\n    }\n    [class*=\"st-key-factor_add_\"] {\n        margin-bottom: -0.5rem;\n    }\n\n    /* Navigation panel aesthetic (Grey with Cyan border) */\n    [data-testid=\"stSidebar\"] {\n        background-color: #DEDFE0;\n        border-right: 4px solid #3BD2E3;\n        padding-left: 8px;\n    }\n\n    [data-testid=\"stSidebar\"] h2 {\n        color: #1f77b4;\n    }\n\n    /* Financial KPI display formatting */\n    [data-testid=\"stMetricValue\"] {\n        font-size: 2rem;\n        font-weight: bold;\n    }\n\n    /* Information container cards */\n    .custom-card {\n        padding: 20px;\n        border-radius: 10px;\n        background-color: #ffffff;\n        box-shadow: 0 2px 8px rgba(0,0,0,0.1);\n        margin: 10px 0;\n        color: #31333F;\n    }\n\n    /* Branding: Hiding standard application headers and footers */\n    #MainMenu {visibility: hidden;}\n    footer {visibility: hidden;}\n\n    /* Responsive breakpoints */\n    @media (max-width: 768px) {\n        .main-header {\n            font-size: 1.8rem;\n        }\n\n        .main-header-container {\n            flex-direction: column;\n            gap: 0.5rem;\n        }\n\n        .docs-icon-link {\n            margin-left: 0;\n            font-size: 1.5rem;\n        }\n    }\n</style>",
+   "<div class=\"main-header-container\"><div class=\"main-header\">Factor-Lake Portfolio Analysis</div><a href=\"https://cornell-sysen-5900.github.io/Factor-Lake/\" target=\"_blank\" class=\"docs-icon-link\" title=\"View Documentation\">\ud83d\udcda</a></div>",
+   "Click the factors you want to add, then choose which direction the portfolio should favor.",
+   "**Momentum**",
+   "**Value**",
+   "**Profitability**",
+   "**Quality**",
+   "**Growth**",
+   "**ROE using 9/30 Data**",
+   "**ROA %**",
+   "---",
+   "---",
+   "**Run 2: ROE using 9/30 Data +1** \u00b7 computed in this app at 02:39:36",
+   "**Run 1: ROE using 9/30 Data +1** \u00b7 computed in this app at 02:39:36",
+   "**Volatility (Raw)**",
+   "**Volatility (Excess)**",
+   "**RF Rate Source**\n\nFRED 4 Week T-Bill (Oct 1)"
+  ],
+  "metric": [
+   [
+    "Final Portfolio Value",
+    "$7,033.52",
+    ""
+   ],
+   [
+    "Total Return",
+    "603.35%",
+    ""
+   ],
+   [
+    "CAGR",
+    "9.27%",
+    ""
+   ],
+   [
+    "Cumulative Outperformance",
+    "-14.87%",
+    ""
+   ],
+   [
+    "Max Drawdown (Portfolio)",
+    "-10.69%",
+    ""
+   ],
+   [
+    "Max Drawdown (Benchmark)",
+    "-23.51%",
+    ""
+   ],
+   [
+    "Max Drawdown (Growth)",
+    "-29.27%",
+    ""
+   ],
+   [
+    "Max Drawdown (Value)",
+    "-23.33%",
+    ""
+   ],
+   [
+    "Sharpe (Portfolio)",
+    "0.6196",
+    "0.0618 vs bench"
+   ],
+   [
+    "Sharpe (Benchmark)",
+    "0.5578",
+    ""
+   ],
+   [
+    "Sharpe (Growth)",
+    "0.5869",
+    ""
+   ],
+   [
+    "Sharpe (Value)",
+    "0.4794",
+    ""
+   ],
+   [
+    "Portfolio",
+    "14.07%",
+    ""
+   ],
+   [
+    "Benchmark",
+    "17.48%",
+    ""
+   ],
+   [
+    "Growth",
+    "17.40%",
+    ""
+   ],
+   [
+    "Value",
+    "19.63%",
+    ""
+   ],
+   [
+    "Portfolio",
+    "13.90%",
+    ""
+   ],
+   [
+    "Benchmark",
+    "17.76%",
+    ""
+   ],
+   [
+    "Growth",
+    "17.58%",
+    ""
+   ],
+   [
+    "Value",
+    "19.97%",
+    ""
+   ],
+   [
+    "Beta vs R2000",
+    "0.262",
+    ""
+   ],
+   [
+    "Beta vs Growth",
+    "0.191",
+    ""
+   ],
+   [
+    "Beta vs Value",
+    "0.269",
+    ""
+   ],
+   [
+    "Yearly Win Rate (vs R2000)",
+    "45.45%",
+    ""
+   ],
+   [
+    "Yearly Win Rate (vs Growth)",
+    "45.45%",
+    ""
+   ],
+   [
+    "Yearly Win Rate (vs Value)",
+    "45.45%",
+    ""
+   ],
+   [
+    "Information Ratio",
+    "-0.0699",
+    ""
+   ],
+   [
+    "IR (vs Growth)",
+    "-0.0872",
+    ""
+   ],
+   [
+    "IR (vs Value)",
+    "-0.0496",
+    ""
+   ]
+  ],
+  "plotly": [
+   {
+    "data": [
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "legendrank": 2,
+      "line": {
+       "color": "#ff7f0e",
+       "dash": "dash",
+       "width": 2
+      },
+      "marker": {
+       "size": 4,
+       "symbol": "square"
+      },
+      "mode": "lines+markers",
+      "name": "Russell 2000",
+      "opacity": 0.8,
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1365.0,
+       1621.074,
+       1912.056783,
+       2101.7328158736,
+       2361.0866453524022,
+       2018.965190440839,
+       1826.355911272783,
+       2070.1744254276996,
+       1996.890250767559,
+       2634.097929787487,
+       3425.380947895648,
+       3559.9984191479466,
+       3604.4983993872956,
+       4161.753851932572,
+       5024.9016008233875,
+       5790.696604788872,
+       5275.903676623141,
+       5297.0072913296335,
+       7822.09066710647,
+       5983.117151269739,
+       6518.007824593254,
+       8262.226718454409
+      ]
+     },
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "legendrank": 3,
+      "line": {
+       "color": "#2ca02c",
+       "dash": "dot",
+       "width": 1.5
+      },
+      "marker": {
+       "size": 4,
+       "symbol": "triangle-up"
+      },
+      "mode": "lines+markers",
+      "name": "Value Index",
+      "opacity": 0.6,
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1316.5,
+       1654.44555,
+       1948.1096351249998,
+       2221.039795006012,
+       2356.0790145423775,
+       2066.9881194580275,
+       1806.3409175943702,
+       2020.2116822375438,
+       1899.201002471515,
+       2518.9102895779706,
+       3199.771740850896,
+       3331.602336573953,
+       3278.2966991887697,
+       3895.272137976096,
+       4695.750562330184,
+       5133.394514739357,
+       4710.402806724834,
+       4009.9659093648506,
+       6573.5371152217995,
+       5410.678399539062,
+       5834.875586062925,
+       7345.524875294617
+      ]
+     },
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "legendrank": 4,
+      "line": {
+       "color": "#d62728",
+       "dash": "dot",
+       "width": 1.5
+      },
+      "marker": {
+       "size": 4,
+       "symbol": "diamond"
+      },
+      "mode": "lines+markers",
+      "name": "Growth Index",
+      "opacity": 0.6,
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1417.3,
+       1586.24216,
+       1871.131251936,
+       1981.1537695498366,
+       2356.5824088795307,
+       1954.078133442907,
+       1830.5803954093153,
+       2101.140177850812,
+       2077.607407858883,
+       2725.405397629283,
+       3626.6969626252867,
+       3763.786107812523,
+       3916.21944517893,
+       4390.865241934616,
+       5312.507856216692,
+       6431.322010735927,
+       5811.985701102057,
+       6725.6298533153,
+       8963.919468498632,
+       6340.180240069083,
+       6947.569507067702,
+       8869.267232722628
+      ]
+     },
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "legendrank": 1,
+      "line": {
+       "color": "#1f77b4",
+       "width": 2.5
+      },
+      "marker": {
+       "size": 6,
+       "symbol": "circle"
+      },
+      "mode": "lines+markers",
+      "name": "Portfolio",
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1347.89587064316,
+       1648.6146326050157,
+       1506.6371471598457,
+       2073.624216370733,
+       1906.588388495951,
+       1915.2773594712814,
+       2027.064483853884,
+       1965.1446405875033,
+       2093.922919721047,
+       2322.6984241444275,
+       2552.418259437551,
+       2279.5694265814695,
+       2701.203323536607,
+       3173.5781128644926,
+       3626.705809082417,
+       3471.595045335664,
+       4232.945740567949,
+       4096.269315448543,
+       4676.637588637851,
+       4572.125479023923,
+       5603.578839907601,
+       7033.520300546685
+      ]
+     }
+    ],
+    "layout": {
+     "height": 500,
+     "hovermode": "x unified",
+     "legend": {
+      "x": 0.01,
+      "xanchor": "left",
+      "y": 0.99,
+      "yanchor": "top"
+     },
+     "template": {
+      "data": {
+       "candlestick": [
+        {
+         "decreasing": {
+          "line": {
+           "color": "#000033"
+          }
+         },
+         "increasing": {
+          "line": {
+           "color": "#000032"
+          }
+         },
+         "type": "candlestick"
+        }
+       ],
+       "contour": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "contour"
+        }
+       ],
+       "contourcarpet": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "contourcarpet"
+        }
+       ],
+       "heatmap": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "heatmap"
+        }
+       ],
+       "histogram2d": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "histogram2d"
+        }
+       ],
+       "icicle": [
+        {
+         "textfont": {
+          "color": "white"
+         },
+         "type": "icicle"
+        }
+       ],
+       "sankey": [
+        {
+         "textfont": {
+          "color": "#000036"
+         },
+         "type": "sankey"
+        }
+       ],
+       "scatter": [
+        {
+         "marker": {
+          "line": {
+           "width": 0
+          }
+         },
+         "type": "scatter"
+        }
+       ],
+       "table": [
+        {
+         "cells": {
+          "fill": {
+           "color": "#000038"
+          },
+          "font": {
+           "color": "#000037"
+          },
+          "line": {
+           "color": "#000039"
+          }
+         },
+         "header": {
+          "fill": {
+           "color": "#000040"
+          },
+          "font": {
+           "color": "#000036"
+          },
+          "line": {
+           "color": "#000039"
+          }
+         },
+         "type": "table"
+        }
+       ],
+       "waterfall": [
+        {
+         "connector": {
+          "line": {
+           "color": "#000036",
+           "width": 2
+          }
+         },
+         "decreasing": {
+          "marker": {
+           "color": "#000033"
+          }
+         },
+         "increasing": {
+          "marker": {
+           "color": "#000032"
+          }
+         },
+         "totals": {
+          "marker": {
+           "color": "#000034"
+          }
+         },
+         "type": "waterfall"
+        }
+       ]
+      },
+      "layout": {
+       "coloraxis": {
+        "colorscale": [
+         [
+          0.0,
+          "#000011"
+         ],
+         [
+          0.1111111111111111,
+          "#000012"
+         ],
+         [
+          0.2222222222222222,
+          "#000013"
+         ],
+         [
+          0.3333333333333333,
+          "#000014"
+         ],
+         [
+          0.4444444444444444,
+          "#000015"
+         ],
+         [
+          0.5555555555555556,
+          "#000016"
+         ],
+         [
+          0.6666666666666666,
+          "#000017"
+         ],
+         [
+          0.7777777777777778,
+          "#000018"
+         ],
+         [
+          0.8888888888888888,
+          "#000019"
+         ],
+         [
+          1.0,
+          "#000020"
+         ]
+        ]
+       },
+       "colorscale": {
+        "diverging": [
+         [
+          0.0,
+          "#000021"
+         ],
+         [
+          0.1111111111111111,
+          "#000022"
+         ],
+         [
+          0.2222222222222222,
+          "#000023"
+         ],
+         [
+          0.3333333333333333,
+          "#000024"
+         ],
+         [
+          0.4444444444444444,
+          "#000025"
+         ],
+         [
+          0.5555555555555556,
+          "#000026"
+         ],
+         [
+          0.6666666666666666,
+          "#000027"
+         ],
+         [
+          0.7777777777777778,
+          "#000028"
+         ],
+         [
+          0.8888888888888888,
+          "#000029"
+         ],
+         [
+          1.0,
+          "#000030"
+         ]
+        ],
+        "sequential": [
+         [
+          0.0,
+          "#000011"
+         ],
+         [
+          0.1111111111111111,
+          "#000012"
+         ],
+         [
+          0.2222222222222222,
+          "#000013"
+         ],
+         [
+          0.3333333333333333,
+          "#000014"
+         ],
+         [
+          0.4444444444444444,
+          "#000015"
+         ],
+         [
+          0.5555555555555556,
+          "#000016"
+         ],
+         [
+          0.6666666666666666,
+          "#000017"
+         ],
+         [
+          0.7777777777777778,
+          "#000018"
+         ],
+         [
+          0.8888888888888888,
+          "#000019"
+         ],
+         [
+          1.0,
+          "#000020"
+         ]
+        ],
+        "sequentialminus": [
+         [
+          0.0,
+          "#000011"
+         ],
+         [
+          0.1111111111111111,
+          "#000012"
+         ],
+         [
+          0.2222222222222222,
+          "#000013"
+         ],
+         [
+          0.3333333333333333,
+          "#000014"
+         ],
+         [
+          0.4444444444444444,
+          "#000015"
+         ],
+         [
+          0.5555555555555556,
+          "#000016"
+         ],
+         [
+          0.6666666666666666,
+          "#000017"
+         ],
+         [
+          0.7777777777777778,
+          "#000018"
+         ],
+         [
+          0.8888888888888888,
+          "#000019"
+         ],
+         [
+          1.0,
+          "#000020"
+         ]
+        ]
+       },
+       "colorway": [
+        "#000001",
+        "#000002",
+        "#000003",
+        "#000004",
+        "#000005",
+        "#000006",
+        "#000007",
+        "#000008",
+        "#000009",
+        "#000010"
+       ]
+      }
+     },
+     "title": {
+      "font": {
+       "size": 14
+      },
+      "text": "<b>Cumulative Wealth: Roe Using 9/30 Data, Roa %</b>"
+     },
+     "xaxis": {
+      "dtick": 1,
+      "griddash": "dash",
+      "hoverformat": "d",
+      "showgrid": true,
+      "tickformat": "d",
+      "title": {
+       "font": {
+        "size": 12
+       },
+       "text": "Year"
+      }
+     },
+     "yaxis": {
+      "griddash": "dash",
+      "showgrid": true,
+      "tickformat": ",.0f",
+      "tickprefix": "$",
+      "title": {
+       "font": {
+        "size": 12
+       },
+       "text": "Portfolio Value (USD)"
+      }
+     }
+    }
+   }
+  ],
+  "selectbox": [
+   [
+    "Rebalance year",
+    [
+     "2002",
+     "2003",
+     "2004",
+     "2005",
+     "2006",
+     "2007",
+     "2008",
+     "2009",
+     "2010",
+     "2011",
+     "2012",
+     "2013",
+     "2014",
+     "2015",
+     "2016",
+     "2017",
+     "2018",
+     "2019",
+     "2020",
+     "2021",
+     "2022",
+     "2023"
+    ],
+    "2023"
+   ]
+  ],
+  "slider": [
+   [
+    "Cohort Percentage",
+    10
+   ]
+  ],
+  "subheader": [
+   "Performance Summary",
+   "Holdings and Ranks",
+   "Portfolio Growth Over Time",
+   "Year-by-Year Performance",
+   "Top vs Bottom Cohort Analysis"
+  ],
+  "success": [
+   "Selected 2 factor(s): ROE using 9/30 Data (Higher is better), ROA % (Higher is better)",
+   "Analysis complete. Saved as \"Run 2: ROE using 9/30 Data +1\" in the Results tab."
+  ],
+  "table": [],
+  "tabs": [
+   "Analysis",
+   "Results",
+   "Run 2: ROE using 9/30 Data +1",
+   "Run 1: ROE using 9/30 Data +1",
+   "Data Viewer",
+   "About"
+  ],
+  "warning": []
+ },
+ "run2_cohort": {
+  "button": [
+   "Open analysis",
+   "Remove this run",
+   "Generate Comparison"
+  ],
+  "caption": [
+   "Paste an analysis ID from your history or from a colleague to see that analysis with its original results, factors and settings.",
+   "Only analyses run or opened in this browser session. Copy an ID to reopen or share it.",
+   "Not saved (computed in this app), so it has no ID.",
+   "Not saved (computed in this app), so it has no ID.",
+   "Each analysis run is saved as its own tab (newest first). Only the last 5 runs are kept, and they are cleared when you refresh the page.",
+   "**Factors:** ROE using 9/30 Data (Higher is better), ROA % (Higher is better)",
+   "**Period:** 2002-2024 | **Initial AUM:** $1,000",
+   "**Universe:** All sectors | Fossil fuels included",
+   "**Factor Combination:** Integrating (top stocks by composite score)",
+   "**Weighting:** Market Cap Weighted",
+   "**Delisting Strategy:** Hold Cash (risk-free rate)",
+   "**Method:** Integrating | **Holdings:** 3 | **Portfolio return (2023 to 2024):** 25.52%"
+  ],
+  "code": [],
+  "dataframe": [
+   "Rank,Ticker,Sector,Score,ROE using 9/30 Data,ROA %,Weight %,Shares,Buy Price,Dollar Value,Period Return %,Contribution %,Delisted\r\n1,T26,Technology,1.6220567413384226,0.1324249475102165,0.1530442265840798,14.277989214437433,38.517773042923416,20.771667705007623,800.0783823845055,-5.28341439657763,-0.7543653376973886,False\r\n2,T00,Technology,1.2213269212390667,0.15557889161399985,0.09919244413403805,39.153351983127045,30.501617434156888,71.93024932455342,2193.98894684105,36.9367718736846,14.461984302908402,False\r\n3,T11,Technology,0.9921202400024878,0.20147456899601934,0.059893988859627684,46.56865880243552,93.94419738336603,27.7772505739039,2609.5115106820454,25.36199676223608,11.810741737690464,False\r\n",
+   "Year,Portfolio Value,YoY Return,Benchmark Returns,Growth Returns,Value Returns\r\n2002,\"$1,347.90\",34.79%,36.50%,41.73%,31.65%\r\n2003,\"$1,648.61\",22.31%,18.76%,11.92%,25.67%\r\n2004,\"$1,506.64\",-8.61%,17.95%,17.96%,17.75%\r\n2005,\"$2,073.62\",37.63%,9.92%,5.88%,14.01%\r\n2006,\"$1,906.59\",-8.06%,12.34%,18.95%,6.08%\r\n2007,\"$1,915.28\",0.46%,-14.49%,-17.08%,-12.27%\r\n2008,\"$2,027.06\",5.84%,-9.54%,-6.32%,-12.61%\r\n2009,\"$1,965.14\",-3.05%,13.35%,14.78%,11.84%\r\n2010,\"$2,093.92\",6.55%,-3.54%,-1.12%,-5.99%\r\n2011,\"$2,322.70\",10.93%,31.91%,31.18%,32.63%\r\n2012,\"$2,552.42\",9.89%,30.04%,33.07%,27.03%\r\n2013,\"$2,279.57\",-10.69%,3.93%,3.78%,4.12%\r\n2014,\"$2,701.20\",18.50%,1.25%,4.05%,-1.60%\r\n2015,\"$3,173.58\",17.49%,15.46%,12.12%,18.82%\r\n2016,\"$3,626.71\",14.28%,20.74%,20.99%,20.55%\r\n2017,\"$3,471.60\",-4.28%,15.24%,21.06%,9.32%\r\n2018,\"$4,232.95\",21.93%,-8.89%,-9.63%,-8.24%\r\n2019,\"$4,096.27\",-3.23%,0.40%,15.72%,-14.87%\r\n2020,\"$4,676.64\",14.17%,47.67%,33.28%,63.93%\r\n2021,\"$4,572.13\",-2.23%,-23.51%,-29.27%,-17.69%\r\n2022,\"$5,603.58\",22.56%,8.94%,9.58%,7.84%\r\n2023,\"$7,033.52\",25.52%,26.76%,27.66%,25.89%\r\n",
+   "Year,Portfolio Return,Benchmark Return,Outperformed Benchmark,Growth Index Return,Outperformed Growth,Value Index Return,Outperformed Value\r\n2002,34.79%,36.50%,\u274c,41.73%,\u274c,31.65%,\u2705\r\n2003,22.31%,18.76%,\u2705,11.92%,\u2705,25.67%,\u274c\r\n2004,-8.61%,17.95%,\u274c,17.96%,\u274c,17.75%,\u274c\r\n2005,37.63%,9.92%,\u2705,5.88%,\u2705,14.01%,\u2705\r\n2006,-8.06%,12.34%,\u274c,18.95%,\u274c,6.08%,\u274c\r\n2007,0.46%,-14.49%,\u2705,-17.08%,\u2705,-12.27%,\u2705\r\n2008,5.84%,-9.54%,\u2705,-6.32%,\u2705,-12.61%,\u2705\r\n2009,-3.05%,13.35%,\u274c,14.78%,\u274c,11.84%,\u274c\r\n2010,6.55%,-3.54%,\u2705,-1.12%,\u2705,-5.99%,\u2705\r\n2011,10.93%,31.91%,\u274c,31.18%,\u274c,32.63%,\u274c\r\n2012,9.89%,30.04%,\u274c,33.07%,\u274c,27.03%,\u274c\r\n2013,-10.69%,3.93%,\u274c,3.78%,\u274c,4.12%,\u274c\r\n2014,18.50%,1.25%,\u2705,4.05%,\u2705,-1.60%,\u2705\r\n2015,17.49%,15.46%,\u2705,12.12%,\u2705,18.82%,\u274c\r\n2016,14.28%,20.74%,\u274c,20.99%,\u274c,20.55%,\u274c\r\n2017,-4.28%,15.24%,\u274c,21.06%,\u274c,9.32%,\u274c\r\n2018,21.93%,-8.89%,\u2705,-9.63%,\u2705,-8.24%,\u2705\r\n2019,-3.23%,0.40%,\u274c,15.72%,\u274c,-14.87%,\u2705\r\n2020,14.17%,47.67%,\u274c,33.28%,\u274c,63.93%,\u274c\r\n2021,-2.23%,-23.51%,\u2705,-29.27%,\u2705,-17.69%,\u2705\r\n2022,22.56%,8.94%,\u2705,9.58%,\u2705,7.84%,\u2705\r\n2023,25.52%,26.76%,\u274c,27.66%,\u274c,25.89%,\u274c\r\n"
+  ],
+  "error": [],
+  "expander": [
+   "Open a saved analysis",
+   "This session's analyses (2)",
+   "Run Cohort Comparison"
+  ],
+  "header": [
+   "Portfolio Performance Results",
+   "Advanced Backtest Statistics",
+   "Yearly Win/Loss Summary"
+  ],
+  "info": [],
+  "markdown": [
+   "<style>\n    /* Header container with icon */\n    .main-header-container {\n        display: flex;\n        align-items: center;\n        justify-content: center;\n        position: relative;\n        margin-bottom: 2rem;\n    }\n\n    /* Typography and header styling */\n    .main-header {\n        font-size: 2.5rem;\n        font-weight: bold;\n        color: #1f77b4;\n        text-align: center;\n        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);\n    }\n\n    /* Documentation icon link */\n    .docs-icon-link {\n        font-size: 2rem;\n        margin-left: 1.5rem;\n        text-decoration: none;\n        cursor: pointer;\n        transition: transform 0.3s ease, opacity 0.3s ease;\n        opacity: 0.7;\n    }\n\n    .docs-icon-link:hover {\n        transform: scale(1.2) rotate(5deg);\n        opacity: 1;\n    }\n\n    /* Global component styling */\n    .stAlert {\n        margin-top: 1rem;\n        border-radius: 10px;\n    }\n\n    /* Interactive element transitions */\n    .stButton>button {\n        border-radius: 8px;\n        font-weight: 600;\n        transition: all 0.3s ease;\n    }\n\n    .stButton>button:hover {\n        transform: translateY(-2px);\n        box-shadow: 0 4px 12px rgba(0,0,0,0.15);\n    }\n\n    /* Factor Selection: compact pill-style \"add factor\" buttons */\n    [class*=\"st-key-factor_add_\"] button {\n        min-height: 0;\n        padding: 0.2rem 0.75rem;\n        border-radius: 999px;\n        font-weight: 400;\n        white-space: nowrap;\n    }\n    [class*=\"st-key-factor_add_\"] button p {\n        font-size: 0.875rem;\n    }\n    [class*=\"st-key-factor_add_\"] {\n        margin-bottom: -0.5rem;\n    }\n\n    /* Navigation panel aesthetic (Grey with Cyan border) */\n    [data-testid=\"stSidebar\"] {\n        background-color: #DEDFE0;\n        border-right: 4px solid #3BD2E3;\n        padding-left: 8px;\n    }\n\n    [data-testid=\"stSidebar\"] h2 {\n        color: #1f77b4;\n    }\n\n    /* Financial KPI display formatting */\n    [data-testid=\"stMetricValue\"] {\n        font-size: 2rem;\n        font-weight: bold;\n    }\n\n    /* Information container cards */\n    .custom-card {\n        padding: 20px;\n        border-radius: 10px;\n        background-color: #ffffff;\n        box-shadow: 0 2px 8px rgba(0,0,0,0.1);\n        margin: 10px 0;\n        color: #31333F;\n    }\n\n    /* Branding: Hiding standard application headers and footers */\n    #MainMenu {visibility: hidden;}\n    footer {visibility: hidden;}\n\n    /* Responsive breakpoints */\n    @media (max-width: 768px) {\n        .main-header {\n            font-size: 1.8rem;\n        }\n\n        .main-header-container {\n            flex-direction: column;\n            gap: 0.5rem;\n        }\n\n        .docs-icon-link {\n            margin-left: 0;\n            font-size: 1.5rem;\n        }\n    }\n</style>",
+   "<div class=\"main-header-container\"><div class=\"main-header\">Factor-Lake Portfolio Analysis</div><a href=\"https://cornell-sysen-5900.github.io/Factor-Lake/\" target=\"_blank\" class=\"docs-icon-link\" title=\"View Documentation\">\ud83d\udcda</a></div>",
+   "**Run 2: ROE using 9/30 Data +1** \u00b7 computed in this app at 02:39:36",
+   "**Run 1: ROE using 9/30 Data +1** \u00b7 computed in this app at 02:39:36",
+   "### Cohort Performance Summary (top vs bottom 10%)",
+   "**Volatility (Raw)**",
+   "**Volatility (Excess)**",
+   "**RF Rate Source**\n\nFRED 4 Week T-Bill (Oct 1)"
+  ],
+  "metric": [
+   [
+    "Final Portfolio Value",
+    "$7,033.52",
+    ""
+   ],
+   [
+    "Total Return",
+    "603.35%",
+    ""
+   ],
+   [
+    "CAGR",
+    "9.27%",
+    ""
+   ],
+   [
+    "Cumulative Outperformance",
+    "-14.87%",
+    ""
+   ],
+   [
+    "Max Drawdown (Portfolio)",
+    "-10.69%",
+    ""
+   ],
+   [
+    "Max Drawdown (Benchmark)",
+    "-23.51%",
+    ""
+   ],
+   [
+    "Max Drawdown (Growth)",
+    "-29.27%",
+    ""
+   ],
+   [
+    "Max Drawdown (Value)",
+    "-23.33%",
+    ""
+   ],
+   [
+    "Sharpe (Portfolio)",
+    "0.6196",
+    "0.0618 vs bench"
+   ],
+   [
+    "Sharpe (Benchmark)",
+    "0.5578",
+    ""
+   ],
+   [
+    "Sharpe (Growth)",
+    "0.5869",
+    ""
+   ],
+   [
+    "Sharpe (Value)",
+    "0.4794",
+    ""
+   ],
+   [
+    "Portfolio",
+    "14.07%",
+    ""
+   ],
+   [
+    "Benchmark",
+    "17.48%",
+    ""
+   ],
+   [
+    "Growth",
+    "17.40%",
+    ""
+   ],
+   [
+    "Value",
+    "19.63%",
+    ""
+   ],
+   [
+    "Portfolio",
+    "13.90%",
+    ""
+   ],
+   [
+    "Benchmark",
+    "17.76%",
+    ""
+   ],
+   [
+    "Growth",
+    "17.58%",
+    ""
+   ],
+   [
+    "Value",
+    "19.97%",
+    ""
+   ],
+   [
+    "Beta vs R2000",
+    "0.262",
+    ""
+   ],
+   [
+    "Beta vs Growth",
+    "0.191",
+    ""
+   ],
+   [
+    "Beta vs Value",
+    "0.269",
+    ""
+   ],
+   [
+    "Yearly Win Rate (vs R2000)",
+    "45.45%",
+    ""
+   ],
+   [
+    "Yearly Win Rate (vs Growth)",
+    "45.45%",
+    ""
+   ],
+   [
+    "Yearly Win Rate (vs Value)",
+    "45.45%",
+    ""
+   ],
+   [
+    "Information Ratio",
+    "-0.0699",
+    ""
+   ],
+   [
+    "IR (vs Growth)",
+    "-0.0872",
+    ""
+   ],
+   [
+    "IR (vs Value)",
+    "-0.0496",
+    ""
+   ]
+  ],
+  "plotly": [
+   {
+    "data": [
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "legendrank": 2,
+      "line": {
+       "color": "#ff7f0e",
+       "dash": "dash",
+       "width": 2
+      },
+      "marker": {
+       "size": 4,
+       "symbol": "square"
+      },
+      "mode": "lines+markers",
+      "name": "Russell 2000",
+      "opacity": 0.8,
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1365.0,
+       1621.074,
+       1912.056783,
+       2101.7328158736,
+       2361.0866453524022,
+       2018.965190440839,
+       1826.355911272783,
+       2070.1744254276996,
+       1996.890250767559,
+       2634.097929787487,
+       3425.380947895648,
+       3559.9984191479466,
+       3604.4983993872956,
+       4161.753851932572,
+       5024.9016008233875,
+       5790.696604788872,
+       5275.903676623141,
+       5297.0072913296335,
+       7822.09066710647,
+       5983.117151269739,
+       6518.007824593254,
+       8262.226718454409
+      ]
+     },
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "legendrank": 3,
+      "line": {
+       "color": "#2ca02c",
+       "dash": "dot",
+       "width": 1.5
+      },
+      "marker": {
+       "size": 4,
+       "symbol": "triangle-up"
+      },
+      "mode": "lines+markers",
+      "name": "Value Index",
+      "opacity": 0.6,
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1316.5,
+       1654.44555,
+       1948.1096351249998,
+       2221.039795006012,
+       2356.0790145423775,
+       2066.9881194580275,
+       1806.3409175943702,
+       2020.2116822375438,
+       1899.201002471515,
+       2518.9102895779706,
+       3199.771740850896,
+       3331.602336573953,
+       3278.2966991887697,
+       3895.272137976096,
+       4695.750562330184,
+       5133.394514739357,
+       4710.402806724834,
+       4009.9659093648506,
+       6573.5371152217995,
+       5410.678399539062,
+       5834.875586062925,
+       7345.524875294617
+      ]
+     },
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "legendrank": 4,
+      "line": {
+       "color": "#d62728",
+       "dash": "dot",
+       "width": 1.5
+      },
+      "marker": {
+       "size": 4,
+       "symbol": "diamond"
+      },
+      "mode": "lines+markers",
+      "name": "Growth Index",
+      "opacity": 0.6,
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1417.3,
+       1586.24216,
+       1871.131251936,
+       1981.1537695498366,
+       2356.5824088795307,
+       1954.078133442907,
+       1830.5803954093153,
+       2101.140177850812,
+       2077.607407858883,
+       2725.405397629283,
+       3626.6969626252867,
+       3763.786107812523,
+       3916.21944517893,
+       4390.865241934616,
+       5312.507856216692,
+       6431.322010735927,
+       5811.985701102057,
+       6725.6298533153,
+       8963.919468498632,
+       6340.180240069083,
+       6947.569507067702,
+       8869.267232722628
+      ]
+     },
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "legendrank": 1,
+      "line": {
+       "color": "#1f77b4",
+       "width": 2.5
+      },
+      "marker": {
+       "size": 6,
+       "symbol": "circle"
+      },
+      "mode": "lines+markers",
+      "name": "Portfolio",
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1347.89587064316,
+       1648.6146326050157,
+       1506.6371471598457,
+       2073.624216370733,
+       1906.588388495951,
+       1915.2773594712814,
+       2027.064483853884,
+       1965.1446405875033,
+       2093.922919721047,
+       2322.6984241444275,
+       2552.418259437551,
+       2279.5694265814695,
+       2701.203323536607,
+       3173.5781128644926,
+       3626.705809082417,
+       3471.595045335664,
+       4232.945740567949,
+       4096.269315448543,
+       4676.637588637851,
+       4572.125479023923,
+       5603.578839907601,
+       7033.520300546685
+      ]
+     }
+    ],
+    "layout": {
+     "height": 500,
+     "hovermode": "x unified",
+     "legend": {
+      "x": 0.01,
+      "xanchor": "left",
+      "y": 0.99,
+      "yanchor": "top"
+     },
+     "template": {
+      "data": {
+       "candlestick": [
+        {
+         "decreasing": {
+          "line": {
+           "color": "#000033"
+          }
+         },
+         "increasing": {
+          "line": {
+           "color": "#000032"
+          }
+         },
+         "type": "candlestick"
+        }
+       ],
+       "contour": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "contour"
+        }
+       ],
+       "contourcarpet": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "contourcarpet"
+        }
+       ],
+       "heatmap": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "heatmap"
+        }
+       ],
+       "histogram2d": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "histogram2d"
+        }
+       ],
+       "icicle": [
+        {
+         "textfont": {
+          "color": "white"
+         },
+         "type": "icicle"
+        }
+       ],
+       "sankey": [
+        {
+         "textfont": {
+          "color": "#000036"
+         },
+         "type": "sankey"
+        }
+       ],
+       "scatter": [
+        {
+         "marker": {
+          "line": {
+           "width": 0
+          }
+         },
+         "type": "scatter"
+        }
+       ],
+       "table": [
+        {
+         "cells": {
+          "fill": {
+           "color": "#000038"
+          },
+          "font": {
+           "color": "#000037"
+          },
+          "line": {
+           "color": "#000039"
+          }
+         },
+         "header": {
+          "fill": {
+           "color": "#000040"
+          },
+          "font": {
+           "color": "#000036"
+          },
+          "line": {
+           "color": "#000039"
+          }
+         },
+         "type": "table"
+        }
+       ],
+       "waterfall": [
+        {
+         "connector": {
+          "line": {
+           "color": "#000036",
+           "width": 2
+          }
+         },
+         "decreasing": {
+          "marker": {
+           "color": "#000033"
+          }
+         },
+         "increasing": {
+          "marker": {
+           "color": "#000032"
+          }
+         },
+         "totals": {
+          "marker": {
+           "color": "#000034"
+          }
+         },
+         "type": "waterfall"
+        }
+       ]
+      },
+      "layout": {
+       "coloraxis": {
+        "colorscale": [
+         [
+          0.0,
+          "#000011"
+         ],
+         [
+          0.1111111111111111,
+          "#000012"
+         ],
+         [
+          0.2222222222222222,
+          "#000013"
+         ],
+         [
+          0.3333333333333333,
+          "#000014"
+         ],
+         [
+          0.4444444444444444,
+          "#000015"
+         ],
+         [
+          0.5555555555555556,
+          "#000016"
+         ],
+         [
+          0.6666666666666666,
+          "#000017"
+         ],
+         [
+          0.7777777777777778,
+          "#000018"
+         ],
+         [
+          0.8888888888888888,
+          "#000019"
+         ],
+         [
+          1.0,
+          "#000020"
+         ]
+        ]
+       },
+       "colorscale": {
+        "diverging": [
+         [
+          0.0,
+          "#000021"
+         ],
+         [
+          0.1111111111111111,
+          "#000022"
+         ],
+         [
+          0.2222222222222222,
+          "#000023"
+         ],
+         [
+          0.3333333333333333,
+          "#000024"
+         ],
+         [
+          0.4444444444444444,
+          "#000025"
+         ],
+         [
+          0.5555555555555556,
+          "#000026"
+         ],
+         [
+          0.6666666666666666,
+          "#000027"
+         ],
+         [
+          0.7777777777777778,
+          "#000028"
+         ],
+         [
+          0.8888888888888888,
+          "#000029"
+         ],
+         [
+          1.0,
+          "#000030"
+         ]
+        ],
+        "sequential": [
+         [
+          0.0,
+          "#000011"
+         ],
+         [
+          0.1111111111111111,
+          "#000012"
+         ],
+         [
+          0.2222222222222222,
+          "#000013"
+         ],
+         [
+          0.3333333333333333,
+          "#000014"
+         ],
+         [
+          0.4444444444444444,
+          "#000015"
+         ],
+         [
+          0.5555555555555556,
+          "#000016"
+         ],
+         [
+          0.6666666666666666,
+          "#000017"
+         ],
+         [
+          0.7777777777777778,
+          "#000018"
+         ],
+         [
+          0.8888888888888888,
+          "#000019"
+         ],
+         [
+          1.0,
+          "#000020"
+         ]
+        ],
+        "sequentialminus": [
+         [
+          0.0,
+          "#000011"
+         ],
+         [
+          0.1111111111111111,
+          "#000012"
+         ],
+         [
+          0.2222222222222222,
+          "#000013"
+         ],
+         [
+          0.3333333333333333,
+          "#000014"
+         ],
+         [
+          0.4444444444444444,
+          "#000015"
+         ],
+         [
+          0.5555555555555556,
+          "#000016"
+         ],
+         [
+          0.6666666666666666,
+          "#000017"
+         ],
+         [
+          0.7777777777777778,
+          "#000018"
+         ],
+         [
+          0.8888888888888888,
+          "#000019"
+         ],
+         [
+          1.0,
+          "#000020"
+         ]
+        ]
+       },
+       "colorway": [
+        "#000001",
+        "#000002",
+        "#000003",
+        "#000004",
+        "#000005",
+        "#000006",
+        "#000007",
+        "#000008",
+        "#000009",
+        "#000010"
+       ]
+      }
+     },
+     "title": {
+      "font": {
+       "size": 14
+      },
+      "text": "<b>Cumulative Wealth: Roe Using 9/30 Data, Roa %</b>"
+     },
+     "xaxis": {
+      "dtick": 1,
+      "griddash": "dash",
+      "hoverformat": "d",
+      "showgrid": true,
+      "tickformat": "d",
+      "title": {
+       "font": {
+        "size": 12
+       },
+       "text": "Year"
+      }
+     },
+     "yaxis": {
+      "griddash": "dash",
+      "showgrid": true,
+      "tickformat": ",.0f",
+      "tickprefix": "$",
+      "title": {
+       "font": {
+        "size": 12
+       },
+       "text": "Portfolio Value (USD)"
+      }
+     }
+    }
+   },
+   {
+    "data": [
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "line": {
+       "color": "#d62728",
+       "dash": "dash",
+       "width": 1.2
+      },
+      "marker": {
+       "size": 3,
+       "symbol": "x"
+      },
+      "mode": "lines+markers",
+      "name": "Russell 2000",
+      "opacity": 0.6,
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1365.0,
+       1621.074,
+       1912.056783,
+       2101.7328158736,
+       2361.0866453524022,
+       2018.965190440839,
+       1826.355911272783,
+       2070.1744254276996,
+       1996.890250767559,
+       2634.097929787487,
+       3425.380947895648,
+       3559.9984191479466,
+       3604.4983993872956,
+       4161.753851932572,
+       5024.9016008233875,
+       5790.696604788872,
+       5275.903676623141,
+       7386.265147272397,
+       10907.29774297715,
+       8342.992043603223,
+       9088.85553230135,
+       11521.033272745191
+      ]
+     },
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "line": {
+       "color": "#ff7f0e",
+       "dash": "dot",
+       "width": 1.2
+      },
+      "marker": {
+       "size": 3,
+       "symbol": "diamond"
+      },
+      "mode": "lines+markers",
+      "name": "Growth Index",
+      "opacity": 0.6,
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1417.3,
+       1586.24216,
+       1871.131251936,
+       1981.1537695498366,
+       2356.5824088795307,
+       1954.078133442907,
+       1830.5803954093153,
+       2101.140177850812,
+       2077.607407858883,
+       2725.405397629283,
+       3626.6969626252867,
+       3763.786107812523,
+       3916.21944517893,
+       4390.865241934616,
+       5312.507856216692,
+       6431.322010735927,
+       5811.985701102057,
+       6725.6298533153,
+       8963.919468498632,
+       6340.180240069083,
+       6947.569507067702,
+       8869.267232722628
+      ]
+     },
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "line": {
+       "color": "#17becf",
+       "dash": "dot",
+       "width": 1.2
+      },
+      "marker": {
+       "size": 3,
+       "symbol": "square"
+      },
+      "mode": "lines+markers",
+      "name": "Value Index",
+      "opacity": 0.6,
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1316.5,
+       1654.44555,
+       1948.1096351249998,
+       2221.039795006012,
+       2356.0790145423775,
+       2066.9881194580275,
+       1806.3409175943702,
+       2020.2116822375438,
+       1899.201002471515,
+       2518.9102895779706,
+       3199.771740850896,
+       3331.602336573953,
+       3278.2966991887697,
+       3895.272137976096,
+       4695.750562330184,
+       5133.394514739357,
+       4710.402806724834,
+       4009.9659093648506,
+       6573.5371152217995,
+       5410.678399539062,
+       5834.875586062925,
+       7345.524875294617
+      ]
+     },
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "line": {
+       "color": "#9467bd",
+       "width": 1.5
+      },
+      "marker": {
+       "size": 4,
+       "symbol": "triangle-down"
+      },
+      "mode": "lines+markers",
+      "name": "Bottom 10%",
+      "opacity": 0.6,
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1318.514313200699,
+       1426.6988001686007,
+       1544.5582236975354,
+       1684.329166658865,
+       1886.0174225399105,
+       2007.6683322162223,
+       1929.439443402526,
+       2240.8226447478783,
+       2723.821822328127,
+       2780.9412041765454,
+       2713.261411949481,
+       2488.8204263683465,
+       2352.355426020384,
+       2450.7982559660627,
+       2066.5424639630405,
+       2565.736353166546,
+       2372.821213076117,
+       3047.076107521569,
+       2568.328944220854,
+       2875.264736833721,
+       2941.0949626063493,
+       3704.0202351580683
+      ]
+     },
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "line": {
+       "color": "#2ca02c",
+       "width": 2.0
+      },
+      "marker": {
+       "size": 5,
+       "symbol": "triangle-up"
+      },
+      "mode": "lines+markers",
+      "name": "Top 10%",
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1347.89587064316,
+       1648.6146326050157,
+       1506.6371471598457,
+       2073.624216370733,
+       1906.588388495951,
+       1915.2773594712814,
+       2027.064483853884,
+       1965.1446405875033,
+       2093.922919721047,
+       2322.6984241444275,
+       2552.418259437551,
+       2279.5694265814695,
+       2701.203323536607,
+       3173.5781128644926,
+       3626.705809082417,
+       3471.595045335664,
+       4232.945740567949,
+       4096.269315448543,
+       4676.637588637851,
+       4572.125479023923,
+       5603.578839907601,
+       7033.520300546685
+      ]
+     },
+     {
+      "hovertemplate": "%{fullData.name}: $%{y:,.0f}<extra></extra>",
+      "line": {
+       "color": "#003366",
+       "width": 2.5
+      },
+      "marker": {
+       "size": 4,
+       "symbol": "circle"
+      },
+      "mode": "lines+markers",
+      "name": "Active Strategy",
+      "type": "scatter",
+      "x": [
+       2002,
+       2003,
+       2004,
+       2005,
+       2006,
+       2007,
+       2008,
+       2009,
+       2010,
+       2011,
+       2012,
+       2013,
+       2014,
+       2015,
+       2016,
+       2017,
+       2018,
+       2019,
+       2020,
+       2021,
+       2022,
+       2023,
+       2024
+      ],
+      "y": [
+       1000.0,
+       1347.89587064316,
+       1648.6146326050157,
+       1506.6371471598457,
+       2073.624216370733,
+       1906.588388495951,
+       1915.2773594712814,
+       2027.064483853884,
+       1965.1446405875033,
+       2093.922919721047,
+       2322.6984241444275,
+       2552.418259437551,
+       2279.5694265814695,
+       2701.203323536607,
+       3173.5781128644926,
+       3626.705809082417,
+       3471.595045335664,
+       4232.945740567949,
+       4096.269315448543,
+       4676.637588637851,
+       4572.125479023923,
+       5603.578839907601,
+       7033.520300546685
+      ]
+     }
+    ],
+    "layout": {
+     "height": 500,
+     "hovermode": "x unified",
+     "legend": {
+      "font": {
+       "size": 10
+      },
+      "x": 0.01,
+      "xanchor": "left",
+      "y": 0.99,
+      "yanchor": "top"
+     },
+     "shapes": [
+      {
+       "line": {
+        "color": "#000000",
+        "dash": "solid",
+        "width": 0.8
+       },
+       "opacity": 0.2,
+       "type": "line",
+       "x0": 0,
+       "x1": 1,
+       "xref": "x domain",
+       "y0": 1000.0,
+       "y1": 1000.0,
+       "yref": "y"
+      }
+     ],
+     "template": {
+      "data": {
+       "candlestick": [
+        {
+         "decreasing": {
+          "line": {
+           "color": "#000033"
+          }
+         },
+         "increasing": {
+          "line": {
+           "color": "#000032"
+          }
+         },
+         "type": "candlestick"
+        }
+       ],
+       "contour": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "contour"
+        }
+       ],
+       "contourcarpet": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "contourcarpet"
+        }
+       ],
+       "heatmap": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "heatmap"
+        }
+       ],
+       "histogram2d": [
+        {
+         "colorscale": [
+          [
+           0.0,
+           "#000011"
+          ],
+          [
+           0.1111111111111111,
+           "#000012"
+          ],
+          [
+           0.2222222222222222,
+           "#000013"
+          ],
+          [
+           0.3333333333333333,
+           "#000014"
+          ],
+          [
+           0.4444444444444444,
+           "#000015"
+          ],
+          [
+           0.5555555555555556,
+           "#000016"
+          ],
+          [
+           0.6666666666666666,
+           "#000017"
+          ],
+          [
+           0.7777777777777778,
+           "#000018"
+          ],
+          [
+           0.8888888888888888,
+           "#000019"
+          ],
+          [
+           1.0,
+           "#000020"
+          ]
+         ],
+         "type": "histogram2d"
+        }
+       ],
+       "icicle": [
+        {
+         "textfont": {
+          "color": "white"
+         },
+         "type": "icicle"
+        }
+       ],
+       "sankey": [
+        {
+         "textfont": {
+          "color": "#000036"
+         },
+         "type": "sankey"
+        }
+       ],
+       "scatter": [
+        {
+         "marker": {
+          "line": {
+           "width": 0
+          }
+         },
+         "type": "scatter"
+        }
+       ],
+       "table": [
+        {
+         "cells": {
+          "fill": {
+           "color": "#000038"
+          },
+          "font": {
+           "color": "#000037"
+          },
+          "line": {
+           "color": "#000039"
+          }
+         },
+         "header": {
+          "fill": {
+           "color": "#000040"
+          },
+          "font": {
+           "color": "#000036"
+          },
+          "line": {
+           "color": "#000039"
+          }
+         },
+         "type": "table"
+        }
+       ],
+       "waterfall": [
+        {
+         "connector": {
+          "line": {
+           "color": "#000036",
+           "width": 2
+          }
+         },
+         "decreasing": {
+          "marker": {
+           "color": "#000033"
+          }
+         },
+         "increasing": {
+          "marker": {
+           "color": "#000032"
+          }
+         },
+         "totals": {
+          "marker": {
+           "color": "#000034"
+          }
+         },
+         "type": "waterfall"
+        }
+       ]
+      },
+      "layout": {
+       "coloraxis": {
+        "colorscale": [
+         [
+          0.0,
+          "#000011"
+         ],
+         [
+          0.1111111111111111,
+          "#000012"
+         ],
+         [
+          0.2222222222222222,
+          "#000013"
+         ],
+         [
+          0.3333333333333333,
+          "#000014"
+         ],
+         [
+          0.4444444444444444,
+          "#000015"
+         ],
+         [
+          0.5555555555555556,
+          "#000016"
+         ],
+         [
+          0.6666666666666666,
+          "#000017"
+         ],
+         [
+          0.7777777777777778,
+          "#000018"
+         ],
+         [
+          0.8888888888888888,
+          "#000019"
+         ],
+         [
+          1.0,
+          "#000020"
+         ]
+        ]
+       },
+       "colorscale": {
+        "diverging": [
+         [
+          0.0,
+          "#000021"
+         ],
+         [
+          0.1111111111111111,
+          "#000022"
+         ],
+         [
+          0.2222222222222222,
+          "#000023"
+         ],
+         [
+          0.3333333333333333,
+          "#000024"
+         ],
+         [
+          0.4444444444444444,
+          "#000025"
+         ],
+         [
+          0.5555555555555556,
+          "#000026"
+         ],
+         [
+          0.6666666666666666,
+          "#000027"
+         ],
+         [
+          0.7777777777777778,
+          "#000028"
+         ],
+         [
+          0.8888888888888888,
+          "#000029"
+         ],
+         [
+          1.0,
+          "#000030"
+         ]
+        ],
+        "sequential": [
+         [
+          0.0,
+          "#000011"
+         ],
+         [
+          0.1111111111111111,
+          "#000012"
+         ],
+         [
+          0.2222222222222222,
+          "#000013"
+         ],
+         [
+          0.3333333333333333,
+          "#000014"
+         ],
+         [
+          0.4444444444444444,
+          "#000015"
+         ],
+         [
+          0.5555555555555556,
+          "#000016"
+         ],
+         [
+          0.6666666666666666,
+          "#000017"
+         ],
+         [
+          0.7777777777777778,
+          "#000018"
+         ],
+         [
+          0.8888888888888888,
+          "#000019"
+         ],
+         [
+          1.0,
+          "#000020"
+         ]
+        ],
+        "sequentialminus": [
+         [
+          0.0,
+          "#000011"
+         ],
+         [
+          0.1111111111111111,
+          "#000012"
+         ],
+         [
+          0.2222222222222222,
+          "#000013"
+         ],
+         [
+          0.3333333333333333,
+          "#000014"
+         ],
+         [
+          0.4444444444444444,
+          "#000015"
+         ],
+         [
+          0.5555555555555556,
+          "#000016"
+         ],
+         [
+          0.6666666666666666,
+          "#000017"
+         ],
+         [
+          0.7777777777777778,
+          "#000018"
+         ],
+         [
+          0.8888888888888888,
+          "#000019"
+         ],
+         [
+          1.0,
+          "#000020"
+         ]
+        ]
+       },
+       "colorway": [
+        "#000001",
+        "#000002",
+        "#000003",
+        "#000004",
+        "#000005",
+        "#000006",
+        "#000007",
+        "#000008",
+        "#000009",
+        "#000010"
+       ]
+      }
+     },
+     "title": {
+      "font": {
+       "size": 14
+      },
+      "text": "<b>Factor Efficacy: Top vs. Bottom 10% Cohort Spread</b>"
+     },
+     "xaxis": {
+      "dtick": 1,
+      "griddash": "dash",
+      "hoverformat": "d",
+      "showgrid": true,
+      "tickformat": "d",
+      "title": {
+       "font": {
+        "size": 11
+       },
+       "text": "Year"
+      }
+     },
+     "yaxis": {
+      "griddash": "dash",
+      "showgrid": true,
+      "tickformat": ",.0f",
+      "tickprefix": "$",
+      "title": {
+       "font": {
+        "size": 11
+       },
+       "text": "Account Value (USD)"
+      }
+     }
+    }
+   }
+  ],
+  "selectbox": [
+   [
+    "Rebalance year",
+    [
+     "2002",
+     "2003",
+     "2004",
+     "2005",
+     "2006",
+     "2007",
+     "2008",
+     "2009",
+     "2010",
+     "2011",
+     "2012",
+     "2013",
+     "2014",
+     "2015",
+     "2016",
+     "2017",
+     "2018",
+     "2019",
+     "2020",
+     "2021",
+     "2022",
+     "2023"
+    ],
+    "2023"
+   ]
+  ],
+  "slider": [
+   [
+    "Cohort Percentage",
+    10
+   ]
+  ],
+  "subheader": [
+   "Performance Summary",
+   "Holdings and Ranks",
+   "Portfolio Growth Over Time",
+   "Year-by-Year Performance",
+   "Top vs Bottom Cohort Analysis"
+  ],
+  "success": [],
+  "table": [
+   "Metric,Top Cohort,Bottom Cohort\r\nTotal Return (%),603.35%,270.40%\r\nFinal Value ($),\"$7,034\",\"$3,704\"\r\nCAGR (%),8.85%,5.86%\r\n"
+  ],
+  "tabs": [
+   "Analysis",
+   "Results",
+   "Run 2: ROE using 9/30 Data +1",
+   "Run 1: ROE using 9/30 Data +1",
+   "Data Viewer",
+   "About"
+  ],
+  "warning": []
+ }
+}

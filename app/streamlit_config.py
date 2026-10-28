@@ -352,3 +352,15 @@ WRDS_FACTOR_GROUPS: List[str] = ['Momentum', 'Value', 'Profitability', 'Quality'
                                  'Growth', 'Risk', 'Analyst', 'Size']
 
 WRDS_FACTOR_OPTIONS: List[str] = list(WRDS_FACTOR_METADATA.keys())
+
+# How the holdings and ranked tables show each WRDS factor's raw value. The panel stores
+# decimals; like Legacy's "... %" columns, rates and returns are shown in percent
+# (x 100, header ending in " %"), market cap in $ millions, and other ratios as they are.
+WRDS_PERCENT_FACTORS = {
+    'mom_12_1', 'mom_12m', 'mom_6m', 'mom_1m', 'f_earnings_to_price', 'f_fcf_yield', 'f_dividend_yield',
+    'f_forward_ep', 'f_forward_ep_fy2', 'f_roe', 'f_roa', 'f_gross_profitability', 'f_accruals_to_assets',
+    'f_leverage', 'f_net_share_issuance', 'f_asset_growth_1yr', 'f_sales_growth_1yr', 'f_capex_growth_1yr',
+    'f_rd_to_sales', 'vol_close_12m', 'vol_close_6m', 'vol_close_3m', 'vol_gk_1m', 'f_analyst_surprise',
+    'f_eps_revision', 'f_ltg',
+}
+WRDS_MILLIONS_FACTORS = {'mkt_cap_musd'}
