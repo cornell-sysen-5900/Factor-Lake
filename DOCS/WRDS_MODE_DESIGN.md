@@ -276,7 +276,9 @@ The key is computed by the unchanged `job_hash(job, data_version, code_version)`
 | `backtest-results/<hash>.holdings.parquet` | WRDS backtest holdings, one row group per rebalance date (section 5.5) |
 
 - Both are under `backtest-results/`, so the existing 90-day lifecycle rule and the Lambda role's write permission already cover them.
-- The Parquet file is written **before** the JSON, so a cache hit (the JSON exists) always has its holdings.
+- The Parquet file is written **before** the JSON, so a cache hit (the JSON exists) normally has its holdings. A cached backtest whose holdings file is missing anyway (deleted by hand, or expired first) is computed again rather than shown without holdings. With the Lambda role's s3:ListBucket missing, S3 answers 403 for a missing file, which counts as missing too.
+- The result JSON's `holdings` entry is `{'file': 'backtest-results/<hash>.holdings.parquet', 'bytes', 'dates', 'rows'}`: the row groups' dates (rebalance dates on which something was bought) in order, and their row counts.
+- The WRDS code version hashes `WRDS_ENGINE_SOURCES` (`src/wrds_jobs.py`): the `wrds_*.py` modules plus the shared files they use (`backtest_jobs.py`, `performance_metrics.py`, `s3_client.py`). Legacy's `ENGINE_SOURCES` list is unchanged, so editing WRDS code never recomputes Legacy results.
 - Without holdings, a monthly result is a few hundred kilobytes, well inside the inline limit, so the S3-link path is rarely needed.
 
 ### 5.4 Saved IDs, old and new
@@ -294,7 +296,9 @@ Columns: `rebalance_date`, `rank`, `permno`, `ticker`, `name`, `sector`, `picked
 - A stock picked by several Mixing sleeves is one row, merged the way `_build_holdings_rows` merges them today.
 - The app renames the columns to Legacy's display headers (Rank, Ticker, Name, Sector, Picked By, Score, factor labels, Weight %, Shares, Buy Price, Dollar Value, Period Return %, Contribution %, Delisted) and adds PERMNO, because two securities can share a ticker on one date.
 
-When the user picks a date, the app reads the file's footer and that date's row group with ranged S3 GETs (the `RangedFile` approach in `scripts/s3_inspect.py`), and caches the table per (ID, date) with `st.cache_data`. Opening a result therefore downloads only the small JSON, and each date costs one small read. For a 3-factor monthly Mixing run, the prototype's holdings file was 9.0 MB as Parquet (the same rows are about 44 MB as JSON), and reading one date back took about 0.02 s locally.
+When the user picks a date, the app reads the file's footer and that date's row group with ranged S3 GETs (`src/wrds_holdings.read_holdings_date`): one GET of the last 64 KB (the footer, plus a second GET if the footer is bigger), then one GET of exactly that row group's bytes. It caches the table per (file, date) with `st.cache_data`.
+
+**The app reads with its own S3 keys, not a presigned link from Lambda.** The app already reads `backtest-results/` with its own keys to open saved analyses by ID. A presigned link expires (an hour today), so a shared ID opened later would need a new Lambda call just to get a fresh link. With its own keys, opening an ID and reading any date's holdings never calls Lambda, and nothing expires before the 90-day rule deletes the files. Opening a result therefore downloads only the small JSON, and each date costs one small read. For a 3-factor monthly Mixing run, the prototype's holdings file was 9.0 MB as Parquet (the same rows are about 44 MB as JSON), and reading one date back took about 0.02 s locally.
 
 ---
 
@@ -358,6 +362,21 @@ Lambda at 3008 MB gets about 2 vCPUs, and pandas mostly uses one core. We assume
 The tracking check passed (correlation at least 0.99, tracking error at most 3% a year; the values are printed, not stored). Peak memory is above the 0.8 GB estimate of 6.3, because the holdings table and its merges are built in memory, and still about a third of the function's 3008 MB.
 
 On Windows, repeated runs in one process get slower: after one engine run, even a plain numpy `argsort` benchmark in the same process is about 4 times slower, so the cause is the process's memory allocator, not the engine. Lambda runs Linux, and stage 6 measures warm repeats there.
+
+### 6.5 Measured in the dev Lambda (stage 4)
+
+The stage 4 code, deployed to the dev function `sysen5900-factor-lake-backtest-dev` (3008 MB, the course role), driven from the local app. The times are the Lambda REPORT lines, taken from the invocation log tail.
+
+| Job | Lambda duration | Max memory used | Result JSON | Holdings Parquet |
+|---|---|---|---|---|
+| Monthly Mixing, 3 factors, 2008-2026, cold container (init 2.6 s, plus the first WRDS data load) | 6.8 s | 1013 MB | 87 KB | 23.2 MB |
+| The same job again (cache hit) | 0.09 s | 1013 MB | 87 KB | |
+| Quarterly Mixing, 3 factors, warm | 1.1 s | 1013 MB | 30 KB | 7.3 MB |
+| Quarterly cohort, 10% (two backtests) | 1.4 s | 1013 MB | 4 KB | |
+| Ranked list, one date | 0.3 s | 1013 MB | 0.9 MB | |
+| Legacy backtest, warm | 2.3 s | 1013 MB | | |
+
+The package is 61.7 MB zipped and 199 MB unzipped (Lambda allows 250 MB). The holdings file is bigger than the 9 MB prototype in 6.2: it has more text columns (name, sector, picked_by), and 221 small row groups compress less well than one large one. That only affects storage: a date is still read with two small ranged GETs. The Legacy result from the dev function matched `main`'s code run locally on the same S3 data, within the 1e-9 relative tolerance of `scripts/check_backtest_lambda.py` (the largest difference was rounding in the last binary digit, Linux vs Windows).
 
 **Recommendation:** keep the function at 3008 MB and a 600 s timeout. The memory leaves plenty of headroom, and Lambda's CPU share grows with memory. Stage 6 replaces these estimates with real numbers from CloudWatch `REPORT` lines (Duration, Max Memory Used, Init Duration) for cold, warm and cached monthly runs, and records them in `DOCS/AWS_LAMBDA_BACKTESTS.md`.
 
@@ -479,7 +498,7 @@ All eleven questions from the stage 1 review are decided; see [Decisions](#decis
 | 1 | this design | `DOCS/WRDS_MODE_DESIGN.md` | |
 | 2 | mode switch and WRDS factor list | `src/wrds_factors.py`, `src/wrds_calendar.py`, `tests/unit/test_legacy_pinned.py` with `tests/fixtures/legacy_pinned_results.json`, `test_wrds_mode_switch.py`, `test_wrds_calendar.py`, `test_wrds_factors.py` | `app/components/sidebar.py`, `app/components/factor_selection.py`, `app/streamlit_config.py`, `app/streamlit_app.py` (WRDS Run shows a "coming in the next stage" note until stage 3); this design (decisions) |
 | 3 | WRDS engine (not deployed) | `src/wrds_data.py`, `src/wrds_engine.py` (metrics included; no separate `wrds_metrics.py`), `src/wrds_service.py` (runner), `scripts/check_wrds_engine.py`, `tests/unit/wrds_fixtures.py`, `test_wrds_engine.py`, `test_wrds_lookahead.py`, `test_wrds_service.py` | `src/performance_metrics.py` (`periods_per_year`), `src/s3_client.py` (`read_bytes`); the dispatch in `src/backtest_service.py` and `FACTOR_LAKE_WRDS_DIR` in the deploy script move to stage 4 |
-| 4 | jobs and cache | `src/wrds_jobs.py`, `src/wrds_service.py`, `test_wrds_jobs.py`, `test_wrds_service.py` | `src/lambda_client.py`, `app/streamlit_utils.py` |
+| 4 | jobs, cache, holdings, Lambda wiring (dev function only) | `src/wrds_jobs.py`, `src/wrds_holdings.py`, `app/components/wrds_results.py` (a first results view), `tests/fixtures/saved_main_*.json` (written by `main`'s code), `test_wrds_jobs.py`, `test_wrds_saved.py` | `src/wrds_service.py` (the cached service), `src/wrds_engine.py` (`rank_stocks`), `src/backtest_service.py` (routing, shared `_respond`), `src/backtest_jobs.py` (`code_version(sources=...)`), `src/saved_analyses.py` (message names the job kind), `app/streamlit_utils.py`, `app/streamlit_app.py`, `app/components/results_tab.py` (one dispatch), `scripts/deploy_backtest_lambda.py` (`--leave-lifecycle-rules`, `--wrds-dir`) |
 | 5 | feature parity | `app/components/wrds_results.py`, `app/wrds_holdings.py`, `test_wrds_saved.py` | `app/components/results_tab.py` (one dispatch), `app/streamlit_utils.py` (open, cohort), `src/saved_analyses.py` (message wording) |
 | 6 | validation and docs | | `scripts/check_backtest_lambda.py` (`--wrds`), `DOCS/AWS_LAMBDA_BACKTESTS.md`, `DOCS/FACTOR_LAKE_USER_GUIDE.md`, `README.md` |
 

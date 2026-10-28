@@ -72,8 +72,9 @@ def load_saved_analysis(text: Optional[str], manager: Optional[S3DataManager] = 
             "Run it again to get an ID you can share."
         )
     if job.get('kind') != 'backtest':
+        what = {'cohort': 'a cohort comparison', 'ranked': 'a ranked stock list'}.get(job.get('kind'), 'another job')
         raise SavedAnalysisError(
-            "This ID belongs to a cohort comparison, not an analysis. Share the ID shown with the analysis instead."
+            f"This ID belongs to {what}, not an analysis. Share the ID shown with the analysis instead."
         )
     metadata = response.get('Metadata') or {}
     return {

@@ -230,6 +230,9 @@ def run_cohort(run: Dict[str, Any], cohort_pct: float):
         (top values, bottom values, compute info or None for local runs)
     """
     from src.backtest_engine import run_cohort_comparison
+    if run.get('data_mode') == 'wrds':
+        result, info = _run_wrds_job(run, 'cohort', cohort_pct=cohort_pct)
+        return result['top'], result['bottom'], info
     if run.get('data') is not None:
         top, bottom = run_cohort_comparison(
             data=run['data'],
@@ -347,6 +350,94 @@ def run_backtest_logic(user_settings: Dict[str, Any],
     add_to_history(run)
     return run
 
+def _wrds_run_label(run_id: int, factor_labels: List[str], frequency: str) -> str:
+    from app.saved_runs import build_run_label
+    frequency_label = {'semiannual': 'semi-annual'}.get(frequency, frequency)
+    return f"{build_run_label(run_id, factor_labels)} (WRDS, {frequency_label})"
+
+
+def _run_wrds_job(run: Dict[str, Any], kind: str, cohort_pct: Optional[float] = None,
+                  rebalance_date: Optional[str] = None):
+    """Sends a cohort or ranked job for a WRDS run to the backtest Lambda. Returns (result, compute info)."""
+    from src.wrds_jobs import build_wrds_job
+    function_name = (run.get('compute') or {}).get('function_name') or get_backtest_lambda_name()
+    if not function_name:
+        raise RuntimeError(f"WRDS jobs run in AWS Lambda, and no Lambda is configured ({BACKTEST_LAMBDA_ENV}).")
+    job = build_wrds_job(kind, run['factors'], run['factor_directions'], run['settings'],
+                         factor_labels=dict(zip(run['factors'], run['factor_labels'])),
+                         cohort_pct=cohort_pct, rebalance_date=rebalance_date)
+    return get_lambda_client(function_name).run(job)
+
+
+def run_wrds_ranked(run: Dict[str, Any], rebalance_date: str):
+    """Every stock ranked on one rebalance date ('YYYY-MM') of a WRDS run, computed in Lambda. Returns (rows, info)."""
+    result, info = _run_wrds_job(run, 'ranked', rebalance_date=rebalance_date)
+    return pd.DataFrame(result['rows'], columns=result['columns']), info
+
+
+@st.cache_data(show_spinner=False, max_entries=64)
+def load_wrds_holdings(filename: str, row_group: int, date: str) -> pd.DataFrame:
+    """
+    One rebalance date of a WRDS run's holdings, read from S3 with the app's own keys
+    (two ranged GETs: footer and that date's row group). A saved file never changes, so
+    every session shares the cache.
+    """
+    from src.wrds_holdings import read_holdings_date
+    return read_holdings_date(get_results_store(), filename, row_group, date)
+
+
+def run_wrds_backtest_logic(user_settings: Dict[str, Any], factor_names: List[str],
+                            factor_dirs: Dict[str, str]) -> Optional[Dict[str, Any]]:
+    """
+    Sends a WRDS backtest to the backtest Lambda and saves the run like a Legacy Lambda
+    run (run['data'] is None), with data_mode 'wrds'.
+
+    Returns:
+        The saved run, or None if the run was rejected or failed (nothing is saved).
+    """
+    from src.wrds_jobs import build_wrds_job
+    from app.streamlit_config import MAX_SAVED_RUNS, WRDS_FACTOR_METADATA
+    from app.saved_runs import add_saved_run
+
+    factor_labels = [f for f in factor_names if f in WRDS_FACTOR_METADATA]
+    if not factor_labels:
+        st.warning("Select at least one factor before running the analysis.")
+        return None
+    if float(user_settings['initial_aum']) <= 0:
+        st.warning("Initial AUM must be greater than $0.")
+        return None
+
+    columns = [WRDS_FACTOR_METADATA[f]['column'] for f in factor_labels]
+    directions = {WRDS_FACTOR_METADATA[f]['column']: factor_dirs.get(f, 'top') for f in factor_labels}
+    try:
+        job = build_wrds_job('backtest', columns, directions, user_settings,
+                             factor_labels={WRDS_FACTOR_METADATA[f]['column']: f for f in factor_labels})
+        results, compute = get_lambda_client(get_backtest_lambda_name()).run(job)
+    except Exception as e:
+        st.error(f"Backtest Execution Error: {str(e)}")
+        return None
+
+    run_id = st.session_state.next_run_id
+    run = {
+        'id': run_id,
+        'label': _wrds_run_label(run_id, factor_labels, job['frequency']),
+        'data_mode': 'wrds',
+        'factor_labels': factor_labels,
+        'factors': columns,
+        'factor_directions': directions,
+        'settings': dict(user_settings),
+        'universe': _universe_filters(user_settings),
+        'data': None,
+        'results': results,
+        'compute': compute,
+        'cohort': None,
+    }
+    st.session_state.next_run_id = run_id + 1
+    st.session_state.saved_runs = add_saved_run(st.session_state.saved_runs, run, MAX_SAVED_RUNS)
+    add_to_history(run)
+    return run
+
+
 def add_to_history(run: Dict[str, Any]) -> None:
     """
     Records a run in this session's history (st.session_state.analysis_history). It
@@ -378,6 +469,30 @@ def open_saved_analysis(text: str) -> Dict[str, Any]:
     job = saved['job']
     factor_labels = [job['factor_labels'].get(f, f) for f in job['factors']]
     run_id = st.session_state.next_run_id
+    compute = {'hash': saved['id'], 'opened': True, 'cached': True,
+               'computed_at': saved['computed_at'], 'function_name': get_backtest_lambda_name()}
+    if job.get('data_mode') == 'wrds':
+        run = {
+            'id': run_id,
+            'label': f"{_wrds_run_label(run_id, factor_labels, job['frequency'])} (opened)",
+            'data_mode': 'wrds',
+            'factor_labels': factor_labels,
+            'factors': list(job['factors']),
+            'factor_directions': dict(job['factor_directions']),
+            'settings': {'data_mode': 'wrds', **{k: job[k] for k in (
+                'frequency', 'start_year', 'end_year', 'initial_aum', 'use_market_cap_weight',
+                'factor_combination', 'restrict_fossil_fuels', 'selected_sectors')}},
+            'universe': {'restrict_fossil_fuels': job['restrict_fossil_fuels'],
+                         'selected_sectors': list(job['selected_sectors'])},
+            'data': None,
+            'results': saved['result'],
+            'compute': compute,
+            'cohort': None,
+        }
+        st.session_state.next_run_id = run_id + 1
+        st.session_state.saved_runs = add_saved_run(st.session_state.saved_runs, run, MAX_SAVED_RUNS)
+        add_to_history(run)
+        return run
     run = {
         'id': run_id,
         'label': f"{build_run_label(run_id, factor_labels)} (opened)",

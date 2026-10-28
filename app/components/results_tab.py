@@ -101,6 +101,10 @@ def render_results_tab(run: Dict[str, Any]) -> None:
     if not results:
         st.warning("No backtest results found. Please execute the analysis.")
         return
+    if run.get('data_mode') == 'wrds':
+        from components.wrds_results import render_wrds_results
+        render_wrds_results(run)
+        return
     settings = run['settings']
 
     # 1. Header Information

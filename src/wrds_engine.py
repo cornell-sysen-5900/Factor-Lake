@@ -142,6 +142,54 @@ def select_positions(universe: pd.DataFrame, factors: List[str], factor_directio
     return positions[['date', 'sleeve', 'permno', 'rank', 'score', 'weight']]
 
 
+def _ranks(scores: pd.Series, permnos: pd.Series) -> pd.Series:
+    """1 for the highest score, ties broken by permno; NaN for stocks without a score."""
+    order = pd.DataFrame({'score': scores, 'permno': permnos})
+    order = order[order['score'].notna()].sort_values(['score', 'permno'], ascending=[False, True], kind='mergesort')
+    return pd.Series(np.arange(1, len(order) + 1, dtype=float), index=order.index).reindex(scores.index)
+
+
+def rank_stocks(data: WrdsData, date: pd.Timestamp, factors: List[str], factor_directions: Dict[str, str],
+                factor_combination: str = 'mixing', top_pct: float = 10.0, use_market_cap_weight: bool = False,
+                restrict_fossil_fuels: bool = False,
+                selected_sectors: Optional[Iterable[str]] = None) -> pd.DataFrame:
+    """
+    Every stock a backtest could buy on one rebalance date, ranked: its raw factor
+    values and z-scores (z_<column>), the composite score (mean z-score, only for stocks
+    with every factor) with its rank, each factor's own rank (rank_<column>, the Mixing
+    sleeves), and whether the strategy holds it and with what weight.
+    """
+    validate_inputs(factors, factor_directions, factor_combination, top_pct, selected_sectors)
+    columns = list(dict.fromkeys(['date', 'permno', 'ticker', 'security_name', 'sector_name', 'gsubind',
+                                  'siccd', 'prc', 'mkt_cap_musd'] + list(factors)))
+    panel = data.panel.loc[(data.panel['date'] == date).to_numpy(), columns]
+    if panel.empty:
+        raise ValueError(f"The WRDS panel has no rows on {date.date()}.")
+    universe = eligible_universe(panel, restrict_fossil_fuels, selected_sectors)
+
+    table = universe[['permno', 'ticker', 'security_name', 'sector_name', 'prc', 'mkt_cap_musd']].copy()
+    zscores = {}
+    for f in factors:
+        zscores[f] = factor_zscores(universe, f, factor_directions.get(f, 'top') == 'top')
+        table[f] = universe[f]
+        table[f'z_{f}'] = zscores[f]
+    z = pd.concat(zscores.values(), axis=1)
+    table['score'] = z.mean(axis=1).where(z.notna().all(axis=1))
+    table['rank'] = _ranks(table['score'], table['permno'])
+    if factor_combination == 'mixing':
+        for f in factors:
+            table[f'rank_{f}'] = _ranks(zscores[f], table['permno'])
+
+    held = select_positions(universe, factors, factor_directions, factor_combination, top_pct,
+                            use_market_cap_weight).groupby('permno')['weight'].sum()
+    table['held'] = table['permno'].isin(held.index)
+    table['weight'] = table['permno'].map(held).fillna(0.0)
+    table = table.rename(columns={'security_name': 'name', 'sector_name': 'sector', 'prc': 'price'})
+    for col in ('ticker', 'name', 'sector'):
+        table[col] = table[col].astype(object)
+    return table.sort_values(['rank', 'permno'], na_position='last').reset_index(drop=True)
+
+
 def _risk_free(data: WrdsData) -> Tuple[np.ndarray, np.ndarray]:
     """Monthly risk-free rate (Fama-French rf; a missing month is tbill_3m / 12) and which months were filled."""
     rf = data.market['rf'].to_numpy(dtype=float)

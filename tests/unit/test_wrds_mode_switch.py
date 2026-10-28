@@ -52,13 +52,18 @@ def at(monkeypatch):
 
 
 class FakeLambdaClient:
-    """Stands in for BacktestLambdaClient: records each job and runs Legacy jobs in-process."""
+    """
+    Stands in for BacktestLambdaClient: records each job and runs Legacy jobs in-process.
+    WRDS jobs are only recorded (test_wrds_saved.py runs them end to end).
+    """
 
     def __init__(self):
         self.jobs = []
 
     def run(self, job):
         self.jobs.append(job)
+        if job.get('data_mode') == 'wrds':
+            raise RuntimeError('WRDS jobs are not run by this fake')
         info = {'hash': 'a' * 64, 'cached': False, 'computed_at': None, 'compute_seconds': 0.1,
                 'size_bytes': 1, 'function_name': LAMBDA_NAME, 'delivery': 'inline',
                 'round_trip_seconds': 0.1}
@@ -231,16 +236,21 @@ def test_wrds_factor_list_grouped_with_names_tooltips_and_defaults(lambda_at):
     assert directions == {'Book/Price': HIGHER, '1-Month Return (Reversal)': LOWER, 'Market Cap': LOWER}
 
 
-def test_wrds_run_shows_a_note_and_sends_no_job(lambda_at):
+def test_wrds_run_sends_a_wrds_job_built_from_the_sidebar(lambda_at):
     at = lambda_at
     _switch(at, 'WRDS')
     assert _button(at, 'Run Portfolio Analysis').disabled          # no factor yet
-    _add(at, WRDS_FACTOR_METADATA, 'Book/Price')
+    _add(at, WRDS_FACTOR_METADATA, 'Book/Price', 'Market Cap')
     _button(at, 'Run Portfolio Analysis').click().run()
 
-    _assert_clean(at)
-    assert any('coming in the next stage' in i.value for i in at.info)
-    assert at.fake_lambda.jobs == []
+    (job,) = at.fake_lambda.jobs
+    assert job['kind'] == 'backtest' and job['data_mode'] == 'wrds'
+    assert (job['frequency'], job['start_year'], job['end_year'], job['top_pct']) == ('quarterly', 2008, 2026, 10.0)
+    assert job['factors'] == ['f_book_to_price', 'mkt_cap_musd']
+    assert job['factor_directions'] == {'f_book_to_price': 'top', 'mkt_cap_musd': 'bottom'}
+    assert job['factor_labels'] == {'f_book_to_price': 'Book/Price', 'mkt_cap_musd': 'Market Cap'}
+    # This fake refuses WRDS jobs: the error is shown and nothing is saved
+    assert any('WRDS jobs are not run by this fake' in e.value for e in at.error)
     assert at.session_state['saved_runs'] == []
 
 

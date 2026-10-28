@@ -1,34 +1,41 @@
 """
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: src/wrds_service.py
-PURPOSE: Runs WRDS backtests inside AWS Lambda on the WRDS data in S3.
-VERSION: 1.0.0
+PURPOSE: Runs WRDS backtest jobs inside AWS Lambda on the WRDS data in S3, with results cached in S3.
+VERSION: 2.0.0
 
-One runner lives for the life of a Lambda container, so warm invocations reuse the
-WRDS data already in memory. The job schema, the result cache and the dispatch from
-src/backtest_service.py come in stage 4 (DOCS/WRDS_MODE_DESIGN.md, section 5).
+src/backtest_service.py sends every job with data_mode 'wrds' here. For each job
+(src/wrds_jobs.py) the service:
+1. Hashes the job with the WRDS data version (the folder and the S3 ETags of the three
+   files the engine reads) and the WRDS code version.
+2. Returns the saved result for that hash when one exists. A saved backtest whose
+   holdings file is missing is computed again, never shown without its holdings.
+3. Otherwise runs the job and saves it: a backtest's holdings first, as
+   backtest-results/<hash>.holdings.parquet (one row group per rebalance date), then
+   the result JSON (backtest-results/<hash>.json), which lists the holdings' dates.
+   The result JSON therefore only exists once its holdings do.
 """
 
 import logging
 import time
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
 
+from .backtest_jobs import encode_saved, job_hash
+from .backtest_service import RESULTS_DIR, _error_code, _is_missing, result_file
 from .s3_client import S3DataManager
 from .wrds_data import WRDS_FILES, WrdsData, read_s3_wrds_data, wrds_dir
-from .wrds_engine import run_wrds_backtest
+from .wrds_engine import rank_stocks, run_wrds_backtest
+from .wrds_holdings import holdings_file, holdings_parquet
+from .wrds_jobs import describe_wrds_job, engine_arguments, validate_wrds_job, wrds_code_version
 
 logger = logging.getLogger(__name__)
 
-# Job keys the runner needs, and the defaults of the optional ones
-REQUIRED_JOB_KEYS = ('factors', 'factor_directions', 'frequency', 'start_year', 'end_year', 'initial_aum')
-JOB_DEFAULTS = {'top_pct': 10.0, 'use_market_cap_weight': False, 'factor_combination': 'mixing',
-                'restrict_fossil_fuels': False, 'selected_sectors': None, 'factor_labels': None}
-
 
 class WrdsBacktestRunner:
-    """Loads the WRDS data from S3 once per data version and runs WRDS backtests on it."""
+    """Loads the WRDS data from S3 once per data version and runs WRDS jobs on it."""
 
     def __init__(self, manager: Optional[S3DataManager] = None, data_dir: Optional[str] = None):
         self.manager = manager or S3DataManager()
@@ -57,19 +64,98 @@ class WrdsBacktestRunner:
             logger.info(f"Loaded the WRDS data ({self.data_dir}) in {time.perf_counter() - started:.1f} s")
         return self._data[1]
 
-    def run(self, job: Dict[str, Any]) -> Tuple[Dict[str, Any], pd.DataFrame]:
+    def run(self, job: Dict[str, Any], version: Optional[str] = None) -> Tuple[Dict[str, Any], Optional[pd.DataFrame]]:
         """
-        Runs a WRDS backtest job: the run_wrds_backtest arguments as a dict.
+        Runs a WRDS job (src/wrds_jobs.py) on the WRDS data.
 
         Returns:
-            (results, holdings) from run_wrds_backtest.
-
-        Raises:
-            ValueError: a missing key or an input the engine rejects.
+            backtest: (run_wrds_backtest results, holdings DataFrame).
+            cohort: ({'top', 'bottom': portfolio values, 'years', 'cohort_pct', 'top_cagr',
+                'bottom_cagr'}, None), the strategy at cohort_pct and its exact opposite.
+            ranked: ({'rebalance_date', 'columns', 'rows'}, None), every stock on that date
+                ranked (src/wrds_engine.rank_stocks).
         """
-        if missing := [k for k in REQUIRED_JOB_KEYS if k not in job]:
-            raise ValueError(f"The WRDS backtest request is missing {missing}.")
-        options = {k: job.get(k, default) for k, default in JOB_DEFAULTS.items()}
-        return run_wrds_backtest(
-            self.data(), list(job['factors']), dict(job['factor_directions']), job['frequency'],
-            int(job['start_year']), int(job['end_year']), float(job['initial_aum']), **options)
+        validate_wrds_job(job)
+        data = self.data(version)
+        factors, directions, options = engine_arguments(job)
+        if job['kind'] == 'backtest':
+            return run_wrds_backtest(data, factors, directions, **options)
+        if job['kind'] == 'cohort':
+            options['top_pct'] = job['cohort_pct']
+            top, _ = run_wrds_backtest(data, factors, directions, **options)
+            inverse = {f: 'bottom' if d == 'top' else 'top' for f, d in directions.items()}
+            bottom, _ = run_wrds_backtest(data, factors, inverse, **options)
+            return {'top': top['portfolio_values'], 'bottom': bottom['portfolio_values'], 'years': top['years'],
+                    'cohort_pct': job['cohort_pct'], 'top_cagr': top['cagr'], 'bottom_cagr': bottom['cagr']}, None
+        date = data.month_date(job['rebalance_date'])
+        table = rank_stocks(data, date, factors, directions, job['factor_combination'], job['top_pct'],
+                            job['use_market_cap_weight'], job['restrict_fossil_fuels'], job['selected_sectors'])
+        return {'rebalance_date': date.strftime('%Y-%m-%d'), 'columns': list(table.columns),
+                'rows': table.to_dict('records')}, None
+
+
+class WrdsBacktestService:
+    """
+    Runs and caches WRDS jobs. Created by BacktestService (one per Lambda container), so
+    it shares its S3 access, result cache, inline limit and response format.
+    """
+
+    def __init__(self, service, runner: Optional[WrdsBacktestRunner] = None):
+        self.service = service
+        self.manager = service.manager
+        self.runner = runner or WrdsBacktestRunner(self.manager)
+        self.code_version = wrds_code_version()
+
+    def run(self, job: Dict[str, Any]) -> Dict[str, Any]:
+        """The job's result, from the cache when possible (see the module docstring)."""
+        validate_wrds_job(job)
+        data_version = self.runner.data_version()
+        key = job_hash(job, data_version, self.code_version)
+        filename = result_file(key)
+
+        cached = self.service._read_cached(filename)
+        if cached is not None and job['kind'] == 'backtest' and not self._exists(holdings_file(RESULTS_DIR, key)):
+            logger.warning(f"Holdings of {key[:12]} are missing; computing the result again")
+            cached = None
+        if cached is not None:
+            body, info = cached
+            logger.info(f"Cache hit {key[:12]} for {describe_wrds_job(job)}")
+        else:
+            started = time.perf_counter()
+            result, holdings = self.runner.run(job, data_version)
+            if holdings is not None:
+                result['holdings'] = self._save_holdings(key, holdings)
+            info = {
+                'computed_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                'compute_seconds': f"{time.perf_counter() - started:.3f}",
+            }
+            body = encode_saved(job, result)   # with its job, so the hash alone can reopen it
+            self._put(filename, body, 'application/json', info)
+            logger.info(f"Computed {key[:12]} in {info['compute_seconds']} s ({len(body)} bytes) "
+                        f"for {describe_wrds_job(job)}")
+        return self.service._respond(key, filename, body, info, cached is not None, data_version,
+                                     self.code_version)
+
+    def _save_holdings(self, key: str, holdings: pd.DataFrame) -> Dict[str, Any]:
+        """Writes the holdings Parquet and returns what the result JSON says about it."""
+        body, layout = holdings_parquet(holdings)
+        filename = holdings_file(RESULTS_DIR, key)
+        self._put(filename, body, 'application/vnd.apache.parquet')
+        return {'file': filename, 'bytes': len(body), **layout}
+
+    def _put(self, filename: str, body: bytes, content_type: str, metadata: Optional[Dict[str, str]] = None) -> None:
+        self.manager.client.put_object(Bucket=self.manager.bucket, Key=self.manager.object_key(filename),
+                                       Body=body, ContentType=content_type, Metadata=metadata or {})
+
+    def _exists(self, filename: str) -> bool:
+        """
+        True when the object exists. Without s3:ListBucket, S3 answers 403 instead of 404
+        for a missing object, so that counts as missing too.
+        """
+        try:
+            self.manager.client.head_object(Bucket=self.manager.bucket, Key=self.manager.object_key(filename))
+            return True
+        except Exception as e:
+            if _is_missing(e) or _error_code(e) in ('AccessDenied', '403', 'Forbidden'):
+                return False
+            raise

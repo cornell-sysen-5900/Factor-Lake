@@ -137,11 +137,11 @@ def run_job(raw: pd.DataFrame, job: Dict[str, Any]) -> Dict[str, Any]:
     )
 
 
-def code_version(source_dir: Optional[Path] = None) -> str:
-    """Hash of the backtest source files (ENGINE_SOURCES)."""
+def code_version(source_dir: Optional[Path] = None, sources: Tuple[str, ...] = ENGINE_SOURCES) -> str:
+    """Hash of the backtest source files (ENGINE_SOURCES for Legacy; WRDS passes its own list)."""
     source_dir = source_dir or Path(__file__).resolve().parent
     digest = hashlib.sha256()
-    for name in ENGINE_SOURCES:
+    for name in sources:
         digest.update(name.encode())
         digest.update((source_dir / name).read_bytes())
     return digest.hexdigest()[:16]

@@ -8,6 +8,9 @@ Usage (from the project root, with AWS keys in .env or the environment):
     uv run python scripts/deploy_backtest_lambda.py              # deploy, then ping the function
     uv run python scripts/deploy_backtest_lambda.py --role-arn <arn>   # keys without IAM access
     uv run python scripts/deploy_backtest_lambda.py --package-only build/backtest_lambda.zip
+    # A separate dev function that leaves the bucket's lifecycle rules alone (only checks them):
+    uv run python scripts/deploy_backtest_lambda.py --function-name sysen5900-factor-lake-backtest-dev \
+        --role-arn <the course role's ARN> --leave-lifecycle-rules
 
 It is safe to run again: it updates what exists and creates what is missing.
 
@@ -46,6 +49,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from src.backtest_service import RESULT_RETENTION_DAYS, RESULTS_DIR  # noqa: E402
 from src.lambda_client import DEFAULT_FUNCTION_NAME  # noqa: E402
 from src.s3_client import DEFAULT_BUCKET, DEFAULT_PREFIX, DEFAULT_REGION  # noqa: E402
+from src.wrds_data import WRDS_DIR_ENV, wrds_dir  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -262,6 +266,43 @@ def set_result_expiry(s3, bucket: str, prefix: str, days: int) -> bool:
     return True
 
 
+def expiry_rule_covers(rules: List[Dict[str, Any]], prefix: str) -> bool:
+    """
+    True when an enabled lifecycle rule expires everything under <prefix>/backtest-results/:
+    the result JSON and the WRDS holdings Parquet files both live there.
+    """
+    results = f'{prefix}/{RESULTS_DIR}/'
+    for rule in rules:
+        rule_prefix = rule.get('Filter', {}).get('Prefix', rule.get('Prefix'))
+        if (rule.get('Status') == 'Enabled' and rule_prefix is not None and results.startswith(rule_prefix)
+                and rule.get('Expiration', {}).get('Days')):
+            return True
+    return False
+
+
+def check_result_expiry(s3, bucket: str, prefix: str) -> bool:
+    """Reads (never writes) the bucket's lifecycle rules and says whether saved results expire."""
+    from botocore.exceptions import ClientError
+    try:
+        rules = s3.get_bucket_lifecycle_configuration(Bucket=bucket)['Rules']
+    except ClientError as e:
+        code = e.response['Error']['Code']
+        if code == 'NoSuchLifecycleConfiguration':
+            rules = []
+        elif code in ('AccessDenied', 'AccessDeniedException'):
+            logger.warning(f"These keys may not read the lifecycle rules of s3://{bucket}; ask an AWS admin to "
+                           f"check that '{prefix}/{RESULTS_DIR}/' expires.")
+            return False
+        else:
+            raise
+    if expiry_rule_covers(rules, prefix):
+        logger.info(f"Lifecycle rules left as they are; s3://{bucket}/{prefix}/{RESULTS_DIR}/ (results and "
+                    f"holdings) expires.")
+        return True
+    logger.warning(f"No enabled lifecycle rule expires s3://{bucket}/{prefix}/{RESULTS_DIR}/.")
+    return False
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Deploy the Factor-Lake backtest Lambda.")
     parser.add_argument('--function-name', default=DEFAULT_FUNCTION_NAME)
@@ -275,6 +316,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument('--role-arn', help="Use this existing role and make no IAM calls (for keys without IAM access)")
     parser.add_argument('--print-role-policy', action='store_true',
                         help="Print the role an AWS admin needs to create, and exit")
+    parser.add_argument('--wrds-dir', default=wrds_dir(),
+                        help=f"Folder of the WRDS data under the prefix (default {wrds_dir()})")
+    parser.add_argument('--leave-lifecycle-rules', action='store_true',
+                        help="Do not write the bucket's lifecycle rules (e.g. for a dev function); only check "
+                             "that the result expiry rule exists")
     args = parser.parse_args(argv)
     prefix = args.prefix.strip('/')
 
@@ -316,8 +362,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     key = upload_package(s3, args.bucket, prefix, package)
     deploy_function(lam, args.function_name, role_arn, {'S3Bucket': args.bucket, 'S3Key': key},
                     args.memory, args.timeout,
-                    {'FACTOR_LAKE_S3_BUCKET': args.bucket, 'FACTOR_LAKE_S3_PREFIX': prefix})
-    expiry_set = set_result_expiry(s3, args.bucket, prefix, RESULT_RETENTION_DAYS)
+                    {'FACTOR_LAKE_S3_BUCKET': args.bucket, 'FACTOR_LAKE_S3_PREFIX': prefix,
+                     WRDS_DIR_ENV: args.wrds_dir.strip('/')})
+    if args.leave_lifecycle_rules:
+        expiry_set = check_result_expiry(s3, args.bucket, prefix)
+    else:
+        expiry_set = set_result_expiry(s3, args.bucket, prefix, RESULT_RETENTION_DAYS)
 
     response = lam.invoke(FunctionName=args.function_name, Payload=json.dumps({'action': 'ping'}).encode())
     reply = json.loads(response['Payload'].read())

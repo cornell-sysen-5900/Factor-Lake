@@ -58,10 +58,6 @@ MAIN_TABS_WIDGET_KEY = "main_tabs_bar"
 MAIN_TABS_VERSION_KEY = "main_tabs_bar_version"
 # Set after a successful run: the confirmation to show once the Results tab opens
 RUN_COMPLETE_KEY = "run_complete_message"
-# Shown instead of running a WRDS backtest until the WRDS engine is deployed (stage 3)
-WRDS_NOT_YET = ("WRDS backtests are coming in the next stage: the WRDS engine in AWS Lambda is not "
-                "deployed yet, so no job was sent.")
-
 
 def _main_tabs_widget_key() -> str:
     """The current widget key of the main tab bar (see MAIN_TABS_WIDGET_KEY)."""
@@ -112,13 +108,18 @@ def _render_legacy_run(user_settings, use_lambda, selected_factor_names, factor_
                 st.rerun()
 
 
-def _render_wrds_run(selected_factor_names) -> None:
+def _render_wrds_run(user_settings, selected_factor_names, factor_directions) -> None:
     """WRDS runs only in AWS Lambda, which reads the WRDS data from S3, so there is nothing to load."""
     st.caption("WRDS backtests run in AWS Lambda on the WRDS data in S3. "
                "No market data is loaded in the app.")
     if st.button("Run Portfolio Analysis", type="primary", width="stretch",
                  disabled=not selected_factor_names, key="run_wrds_analysis"):
-        st.info(WRDS_NOT_YET)
+        with st.spinner("Running the WRDS backtest in AWS Lambda..."):
+            run = utils.run_wrds_backtest_logic(user_settings, selected_factor_names, factor_directions)
+        if run is not None:
+            st.session_state[RUN_COMPLETE_KEY] = (f"Analysis complete. Saved as \"{run['label']}\" in the Results tab. "
+                                                  f"Result {utils.describe_compute(run['compute'])}.")
+            st.rerun()
 
 
 def main():
@@ -163,7 +164,7 @@ def main():
             selected_factor_names, factor_directions = render_factor_selection(data_mode)
 
             if data_mode == 'wrds':
-                _render_wrds_run(selected_factor_names)
+                _render_wrds_run(user_settings, selected_factor_names, factor_directions)
             else:
                 _render_legacy_run(user_settings, use_lambda, selected_factor_names, factor_directions)
 

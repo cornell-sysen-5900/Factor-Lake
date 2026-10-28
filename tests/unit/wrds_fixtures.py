@@ -5,13 +5,64 @@ values, built from scratch so no licensed data is needed.
 Month ends are the last business day of each month (like CRSP's last trading day), not
 calendar month ends. Tests change the frames and rebuild WrdsData from them.
 """
+import io
 from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 
-from src.wrds_data import MARKET_COLUMNS, PANEL_COLUMNS, RETURNS_COLUMNS, WrdsData
+from src.wrds_data import (DEFAULT_WRDS_DIR, MARKET_COLUMNS, MARKET_FILE, PANEL_COLUMNS, PANEL_FILE,
+                           RETURNS_COLUMNS, RETURNS_FILE, WrdsData)
 from src.wrds_factors import WRDS_FACTOR_COLUMNS, WRDS_SECTORS
+from tests.unit.test_backtest_lambda import FakeS3
+
+# WRDS sidebar settings the synthetic data covers (its months run 2009-11 to 2013-02)
+WRDS_SETTINGS = {'data_mode': 'wrds', 'frequency': 'quarterly', 'start_year': 2010, 'end_year': 2012,
+                 'initial_aum': 1000.0, 'use_market_cap_weight': False, 'factor_combination': 'mixing',
+                 'restrict_fossil_fuels': False, 'selected_sectors': None}
+
+
+class RangeS3(FakeS3):
+    """FakeS3 that also answers ranged GETs like S3 (Range and ContentRange) and records every GET."""
+
+    def __init__(self, can_list=True):
+        super().__init__(can_list)
+        self.gets = []   # (key, range or None)
+
+    def get_object(self, Bucket, Key, Range=None):
+        self.gets.append((Key, Range))
+        response = super().get_object(Bucket, Key)
+        if Range is None:
+            return response
+        body = response['Body'].read()
+        spec = Range.removeprefix('bytes=')
+        if spec.startswith('-'):
+            start, end = max(0, len(body) - int(spec[1:])), len(body) - 1
+        else:
+            first, last = spec.split('-')
+            start, end = int(first), min(int(last), len(body) - 1)
+        return {'Body': io.BytesIO(body[start:end + 1]), 'Metadata': response['Metadata'],
+                'ContentRange': f'bytes {start}-{end}/{len(body)}'}
+
+
+def wrds_file_bytes(frames: 'Frames') -> dict:
+    """The three WRDS files as Parquet bytes, with extra columns the loader must not read."""
+    panel = frames.panel.assign(ret_next_1m=0.5, delisted_next_month=False, security_extra='x')
+    returns = frames.returns.assign(ticker='T', prc=1.0)
+    market = frames.market.assign(month=frames.market['month_end'].dt.strftime('%Y-%m'), smb=0.0)
+    out = {}
+    for name, df in ((PANEL_FILE, panel), (RETURNS_FILE, returns), (MARKET_FILE, market)):
+        buffer = io.BytesIO()
+        df.to_parquet(buffer, index=False)
+        out[name] = buffer.getvalue()
+    return out
+
+
+def put_wrds_files(s3: FakeS3, frames: 'Frames', prefix: str = 'factor-lake-data',
+                   data_dir: str = DEFAULT_WRDS_DIR) -> None:
+    """Publishes the synthetic WRDS files to a fake S3, as scripts/upload_wrds.py publishes the real ones."""
+    for name, body in wrds_file_bytes(frames).items():
+        s3.objects[f'{prefix}/{data_dir}/{name}'] = (body, {})
 
 
 @dataclass
