@@ -29,7 +29,7 @@ import streamlit_css as css
 import streamlit_config as config
 
 import components.sidebar as sidebar
-from components.factor_selection import render_factor_selection
+from components.factor_selection import render_factor_selection, reset_factor_selection
 from components.results_tab import render_analysis_history, render_open_saved_analysis, render_saved_runs
 from components.data_viewer import render_data_viewer_tab, clear_viewer_data
 from components.about import render_about_tab
@@ -58,6 +58,9 @@ MAIN_TABS_WIDGET_KEY = "main_tabs_bar"
 MAIN_TABS_VERSION_KEY = "main_tabs_bar_version"
 # Set after a successful run: the confirmation to show once the Results tab opens
 RUN_COMPLETE_KEY = "run_complete_message"
+# Shown instead of running a WRDS backtest until the WRDS engine is deployed (stage 3)
+WRDS_NOT_YET = ("WRDS backtests are coming in the next stage: the WRDS engine in AWS Lambda is not "
+                "deployed yet, so no job was sent.")
 
 
 def _main_tabs_widget_key() -> str:
@@ -75,6 +78,47 @@ def _on_main_tab_change() -> None:
     """on_change callback: leaving the Data Viewer releases the table it loaded."""
     if st.session_state[_main_tabs_widget_key()] != "Data Viewer":
         clear_viewer_data()
+
+
+def _render_legacy_run(user_settings, use_lambda, selected_factor_names, factor_directions) -> None:
+    """Load Market Data and Run Portfolio Analysis for Legacy, exactly as before WRDS mode."""
+    # Step 1: Data Acquisition (with Lambda backtests, only the Data Viewer needs it)
+    if use_lambda:
+        st.caption("Backtests run in AWS Lambda, which reads the market data from S3. "
+                   "Load Market Data is only needed for the Data Viewer.")
+    if st.button("Load Market Data", type="secondary" if use_lambda else "primary",
+                 width="stretch", disabled=not selected_factor_names):
+        with st.spinner("Accessing cloud database..."):
+            utils.load_and_process_data(user_settings)
+
+    # Step 2: Execution
+    if use_lambda or st.session_state.get('data_loaded', False):
+        if st.button("Run Portfolio Analysis", type="primary", width="stretch",
+                     disabled=not selected_factor_names):
+            spinner = ("Running the backtest in AWS Lambda..." if use_lambda
+                       else "Executing backtest simulation...")
+            with st.spinner(spinner):
+                run = utils.run_backtest_logic(
+                    user_settings,
+                    selected_factor_names,
+                    factor_directions
+                )
+
+            if run is not None:
+                message = f"Analysis complete. Saved as \"{run['label']}\" in the Results tab."
+                if run.get('compute'):
+                    message += f" Result {utils.describe_compute(run['compute'])}."
+                st.session_state[RUN_COMPLETE_KEY] = message
+                st.rerun()
+
+
+def _render_wrds_run(selected_factor_names) -> None:
+    """WRDS runs only in AWS Lambda, which reads the WRDS data from S3, so there is nothing to load."""
+    st.caption("WRDS backtests run in AWS Lambda on the WRDS data in S3. "
+               "No market data is loaded in the app.")
+    if st.button("Run Portfolio Analysis", type="primary", width="stretch",
+                 disabled=not selected_factor_names, key="run_wrds_analysis"):
+        st.info(WRDS_NOT_YET)
 
 
 def main():
@@ -97,8 +141,11 @@ def main():
     
     # Render Global Sidebar and capture configuration
     user_settings = sidebar.render_sidebar(config.SECTOR_OPTIONS, utils.describe_data_source(),
-                                           utils.get_backtest_lambda_name())
+                                           utils.get_backtest_lambda_name(),
+                                           on_data_mode_change=reset_factor_selection)
     use_lambda = utils.lambda_backtests_enabled(user_settings)
+    # Legacy settings have no data_mode key
+    data_mode = user_settings.get('data_mode', 'legacy')
 
     # A finished run opens the Results tab. The active tab can only be set
     # before st.tabs is drawn, so the run requests it and reruns (see below).
@@ -113,36 +160,12 @@ def main():
     if tab_analysis.open:
         with tab_analysis:
             # Configuration phase: Capture factors and directions
-            selected_factor_names, factor_directions = render_factor_selection()
+            selected_factor_names, factor_directions = render_factor_selection(data_mode)
 
-            # Step 1: Data Acquisition (with Lambda backtests, only the Data Viewer needs it)
-            if use_lambda:
-                st.caption("Backtests run in AWS Lambda, which reads the market data from S3. "
-                           "Load Market Data is only needed for the Data Viewer.")
-            if st.button("Load Market Data", type="secondary" if use_lambda else "primary",
-                         width="stretch", disabled=not selected_factor_names):
-                with st.spinner("Accessing cloud database..."):
-                    utils.load_and_process_data(user_settings)
-
-            # Step 2: Execution
-            if use_lambda or st.session_state.get('data_loaded', False):
-                if st.button("Run Portfolio Analysis", type="primary", width="stretch",
-                             disabled=not selected_factor_names):
-                    spinner = ("Running the backtest in AWS Lambda..." if use_lambda
-                               else "Executing backtest simulation...")
-                    with st.spinner(spinner):
-                        run = utils.run_backtest_logic(
-                            user_settings,
-                            selected_factor_names,
-                            factor_directions
-                        )
-
-                    if run is not None:
-                        message = f"Analysis complete. Saved as \"{run['label']}\" in the Results tab."
-                        if run.get('compute'):
-                            message += f" Result {utils.describe_compute(run['compute'])}."
-                        st.session_state[RUN_COMPLETE_KEY] = message
-                        st.rerun()
+            if data_mode == 'wrds':
+                _render_wrds_run(selected_factor_names)
+            else:
+                _render_legacy_run(user_settings, use_lambda, selected_factor_names, factor_directions)
 
     if tab_results.open:
         with tab_results:

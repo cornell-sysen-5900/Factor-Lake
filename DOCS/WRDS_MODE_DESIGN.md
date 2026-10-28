@@ -1,6 +1,6 @@
 # WRDS mode: design
 
-Status: design (stage 1 of 6), branch `feature/wrds-mode`. No feature code yet.
+Status: design approved (stage 1 of 6), branch `feature/wrds-mode`. The review's decisions are in [Decisions](#decisions) and are worked into the sections below.
 
 WRDS mode is a second data source next to today's data (called **Legacy** below). It backtests on the point-in-time WRDS panel (`pipeline/DATA_DICTIONARY.md`) with semi-annual, quarterly or monthly rebalancing, and it runs **only in AWS Lambda**: the app sends the job and shows the result. Legacy keeps working exactly as it does today.
 
@@ -18,6 +18,25 @@ Contents:
 10. [Stages and files](#10-stages-and-files)
 
 A rule for this document and the code that follows: the WRDS data is licensed, so **no statistics of the data** (row counts, coverage, returns) go into the repo (see `pipeline/README.md`). The measurements in section 6 are file sizes, memory and run times only.
+
+## Decisions
+
+Decided in the stage 1 review:
+
+| # | Question | Decision | Where |
+|---|---|---|---|
+| 1 | Delisting during a quarter or half year | The money is held as cash earning the risk-free rate until the next rebalance | 3.3 |
+| 2 | Ranked stocks | A new `ranked` job that ranks every stock on one rebalance date at a time | 5.1, 8 |
+| 3 | Fossil fuel filter | Keep the Legacy mapping (the GICS and SIC codes in 2.3; Oil & Gas Storage & Transportation is not excluded) | 2.3 |
+| 4 | Default directions where research is mixed | Lower is better for all of them. The 1-month factor is named "1-Month Return (Reversal)". Every tooltip that defaults to Lower says why in one short sentence | 2.1 |
+| 5 | Unclassified stocks | Left out when the sector filter is on | 2.2 |
+| 6 | Today's GICS codes for the sector filter | Accepted, documented as a limitation | 2.2, R3 |
+| 7 | Defaults | Quarterly, 2008-2026 | 8 |
+| 8 | Missing return without a delisting | 0% for that month; the result reports how many stock-months that was | 3.3 |
+| 9 | ETF total-return benchmarks | Accepted, labelled for example "IWM (ETF, total return)" | 4.1 |
+| 10 | Missing risk-free month | Filled with `tbill_3m / 12`, and the filled months are flagged in the result | 4.1 |
+| 11 | Top % | Fixed at 10%, as in Legacy | 5.1 |
+| - | Legacy invariant (correction) | Legacy **results** must not change; its code version and cache keys may. Routing WRDS jobs may edit a file in `ENGINE_SOURCES` (for example `backtest_jobs.py`) | 1.2 |
 
 ---
 
@@ -39,15 +58,15 @@ A rule for this document and the code that follows: the WRDS data is licensed, s
 | Saved IDs | `backtest-results/<hash>.json` | the same file layout, plus `<hash>.holdings.parquet` | the saved job's `data_mode` |
 | Data Viewer | Legacy data | stays Legacy | not split |
 
-### 1.2 How Legacy stays byte-for-byte unchanged
+### 1.2 How Legacy results stay unchanged
 
-A Legacy result is decided by its job, the data version and the code version (`job_hash` in `src/backtest_jobs.py`). Each of the three is kept identical:
+The invariant is that **Legacy results do not change**. Legacy's code version and cache keys may change: editing a file in `ENGINE_SOURCES` (for example `backtest_jobs.py`, to route WRDS jobs) changes the code version, so Legacy results are computed once more under new keys, with the same numbers. Old Legacy analysis IDs still open, because opening reads the saved file by its ID and never recomputes it (5.4).
 
-1. **Code version.** `code_version()` hashes the files in `ENGINE_SOURCES`. **No file in `ENGINE_SOURCES` is edited by this feature** (`backtest_engine.py`, `backtest_jobs.py`, `benchmarks.py`, `data_standardization.py`, `factor_registry.py`, `factor_utils.py`, `performance_metrics.py`, `portfolio.py`, `portfolio_filters.py`, `s3_client.py`, `universe_selection.py`). WRDS code lives in new `src/wrds_*.py` modules that may import these files but never change them. The Legacy code version on `main` today is `ddae4e751a197e7a`; a new test pins it (stage 2).
-2. **Job.** Legacy jobs are still built by the unchanged `build_job`, which reads only the keys it knows, so the new `settings['data_mode']` never reaches a Legacy job. A Legacy job has no `data_mode` key, so its JSON, and therefore its hash, is the same as today. A test pins the hash of a fixed Legacy job with a fixed data version.
-3. **Data version.** Legacy's data version stays the ETags of the two Legacy files. The WRDS data sits in its own folder (`factor-lake-data/wrds_2026_10/`), so publishing it changes nothing Legacy reads.
-4. **Local Legacy runs.** `run_backtest_logic`'s Legacy body, `load_and_process_data` and `select_universe` are not edited. The WRDS branch returns before the Legacy code.
-5. **Files that do change** are outside `ENGINE_SOURCES`, so their edits cannot move a Legacy cache key: `src/backtest_service.py` (dispatch), `src/lambda_client.py` (decode WRDS kinds), `app/*` (UI), `scripts/deploy_backtest_lambda.py` (WRDS folder setting). Each edit adds a branch for WRDS and leaves the Legacy lines as they are.
+1. **Engine.** The Legacy engine (`backtest_engine.py`, `benchmarks.py`, `performance_metrics.py`, `universe_selection.py`, ...) is not edited. WRDS code lives in new `src/wrds_*.py` modules that may import Legacy files but do not change them. Files that only route jobs, such as `backtest_jobs.py`, may get a WRDS branch.
+2. **Job.** Legacy jobs are still built by `build_job`, which reads only the keys it knows. The sidebar's Legacy settings are exactly as on `main` (no `data_mode` key), and a Legacy job never has a `data_mode` key.
+3. **Data.** Legacy reads the same two files. The WRDS data sits in its own folder (`factor-lake-data/wrds_2026_10/`), so publishing it changes nothing Legacy reads.
+4. **Local Legacy runs.** `run_backtest_logic`'s Legacy body, `load_and_process_data` and `select_universe` are not edited. The WRDS branch is decided before the Legacy code runs.
+5. **Pinned results.** `tests/unit/test_legacy_pinned.py` runs fixed Legacy jobs (Mixing and Integrating, all three delisting strategies, equal and cap weight, a sector filter, a cohort comparison) through `build_job` and `run_job`. It compares the whole result, holdings included, with `tests/fixtures/legacy_pinned_results.json`, which was captured from `main` (c063100) before any WRDS code existed.
 6. **Tests.** Every existing test passes without being edited. New behaviour gets new test files. If an existing app test has to change because the sidebar gained a widget, that is a sign the Legacy path changed, and the change is reviewed as such.
 
 ---
@@ -63,7 +82,7 @@ Every factor is a column of `factor_panel_monthly.parquet` whose value at month 
 | Momentum | `mom_12_1` | 12-1 Mo Momentum | Higher | Return over the past 12 months, skipping the most recent month. |
 | Momentum | `mom_12m` | 12-Mo Momentum | Higher | Return over the past 252 trading days. |
 | Momentum | `mom_6m` | 6-Mo Momentum | Higher | Return over the past 126 trading days. |
-| Momentum | `mom_1m` | 1-Mo Return | Lower | Return over the past 21 trading days. Recent losers tend to bounce back (short-term reversal). |
+| Momentum | `mom_1m` | 1-Month Return (Reversal) | Lower | Return over the past 21 trading days. Lower is better: last month's losers tend to rebound the next month. |
 | Value | `f_book_to_price` | Book/Price | Higher | Book equity divided by the company's market cap today. |
 | Value | `f_earnings_to_price` | Earnings/Price | Higher | Trailing 12-month earnings divided by market cap. |
 | Value | `f_sales_to_price` | Sales/Price | Higher | Trailing 12-month revenue divided by market cap. |
@@ -80,26 +99,26 @@ Every factor is a column of `factor_panel_monthly.parquet` whose value at month 
 | Profitability | `f_roe` | ROE | Higher | Trailing 12-month net income divided by book equity. |
 | Profitability | `f_roa` | ROA | Higher | Trailing 12-month net income divided by total assets. |
 | Profitability | `f_gross_profitability` | Gross Profitability | Higher | Revenue minus cost of goods sold (trailing 12 months), divided by total assets. |
-| Quality | `f_accruals_to_assets` | Accruals/Assets | Lower | Net income minus operating cash flow, over total assets. Lower means more cash-backed earnings. |
-| Quality | `f_leverage` | Debt/Assets | Lower | Total debt divided by total assets. |
+| Quality | `f_accruals_to_assets` | Accruals/Assets | Lower | Net income minus operating cash flow, over total assets. Lower is better: earnings backed by cash tend to last. |
+| Quality | `f_leverage` | Debt/Assets | Lower | Total debt divided by total assets. Lower is better: less debt means less risk of financial distress. |
 | Quality | `f_current_ratio` | Current Ratio | Higher | Current assets divided by current liabilities. |
-| Quality | `f_net_share_issuance` | Net Share Issuance | Lower | Change in split-adjusted shares outstanding over the past year. |
-| Growth | `f_asset_growth_1yr` | 1-Yr Asset Growth | Lower | Total assets vs four quarters earlier. Fast-growing firms tend to underperform. |
+| Quality | `f_net_share_issuance` | Net Share Issuance | Lower | Change in split-adjusted shares outstanding over the past year. Lower is better: companies that issue shares tend to trail those that buy them back. |
+| Growth | `f_asset_growth_1yr` | 1-Yr Asset Growth | Lower | Total assets vs four quarters earlier. Lower is better: fast-growing companies tend to underperform. |
 | Growth | `f_sales_growth_1yr` | 1-Yr Sales Growth | Higher | Trailing 12-month revenue vs a year earlier. |
-| Growth | `f_capex_growth_1yr` | 1-Yr CapEx Growth | Lower | Trailing 12-month capex vs a year earlier. |
+| Growth | `f_capex_growth_1yr` | 1-Yr CapEx Growth | Lower | Trailing 12-month capex vs a year earlier. Lower is better: companies that ramp up investment tend to underperform. |
 | Growth | `f_rd_to_sales` | R&D/Sales | Higher | Trailing 12-month R&D divided by revenue. |
-| Risk | `vol_close_12m` | 12-Mo Volatility | Lower | Annualized volatility of daily returns over the past year. |
-| Risk | `vol_close_6m` | 6-Mo Volatility | Lower | Annualized volatility of daily returns over the past 6 months. |
-| Risk | `vol_close_3m` | 3-Mo Volatility | Lower | Annualized volatility of daily returns over the past 3 months. |
-| Risk | `vol_gk_1m` | 1-Mo Volatility (High-Low) | Lower | Garman-Klass volatility from daily open, high, low and close over the past month, annualized. |
-| Risk | `beta_252d` | Beta (1-Yr Daily) | Lower | Market beta from daily excess returns over the past year. |
-| Risk | `beta_60m` | Beta (5-Yr Monthly) | Lower | Market beta from monthly excess returns over the past 5 years. |
+| Risk | `vol_close_12m` | 12-Mo Volatility | Lower | Annualized volatility of daily returns over the past year. Lower is better: calmer stocks have earned as much with less risk. |
+| Risk | `vol_close_6m` | 6-Mo Volatility | Lower | Annualized volatility of daily returns over the past 6 months. Lower is better: calmer stocks have earned as much with less risk. |
+| Risk | `vol_close_3m` | 3-Mo Volatility | Lower | Annualized volatility of daily returns over the past 3 months. Lower is better: calmer stocks have earned as much with less risk. |
+| Risk | `vol_gk_1m` | 1-Mo Volatility (High-Low) | Lower | Garman-Klass volatility from daily open, high, low and close over the past month, annualized. Lower is better: calmer stocks have earned as much with less risk. |
+| Risk | `beta_252d` | Beta (1-Yr Daily) | Lower | Market beta from daily excess returns over the past year. Lower is better: low-beta stocks have earned more than their risk suggests. |
+| Risk | `beta_60m` | Beta (5-Yr Monthly) | Lower | Market beta from monthly excess returns over the past 5 years. Lower is better: low-beta stocks have earned more than their risk suggests. |
 | Analyst | `f_sue` | Earnings Surprise (SUE) | Higher | Change in quarterly EPS vs a year earlier, scaled by its past volatility. |
 | Analyst | `f_analyst_surprise` | Analyst EPS Surprise | Higher | Latest reported EPS minus the consensus before it, over price. |
 | Analyst | `f_eps_revision` | EPS Revisions | Higher | Analysts revising this year's EPS up minus those revising down, over the number of analysts. |
-| Analyst | `f_eps_dispersion` | Analyst Disagreement | Lower | Spread of analysts' EPS estimates relative to their mean. |
-| Analyst | `f_ltg` | Long-Term Growth Forecast | Lower | Analysts' long-term EPS growth forecast. Optimistic forecasts tend to disappoint. |
-| Size | `mkt_cap_musd` | Market Cap | Lower | Market value of the listed shares. Smaller companies have historically earned more. |
+| Analyst | `f_eps_dispersion` | Analyst Disagreement | Lower | Spread of analysts' EPS estimates relative to their mean. Lower is better: stocks analysts disagree on tend to underperform. |
+| Analyst | `f_ltg` | Long-Term Growth Forecast | Lower | Analysts' long-term EPS growth forecast. Lower is better: the most optimistic forecasts tend to disappoint. |
+| Size | `mkt_cap_musd` | Market Cap | Lower | Market value of the listed shares. Lower is better: smaller companies have historically earned more. |
 
 Left out on purpose:
 
@@ -119,13 +138,13 @@ The factor picker today lays out one column per group, so eight groups need two 
 
 The sector filter offers the 11 GICS sectors, using the panel's `sector_name` column (GICS, with the SIC fallback from the data dictionary): Communication Services, Consumer Discretionary, Consumer Staples, Energy, Financials, Health Care, Industrials, Information Technology, Materials, Real Estate, Utilities.
 
-`sector_name` also has the value `Unclassified`, for stocks with neither GICS nor a mapped SIC code. These stocks are in the universe when the sector filter is off. They are not offered in the list, so turning the filter on leaves them out (open question 5).
+`sector_name` also has the value `Unclassified`, for stocks with neither GICS nor a mapped SIC code. These stocks are in the universe when the sector filter is off. They are not offered in the list, so turning the filter on leaves them out (decision 5).
 
-The panel's GICS code is the current classification, not the historical one (data dictionary), so the sector filter is the one input that is not strictly point in time (risk R3).
+**Limitation (decision 6):** the panel's GICS code is today's classification, not the historical one (data dictionary), so the sector filter is the one input that is not strictly point in time. A stock that moved sectors is filtered by its current sector for its whole history. The sector list's tooltip says so (risk R3).
 
 ### 2.3 Fossil fuel filter
 
-Legacy excludes five FactSet industries. WRDS mode excludes the matching GICS sub-industries (`gsubind`): 10101010 Oil & Gas Drilling, 10101020 Oil & Gas Equipment & Services, 10102010 Integrated Oil & Gas, 10102020 Oil & Gas Exploration & Production, 10102030 Oil & Gas Refining & Marketing, 10102050 Coal & Consumable Fuels. Where GICS is missing, it excludes SIC 1221, 1222, 1231 (coal), 1311 (crude oil and gas), 1381, 1382, 1389 (oil and gas field services) and 2911 (refining). 10102040 Oil & Gas Storage & Transportation is not in Legacy's list and is kept (open question 3).
+Legacy excludes five FactSet industries. WRDS mode excludes the matching GICS sub-industries (`gsubind`): 10101010 Oil & Gas Drilling, 10101020 Oil & Gas Equipment & Services, 10102010 Integrated Oil & Gas, 10102020 Oil & Gas Exploration & Production, 10102030 Oil & Gas Refining & Marketing, 10102050 Coal & Consumable Fuels. Where GICS is missing, it excludes SIC 1221, 1222, 1231 (coal), 1311 (crude oil and gas), 1381, 1382, 1389 (oil and gas field services) and 2911 (refining). This keeps Legacy's mapping (decision 3): 10102040 Oil & Gas Storage & Transportation is not in Legacy's list, so it is kept.
 
 ---
 
@@ -169,8 +188,8 @@ At each rebalance date t:
 3. **Factors.** Only allowlisted columns (section 2.1), and only their values at t. The pipeline guarantees these were public by t (Compustat report date, IBES statistics date, announcement date). Z-scores use only the stocks at t.
 4. **Weights.** Market-cap weights use `mkt_cap_musd` at t.
 5. **Returns start after t.** A position bought at the close on t earns the stock's monthly returns for the months after t, up to and including the next rebalance date t'. These are `ret_next_1m` at t for one month, or `ret_m` from `returns_monthly.parquet` for each month in (t, t'] for longer periods. `returns_monthly` keeps a stock's rows after it leaves the index, so a stock that drops out mid-period is still held to t'.
-6. **Delisting.** CRSP's delisting return is included in the delisting month's `ret_m`. A stock has no rows after it delists. For the rest of the period, its money is held as cash earning the risk-free rate (open question 1), and the position is marked Delisted.
-7. **Missing return.** If a held stock has no return for a month and has not delisted (it stopped trading, or CRSP has no price), that month counts as 0% and the position is still held. The result counts these months (`missing_return_months`).
+6. **Delisting.** CRSP's delisting return is included in the delisting month's `ret_m`. A stock has no rows after it delists. For the rest of the period, its money is held as cash earning the risk-free rate until the next rebalance (decision 1), and the position is marked Delisted.
+7. **Missing return.** If a held stock has no return for a month and has not delisted (it stopped trading, or CRSP has no price), that month counts as 0% and the position is still held. The result reports how many stock-months that was (`missing_return_stock_months`; decision 8).
 8. **Benchmarks** compound over the same months (t, t'] (section 4).
 
 Section 9.1 lists the tests for these rules.
@@ -185,13 +204,13 @@ All benchmarks come from `market_monthly.parquet`, compounded over each holding 
 
 | Role | Column | Shown as |
 |---|---|---|
-| Benchmark | `iwm_total_ret` | Russell 2000 (IWM) |
-| Value | `iwn_total_ret` | Russell 2000 Value (IWN) |
-| Growth | `iwo_total_ret` | Russell 2000 Growth (IWO) |
+| Benchmark | `iwm_total_ret` | IWM (ETF, total return) |
+| Value | `iwn_total_ret` | IWN (ETF, total return) |
+| Growth | `iwo_total_ret` | IWO (ETF, total return) |
 | Risk-free | `rf` | Fama-French one-month T-bill |
 
 - These are ETF total returns (dividends in, fund fees out). Legacy uses index returns, so the two modes' benchmarks are not the same numbers.
-- The Fama-French `rf` is published a few weeks late, so the newest month can be missing. A missing month is filled with that month end's 3-month T-bill yield converted to a monthly rate, `(1 + tbill_3m) ** (1/12) - 1`, and the result lists the filled months (`rf_filled_months`).
+- The Fama-French `rf` is published a few weeks late, so the newest month can be missing. A missing month is filled with that month end's 3-month T-bill yield divided by 12, `tbill_3m / 12`, and the result flags the filled months (`rf_filled_months`; decision 10).
 - `benchmark_index` is not part of a WRDS job: the benchmark is always IWM.
 
 ### 4.2 Metrics
@@ -231,7 +250,7 @@ A WRDS job is plain JSON like a Legacy job, built by `build_wrds_job` and checke
 | `frequency` | `semiannual`, `quarterly`, `monthly` | |
 | `start_year`, `end_year` | 2008-2026 | section 3.2 |
 | `initial_aum` | > 0 | |
-| `top_pct` | 10.0 | fixed, as in Legacy (open question 11) |
+| `top_pct` | 10.0 | fixed, as in Legacy (decision 11) |
 | `use_market_cap_weight` | bool | |
 | `factor_combination` | `mixing`, `integrating` | |
 | `restrict_fossil_fuels` | bool | section 2.3 |
@@ -376,7 +395,7 @@ for Mixing and Integrating, equal and cap weight, mixed directions, and `top_pct
 | Results header | Data source WRDS, frequency, the real first rebalance date and last period end, number of rebalances, "Delisting returns included (CRSP)", how it was computed, and the Analysis ID. |
 | Summary | Final value, total return, CAGR over calendar years (n / k), cumulative outperformance vs IWM. |
 | Holdings and Ranks | A rebalance-date selector (newest first by default, remembered per run as today), loaded from the holdings Parquet (section 5.5), with the period return caption ("2026-06-30 to 2026-07-31") and a CSV download. |
-| Ranked stocks | Under the holdings table, **Show all ranked stocks on this date** sends a `ranked` job for that date. It returns every buyable stock with each factor's raw value and z-score, the composite score and rank, each stock's rank within each Mixing sleeve, and a Held flag. Cached by hash; CSV download (open question 2). |
+| Ranked stocks | Under the holdings table, **Show all ranked stocks on this date** sends a `ranked` job for that date. It returns every buyable stock with each factor's raw value and z-score, the composite score and rank, each stock's rank within each Mixing sleeve, and a Held flag. One rebalance date per job (decision 2). Cached by hash; CSV download. |
 | Growth plot | x axis = period end dates (thinned tick labels for monthly). |
 | Performance table | One row per period, with a **By calendar year** switch that shows calendar-year returns. |
 | Cohort | Generate Comparison sends a WRDS `cohort` job (same frequency, dates and filters). CAGR uses calendar years, not the number of periods (the old sub-annual branch had this bug). |
@@ -396,15 +415,16 @@ for Mixing and Integrating, equal and cap weight, mixed directions, and `top_pct
 
 | File | Checks |
 |---|---|
-| `test_legacy_freeze.py` | Legacy `code_version()` is still `ddae4e751a197e7a`; a fixed Legacy job's hash is unchanged; `build_job` ignores `data_mode`; Legacy sidebar settings have the same keys and defaults as today, plus `data_mode` |
-| `test_wrds_calendar.py` | the rebalance dates in the section 3.2 table for each frequency; data bounds; `start == end`; out-of-range years rejected; trading-day dates used, not calendar month ends |
+| `test_legacy_pinned.py` | fixed Legacy jobs give exactly the results they gave on `main` (section 1.2) |
+| `test_wrds_calendar.py` | the rebalance dates in the section 3.2 table for each frequency; data bounds; `start == end`; out-of-range years rejected; trading-day dates used, not calendar month ends (stage 3, when dates come from the panel) |
+| `test_wrds_factors.py` | the app's factor list and the Lambda allowlist match; keys, groups and tooltips; every Lower default says why; the 11 GICS sectors |
 | `test_wrds_lookahead.py` | changing any row dated after t leaves the holdings at t unchanged; changing returns changes returns only, never the selection; non-allowlisted columns (`ret_next_1m`, `delisted_next_month`, ...) are rejected as factors; a stock that joins later is never held earlier; a stock that leaves mid-period is held to t' with `returns_monthly` returns; a period's return uses exactly the months in (t, t'] |
 | `test_wrds_engine_matches_legacy.py` | section 7.3 |
 | `test_wrds_engine.py` | Mixing and Integrating, equal and cap weight, sectors, fossil fuel GICS and SIC codes, delisting mid-period then cash at rf, missing-return month at 0%, `permno` tie-break, at least one stock, duplicate tickers on one date |
 | `test_wrds_metrics.py` | with k = 1, every shared key equals `compute_comprehensive_metrics`; annualization for k = 2, 4, 12; CAGR in years; rf fill from `tbill_3m` |
 | `test_wrds_jobs.py` | build and validate; unknown factor or frequency rejected; `ranked` needs a scheduled date; WRDS and Legacy hashes never collide; the app and Lambda allowlists match |
 | `test_wrds_service.py` | with a fake S3, as in `test_backtest_lambda.py`: dispatch on `data_mode`; data version from the WRDS ETags; holdings Parquet written before the JSON; cache hit returns the same result; one row group per date; the Legacy path still returns today's result |
-| `test_wrds_mode_switch.py` | with Streamlit AppTest: Legacy by default; switching resets factors; WRDS disabled without Lambda; WRDS hides delisting, Load Market Data and the Lambda switch; the factor groups |
+| `test_wrds_mode_switch.py` | with Streamlit AppTest: Legacy by default; switching resets factors; WRDS disabled without Lambda; WRDS hides delisting, Load Market Data and the Lambda switch; Legacy shows no WRDS control; the factor groups and defaults; Legacy settings and Lambda jobs exactly as on `main`, also after a visit to WRDS |
 | `test_wrds_saved.py` | a Legacy format-2 fixture, a pre-sharing fixture and a WRDS fixture open; WRDS cohort and ranked IDs are refused; holdings load per date |
 | `scripts/check_backtest_lambda.py --wrds` | in AWS: each frequency end to end; a cached repeat equals the first run; the WRDS engine run locally on the S3 files equals the Lambda result |
 | Stage 6 validation | a monthly cap-weighted run of the whole universe tracks IWM: correlation of monthly returns at least 0.99 and annualized tracking error at most 3%. The prototype passed; the measured numbers stay out of the repo |
@@ -413,23 +433,13 @@ Stages 3 to 6 run the full existing suite on every commit, so any change to a Le
 
 ### 9.2 Open questions
 
-1. **Delisting within a quarter or half year.** After a delisting month, the money earns rf until the next rebalance (proposed), or it is reinvested pro rata in the period's other holdings (closer to an index fund)? Monthly runs are not affected.
-2. **Ranked stocks.** Legacy's "Holdings and Ranks" shows only the stocks held. Should WRDS add the full ranked list per date as a `ranked` job (proposed), or show held stocks only, like Legacy?
-3. **Fossil fuel filter.** Is the GICS and SIC mapping in 2.3 right? Should Oil & Gas Storage & Transportation be excluded too?
-4. **Default directions** where the literature is mixed: 1-Mo Return Lower (Legacy's 1-Mo Momentum defaults to Higher), Long-Term Growth Lower, Market Cap Lower, the betas Lower.
-5. **Unclassified stocks:** in the universe without a sector filter, and left out when the filter is on (proposed)?
-6. **Current, not historical, GICS** for the sector filter: accept as a documented limitation?
-7. **Defaults:** frequency Quarterly and period 2008-2026?
-8. **Missing return month** (no CRSP row, not a delisting): 0% and keep holding (proposed), or drop the stock and spread its money over the other holdings?
-9. **ETF benchmarks** (after fees) instead of index returns: accept that WRDS and Legacy benchmarks differ slightly?
-10. **rf for the newest month**, filled from the 3-month T-bill: OK?
-11. **Top %:** Legacy has no sidebar control (fixed at 10%, plus the cohort slider). Keep it the same in WRDS (proposed), or add a control to both modes?
+All eleven questions from the stage 1 review are decided; see [Decisions](#decisions).
 
 ### 9.3 Risks
 
 | # | Risk | Mitigation |
 |---|---|---|
-| R1 | An edit to a shared engine file changes every Legacy cache key | `test_legacy_freeze.py` fails and names the file; WRDS code lives only in new modules |
+| R1 | An edit to a shared file changes Legacy results | `test_legacy_pinned.py` compares whole Legacy results with `main`'s; WRDS code lives in new modules (a changed Legacy cache key alone is allowed) |
 | R2 | Look-ahead creeps in through a new factor or filter | factor allowlist; look-ahead tests that change future rows |
 | R3 | The sector filter uses today's GICS | documented in the UI tooltip and in this design; historical GICS would need a new pipeline pull |
 | R4 | Licensed WRDS values are shown in the app (holdings, ranked lists, factor values) and in shared IDs | same private bucket and access model as Legacy; no WRDS data in the repo; the Data Viewer stays Legacy; check the WRDS terms before the class demo |
@@ -443,10 +453,10 @@ Stages 3 to 6 run the full existing suite on every commit, so any change to a Le
 
 ## 10. Stages and files
 
-| Stage | Commit | New files | Changed files (outside `ENGINE_SOURCES`) |
+| Stage | Commit | New files | Changed files |
 |---|---|---|---|
 | 1 | this design | `DOCS/WRDS_MODE_DESIGN.md` | |
-| 2 | mode switch and WRDS factor list | `src/wrds_factors.py`, `src/wrds_calendar.py`, `tests/unit/test_legacy_freeze.py`, `test_wrds_mode_switch.py`, `test_wrds_calendar.py` | `app/components/sidebar.py`, `app/components/factor_selection.py`, `app/streamlit_config.py`, `app/streamlit_app.py` (WRDS Run shows "not available yet" until stage 3) |
+| 2 | mode switch and WRDS factor list | `src/wrds_factors.py`, `src/wrds_calendar.py`, `tests/unit/test_legacy_pinned.py` with `tests/fixtures/legacy_pinned_results.json`, `test_wrds_mode_switch.py`, `test_wrds_calendar.py`, `test_wrds_factors.py` | `app/components/sidebar.py`, `app/components/factor_selection.py`, `app/streamlit_config.py`, `app/streamlit_app.py` (WRDS Run shows a "coming in the next stage" note until stage 3); this design (decisions) |
 | 3 | WRDS engine in Lambda | `src/wrds_data.py`, `src/wrds_engine.py`, `src/wrds_metrics.py`, `test_wrds_engine*.py`, `test_wrds_lookahead.py`, `test_wrds_metrics.py` | `src/backtest_service.py` (dispatch), `scripts/deploy_backtest_lambda.py` (`FACTOR_LAKE_WRDS_DIR`) |
 | 4 | jobs and cache | `src/wrds_jobs.py`, `src/wrds_service.py`, `test_wrds_jobs.py`, `test_wrds_service.py` | `src/lambda_client.py`, `app/streamlit_utils.py` |
 | 5 | feature parity | `app/components/wrds_results.py`, `app/wrds_holdings.py`, `test_wrds_saved.py` | `app/components/results_tab.py` (one dispatch), `app/streamlit_utils.py` (open, cohort), `src/saved_analyses.py` (message wording) |
