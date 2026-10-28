@@ -14,7 +14,8 @@ from app.wrds_tables import (benchmark_label, calendar_year_table, drawdowns, fa
                              frequency_caption, holdings_display_table, metrics_table, period_table,
                              ranked_display_table, result_notes, table_number_formats)
 from src.wrds_engine import rank_stocks, run_wrds_backtest
-from tests.unit.results_snapshot import legacy_results_snapshot, without_clock_times
+from scripts.check_backtest_lambda import TOLERANCE, max_difference
+from tests.unit.results_snapshot import comparable, legacy_results_snapshot
 from tests.unit.test_backtest_lambda import DELISTING_FILE, UNIVERSE_FILE, _delisting, _parquet, _raw_universe
 from tests.unit.test_saved_runs import _assert_clean, _click_main_tab, _open_tab
 from tests.unit.test_wrds_saved import _run_wrds, manager, new_session  # noqa: F401 (fixtures)
@@ -283,4 +284,7 @@ def test_the_data_viewer_says_it_shows_legacy_data_in_wrds_mode(new_session):
 def test_legacy_results_tab_renders_exactly_as_on_main():
     expected = json.loads((FIXTURES / 'legacy_results_render_main.json').read_text(encoding='utf-8'))
     actual = json.loads(json.dumps(legacy_results_snapshot(), sort_keys=True))
-    assert without_clock_times(actual) == without_clock_times(expected)
+    # Text, widgets and table cells must be equal; numbers to the Lambda check's relative 1e-9
+    # (main's snapshot was rendered on Windows, CI renders on Linux)
+    difference, where = max_difference(comparable(actual), comparable(expected))
+    assert difference <= TOLERANCE, f"{where} differs from main's rendering (relative difference {difference:.2e})"

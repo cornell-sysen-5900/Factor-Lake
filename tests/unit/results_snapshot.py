@@ -9,7 +9,10 @@ same. This file only uses helpers that exist on main, so it runs there unchanged
 
     uv run python -m tests.unit.results_snapshot <output.json>
 """
+import csv
+import io
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -22,10 +25,27 @@ from tests.unit.test_saved_runs import (_assert_clean, _click_main_tab, _open_ta
 APP_DIR = Path(__file__).resolve().parents[2] / 'app'
 
 
-def without_clock_times(snapshot: dict) -> dict:
-    """The snapshot with the session history's clock times ("at 14:03:59") masked, for comparing runs."""
-    import re
-    return json.loads(re.sub(r'at \d\d:\d\d:\d\d', 'at <time>', json.dumps(snapshot)))
+def _cell(text: str):
+    """A table cell as a number when it is one, else the text."""
+    try:
+        return float(text)
+    except ValueError:
+        return text
+
+
+def comparable(snapshot: dict) -> dict:
+    """
+    The snapshot in a form that compares the same on every machine: the session history's
+    clock times ("at 14:03:59") masked, and each table's CSV parsed into rows of cells
+    (pandas writes CSV lines ending in \\r\\n on Windows and \\n on Linux, and a number can
+    differ in its last binary digit between them). Compare with a numeric tolerance.
+    """
+    snapshot = json.loads(re.sub(r'at \d\d:\d\d:\d\d', 'at <time>', json.dumps(snapshot)))
+    for step in snapshot.values():
+        for kind in ('dataframe', 'table'):
+            step[kind] = [[[_cell(c) for c in row] for row in csv.reader(io.StringIO(text))]
+                          for text in step[kind]]
+    return snapshot
 
 
 def _text(elements):

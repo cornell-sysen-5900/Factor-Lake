@@ -7,6 +7,11 @@ backtests and the Lambda itself use, and the whole result (metrics, values, retu
 and every holdings row) is compared with tests/fixtures/legacy_pinned_results.json.
 Legacy's code version may change during WRDS work; its results may not.
 
+Everything that is not a number (keys, tickers, ranks, flags, row order) must be equal.
+Numbers must agree to a relative 1e-9, the tolerance scripts/check_backtest_lambda.py
+uses for Lambda vs local: the fixture was captured on Windows and CI runs on Linux,
+where a few values (betas, from LAPACK) can differ in the last binary digit.
+
 The fixture was captured from main (c063100). Regenerate it only when a change to
 Legacy results is intended:
 
@@ -17,7 +22,8 @@ from pathlib import Path
 
 import pytest
 
-from src.backtest_jobs import build_job, decode_result, encode_result, results_match, run_job
+from scripts.check_backtest_lambda import TOLERANCE, max_difference
+from src.backtest_jobs import build_job, encode_result, run_job
 from tests.unit.test_mixing_regression import delisting_universe, synthetic_universe
 
 FIXTURE_PATH = Path(__file__).resolve().parents[1] / 'fixtures' / 'legacy_pinned_results.json'
@@ -62,8 +68,8 @@ def test_legacy_job_gives_the_results_it_gave_on_main(pinned, name):
     job, result = run_pinned(name)
     expected = pinned[name]
     assert job == expected['job']
-    assert results_match(decode_result(job['kind'], encode_result(result)),
-                         decode_result(job['kind'], expected['result']))
+    difference, where = max_difference(json.loads(encode_result(result)), expected['result'])
+    assert difference <= TOLERANCE, f"{where} differs from main by {difference:.2e} (relative)"
 
 
 def test_pinned_jobs_cover_holdings_and_delistings(pinned):
