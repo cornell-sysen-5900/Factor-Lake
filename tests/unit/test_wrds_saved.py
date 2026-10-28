@@ -119,10 +119,11 @@ def test_a_wrds_run_is_computed_in_lambda_cached_and_shows_its_summary_and_holdi
     assert any('Analysis complete' in s.value for s in at.success)
 
     # Summary and the newest date's holdings, read with ranged GETs
-    assert '**Data Source:** WRDS | **Rebalancing:** Quarterly (12 rebalances)' in [c.value for c in at.caption]
+    assert any(c.value.startswith('**Data Source:** WRDS | **Rebalancing:** Quarterly (12 rebalances, 2009-12-')
+               for c in at.caption)
     assert _metric(at, 'CAGR') == f"{results['cagr']:.2%}"
     newest = results['rebalance_dates'][-1]
-    assert at.selectbox(key=f"wrds_date_{run['id']}").value == newest
+    assert at.selectbox(key=f"ranked_year_{run['id']}").value == newest
     rows = results['holdings']['rows'][results['holdings']['dates'].index(newest)]
     assert any(c.value.startswith(f"**Method:** Mixing | **Holdings:** {rows} |") for c in at.caption)
     holdings_gets = [r for k, r in s3.gets if k.endswith('.holdings.parquet')]
@@ -137,14 +138,14 @@ def test_a_wrds_run_is_computed_in_lambda_cached_and_shows_its_summary_and_holdi
 def test_ranked_and_cohort_jobs_run_from_a_wrds_run(new_session):
     at = new_session()
     run = _run_wrds(at, 'w_roe')
-    at.selectbox(key=f"wrds_date_{run['id']}").set_value(run['results']['rebalance_dates'][2]).run()
+    at.selectbox(key=f"ranked_year_{run['id']}").set_value(run['results']['rebalance_dates'][2]).run()
     at.button(key=f"wrds_rank_btn_{run['id']}").click().run()
     _assert_clean(at)
     ranked = at.session_state[f"wrds_ranked_{run['id']}"]
     assert ranked['date'] == run['results']['rebalance_dates'][2] and len(ranked['rows']) > 10
     assert ranked['compute']['cached'] is False
 
-    at.button(key=f"wrds_cohort_btn_{run['id']}").click().run()
+    at.button(key=f"cohort_btn_{run['id']}").click().run()
     _assert_clean(at)
     cohort = at.session_state['saved_runs'][0]['cohort']
     assert cohort['pct'] == 10 and len(cohort['top']) == len(run['results']['years'])

@@ -161,12 +161,12 @@ WRDS mode is a second data source next to Legacy. It backtests on point-in-time 
 
 ### Read WRDS results
 
-The results look like Legacy's, on dates instead of years:
+The results have Legacy's sections, tiles, tables and charts, on dates instead of years:
 
 - The run's tab reads e.g. "Run 2: WRDS, Quarterly".
 - **Holdings and Ranks**: pick a rebalance date to see what was held from that date, with weights, returns and factor values in percent as in Legacy, and a CSV download. **All ranked stocks on this date** ranks every stock the strategy could buy on that date.
-- Charts of growth, period returns and drawdown, against **IWM** (Russell 2000), **IWN** (Value) and **IWO** (Growth).
-- A period table (switch to **By calendar year** for yearly returns), the cohort comparison, and the statistics, annualized by the frequency.
+- Legacy's growth chart against **IWM** (Russell 2000), **IWN** (Value) and **IWO** (Growth), and below it each period's return.
+- **Period-by-Period Performance**: Legacy's Year-by-Year table with one row per period (switch to **By calendar year** for yearly returns). Then the cohort comparison, the statistics annualized by the frequency (the caption says how), and a win/loss table per period, e.g. **Quarterly Win/Loss Summary**.
 - The Analysis ID shares a WRDS run exactly like a Legacy one.
 
 ### How WRDS mode treats delistings and gaps
