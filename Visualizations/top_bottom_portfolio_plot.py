@@ -9,7 +9,7 @@ VERSION: 3.0.0
 import plotly.graph_objects as go
 from typing import List, Optional, Dict, Any, Union
 
-from Visualizations.portfolio_growth_plot import date_axis
+from Visualizations.portfolio_growth_plot import date_axis, line_mode
 
 HOVER_TEMPLATE = '%{fullData.name}: $%{y:,.0f}<extra></extra>'
 
@@ -39,6 +39,7 @@ def plot_top_bottom_percent(
         go.Figure: The generated Plotly figure object.
     """
     fig = go.Figure()
+    mode = line_mode(len(years))
 
     def _get_trajectory(series: Optional[List[float]]) -> Optional[List[float]]:
         if series is None:
@@ -73,7 +74,7 @@ def plot_top_bottom_percent(
         if vals and len(vals) == len(years):
             fig.add_trace(go.Scatter(
                 x=years, y=vals, name=label,
-                mode='lines+markers',
+                mode=mode,
                 line=dict(color=color, dash=style, width=1.2),
                 marker=dict(symbol=marker, size=3),
                 opacity=0.6, hovertemplate=HOVER_TEMPLATE
@@ -85,7 +86,7 @@ def plot_top_bottom_percent(
         if len(bot_vals) >= len(years):
             fig.add_trace(go.Scatter(
                 x=years, y=bot_vals[:len(years)], name=f'Bottom {percent}%',
-                mode='lines+markers',
+                mode=mode,
                 line=dict(color='#9467bd', width=1.5),
                 marker=dict(symbol='triangle-down', size=4),
                 opacity=0.6, hovertemplate=HOVER_TEMPLATE
@@ -97,7 +98,7 @@ def plot_top_bottom_percent(
         if len(top_vals) >= len(years):
             fig.add_trace(go.Scatter(
                 x=years, y=top_vals[:len(years)], name=f'Top {percent}%',
-                mode='lines+markers',
+                mode=mode,
                 line=dict(color='#2ca02c', width=2.0),
                 marker=dict(symbol='triangle-up', size=5),
                 hovertemplate=HOVER_TEMPLATE
@@ -109,7 +110,7 @@ def plot_top_bottom_percent(
         fig.add_trace(go.Scatter(
             x=years[:common_len], y=baseline_portfolio_values[:common_len],
             name='Active Strategy',
-            mode='lines+markers',
+            mode=mode,
             line=dict(color='#003366', width=2.5),
             marker=dict(symbol='circle', size=4),
             hovertemplate=HOVER_TEMPLATE

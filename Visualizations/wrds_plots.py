@@ -13,7 +13,7 @@ from typing import List
 
 import plotly.graph_objects as go
 
-from Visualizations.portfolio_growth_plot import date_axis
+from Visualizations.portfolio_growth_plot import date_axis, line_mode
 
 PERCENT_HOVER = '%{fullData.name}: %{y:.2f}%<extra></extra>'
 
@@ -28,7 +28,7 @@ def plot_wrds_period_returns(period_ends: List[str], port_returns: List[float], 
     ))
     # Legacy's benchmark line
     fig.add_trace(go.Scatter(
-        x=period_ends, y=bench_returns, name=bench_label, mode='lines+markers',
+        x=period_ends, y=bench_returns, name=bench_label, mode=line_mode(len(period_ends)),
         line=dict(color='#ff7f0e', width=2, dash='dash'), marker=dict(symbol='square', size=4),
         opacity=0.8, legendrank=2, hovertemplate=PERCENT_HOVER
     ))

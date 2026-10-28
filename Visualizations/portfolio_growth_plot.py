@@ -12,6 +12,13 @@ from typing import Dict, List, Optional
 HOVER_TEMPLATE = '%{fullData.name}: $%{y:,.0f}<extra></extra>'
 # Legacy's benchmark names; WRDS runs pass their ETFs' names instead
 BENCHMARK_NAMES = {'benchmark': 'Russell 2000', 'value': 'Value Index', 'growth': 'Growth Index'}
+# Series longer than this (monthly WRDS runs) are drawn without markers; Legacy's never are
+MARKER_LIMIT = 60
+
+
+def line_mode(n_points: int) -> str:
+    """Lines with markers, or lines only for a series of more than MARKER_LIMIT points."""
+    return 'lines+markers' if n_points <= MARKER_LIMIT else 'lines'
 
 
 def date_axis(fig: go.Figure, font_size: int) -> go.Figure:
@@ -62,6 +69,7 @@ def plot_portfolio_growth(
     """
     fig = go.Figure()
     names = {**BENCHMARK_NAMES, **(names or {})}
+    mode = line_mode(len(years))
 
     # Benchmarks are added first so the portfolio line is drawn on top of them;
     # legendrank keeps the legend in the original order (Portfolio first).
@@ -72,7 +80,7 @@ def plot_portfolio_growth(
             x=years,
             y=bench_vals,
             name=names['benchmark'],
-            mode='lines+markers',
+            mode=mode,
             line=dict(color='#ff7f0e', width=2, dash='dash'),
             marker=dict(symbol='square', size=4),
             opacity=0.8,
@@ -86,7 +94,7 @@ def plot_portfolio_growth(
             x=years,
             y=val_vals,
             name=names['value'],
-            mode='lines+markers',
+            mode=mode,
             line=dict(color='#2ca02c', width=1.5, dash='dot'),
             marker=dict(symbol='triangle-up', size=4),
             opacity=0.6,
@@ -100,7 +108,7 @@ def plot_portfolio_growth(
             x=years,
             y=gro_vals,
             name=names['growth'],
-            mode='lines+markers',
+            mode=mode,
             line=dict(color='#d62728', width=1.5, dash='dot'),
             marker=dict(symbol='diamond', size=4),
             opacity=0.6,
@@ -113,7 +121,7 @@ def plot_portfolio_growth(
         x=years,
         y=port_vals,
         name='Portfolio',
-        mode='lines+markers',
+        mode=mode,
         line=dict(color='#1f77b4', width=2.5),
         marker=dict(symbol='circle', size=6),
         legendrank=1,

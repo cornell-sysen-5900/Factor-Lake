@@ -215,6 +215,20 @@ def test_period_returns_chart_has_legacys_style(backtest):
     assert fig.layout.xaxis.tickformat == '%Y' and fig.layout.xaxis.hoverformat == '%Y-%m-%d'
 
 
+@pytest.mark.parametrize('n, mode', [(60, 'lines+markers'), (61, 'lines')])
+def test_series_over_60_points_have_no_markers(n, mode):
+    """Monthly runs (about 220 points) are drawn as lines; Legacy's yearly charts never reach 60 points."""
+    dates = [d.strftime('%Y-%m-%d') for d in month_ends('2008-04', '2026-09')][:n]
+    values = [1.0 + i for i in range(n)]
+    growth = plot_portfolio_growth(dates, values, values, values, values, ['ROE'], dates=True)
+    cohort = plot_top_bottom_percent(dates, 10, True, values, values, values, initial_investment=1.0,
+                                     baseline_portfolio_values=values, precomputed_top=values,
+                                     precomputed_bot=values, dates=True)
+    period = plot_wrds_period_returns(dates, values, values, 'IWM (ETF, total return)', 'Monthly')
+    assert len(growth.data) == 4 and len(cohort.data) == 6
+    assert {t.mode for t in growth.data + cohort.data} == {mode} and period.data[1].mode == mode
+
+
 # ---------------------------------------------------------------------------
 # Every view in the app, against Legacy's Results tab as main rendered it
 # ---------------------------------------------------------------------------
@@ -273,6 +287,10 @@ def test_a_wrds_run_looks_like_legacys_results(new_session, legacy):
     tiles = {m[0]: m[1] for m in shown['metric']}
     assert tiles['CAGR'] == f"{results['cagr']:.2%}" and tiles['Beta vs IWM'] == f"{results['portfolio_beta']:.3f}"
     assert tiles['Quarterly Win Rate (vs IWM)'] == f"{results['win_rate']:.2%}"
+    # The RF Rate Source tile: a short label, the full description in its tooltip
+    rf = next(m for m in at.main.markdown if m.value.startswith('**RF Rate Source**'))
+    assert rf.value == '**RF Rate Source**\n\nFama-French 1-month T-bill'
+    assert rf.proto.help == results['risk_free_rate_source'] and len(rf.proto.help) > len('Fama-French 1-month T-bill')
     assert next(m for m in at.main.metric if m.label == 'Cumulative Outperformance').help == \
         'Against the same initial AUM invested in IWM (ETF, total return).'
 

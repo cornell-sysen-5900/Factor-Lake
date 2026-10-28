@@ -29,6 +29,8 @@ from app.wrds_tables import (FREQUENCY_LABELS, benchmark_label, calendar_year_re
 from Visualizations.wrds_plots import plot_wrds_period_returns
 
 WRDS_DELISTING = "CRSP delisting returns included, then the risk-free rate until the next rebalance"
+# The RF Rate Source tile's text; the result's full description is in its tooltip
+RISK_FREE_LABEL = "Fama-French 1-month T-bill"
 
 
 def render_wrds_results(run: Dict[str, Any]) -> None:
@@ -89,7 +91,8 @@ def render_wrds_results(run: Dict[str, Any]) -> None:
     # 7. Advanced Backtest Statistics
     st.header("Advanced Backtest Statistics")
     st.caption(frequency_caption(results))
-    _render_advanced_stats_grid(results, index=short_benchmark(results, 'benchmark'), period=frequency)
+    _render_advanced_stats_grid(results, index=short_benchmark(results, 'benchmark'), period=frequency,
+                                rf_label=RISK_FREE_LABEL)
     st.divider()
 
     # 8. Win/Loss Summary, one row per period

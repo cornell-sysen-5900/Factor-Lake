@@ -277,11 +277,13 @@ def _render_win_loss_ledger(res: Dict[str, Any], columns: List[str] = WIN_LOSS_C
         ])))
         st.dataframe(df, width="stretch", hide_index=True)
 
-def _render_advanced_stats_grid(res: Dict[str, Any], index: str = "R2000", period: str = "Yearly") -> None:
+def _render_advanced_stats_grid(res: Dict[str, Any], index: str = "R2000", period: str = "Yearly",
+                                rf_label: Optional[str] = None) -> None:
     """
     Renders a multi-row grid containing advanced risk and efficiency metrics.
 
-    WRDS runs name their benchmark (index="IWM") and their period ("Quarterly").
+    WRDS runs name their benchmark (index="IWM") and their period ("Quarterly"), and
+    give a short risk-free label (rf_label) whose tooltip holds the full description.
     """
     # Row 1: Drawdowns
 # Row 1: Drawdowns
@@ -321,7 +323,11 @@ def _render_advanced_stats_grid(res: Dict[str, Any], index: str = "R2000", perio
     b1.metric(f"Beta vs {index}", f"{res.get('portfolio_beta', 0):.3f}")
     b2.metric("Beta vs Growth", f"{res.get('portfolio_beta_growth', 0):.3f}")
     b3.metric("Beta vs Value", f"{res.get('portfolio_beta_value', 0):.3f}")
-    b4.write(f"**RF Rate Source**\n\n{res.get('risk_free_rate_source', 'FRED')}")
+    if rf_label:
+        # A short label, with the full description in the tooltip
+        b4.markdown(f"**RF Rate Source**\n\n{rf_label}", help=res.get('risk_free_rate_source'))
+    else:
+        b4.write(f"**RF Rate Source**\n\n{res.get('risk_free_rate_source', 'FRED')}")
 
     # Row 6: Win Rates (Restored)
     w1, w2, w3, w4 = st.columns(4)
