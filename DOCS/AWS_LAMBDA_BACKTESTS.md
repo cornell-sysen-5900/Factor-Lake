@@ -45,6 +45,28 @@ Without a usable role, run `uv run python scripts/deploy_backtest_lambda.py --pr
 
 It finishes by pinging the function. Options: `--memory`, `--timeout`, `--function-name`, `--role-arn`, `--package-only out.zip` (build the zip without deploying).
 
+### Deploy from CI
+
+The app on Streamlit Cloud redeploys from `main` on every merge, and `.github/workflows/deploy-lambda.yml` keeps the Lambda in step with it. A push to `main` that changes `src/`, `aws_lambda/`, `scripts/deploy_backtest_lambda.py` or `uv.lock` (which sets the bundled pandas, numpy and pyarrow versions) runs:
+
+1. **Unit tests.** The workflow calls `tests.yml`. Nothing is deployed unless the tests pass.
+2. **Deploy.** It runs `uv sync --locked`, then the deploy command above with `--role-arn` and `--function-name` from the repository variables. The Python version comes from `.python-version`, so the Lambda gets the library versions locked in `uv.lock`.
+3. **Check.** It runs `scripts/check_backtest_lambda.py` (section 4) against the new function.
+
+The run fails if any step fails, so a red run means the Lambda may be behind `main`. To redeploy by hand, open Actions → Deploy Backtest Lambda → Run workflow (only `main` deploys). Deploys never overlap. A push that arrives during a deploy waits for it to finish.
+
+A repository admin has to add these under Settings → Secrets and variables → Actions:
+
+| Kind | Name | Value |
+|---|---|---|
+| Secret | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Keys that may update the function, pass its role, upload to `factor-lake-data/_deploy/` and read the market data (the class `Sysen5900Student` keys can) |
+| Variable | `LAMBDA_ROLE_ARN` | `arn:aws:iam::620832638024:role/Sysen5900LambdaExecRole` |
+| Variable | `LAMBDA_FUNCTION_NAME` | `sysen5900-factor-lake-backtest` |
+
+Until all four are set, the workflow stops at its first step and names what is missing. It never falls back to the script's default function name.
+
+Old packages are not deleted. Each package in `factor-lake-data/_deploy/` is named by its content hash, so a deploy with unchanged code reuses the same file, and only real changes add a new one (about 62 MB each). To clear them out, delete all but the newest few `backtest-lambda-*.zip` files in the S3 console, or ask an AWS admin for a lifecycle rule on `factor-lake-data/_deploy/`.
+
 ## 3. Turn it on in the app
 
 Set the function name next to the AWS keys, in `.env` locally or in the Streamlit Cloud secrets:
