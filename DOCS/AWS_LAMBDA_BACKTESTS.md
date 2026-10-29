@@ -108,6 +108,8 @@ The hash a result is saved under doubles as its **analysis ID**. Each saved file
 - Each Lambda run's tab shows the full ID with a copy button.
 - **Results → Open a saved analysis** opens an ID as a new tab with the original results and settings.
 - **This session's analyses** lists only the runs of the current browser session. Nothing is listed from S3, so nobody sees other people's analyses unless they're given an ID.
+- **Earlier analyses on this browser** (`app/analysis_history.py`) lists IDs from earlier sessions on the same browser. The app has no logins, so they are kept in the browser's `localStorage` (key `factor-lake-analyses`, newest 200). A small inline JavaScript component (`st.components.v2`) adds each session's IDs and reports the stored list to the app once per page load. Reporting more often would rerun the app and clear messages like "Analysis complete".
+- **All saved analyses** lists everyone's newest 20 from S3 (`list_saved_analyses`). It reads only the files' metadata (the Lambda saves a short `summary` and the `kind`, so cohort comparisons are left out), and only while expanded. The app's key needs `s3:ListBucket` on `backtest-results/`; without it the list explains that. Results saved before summaries existed show "Details not recorded".
 - Errors: text that isn't a 64-character ID, an ID with no saved analysis (mistyped, or deleted by the 90-day rule), a result saved before sharing existed, or a cohort comparison's ID.
 
 Demo (about 2 minutes, after the steps in section 5):
@@ -117,6 +119,8 @@ Demo (about 2 minutes, after the steps in section 5):
 3. Paste the ID and click **Open analysis**. The same final value, CAGR, holdings and charts appear in a tab labelled "(opened)", with "Opened from a saved analysis (first computed …)". Generate Comparison also works there.
 4. Paste a wrong ID (for example drop the last character, or change one character) to show the errors: "is not an analysis ID" and "No saved analysis has the ID … deleted after 90 days".
 5. Back in the first window, **This session's analyses** lists your runs with their IDs. The second window lists only the analysis it opened.
+6. Close both windows, open the app again in the first browser, and go to **Results → Earlier analyses on this browser**: the analyses from before are listed with their IDs. Click **Open** on one, and it opens without pasting anything.
+7. Expand **All saved analyses** to show everyone's recent analyses with their factors and dates, and open one from there.
 
 ## 7. Troubleshoot
 

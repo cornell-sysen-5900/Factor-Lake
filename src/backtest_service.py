@@ -41,6 +41,19 @@ def result_file(key: str) -> str:
     return f'{RESULTS_DIR}/{key}.json'
 
 
+def summarize_job(job: Dict[str, Any]) -> str:
+    """
+    A short description of a job for listings, e.g. "ROE using 9/30 Data (higher), ROA % (higher)
+    | Mixing | 2002-2024 | $1,000". Stored as S3 metadata, so it is kept ASCII and short.
+    """
+    factors = ', '.join(
+        f"{job['factor_labels'].get(f, f)} ({'higher' if job['factor_directions'][f] == 'top' else 'lower'})"
+        for f in job['factors'])
+    text = (f"{factors} | {job['factor_combination'].capitalize()} | "
+            f"{job['start_year']}-{job['end_year']} | ${job['initial_aum']:,.0f}")
+    return text.encode('ascii', 'replace').decode()[:500]
+
+
 class BacktestService:
     """
     Runs and caches backtests. One instance lives for the life of a Lambda container,
@@ -93,6 +106,9 @@ class BacktestService:
             info = {
                 'computed_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
                 'compute_seconds': f"{time.perf_counter() - started:.3f}",
+                # Read by the list of saved analyses without downloading each result
+                'kind': job['kind'],
+                'summary': summarize_job(job),
             }
             body = encode_saved(job, result)   # with its job, so the hash alone can reopen it
             self.manager.client.put_object(

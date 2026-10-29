@@ -13,7 +13,8 @@ from typing import Dict, Any, List, Tuple, Optional
 from Visualizations.portfolio_growth_plot import plot_portfolio_growth
 from Visualizations.top_bottom_portfolio_plot import plot_top_bottom_percent
 from app.streamlit_config import MAX_SAVED_RUNS
-from app.streamlit_utils import describe_compute, get_backtest_lambda_name, open_saved_analysis, run_cohort
+from app.streamlit_utils import (describe_compute, get_backtest_lambda_name, list_all_saved_analyses,
+                                 open_saved_analysis, run_cohort)
 from src.saved_analyses import SavedAnalysisError
 from app.saved_runs import remove_saved_run
 from app.holdings_table import (
@@ -395,6 +396,79 @@ def render_analysis_history(history: List[Dict[str, Any]]) -> None:
                 st.code(entry['analysis_id'], language=None)
             else:
                 st.caption("Not saved (computed in this app), so it has no ID.")
+
+
+# How many rows each list of saved analyses shows
+LISTED_ANALYSES = 20
+# Message shown at the top of Results after opening an analysis from a list
+OPENED_MESSAGE_KEY = "opened_analysis_message"
+
+
+def render_earlier_analyses(entries: Optional[List[Dict[str, Any]]]) -> None:
+    """
+    Analyses from earlier sessions in this browser (see app/analysis_history.py), newest
+    first, each with its ID and an Open button. Hidden until there is one.
+    """
+    if not entries:
+        return
+    with st.expander(f"Earlier analyses on this browser ({len(entries)})", key="earlier_analyses_expander"):
+        st.caption("Analyses you ran or opened in earlier sessions on this browser. They are kept in this "
+                   "browser only, so they don't appear on another computer or after clearing site data.")
+        for entry in entries[:LISTED_ANALYSES]:
+            when = (entry.get('saved_at') or '').replace('T', ' ').rstrip('Z')
+            st.markdown(f"**{entry.get('label', 'Analysis')}** · {entry.get('how', 'saved')} on {when} UTC")
+            _render_listed_analysis(entry['analysis_id'], 'earlier')
+        _caption_hidden_rows(len(entries))
+
+
+def render_all_saved_analyses() -> None:
+    """
+    Everyone's saved analyses in S3, newest first, loaded only while the expander is open
+    (it reruns the app when opened or closed).
+    """
+    expander = st.expander("All saved analyses", key="all_analyses_expander", on_change="rerun")
+    with expander:
+        if not expander.open:
+            return
+        st.caption("Every analysis saved by anyone using this app, newest first. Saved analyses are "
+                   "deleted after 90 days.")
+        try:
+            with st.spinner("Listing saved analyses in S3..."):
+                listing = list_all_saved_analyses(LISTED_ANALYSES)
+        except SavedAnalysisError as e:
+            st.error(str(e))
+            return
+        if not listing['entries']:
+            st.info("No saved analyses yet. Run one with AWS Lambda backtests on.")
+            return
+        for entry in listing['entries']:
+            summary = entry['summary'] or "Details not recorded (saved before listings had summaries)"
+            st.markdown(f"**{summary}** · saved {entry['saved_at']:%Y-%m-%d %H:%M} UTC")
+            _render_listed_analysis(entry['analysis_id'], 'all')
+        if listing['total'] > len(listing['entries']):
+            st.caption(f"Showing the newest {len(listing['entries'])}. Older ones can still be opened by their ID.")
+
+
+def _render_listed_analysis(analysis_id: str, list_name: str) -> None:
+    """One listed analysis: its ID (with a copy button) and an Open button."""
+    id_col, button_col = st.columns([5, 1], vertical_alignment="center")
+    with id_col:
+        st.code(analysis_id, language=None)
+    with button_col:
+        if st.button("Open", key=f"open_{list_name}_{analysis_id}"):
+            try:
+                run = open_saved_analysis(analysis_id)
+            except SavedAnalysisError as e:
+                st.error(str(e))
+                return
+            # Rerun so the lists above show the analysis as this session's, with the message on top
+            st.session_state[OPENED_MESSAGE_KEY] = f"Opened as \"{run['label']}\"."
+            st.rerun()
+
+
+def _caption_hidden_rows(total: int) -> None:
+    if total > LISTED_ANALYSES:
+        st.caption(f"Showing the newest {LISTED_ANALYSES} of {total}.")
 
 def _render_summary_metrics(res: Dict[str, Any], settings: Dict[str, Any]) -> None:
     """

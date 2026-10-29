@@ -352,14 +352,17 @@ def add_to_history(run: Dict[str, Any]) -> None:
     Records a run in this session's history (st.session_state.analysis_history). It
     lives only in the session, so it lists only this user's own runs, including ones
     no longer shown as Results tabs (only the last MAX_SAVED_RUNS are kept there).
+    Entries with an ID are also kept in the browser (app/analysis_history.py).
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
     compute = run.get('compute') or {}
+    now = datetime.now(timezone.utc)
     st.session_state.analysis_history = st.session_state.get('analysis_history', []) + [{
         'label': run['label'],
         'analysis_id': compute.get('hash'),
         'how': 'opened' if compute.get('opened') else 'computed in Lambda' if compute else 'computed in this app',
-        'time': datetime.now().strftime('%H:%M:%S'),
+        'time': now.strftime('%H:%M:%S UTC'),
+        'saved_at': now.strftime('%Y-%m-%dT%H:%M:%SZ'),
     }]
 
 def open_saved_analysis(text: str) -> Dict[str, Any]:
@@ -405,3 +408,9 @@ def get_results_store():
     """The S3 location saved analyses are read from (the market data's bucket and prefix)."""
     from src.s3_client import S3DataManager
     return S3DataManager()
+
+@st.cache_data(ttl=60, show_spinner=False)
+def list_all_saved_analyses(limit: int) -> Dict[str, Any]:
+    """The newest `limit` saved analyses of everyone (src/saved_analyses.list_saved_analyses), reused for a minute."""
+    from src.saved_analyses import list_saved_analyses
+    return list_saved_analyses(get_results_store(), limit=limit)
