@@ -1,0 +1,84 @@
+name: Deploy Backtest Lambda
+
+# Redeploys the backtest Lambda when code it runs changes on main, so the Lambda never
+# runs older code than the app (see DOCS/AWS_LAMBDA_BACKTESTS.md, "Deploy from CI").
+# The unit tests (tests.yml) run first; nothing is deployed unless they pass.
+#
+# Required repo settings (Settings -> Secrets and variables -> Actions):
+#   Secrets:   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY - keys that may update the function,
+#              pass its role, upload to s3://.../factor-lake-data/_deploy/ and read the data
+#   Variables: LAMBDA_ROLE_ARN      - e.g. arn:aws:iam::620832638024:role/Sysen5900LambdaExecRole
+#              LAMBDA_FUNCTION_NAME - e.g. sysen5900-factor-lake-backtest
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "aws_lambda/**"
+      - "scripts/deploy_backtest_lambda.py"
+      - "uv.lock"  # pandas/numpy/pyarrow versions bundled into the Lambda
+      - ".github/workflows/deploy-lambda.yml"
+  workflow_dispatch:
+
+# One deploy at a time; a newer push waits for the running deploy instead of cancelling it
+concurrency:
+  group: deploy-backtest-lambda
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    uses: ./.github/workflows/tests.yml
+
+  deploy:
+    needs: tests
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AWS_DEFAULT_REGION: us-east-1
+      LAMBDA_ROLE_ARN: ${{ vars.LAMBDA_ROLE_ARN }}
+      LAMBDA_FUNCTION_NAME: ${{ vars.LAMBDA_FUNCTION_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Without these the deploy script would fall back to its defaults and create a new function
+      - name: Check repo settings
+        env:
+          HAS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+          HAS_SECRET_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
+        run: |
+          missing=""
+          [ -n "$LAMBDA_ROLE_ARN" ] || missing="$missing variable LAMBDA_ROLE_ARN,"
+          [ -n "$LAMBDA_FUNCTION_NAME" ] || missing="$missing variable LAMBDA_FUNCTION_NAME,"
+          [ "$HAS_KEY_ID" = "true" ] || missing="$missing secret AWS_ACCESS_KEY_ID,"
+          [ "$HAS_SECRET_KEY" = "true" ] || missing="$missing secret AWS_SECRET_ACCESS_KEY,"
+          if [ -n "$missing" ]; then
+            echo "::error::Add the repo${missing%,} (Settings -> Secrets and variables -> Actions)"
+            exit 1
+          fi
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      # Python comes from .python-version, so the Lambda gets the library versions the app locks
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Deploy the Lambda
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          uv run python scripts/deploy_backtest_lambda.py \
+            --role-arn "$LAMBDA_ROLE_ARN" --function-name "$LAMBDA_FUNCTION_NAME"
+
+      - name: Check the Lambda against local runs and its cache
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          FACTOR_LAKE_BACKTEST_LAMBDA: ${{ vars.LAMBDA_FUNCTION_NAME }}
+        run: uv run python scripts/check_backtest_lambda.py
