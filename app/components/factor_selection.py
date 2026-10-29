@@ -31,6 +31,13 @@ SELECTED_KEY = 'factor_builder_selected'
 _OUTPUT_GROUP_ORDER = ['Momentum', 'Profitability', 'Growth', 'Value', 'Quality']
 
 
+def clear_factor_selection() -> None:
+    """Clear this session's factor inputs, including previously removed rows."""
+    st.session_state[SELECTED_KEY] = {}
+    for name in config.FACTOR_METADATA:
+        st.session_state.pop(_direction_key(name), None)
+
+
 def render_factor_selection() -> Tuple[List[str], Dict[str, str]]:
     """
     Renders the factor builder: the available factors grouped by category
