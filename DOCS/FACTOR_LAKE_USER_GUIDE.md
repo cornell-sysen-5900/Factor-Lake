@@ -73,8 +73,10 @@ When backtests run in AWS Lambda, every analysis is saved for 90 days under an *
 1. The ID is shown in the captions at the top of each run's tab. Click the copy button on the right of the ID.
 2. To open an analysis (yours or a colleague's), go to **Results → Open a saved analysis**, paste the ID and click **Open analysis**. It opens as a new tab, labelled "(opened)", with the original results, factors and settings. It loads from S3 and does not rerun the backtest.
 3. **This session's analyses** in the Results tab lists every analysis you ran or opened since the page was loaded, with its ID, including runs no longer shown as tabs. It never shows other people's analyses.
-4. Runs computed in the app (with the Lambda switch off) are not saved, so they have no ID.
-5. An ID that is mistyped, or older than 90 days, shows an error saying no saved analysis has that ID.
+4. Forgot to copy an ID? **Earlier analyses on this browser** lists the analyses you ran or opened in earlier sessions on the same browser, each with its ID and an **Open** button. They are kept in your browser only, so they don't follow you to another computer and disappear if you clear the site's data.
+5. **All saved analyses** lists everyone's saved analyses (newest 20), with their factors, method, period and starting amount, and an **Open** button. It loads only when you expand it. WRDS analyses start with "WRDS" and their frequency, e.g. "WRDS, Quarterly | ROE (higher), ROA (higher) | ...", and the two lists above show the same line under a WRDS run.
+6. Runs computed in the app (with the Lambda switch off) are not saved, so they have no ID.
+7. An ID that is mistyped, or older than 90 days, shows an error saying no saved analysis has that ID.
 
 ## 8. Read the results in order
 

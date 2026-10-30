@@ -3,9 +3,10 @@ A snapshot of the Results tab for Legacy runs: everything the main area shows (t
 metrics, tables, widgets and Plotly chart specs), in order, for two local Legacy runs
 and a cohort comparison on the synthetic universe.
 
-tests/fixtures/legacy_results_render_main.json holds the snapshot taken with main's code
-(c063100), before WRDS mode existed; test_wrds_results.py checks the branch renders the
-same. This file only uses helpers that exist on main, so it runs there unchanged:
+tests/fixtures/legacy_results_render_main.json holds the snapshot taken with main's code,
+which has no WRDS mode: first c063100, then c1c3c04 when main gained the analysis lists
+(PR #69); test_wrds_results.py checks the branch renders the same. This file only uses
+helpers that exist on main, so it runs there unchanged (in a worktree of main):
 
     uv run python -m tests.unit.results_snapshot <output.json>
 """

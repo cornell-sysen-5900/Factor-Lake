@@ -443,15 +443,27 @@ def add_to_history(run: Dict[str, Any]) -> None:
     Records a run in this session's history (st.session_state.analysis_history). It
     lives only in the session, so it lists only this user's own runs, including ones
     no longer shown as Results tabs (only the last MAX_SAVED_RUNS are kept there).
+    Entries with an ID are also kept in the browser (app/analysis_history.py). WRDS
+    entries also have a summary (data source, frequency, factors), as in the list of
+    all saved analyses, because their label only names the frequency.
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
     compute = run.get('compute') or {}
-    st.session_state.analysis_history = st.session_state.get('analysis_history', []) + [{
+    now = datetime.now(timezone.utc)
+    entry = {
         'label': run['label'],
         'analysis_id': compute.get('hash'),
         'how': 'opened' if compute.get('opened') else 'computed in Lambda' if compute else 'computed in this app',
-        'time': datetime.now().strftime('%H:%M:%S'),
-    }]
+        'time': now.strftime('%H:%M:%S UTC'),
+        'saved_at': now.strftime('%Y-%m-%dT%H:%M:%SZ'),
+    }
+    if run.get('data_mode') == 'wrds':
+        from src.wrds_jobs import build_wrds_job
+        from src.wrds_service import summarize_wrds_job
+        entry['summary'] = summarize_wrds_job(build_wrds_job(
+            'backtest', run['factors'], run['factor_directions'], run['settings'],
+            factor_labels=dict(zip(run['factors'], run['factor_labels']))))
+    st.session_state.analysis_history = st.session_state.get('analysis_history', []) + [entry]
 
 def open_saved_analysis(text: str) -> Dict[str, Any]:
     """
@@ -520,3 +532,9 @@ def get_results_store():
     """The S3 location saved analyses are read from (the market data's bucket and prefix)."""
     from src.s3_client import S3DataManager
     return S3DataManager()
+
+@st.cache_data(ttl=60, show_spinner=False)
+def list_all_saved_analyses(limit: int) -> Dict[str, Any]:
+    """The newest `limit` saved analyses of everyone (src/saved_analyses.list_saved_analyses), reused for a minute."""
+    from src.saved_analyses import list_saved_analyses
+    return list_saved_analyses(get_results_store(), limit=limit)

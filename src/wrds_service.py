@@ -13,7 +13,8 @@ src/backtest_service.py sends every job with data_mode 'wrds' here. For each job
 3. Otherwise runs the job and saves it: a backtest's holdings first, as
    backtest-results/<hash>.holdings.parquet (one row group per rebalance date), then
    the result JSON (backtest-results/<hash>.json), which lists the holdings' dates.
-   The result JSON therefore only exists once its holdings do.
+   The result JSON therefore only exists once its holdings do. Its S3 metadata has the
+   job's kind and a short summary, read by the list of saved analyses.
 """
 
 import logging
@@ -24,14 +25,25 @@ from typing import Any, Dict, Optional, Tuple
 import pandas as pd
 
 from .backtest_jobs import encode_saved, job_hash
-from .backtest_service import RESULTS_DIR, _error_code, _is_missing, result_file
+from .backtest_service import RESULTS_DIR, _error_code, _is_missing, result_file, summarize_job
 from .s3_client import S3DataManager
+from .wrds_calendar import FREQUENCY_LABELS
 from .wrds_data import WRDS_FILES, WrdsData, read_s3_wrds_data, wrds_dir
 from .wrds_engine import rank_stocks, run_wrds_backtest
 from .wrds_holdings import holdings_file, holdings_parquet
 from .wrds_jobs import describe_wrds_job, engine_arguments, validate_wrds_job, wrds_code_version
 
 logger = logging.getLogger(__name__)
+
+
+def summarize_wrds_job(job: Dict[str, Any]) -> str:
+    """
+    A short description of a WRDS job for listings: the data source and frequency, then
+    Legacy's summary, e.g. "WRDS, Quarterly | ROE (higher), ROA (higher) | Mixing |
+    2008-2026 | $1,000". Stored as S3 metadata, so it is kept ASCII and short.
+    """
+    frequency = FREQUENCY_LABELS.get(job['frequency'], job['frequency'])
+    return f"WRDS, {frequency} | {summarize_job(job)}".encode('ascii', 'replace').decode()[:500]
 
 
 class WrdsBacktestRunner:
@@ -128,6 +140,9 @@ class WrdsBacktestService:
             info = {
                 'computed_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
                 'compute_seconds': f"{time.perf_counter() - started:.3f}",
+                # Read by the list of saved analyses without downloading each result
+                'kind': job['kind'],
+                'summary': summarize_wrds_job(job),
             }
             body = encode_saved(job, result)   # with its job, so the hash alone can reopen it
             self._put(filename, body, 'application/json', info)

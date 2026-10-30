@@ -24,6 +24,8 @@ REBALANCE_MONTHS = {
     'monthly': tuple(range(1, 13)),
 }
 PERIODS_PER_YEAR = {'semiannual': 2, 'quarterly': 4, 'monthly': 12}
+# Display names, as the app and the saved analyses' summaries show them
+FREQUENCY_LABELS = {'semiannual': 'Semi-annual', 'quarterly': 'Quarterly', 'monthly': 'Monthly'}
 
 
 def _index(month: str) -> int:

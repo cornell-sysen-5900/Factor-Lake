@@ -6,7 +6,9 @@ Month ends are the last business day of each month (like CRSP's last trading day
 calendar month ends. Tests change the frames and rebuild WrdsData from them.
 """
 import io
+from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -28,6 +30,9 @@ class RangeS3(FakeS3):
     def __init__(self, can_list=True):
         super().__init__(can_list)
         self.gets = []   # (key, range or None)
+        # Objects the tests put straight into self.objects (the data files) have no put time;
+        # they count as saved before every put
+        self.modified = defaultdict(lambda: datetime(2026, 9, 30, tzinfo=timezone.utc))
 
     def get_object(self, Bucket, Key, Range=None):
         self.gets.append((Key, Range))

@@ -30,7 +30,10 @@ import streamlit_config as config
 
 import components.sidebar as sidebar
 from components.factor_selection import render_factor_selection, reset_factor_selection
-from components.results_tab import render_analysis_history, render_open_saved_analysis, render_saved_runs
+from components.results_tab import (OPENED_MESSAGE_KEY, render_all_saved_analyses, render_analysis_history,
+                                    render_earlier_analyses, render_open_saved_analysis,
+                                    render_saved_runs)
+from analysis_history import BROWSER_ANALYSES_KEY, earlier_analyses, sync_browser_analyses
 from components.data_viewer import render_data_viewer_tab, clear_viewer_data
 from components.about import render_about_tab
 
@@ -173,9 +176,14 @@ def main():
             # Performance Visualization phase
             if RUN_COMPLETE_KEY in st.session_state:
                 st.success(st.session_state.pop(RUN_COMPLETE_KEY))
+            if OPENED_MESSAGE_KEY in st.session_state:
+                st.success(st.session_state.pop(OPENED_MESSAGE_KEY))
             # Open a saved analysis by its ID (it becomes the newest run tab), and this session's history
             render_open_saved_analysis(has_runs=bool(st.session_state.get('saved_runs')))
-            render_analysis_history(st.session_state.get('analysis_history', []))
+            history = st.session_state.get('analysis_history', [])
+            render_analysis_history(history)
+            render_earlier_analyses(earlier_analyses(st.session_state.get(BROWSER_ANALYSES_KEY), history))
+            render_all_saved_analyses()
             if st.session_state.get('saved_runs'):
                 render_saved_runs(st.session_state.saved_runs)
             else:
@@ -193,6 +201,9 @@ def main():
         with tab_about:
             # Documentation phase
             render_about_tab()
+
+    # Keep this session's analysis IDs in the browser too, so they can be found in later sessions
+    sync_browser_analyses(st.session_state.get('analysis_history', []))
 
 if __name__ == "__main__":
     main()

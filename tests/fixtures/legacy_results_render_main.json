@@ -46,6 +46,7 @@
   "expander": [
    "Open a saved analysis",
    "This session's analyses (1)",
+   "All saved analyses",
    "Run Cohort Comparison"
   ],
   "header": [
@@ -68,7 +69,7 @@
    "**ROA %**",
    "---",
    "---",
-   "**Run 1: ROE using 9/30 Data +1** \u00b7 computed in this app at 02:39:36",
+   "**Run 1: ROE using 9/30 Data +1** \u00b7 computed in this app at 00:09:10 UTC",
    "**Volatility (Raw)**",
    "**Volatility (Excess)**",
    "**RF Rate Source**\n\nFRED 4 Week T-Bill (Oct 1)"
@@ -1092,6 +1093,7 @@
   "expander": [
    "Open a saved analysis",
    "This session's analyses (2)",
+   "All saved analyses",
    "Run Cohort Comparison"
   ],
   "header": [
@@ -1103,8 +1105,8 @@
   "markdown": [
    "<style>\n    /* Header container with icon */\n    .main-header-container {\n        display: flex;\n        align-items: center;\n        justify-content: center;\n        position: relative;\n        margin-bottom: 2rem;\n    }\n\n    /* Typography and header styling */\n    .main-header {\n        font-size: 2.5rem;\n        font-weight: bold;\n        color: #1f77b4;\n        text-align: center;\n        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);\n    }\n\n    /* Documentation icon link */\n    .docs-icon-link {\n        font-size: 2rem;\n        margin-left: 1.5rem;\n        text-decoration: none;\n        cursor: pointer;\n        transition: transform 0.3s ease, opacity 0.3s ease;\n        opacity: 0.7;\n    }\n\n    .docs-icon-link:hover {\n        transform: scale(1.2) rotate(5deg);\n        opacity: 1;\n    }\n\n    /* Global component styling */\n    .stAlert {\n        margin-top: 1rem;\n        border-radius: 10px;\n    }\n\n    /* Interactive element transitions */\n    .stButton>button {\n        border-radius: 8px;\n        font-weight: 600;\n        transition: all 0.3s ease;\n    }\n\n    .stButton>button:hover {\n        transform: translateY(-2px);\n        box-shadow: 0 4px 12px rgba(0,0,0,0.15);\n    }\n\n    /* Factor Selection: compact pill-style \"add factor\" buttons */\n    [class*=\"st-key-factor_add_\"] button {\n        min-height: 0;\n        padding: 0.2rem 0.75rem;\n        border-radius: 999px;\n        font-weight: 400;\n        white-space: nowrap;\n    }\n    [class*=\"st-key-factor_add_\"] button p {\n        font-size: 0.875rem;\n    }\n    [class*=\"st-key-factor_add_\"] {\n        margin-bottom: -0.5rem;\n    }\n\n    /* Navigation panel aesthetic (Grey with Cyan border) */\n    [data-testid=\"stSidebar\"] {\n        background-color: #DEDFE0;\n        border-right: 4px solid #3BD2E3;\n        padding-left: 8px;\n    }\n\n    [data-testid=\"stSidebar\"] h2 {\n        color: #1f77b4;\n    }\n\n    /* Financial KPI display formatting */\n    [data-testid=\"stMetricValue\"] {\n        font-size: 2rem;\n        font-weight: bold;\n    }\n\n    /* Information container cards */\n    .custom-card {\n        padding: 20px;\n        border-radius: 10px;\n        background-color: #ffffff;\n        box-shadow: 0 2px 8px rgba(0,0,0,0.1);\n        margin: 10px 0;\n        color: #31333F;\n    }\n\n    /* Branding: Hiding standard application headers and footers */\n    #MainMenu {visibility: hidden;}\n    footer {visibility: hidden;}\n\n    /* Responsive breakpoints */\n    @media (max-width: 768px) {\n        .main-header {\n            font-size: 1.8rem;\n        }\n\n        .main-header-container {\n            flex-direction: column;\n            gap: 0.5rem;\n        }\n\n        .docs-icon-link {\n            margin-left: 0;\n            font-size: 1.5rem;\n        }\n    }\n</style>",
    "<div class=\"main-header-container\"><div class=\"main-header\">Factor-Lake Portfolio Analysis</div><a href=\"https://cornell-sysen-5900.github.io/Factor-Lake/\" target=\"_blank\" class=\"docs-icon-link\" title=\"View Documentation\">\ud83d\udcda</a></div>",
-   "**Run 2: ROE using 9/30 Data +1** \u00b7 computed in this app at 02:39:36",
-   "**Run 1: ROE using 9/30 Data +1** \u00b7 computed in this app at 02:39:36",
+   "**Run 2: ROE using 9/30 Data +1** \u00b7 computed in this app at 00:09:12 UTC",
+   "**Run 1: ROE using 9/30 Data +1** \u00b7 computed in this app at 00:09:10 UTC",
    "**Volatility (Raw)**",
    "**Volatility (Excess)**",
    "**RF Rate Source**\n\nFRED 4 Week T-Bill (Oct 1)"
@@ -2144,6 +2146,7 @@
   "expander": [
    "Open a saved analysis",
    "This session's analyses (2)",
+   "All saved analyses",
    "Run Cohort Comparison"
   ],
   "header": [
@@ -2166,8 +2169,8 @@
    "**ROA %**",
    "---",
    "---",
-   "**Run 2: ROE using 9/30 Data +1** \u00b7 computed in this app at 02:39:36",
-   "**Run 1: ROE using 9/30 Data +1** \u00b7 computed in this app at 02:39:36",
+   "**Run 2: ROE using 9/30 Data +1** \u00b7 computed in this app at 00:09:12 UTC",
+   "**Run 1: ROE using 9/30 Data +1** \u00b7 computed in this app at 00:09:10 UTC",
    "**Volatility (Raw)**",
    "**Volatility (Excess)**",
    "**RF Rate Source**\n\nFRED 4 Week T-Bill (Oct 1)"
@@ -3192,6 +3195,7 @@
   "expander": [
    "Open a saved analysis",
    "This session's analyses (2)",
+   "All saved analyses",
    "Run Cohort Comparison"
   ],
   "header": [
@@ -3203,8 +3207,8 @@
   "markdown": [
    "<style>\n    /* Header container with icon */\n    .main-header-container {\n        display: flex;\n        align-items: center;\n        justify-content: center;\n        position: relative;\n        margin-bottom: 2rem;\n    }\n\n    /* Typography and header styling */\n    .main-header {\n        font-size: 2.5rem;\n        font-weight: bold;\n        color: #1f77b4;\n        text-align: center;\n        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);\n    }\n\n    /* Documentation icon link */\n    .docs-icon-link {\n        font-size: 2rem;\n        margin-left: 1.5rem;\n        text-decoration: none;\n        cursor: pointer;\n        transition: transform 0.3s ease, opacity 0.3s ease;\n        opacity: 0.7;\n    }\n\n    .docs-icon-link:hover {\n        transform: scale(1.2) rotate(5deg);\n        opacity: 1;\n    }\n\n    /* Global component styling */\n    .stAlert {\n        margin-top: 1rem;\n        border-radius: 10px;\n    }\n\n    /* Interactive element transitions */\n    .stButton>button {\n        border-radius: 8px;\n        font-weight: 600;\n        transition: all 0.3s ease;\n    }\n\n    .stButton>button:hover {\n        transform: translateY(-2px);\n        box-shadow: 0 4px 12px rgba(0,0,0,0.15);\n    }\n\n    /* Factor Selection: compact pill-style \"add factor\" buttons */\n    [class*=\"st-key-factor_add_\"] button {\n        min-height: 0;\n        padding: 0.2rem 0.75rem;\n        border-radius: 999px;\n        font-weight: 400;\n        white-space: nowrap;\n    }\n    [class*=\"st-key-factor_add_\"] button p {\n        font-size: 0.875rem;\n    }\n    [class*=\"st-key-factor_add_\"] {\n        margin-bottom: -0.5rem;\n    }\n\n    /* Navigation panel aesthetic (Grey with Cyan border) */\n    [data-testid=\"stSidebar\"] {\n        background-color: #DEDFE0;\n        border-right: 4px solid #3BD2E3;\n        padding-left: 8px;\n    }\n\n    [data-testid=\"stSidebar\"] h2 {\n        color: #1f77b4;\n    }\n\n    /* Financial KPI display formatting */\n    [data-testid=\"stMetricValue\"] {\n        font-size: 2rem;\n        font-weight: bold;\n    }\n\n    /* Information container cards */\n    .custom-card {\n        padding: 20px;\n        border-radius: 10px;\n        background-color: #ffffff;\n        box-shadow: 0 2px 8px rgba(0,0,0,0.1);\n        margin: 10px 0;\n        color: #31333F;\n    }\n\n    /* Branding: Hiding standard application headers and footers */\n    #MainMenu {visibility: hidden;}\n    footer {visibility: hidden;}\n\n    /* Responsive breakpoints */\n    @media (max-width: 768px) {\n        .main-header {\n            font-size: 1.8rem;\n        }\n\n        .main-header-container {\n            flex-direction: column;\n            gap: 0.5rem;\n        }\n\n        .docs-icon-link {\n            margin-left: 0;\n            font-size: 1.5rem;\n        }\n    }\n</style>",
    "<div class=\"main-header-container\"><div class=\"main-header\">Factor-Lake Portfolio Analysis</div><a href=\"https://cornell-sysen-5900.github.io/Factor-Lake/\" target=\"_blank\" class=\"docs-icon-link\" title=\"View Documentation\">\ud83d\udcda</a></div>",
-   "**Run 2: ROE using 9/30 Data +1** \u00b7 computed in this app at 02:39:36",
-   "**Run 1: ROE using 9/30 Data +1** \u00b7 computed in this app at 02:39:36",
+   "**Run 2: ROE using 9/30 Data +1** \u00b7 computed in this app at 00:09:12 UTC",
+   "**Run 1: ROE using 9/30 Data +1** \u00b7 computed in this app at 00:09:10 UTC",
    "### Cohort Performance Summary (top vs bottom 10%)",
    "**Volatility (Raw)**",
    "**Volatility (Excess)**",

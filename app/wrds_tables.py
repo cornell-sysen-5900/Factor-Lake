@@ -15,8 +15,8 @@ import pandas as pd
 
 from app.holdings_table import holdings_number_formats
 from app.streamlit_config import WRDS_MILLIONS_FACTORS, WRDS_PERCENT_FACTORS
+from src.wrds_calendar import FREQUENCY_LABELS  # noqa: F401 (the app's frequency names)
 
-FREQUENCY_LABELS = {'semiannual': 'Semi-annual', 'quarterly': 'Quarterly', 'monthly': 'Monthly'}
 # The three benchmark roles of a WRDS result, its result keys, and the short role name
 BENCHMARKS = [('benchmark', 'benchmark_returns', ''), ('value', 'value_benchmark_returns', 'Value'),
               ('growth', 'growth_benchmark_returns', 'Growth')]
