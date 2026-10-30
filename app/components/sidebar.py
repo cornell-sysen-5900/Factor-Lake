@@ -41,6 +41,46 @@ def _render_data_mode(backtest_lambda: str, on_change: Optional[Callable[[], Non
     return choice == 'WRDS'
 
 
+# Only analysis inputs are reset; the Lambda execution preference and the data source are kept.
+PARAMETER_DEFAULTS = {
+    'restrict_fossil_fuels_input': False,
+    'weighting_method_input': 'Equal Weight',
+    'factor_combination_input': 'Mixing',
+    'delisting_strategy_input': 'Zero Return',
+    'sector_filter_enabled_input': False,
+    'start_year_input': 2002,
+    'end_year_input': 2024,
+    'initial_aum_input': 1000.0,
+}
+# WRDS mode's inputs: the shared ones, with its frequency and years in place of Legacy's
+# delisting strategy and years
+WRDS_PARAMETER_DEFAULTS = {
+    **{k: v for k, v in PARAMETER_DEFAULTS.items()
+       if k not in ('delisting_strategy_input', 'start_year_input', 'end_year_input')},
+    'wrds_frequency_input': config.WRDS_DEFAULT_FREQUENCY,
+    'wrds_start_year_input': WRDS_FIRST_YEAR,
+    'wrds_end_year_input': WRDS_LAST_YEAR,
+}
+
+
+def clear_sidebar_parameters() -> None:
+    """Button callback helper: explicitly send default values to the visible inputs."""
+    wrds = st.session_state.get(DATA_MODE_KEY) == 'WRDS'
+    shown, hidden = ((WRDS_PARAMETER_DEFAULTS, PARAMETER_DEFAULTS) if wrds
+                     else (PARAMETER_DEFAULTS, WRDS_PARAMETER_DEFAULTS))
+    # The other data source's own inputs are not on screen: forget them, so they
+    # show their defaults when the data source is switched.
+    for key in hidden.keys() - shown.keys():
+        st.session_state.pop(key, None)
+    # Assigning values tells the browser to update its controls. Merely deleting
+    # their keys can leave the previous values visible on the frontend.
+    st.session_state.update(shown)
+    # The sector multiselects disappear when filtering is disabled. When enabled
+    # again they use render_sidebar's existing default (all available sectors).
+    st.session_state.pop('selected_sectors_input', None)
+    st.session_state.pop('wrds_sectors_input', None)
+
+
 def render_sidebar(sector_options: List[str], data_source_label: str,
                    backtest_lambda: str = '',
                    on_data_mode_change: Optional[Callable[[], None]] = None) -> Dict[str, Any]:
@@ -91,6 +131,7 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
         restrict_fossil_fuels = st.checkbox(
             "Restrict Fossil Fuel Companies",
             value=False,
+            key="restrict_fossil_fuels_input",
             help="Exclude coal, oil, gas and petroleum companies."
         )
         
@@ -102,6 +143,7 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
             "Select weighting method:",
             options=["Equal Weight", "Market Cap Weight"],
             index=0,
+            key="weighting_method_input",
             help="Equal: same dollars per stock. Market Cap: sized by company value."
         )
         use_market_cap_weight = (weighting_method == "Market Cap Weight")
@@ -149,6 +191,7 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
                 "How to treat delisted positions:",
                 options=["Zero Return", "Hold Cash", "Reinvest"],
                 index=0,
+                key="delisting_strategy_input",
                 help="Zero Return: earns 0%. Hold Cash: earns the risk free rate. Reinvest: spread across remaining stocks."
             )
             delisting_map = {"Zero Return": "zero_return", "Hold Cash": "hold_cash", "Reinvest": "reinvest"}
@@ -161,6 +204,7 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
         sector_filter_enabled = st.checkbox(
             "Enable Sector Filter",
             value=False,
+            key="sector_filter_enabled_input",
             help="Limit the portfolio to chosen sectors."
         )
         selected_sectors = []
@@ -180,6 +224,7 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
                     "Include following sectors:",
                     options=sector_options,
                     default=sector_options,
+                    key="selected_sectors_input",
                     help="Only stocks in these sectors can be held."
                 )
 
@@ -203,6 +248,7 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
             value=1000.0,
             step=100.0,
             format="%.0f",
+            key="initial_aum_input",
             help="Starting portfolio value."
         )
 

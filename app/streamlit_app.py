@@ -29,7 +29,8 @@ import streamlit_css as css
 import streamlit_config as config
 
 import components.sidebar as sidebar
-from components.factor_selection import render_factor_selection, reset_factor_selection
+from components.factor_selection import (clear_factor_selection, render_factor_selection,
+                                         reset_factor_selection)
 from components.results_tab import (OPENED_MESSAGE_KEY, render_all_saved_analyses, render_analysis_history,
                                     render_earlier_analyses, render_open_saved_analysis,
                                     render_saved_runs)
@@ -61,6 +62,21 @@ MAIN_TABS_WIDGET_KEY = "main_tabs_bar"
 MAIN_TABS_VERSION_KEY = "main_tabs_bar_version"
 # Set after a successful run: the confirmation to show once the Results tab opens
 RUN_COMPLETE_KEY = "run_complete_message"
+PARAMETERS_CLEARED_KEY = "parameters_cleared_message"
+
+
+def _clear_parameters() -> None:
+    """Reset analysis inputs before widgets render, without touching saved runs or caches."""
+    sidebar.clear_sidebar_parameters()
+    clear_factor_selection()
+    # A local run must load a universe filtered by the new settings. Keep raw_data
+    # so Load Market Data can reuse it without another download. Saved runs keep
+    # their own references to the old filtered data, so never mutate that frame.
+    st.session_state.data_loaded = False
+    st.session_state.rdata = None
+    st.session_state.loaded_filters = None
+    clear_viewer_data()
+    st.session_state[PARAMETERS_CLEARED_KEY] = True
 
 def _main_tabs_widget_key() -> str:
     """The current widget key of the main tab bar (see MAIN_TABS_WIDGET_KEY)."""
@@ -163,6 +179,17 @@ def main():
 
     if tab_analysis.open:
         with tab_analysis:
+            st.button(
+                "Clear Parameters", key="clear_parameters", on_click=_clear_parameters,
+                help="Remove selected factors and restore analysis settings to their defaults. "
+                     "Saved results and cached source data are kept.",
+            )
+            if st.session_state.pop(PARAMETERS_CLEARED_KEY, False):
+                # WRDS runs always go to Lambda, without Load Market Data
+                next_step = ("Choose new inputs, then run the analysis." if use_lambda or data_mode == 'wrds' else
+                             "Choose new inputs, then click Load Market Data and Run Portfolio Analysis.")
+                st.info(f"Parameters cleared. {next_step} Your saved results are kept.")
+
             # Configuration phase: Capture factors and directions
             selected_factor_names, factor_directions = render_factor_selection(data_mode)
 

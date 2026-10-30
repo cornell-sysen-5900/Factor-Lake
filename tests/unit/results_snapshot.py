@@ -5,7 +5,8 @@ and a cohort comparison on the synthetic universe.
 
 tests/fixtures/legacy_results_render_main.json holds the snapshot taken with main's code,
 which has no WRDS mode: first c063100, then c1c3c04 when main gained the analysis lists
-(PR #69); test_wrds_results.py checks the branch renders the same. This file only uses
+(PR #69). PR #67 added its Clear Parameters button to the two steps that show the
+Analysis tab (the only change). test_wrds_results.py checks the branch renders the same. This file only uses
 helpers that exist on main, so it runs there unchanged (in a worktree of main):
 
     uv run python -m tests.unit.results_snapshot <output.json>

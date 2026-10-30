@@ -1,6 +1,7 @@
 {
  "run1": {
   "button": [
+   "Clear Parameters",
    "12-Mo Momentum %",
    "6-Mo Momentum %",
    "1-Mo Momentum %",
@@ -2100,6 +2101,7 @@
  },
  "run2": {
   "button": [
+   "Clear Parameters",
    "12-Mo Momentum %",
    "6-Mo Momentum %",
    "1-Mo Momentum %",

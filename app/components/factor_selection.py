@@ -54,6 +54,11 @@ def reset_factor_selection() -> None:
             st.session_state.pop(f"factor_dir_{meta['key']}", None)
 
 
+def clear_factor_selection() -> None:
+    """Clear this session's factor inputs, including previously removed rows (Clear Parameters)."""
+    reset_factor_selection()
+
+
 def render_factor_selection(data_mode: str = 'legacy') -> Tuple[List[str], Dict[str, str]]:
     """
     Renders the factor builder: the available factors grouped by category
