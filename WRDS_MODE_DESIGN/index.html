@@ -1,0 +1,4743 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="API Reference and Guides for the Factor-Lake Portfolio Analysis System">
+      
+      
+      
+      
+        <link rel="prev" href="../AWS_LAMBDA_BACKTESTS/">
+      
+      
+        <link rel="next" href="../SUPABASE_SETUP/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>WRDS Mode Design - Factor-Lake</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="red" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#wrds-mode-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Factor-Lake" class="md-header__button md-logo" aria-label="Factor-Lake" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Factor-Lake
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              WRDS Mode Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="red" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="red" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../FACTOR_LAKE_USER_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/src/backtest_engine/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Factor-Lake" class="md-nav__button md-logo" aria-label="Factor-Lake" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Factor-Lake
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../FACTOR_LAKE_USER_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Factor Lake User Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DEV_ONBOARDING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Onboarding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../STREAMLIT_ADMIN_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streamlit Admin Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DOCS_CONTRIBUTOR_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Contributor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DEPLOYMENT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AWS_S3_DATA/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS S3 Data Source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AWS_LAMBDA_BACKTESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtests in AWS Lambda
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WRDS Mode Design
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WRDS Mode Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-where-legacy-and-wrds-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Where Legacy and WRDS split
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Where Legacy and WRDS split">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-the-split-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 The split points
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-how-legacy-results-stay-unchanged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 How Legacy results stay unchanged
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-wrds-factors-and-sectors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. WRDS factors and sectors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. WRDS factors and sectors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-factor-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Factor list
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-sectors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Sectors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-fossil-fuel-filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Fossil fuel filter
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-rebalance-dates-and-look-ahead-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Rebalance dates and look-ahead rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Rebalance dates and look-ahead rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-rebalance-months" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Rebalance months
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-start-and-end-years" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Start and end years
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-look-ahead-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Look-ahead rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-benchmarks-and-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Benchmarks and metrics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Benchmarks and metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-benchmarks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Benchmarks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-jobs-cache-keys-saved-ids-and-holdings-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Jobs, cache keys, saved IDs and holdings files
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Jobs, cache keys, saved IDs and holdings files">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-wrds-jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 WRDS jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-cache-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Cache key
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-where-results-are-stored" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Where results are stored
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-saved-ids-old-and-new" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Saved IDs, old and new
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-holdings-as-parquet-loaded-per-date" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 Holdings as Parquet, loaded per date
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-how-lambda-loads-the-wrds-data-with-measurements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. How Lambda loads the WRDS data, with measurements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. How Lambda loads the WRDS data, with measurements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-files-and-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Files and columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-measured-on-the-real-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Measured on the real files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-estimates-for-lambda-monthly-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Estimates for Lambda (monthly run)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-measured-with-the-stage-3-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 Measured with the stage 3 engine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-measured-in-the-dev-lambda-stage-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 Measured in the dev Lambda (stage 4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-the-vectorized-engine-and-the-legacy-match-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. The vectorized engine and the Legacy match test
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. The vectorized engine and the Legacy match test">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Engine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-deliberate-differences-from-the-legacy-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Deliberate differences from the Legacy engine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-the-match-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 The match test
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-each-feature-in-wrds-mode-and-the-app-without-lambda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Each feature in WRDS mode, and the app without Lambda
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-test-plan-open-questions-and-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Test plan, open questions and risks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Test plan, open questions and risks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-tests-new-files-existing-tests-are-not-edited" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 Tests (new files; existing tests are not edited)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 Open questions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 Risks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-stages-and-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Stages and files
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SUPABASE_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supabase Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SUPABASE_UPLOAD_TOOL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supabase Upload Tool
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SUPABASE_MAINTENANCE_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supabase Maintenance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../STREAMLIT_STYLING_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streamlit Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Bandit%20%26%20Safety/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security Scanning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../REORGANIZATION_SUMMARY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reorganization Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    src
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    src
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/backtest_engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    backtest_engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/backtest_jobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    backtest_jobs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/backtest_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    backtest_service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    benchmarks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/data_standardization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    data_standardization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/factor_registry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factor_registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/factor_utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factor_utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/factors_doc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factors_doc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/lambda_client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    lambda_client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/performance_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    performance_metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/portfolio/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    portfolio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/portfolio_filters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    portfolio_filters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/s3_client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    s3_client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/saved_analyses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    saved_analyses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/supabase_client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    supabase_client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/universe_selection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    universe_selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_calendar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_calendar
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_factors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_factors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_holdings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_holdings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_jobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_jobs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    app
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    app
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/analysis_history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    analysis_history
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_2" id="__nav_3_2_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    components
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    components
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/about/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    about
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/data_viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    data_viewer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/factor_selection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factor_selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/results_tab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    results_tab
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/sidebar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidebar
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/wrds_results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/holdings_table/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    holdings_table
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/saved_runs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    saved_runs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/streamlit_app/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_app
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/streamlit_config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/streamlit_css/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_css
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/streamlit_utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/viewer_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    viewer_data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/wrds_tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visualizations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Visualizations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/Visualizations/portfolio_growth_plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    portfolio_growth_plot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/Visualizations/top_bottom_portfolio_plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    top_bottom_portfolio_plot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/Visualizations/wrds_plots/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_plots
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-where-legacy-and-wrds-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Where Legacy and WRDS split
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Where Legacy and WRDS split">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-the-split-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 The split points
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-how-legacy-results-stay-unchanged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 How Legacy results stay unchanged
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-wrds-factors-and-sectors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. WRDS factors and sectors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. WRDS factors and sectors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-factor-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Factor list
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-sectors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Sectors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-fossil-fuel-filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Fossil fuel filter
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-rebalance-dates-and-look-ahead-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Rebalance dates and look-ahead rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Rebalance dates and look-ahead rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-rebalance-months" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Rebalance months
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-start-and-end-years" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Start and end years
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-look-ahead-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Look-ahead rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-benchmarks-and-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Benchmarks and metrics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Benchmarks and metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-benchmarks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Benchmarks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-jobs-cache-keys-saved-ids-and-holdings-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Jobs, cache keys, saved IDs and holdings files
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Jobs, cache keys, saved IDs and holdings files">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-wrds-jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 WRDS jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-cache-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Cache key
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-where-results-are-stored" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Where results are stored
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-saved-ids-old-and-new" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Saved IDs, old and new
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-holdings-as-parquet-loaded-per-date" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 Holdings as Parquet, loaded per date
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-how-lambda-loads-the-wrds-data-with-measurements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. How Lambda loads the WRDS data, with measurements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. How Lambda loads the WRDS data, with measurements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-files-and-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Files and columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-measured-on-the-real-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Measured on the real files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-estimates-for-lambda-monthly-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Estimates for Lambda (monthly run)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-measured-with-the-stage-3-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 Measured with the stage 3 engine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-measured-in-the-dev-lambda-stage-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 Measured in the dev Lambda (stage 4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-the-vectorized-engine-and-the-legacy-match-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. The vectorized engine and the Legacy match test
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. The vectorized engine and the Legacy match test">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Engine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-deliberate-differences-from-the-legacy-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Deliberate differences from the Legacy engine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-the-match-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 The match test
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-each-feature-in-wrds-mode-and-the-app-without-lambda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Each feature in WRDS mode, and the app without Lambda
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-test-plan-open-questions-and-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Test plan, open questions and risks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Test plan, open questions and risks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-tests-new-files-existing-tests-are-not-edited" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 Tests (new files; existing tests are not edited)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 Open questions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 Risks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-stages-and-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Stages and files
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="wrds-mode-design">WRDS mode: design</h1>
+<p>Status: <strong>built</strong> (all six stages, branch <code>feature/wrds-mode</code>), validated on the dev function <code>sysen5900-factor-lake-backtest-dev</code>. The review's final decisions are in <a href="#decisions">Decisions</a> and are worked into the sections below; where the build differs from the first design, the section says so ("As built" notes in 6, 7 and 8, and the stage table in 10). Using WRDS mode: <code>DOCS/FACTOR_LAKE_USER_GUIDE.md</code>, section 15. Running and deploying it: <code>DOCS/AWS_LAMBDA_BACKTESTS.md</code>, section 9, with the validation table.</p>
+<p>WRDS mode is a second data source next to today's data (called <strong>Legacy</strong> below). It backtests on the point-in-time WRDS panel (<code>pipeline/DATA_DICTIONARY.md</code>) with semi-annual, quarterly or monthly rebalancing, and it runs <strong>only in AWS Lambda</strong>: the app sends the job and shows the result. Legacy keeps working exactly as it does today.</p>
+<p>Contents:</p>
+<ol>
+<li><a href="#1-where-legacy-and-wrds-split">Where Legacy and WRDS split</a></li>
+<li><a href="#2-wrds-factors-and-sectors">WRDS factors and sectors</a></li>
+<li><a href="#3-rebalance-dates-and-look-ahead-rules">Rebalance dates and look-ahead rules</a></li>
+<li><a href="#4-benchmarks-and-metrics">Benchmarks and metrics</a></li>
+<li><a href="#5-jobs-cache-keys-saved-ids-and-holdings-files">Jobs, cache keys, saved IDs and holdings files</a></li>
+<li><a href="#6-how-lambda-loads-the-wrds-data-with-measurements">How Lambda loads the WRDS data, with measurements</a></li>
+<li><a href="#7-the-vectorized-engine-and-the-legacy-match-test">The vectorized engine and the Legacy match test</a></li>
+<li><a href="#8-each-feature-in-wrds-mode-and-the-app-without-lambda">Each feature in WRDS mode, and the app without Lambda</a></li>
+<li><a href="#9-test-plan-open-questions-and-risks">Test plan, open questions and risks</a></li>
+<li><a href="#10-stages-and-files">Stages and files</a></li>
+</ol>
+<p>A rule for this document and the code that follows: the WRDS data is licensed, so <strong>no statistics of the data</strong> (row counts, coverage, returns) go into the repo (see <code>pipeline/README.md</code>). The measurements in section 6 are file sizes, memory and run times only.</p>
+<h2 id="decisions">Decisions</h2>
+<p>Decided in the stage 1 review:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Question</th>
+<th>Decision</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Delisting during a quarter or half year</td>
+<td>The money is held as cash earning the risk-free rate until the next rebalance</td>
+<td>3.3</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Ranked stocks</td>
+<td>A new <code>ranked</code> job that ranks every stock on one rebalance date at a time</td>
+<td>5.1, 8</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Fossil fuel filter</td>
+<td>Keep the Legacy mapping (the GICS and SIC codes in 2.3; Oil &amp; Gas Storage &amp; Transportation is not excluded)</td>
+<td>2.3</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Default directions where research is mixed</td>
+<td>Lower is better for all of them. The 1-month factor is named "1-Month Return (Reversal)". Every tooltip that defaults to Lower says why in one short sentence</td>
+<td>2.1</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Unclassified stocks</td>
+<td>Left out when the sector filter is on</td>
+<td>2.2</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Today's GICS codes for the sector filter</td>
+<td>Accepted, documented as a limitation</td>
+<td>2.2, R3</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Defaults</td>
+<td>Quarterly, 2008-2026</td>
+<td>8</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Missing return without a delisting</td>
+<td>0% for that month; the result reports how many stock-months that was</td>
+<td>3.3</td>
+</tr>
+<tr>
+<td>9</td>
+<td>ETF total-return benchmarks</td>
+<td>Accepted, labelled for example "IWM (ETF, total return)"</td>
+<td>4.1</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Missing risk-free month</td>
+<td>Filled with <code>tbill_3m / 12</code>, and the filled months are flagged in the result</td>
+<td>4.1</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Top %</td>
+<td>Fixed at 10%, as in Legacy</td>
+<td>5.1</td>
+</tr>
+<tr>
+<td>-</td>
+<td>Legacy invariant (correction)</td>
+<td>Legacy <strong>results</strong> must not change; its code version and cache keys may. Routing WRDS jobs may edit a file in <code>ENGINE_SOURCES</code> (for example <code>backtest_jobs.py</code>)</td>
+<td>1.2</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="1-where-legacy-and-wrds-split">1. Where Legacy and WRDS split</h2>
+<h3 id="11-the-split-points">1.1 The split points</h3>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Legacy (unchanged)</th>
+<th>WRDS (new)</th>
+<th>Where the choice is made</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sidebar</td>
+<td>today's controls</td>
+<td>Data source, frequency, GICS sectors, no delisting option, no Lambda switch</td>
+<td><code>settings['data_mode']</code>, new key; Legacy controls are drawn by the same code with the same widget keys</td>
+</tr>
+<tr>
+<td>Factor list</td>
+<td><code>FACTOR_METADATA</code></td>
+<td><code>WRDS_FACTOR_METADATA</code> (section 2)</td>
+<td><code>render_factor_selection(data_mode)</code></td>
+</tr>
+<tr>
+<td>Run</td>
+<td><code>run_backtest_logic</code> (local or Lambda)</td>
+<td><code>run_wrds_backtest</code> (Lambda only)</td>
+<td>one <code>if</code> at the top of <code>run_backtest_logic</code>; the Legacy body below it is not edited</td>
+</tr>
+<tr>
+<td>Job</td>
+<td><code>build_job</code> (<code>src/backtest_jobs.py</code>)</td>
+<td><code>build_wrds_job</code> (<code>src/wrds_jobs.py</code>)</td>
+<td>the job's <code>data_mode</code> key: absent means Legacy</td>
+</tr>
+<tr>
+<td>Lambda</td>
+<td><code>BacktestService.run</code></td>
+<td><code>WrdsBacktestService.run</code></td>
+<td>one dispatch on <code>job.get('data_mode')</code> in <code>BacktestService.handle_event</code></td>
+</tr>
+<tr>
+<td>Engine</td>
+<td><code>src/backtest_engine.py</code></td>
+<td><code>src/wrds_engine.py</code> (vectorized)</td>
+<td>separate modules</td>
+</tr>
+<tr>
+<td>Data</td>
+<td><code>full_precision_test.parquet</code>, <code>last_price_mapping.parquet</code></td>
+<td><code>wrds_2026_10/factor_panel_monthly.parquet</code>, <code>returns_monthly.parquet</code>, <code>market_monthly.parquet</code></td>
+<td>the service that runs the job</td>
+</tr>
+<tr>
+<td>Benchmarks, metrics</td>
+<td><code>src/benchmarks.py</code>, <code>src/performance_metrics.py</code></td>
+<td><code>src/wrds_metrics.py</code> (IWM, IWN, IWO, Fama-French rf)</td>
+<td>separate modules</td>
+</tr>
+<tr>
+<td>Results tab</td>
+<td><code>render_results_tab</code></td>
+<td><code>render_wrds_results_tab</code> (new <code>app/components/wrds_results.py</code>, reusing Legacy's render helpers read-only)</td>
+<td><code>run['data_mode']</code></td>
+</tr>
+<tr>
+<td>Saved IDs</td>
+<td><code>backtest-results/&lt;hash&gt;.json</code></td>
+<td>the same file layout, plus <code>&lt;hash&gt;.holdings.parquet</code></td>
+<td>the saved job's <code>data_mode</code></td>
+</tr>
+<tr>
+<td>Data Viewer</td>
+<td>Legacy data</td>
+<td>stays Legacy</td>
+<td>not split</td>
+</tr>
+</tbody>
+</table>
+<h3 id="12-how-legacy-results-stay-unchanged">1.2 How Legacy results stay unchanged</h3>
+<p>The invariant is that <strong>Legacy results do not change</strong>. Legacy's code version and cache keys may change: editing a file in <code>ENGINE_SOURCES</code> (for example <code>backtest_jobs.py</code>, to route WRDS jobs) changes the code version, so Legacy results are computed once more under new keys, with the same numbers. Old Legacy analysis IDs still open, because opening reads the saved file by its ID and never recomputes it (5.4).</p>
+<ol>
+<li><strong>Engine.</strong> The Legacy engine (<code>backtest_engine.py</code>, <code>benchmarks.py</code>, <code>performance_metrics.py</code>, <code>universe_selection.py</code>, ...) is not edited. WRDS code lives in new <code>src/wrds_*.py</code> modules that may import Legacy files but do not change them. Files that only route jobs, such as <code>backtest_jobs.py</code>, may get a WRDS branch.</li>
+<li><strong>Job.</strong> Legacy jobs are still built by <code>build_job</code>, which reads only the keys it knows. The sidebar's Legacy settings are exactly as on <code>main</code> (no <code>data_mode</code> key), and a Legacy job never has a <code>data_mode</code> key.</li>
+<li><strong>Data.</strong> Legacy reads the same two files. The WRDS data sits in its own folder (<code>factor-lake-data/wrds_2026_10/</code>), so publishing it changes nothing Legacy reads.</li>
+<li><strong>Local Legacy runs.</strong> <code>run_backtest_logic</code>'s Legacy body, <code>load_and_process_data</code> and <code>select_universe</code> are not edited. The WRDS branch is decided before the Legacy code runs.</li>
+<li><strong>Pinned results.</strong> <code>tests/unit/test_legacy_pinned.py</code> runs fixed Legacy jobs (Mixing and Integrating, all three delisting strategies, equal and cap weight, a sector filter, a cohort comparison) through <code>build_job</code> and <code>run_job</code>. It compares the whole result, holdings included, with <code>tests/fixtures/legacy_pinned_results.json</code>, which was captured from <code>main</code> (c063100) before any WRDS code existed.</li>
+<li><strong>Tests.</strong> Every existing test passes without being edited. New behaviour gets new test files. If an existing app test has to change because the sidebar gained a widget, that is a sign the Legacy path changed, and the change is reviewed as such.</li>
+</ol>
+<hr />
+<h2 id="2-wrds-factors-and-sectors">2. WRDS factors and sectors</h2>
+<h3 id="21-factor-list">2.1 Factor list</h3>
+<p>Every factor is a column of <code>factor_panel_monthly.parquet</code> whose value at month end t was public by t (data dictionary, "Point in time"). The display names describe the WRDS definition, so they are not Legacy's names (no "9/30 Data"). <strong>Direction</strong> is the default when the factor is added: Higher = buy the highest values (<code>'top'</code>), Lower = buy the lowest (<code>'bottom'</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Column</th>
+<th>Display name</th>
+<th>Default</th>
+<th>Tooltip</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Momentum</td>
+<td><code>mom_12_1</code></td>
+<td>12-1 Mo Momentum</td>
+<td>Higher</td>
+<td>Return over the past 12 months, skipping the most recent month.</td>
+</tr>
+<tr>
+<td>Momentum</td>
+<td><code>mom_12m</code></td>
+<td>12-Mo Momentum</td>
+<td>Higher</td>
+<td>Return over the past 252 trading days.</td>
+</tr>
+<tr>
+<td>Momentum</td>
+<td><code>mom_6m</code></td>
+<td>6-Mo Momentum</td>
+<td>Higher</td>
+<td>Return over the past 126 trading days.</td>
+</tr>
+<tr>
+<td>Momentum</td>
+<td><code>mom_1m</code></td>
+<td>1-Month Return (Reversal)</td>
+<td>Lower</td>
+<td>Return over the past 21 trading days. Lower is better: last month's losers tend to rebound the next month.</td>
+</tr>
+<tr>
+<td>Value</td>
+<td><code>f_book_to_price</code></td>
+<td>Book/Price</td>
+<td>Higher</td>
+<td>Book equity divided by the company's market cap today.</td>
+</tr>
+<tr>
+<td>Value</td>
+<td><code>f_earnings_to_price</code></td>
+<td>Earnings/Price</td>
+<td>Higher</td>
+<td>Trailing 12-month earnings divided by market cap.</td>
+</tr>
+<tr>
+<td>Value</td>
+<td><code>f_sales_to_price</code></td>
+<td>Sales/Price</td>
+<td>Higher</td>
+<td>Trailing 12-month revenue divided by market cap.</td>
+</tr>
+<tr>
+<td>Value</td>
+<td><code>f_fcf_yield</code></td>
+<td>FCF Yield</td>
+<td>Higher</td>
+<td>Trailing 12-month free cash flow divided by market cap.</td>
+</tr>
+<tr>
+<td>Value</td>
+<td><code>f_dividend_yield</code></td>
+<td>Dividend Yield</td>
+<td>Higher</td>
+<td>Trailing 12-month dividends divided by market cap.</td>
+</tr>
+<tr>
+<td>Value</td>
+<td><code>f_ebitda_to_ev</code></td>
+<td>EBITDA/EV</td>
+<td>Higher</td>
+<td>Trailing 12-month EBITDA divided by enterprise value.</td>
+</tr>
+<tr>
+<td>Value</td>
+<td><code>f_ebit_to_ev</code></td>
+<td>EBIT/EV</td>
+<td>Higher</td>
+<td>Trailing 12-month EBIT divided by enterprise value.</td>
+</tr>
+<tr>
+<td>Value</td>
+<td><code>f_sales_to_ev</code></td>
+<td>Sales/EV</td>
+<td>Higher</td>
+<td>Trailing 12-month revenue divided by enterprise value.</td>
+</tr>
+<tr>
+<td>Value</td>
+<td><code>f_forward_ep</code></td>
+<td>Forward E/P (FY1)</td>
+<td>Higher</td>
+<td>Analyst consensus EPS for this fiscal year divided by price.</td>
+</tr>
+<tr>
+<td>Value</td>
+<td><code>f_forward_ep_fy2</code></td>
+<td>Forward E/P (FY2)</td>
+<td>Higher</td>
+<td>Analyst consensus EPS for next fiscal year divided by price.</td>
+</tr>
+<tr>
+<td>Value</td>
+<td><code>f_forward_cfp</code></td>
+<td>Forward Cash Flow/P</td>
+<td>Higher</td>
+<td>Analyst consensus cash flow per share divided by price.</td>
+</tr>
+<tr>
+<td>Value</td>
+<td><code>f_forward_sales_to_ev</code></td>
+<td>Forward Sales/EV</td>
+<td>Higher</td>
+<td>Analyst consensus sales divided by enterprise value.</td>
+</tr>
+<tr>
+<td>Value</td>
+<td><code>f_forward_ebitda_to_ev</code></td>
+<td>Forward EBITDA/EV</td>
+<td>Higher</td>
+<td>Analyst consensus EBITDA divided by enterprise value.</td>
+</tr>
+<tr>
+<td>Profitability</td>
+<td><code>f_roe</code></td>
+<td>ROE</td>
+<td>Higher</td>
+<td>Trailing 12-month net income divided by book equity.</td>
+</tr>
+<tr>
+<td>Profitability</td>
+<td><code>f_roa</code></td>
+<td>ROA</td>
+<td>Higher</td>
+<td>Trailing 12-month net income divided by total assets.</td>
+</tr>
+<tr>
+<td>Profitability</td>
+<td><code>f_gross_profitability</code></td>
+<td>Gross Profitability</td>
+<td>Higher</td>
+<td>Revenue minus cost of goods sold (trailing 12 months), divided by total assets.</td>
+</tr>
+<tr>
+<td>Quality</td>
+<td><code>f_accruals_to_assets</code></td>
+<td>Accruals/Assets</td>
+<td>Lower</td>
+<td>Net income minus operating cash flow, over total assets. Lower is better: earnings backed by cash tend to last.</td>
+</tr>
+<tr>
+<td>Quality</td>
+<td><code>f_leverage</code></td>
+<td>Debt/Assets</td>
+<td>Lower</td>
+<td>Total debt divided by total assets. Lower is better: less debt means less risk of financial distress.</td>
+</tr>
+<tr>
+<td>Quality</td>
+<td><code>f_current_ratio</code></td>
+<td>Current Ratio</td>
+<td>Higher</td>
+<td>Current assets divided by current liabilities.</td>
+</tr>
+<tr>
+<td>Quality</td>
+<td><code>f_net_share_issuance</code></td>
+<td>Net Share Issuance</td>
+<td>Lower</td>
+<td>Change in split-adjusted shares outstanding over the past year. Lower is better: companies that issue shares tend to trail those that buy them back.</td>
+</tr>
+<tr>
+<td>Growth</td>
+<td><code>f_asset_growth_1yr</code></td>
+<td>1-Yr Asset Growth</td>
+<td>Lower</td>
+<td>Total assets vs four quarters earlier. Lower is better: fast-growing companies tend to underperform.</td>
+</tr>
+<tr>
+<td>Growth</td>
+<td><code>f_sales_growth_1yr</code></td>
+<td>1-Yr Sales Growth</td>
+<td>Higher</td>
+<td>Trailing 12-month revenue vs a year earlier.</td>
+</tr>
+<tr>
+<td>Growth</td>
+<td><code>f_capex_growth_1yr</code></td>
+<td>1-Yr CapEx Growth</td>
+<td>Lower</td>
+<td>Trailing 12-month capex vs a year earlier. Lower is better: companies that ramp up investment tend to underperform.</td>
+</tr>
+<tr>
+<td>Growth</td>
+<td><code>f_rd_to_sales</code></td>
+<td>R&amp;D/Sales</td>
+<td>Higher</td>
+<td>Trailing 12-month R&amp;D divided by revenue.</td>
+</tr>
+<tr>
+<td>Risk</td>
+<td><code>vol_close_12m</code></td>
+<td>12-Mo Volatility</td>
+<td>Lower</td>
+<td>Annualized volatility of daily returns over the past year. Lower is better: calmer stocks have earned as much with less risk.</td>
+</tr>
+<tr>
+<td>Risk</td>
+<td><code>vol_close_6m</code></td>
+<td>6-Mo Volatility</td>
+<td>Lower</td>
+<td>Annualized volatility of daily returns over the past 6 months. Lower is better: calmer stocks have earned as much with less risk.</td>
+</tr>
+<tr>
+<td>Risk</td>
+<td><code>vol_close_3m</code></td>
+<td>3-Mo Volatility</td>
+<td>Lower</td>
+<td>Annualized volatility of daily returns over the past 3 months. Lower is better: calmer stocks have earned as much with less risk.</td>
+</tr>
+<tr>
+<td>Risk</td>
+<td><code>vol_gk_1m</code></td>
+<td>1-Mo Volatility (High-Low)</td>
+<td>Lower</td>
+<td>Garman-Klass volatility from daily open, high, low and close over the past month, annualized. Lower is better: calmer stocks have earned as much with less risk.</td>
+</tr>
+<tr>
+<td>Risk</td>
+<td><code>beta_252d</code></td>
+<td>Beta (1-Yr Daily)</td>
+<td>Lower</td>
+<td>Market beta from daily excess returns over the past year. Lower is better: low-beta stocks have earned more than their risk suggests.</td>
+</tr>
+<tr>
+<td>Risk</td>
+<td><code>beta_60m</code></td>
+<td>Beta (5-Yr Monthly)</td>
+<td>Lower</td>
+<td>Market beta from monthly excess returns over the past 5 years. Lower is better: low-beta stocks have earned more than their risk suggests.</td>
+</tr>
+<tr>
+<td>Analyst</td>
+<td><code>f_sue</code></td>
+<td>Earnings Surprise (SUE)</td>
+<td>Higher</td>
+<td>Change in quarterly EPS vs a year earlier, scaled by its past volatility.</td>
+</tr>
+<tr>
+<td>Analyst</td>
+<td><code>f_analyst_surprise</code></td>
+<td>Analyst EPS Surprise</td>
+<td>Higher</td>
+<td>Latest reported EPS minus the consensus before it, over price.</td>
+</tr>
+<tr>
+<td>Analyst</td>
+<td><code>f_eps_revision</code></td>
+<td>EPS Revisions</td>
+<td>Higher</td>
+<td>Analysts revising this year's EPS up minus those revising down, over the number of analysts.</td>
+</tr>
+<tr>
+<td>Analyst</td>
+<td><code>f_eps_dispersion</code></td>
+<td>Analyst Disagreement</td>
+<td>Lower</td>
+<td>Spread of analysts' EPS estimates relative to their mean. Lower is better: stocks analysts disagree on tend to underperform.</td>
+</tr>
+<tr>
+<td>Analyst</td>
+<td><code>f_ltg</code></td>
+<td>Long-Term Growth Forecast</td>
+<td>Lower</td>
+<td>Analysts' long-term EPS growth forecast. Lower is better: the most optimistic forecasts tend to disappoint.</td>
+</tr>
+<tr>
+<td>Size</td>
+<td><code>mkt_cap_musd</code></td>
+<td>Market Cap</td>
+<td>Lower</td>
+<td>Market value of the listed shares. Lower is better: smaller companies have historically earned more.</td>
+</tr>
+</tbody>
+</table>
+<p>Left out on purpose:</p>
+<ul>
+<li><code>ret_next_1m</code> and <code>delisted_next_month</code> describe the month after t. They are the holding return, never a factor (section 3.3).</li>
+<li>The <code>_qe</code> columns (<code>f_book_to_price_qe</code>, ...) use Compustat's quarter-end price, which is up to a quarter old at t. The table above uses today's price instead.</li>
+<li><code>vol_close_1m</code>, <code>vol_gk_3m</code>, <code>vol_gk_6m</code>, <code>vol_gk_12m</code> repeat factors already listed.</li>
+<li><code>rv_multiples_monthly.parquet</code> (within-industry percentiles) is a separate file. It can be added later without changing the design.</li>
+</ul>
+<p>Where the list lives:</p>
+<ul>
+<li><code>app/streamlit_config.py</code> gets <code>WRDS_FACTOR_METADATA</code> and <code>WRDS_FACTOR_GROUPS</code>, in the same shape as <code>FACTOR_METADATA</code> (<code>key</code>, <code>group</code>, <code>column</code>, <code>tooltip</code>, <code>higher_is_better</code>), keyed by display name. Widget keys get a <code>w_</code> prefix so they never clash with Legacy keys.</li>
+<li><code>src/wrds_factors.py</code> holds <code>WRDS_FACTOR_COLUMNS</code>, the allowlist the Lambda checks jobs against. A test checks that both lists name the same columns.</li>
+</ul>
+<p>The factor picker today lays out one column per group, so eight groups need two rows (stage 2).</p>
+<h3 id="22-sectors">2.2 Sectors</h3>
+<p>The sector filter offers the 11 GICS sectors, using the panel's <code>sector_name</code> column (GICS, with the SIC fallback from the data dictionary): Communication Services, Consumer Discretionary, Consumer Staples, Energy, Financials, Health Care, Industrials, Information Technology, Materials, Real Estate, Utilities.</p>
+<p><code>sector_name</code> also has the value <code>Unclassified</code>, for stocks with neither GICS nor a mapped SIC code. These stocks are in the universe when the sector filter is off. They are not offered in the list, so turning the filter on leaves them out (decision 5).</p>
+<p><strong>Limitation (decision 6):</strong> the panel's GICS code is today's classification, not the historical one (data dictionary), so the sector filter is the one input that is not strictly point in time. A stock that moved sectors is filtered by its current sector for its whole history. The sector list's tooltip says so (risk R3).</p>
+<h3 id="23-fossil-fuel-filter">2.3 Fossil fuel filter</h3>
+<p>Legacy excludes five FactSet industries. WRDS mode excludes the matching GICS sub-industries (<code>gsubind</code>): 10101010 Oil &amp; Gas Drilling, 10101020 Oil &amp; Gas Equipment &amp; Services, 10102010 Integrated Oil &amp; Gas, 10102020 Oil &amp; Gas Exploration &amp; Production, 10102030 Oil &amp; Gas Refining &amp; Marketing, 10102050 Coal &amp; Consumable Fuels. Where GICS is missing, it excludes SIC 1221, 1222, 1231 (coal), 1311 (crude oil and gas), 1381, 1382, 1389 (oil and gas field services) and 2911 (refining). This keeps Legacy's mapping (decision 3): 10102040 Oil &amp; Gas Storage &amp; Transportation is not in Legacy's list, so it is kept.</p>
+<hr />
+<h2 id="3-rebalance-dates-and-look-ahead-rules">3. Rebalance dates and look-ahead rules</h2>
+<h3 id="31-rebalance-months">3.1 Rebalance months</h3>
+<table>
+<thead>
+<tr>
+<th>Frequency</th>
+<th>Rebalance months</th>
+<th>Periods per year (k)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Semi-annual</td>
+<td>Jun, Dec</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Quarterly</td>
+<td>Mar, Jun, Sep, Dec</td>
+<td>4</td>
+</tr>
+<tr>
+<td>Monthly</td>
+<td>every month</td>
+<td>12</td>
+</tr>
+</tbody>
+</table>
+<p>A rebalance date is the panel's <code>date</code> in that month: the last CRSP trading day of the month, not the calendar month end. The UI shows the real dates.</p>
+<h3 id="32-start-and-end-years">3.2 Start and end years</h3>
+<p>The sidebar still asks for a start year and an end year, from 2008 to 2026. <strong>The backtest covers the calendar years from start to end</strong>, within the data's bounds (first panel month 2008-04, last month with returns 2026-09):</p>
+<ul>
+<li>The <strong>first rebalance</strong> is the December month end of <code>start_year - 1</code>. When that is before the data starts, it is the first rebalance month in the data instead.</li>
+<li>The <strong>last holding period ends</strong> at the December month end of <code>end_year</code>. When that is after the data ends, it ends at the last rebalance month whose whole holding period is in the data. There are no partial periods.</li>
+<li>Rebalances are every rebalance month between the two. Each holding period runs from one rebalance date to the next.</li>
+<li><code>start_year == end_year</code> is allowed (one calendar year). <code>start_year &gt; end_year</code> is fixed by the sidebar as today. A range with no complete period is rejected with a message.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Run</th>
+<th>Rebalance dates</th>
+<th>Holding periods cover</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Monthly, 2008-2026</td>
+<td>2008-04 ... 2026-08 (221)</td>
+<td>May 2008 - Sep 2026</td>
+</tr>
+<tr>
+<td>Quarterly, 2008-2026</td>
+<td>2008-06 ... 2026-06 (73)</td>
+<td>Jul 2008 - Sep 2026</td>
+</tr>
+<tr>
+<td>Semi-annual, 2008-2026</td>
+<td>2008-06 ... 2025-12 (36)</td>
+<td>Jul 2008 - Jun 2026</td>
+</tr>
+<tr>
+<td>Quarterly, 2010-2012</td>
+<td>2009-12 ... 2012-09 (12)</td>
+<td>Jan 2010 - Dec 2012</td>
+</tr>
+<tr>
+<td>Monthly, 2015-2015</td>
+<td>2014-12 ... 2015-11 (12)</td>
+<td>Jan 2015 - Dec 2015</td>
+</tr>
+</tbody>
+</table>
+<p><code>src/wrds_calendar.py</code> holds this rule as a pure function that works on year-month values, so the sidebar can show "Rebalances: 2009-12 to 2012-09 (12 quarterly)" without any data. The Lambda then maps each month to the panel's trading date and rejects a job whose months are not in the data. The data bounds (<code>2008-04</code>, <code>2026-09</code>) are constants in <code>src/wrds_calendar.py</code>, and a data test checks them against the files.</p>
+<h3 id="33-look-ahead-rules">3.3 Look-ahead rules</h3>
+<p>At each rebalance date t:</p>
+<ol>
+<li><strong>Universe.</strong> The stocks are the panel rows at date t: the Russell 2000 members of the latest IWM snapshot that was public by t (<code>snapshot_eff_dt &lt;= t</code>). The engine never filters on anything dated after t. In particular, a stock is not dropped because it later has no return or delists.</li>
+<li><strong>Buyable.</strong> A stock needs <code>prc &gt; 0</code> and <code>mkt_cap_musd &gt; 0</code> at t. Both are known at t.</li>
+<li><strong>Factors.</strong> Only allowlisted columns (section 2.1), and only their values at t. The pipeline guarantees these were public by t (Compustat report date, IBES statistics date, announcement date). Z-scores use only the stocks at t.</li>
+<li><strong>Weights.</strong> Market-cap weights use <code>mkt_cap_musd</code> at t.</li>
+<li><strong>Returns start after t.</strong> A position bought at the close on t earns the stock's monthly returns for the months after t, up to and including the next rebalance date t'. These are <code>ret_m</code> from <code>returns_monthly.parquet</code> for each month in (t, t'], for every frequency. The panel's <code>ret_next_1m</code> holds the same values for one month, but the loader never reads it, so no column about the month after t is ever in memory next to the factors. <code>returns_monthly</code> keeps a stock's rows after it leaves the index, so a stock that drops out mid-period is still held to t'.</li>
+<li><strong>Delisting.</strong> CRSP's delisting return is included in the delisting month's <code>ret_m</code>. A stock has no rows after it delists. For the rest of the period, its money is held as cash earning the risk-free rate until the next rebalance (decision 1), and the position is marked Delisted.</li>
+<li><strong>Missing return.</strong> If a held stock has no return for a month and has not delisted (it stopped trading, or CRSP has no price), that month counts as 0% and the position is still held. The result reports how many stock-months that was (<code>missing_return_stock_months</code>; decision 8).</li>
+<li><strong>Benchmarks</strong> compound over the same months (t, t'] (section 4).</li>
+</ol>
+<p>Section 9.1 lists the tests for these rules.</p>
+<hr />
+<h2 id="4-benchmarks-and-metrics">4. Benchmarks and metrics</h2>
+<h3 id="41-benchmarks">4.1 Benchmarks</h3>
+<p>All benchmarks come from <code>market_monthly.parquet</code>, compounded over each holding period's months (t, t']:</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Column</th>
+<th>Shown as</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Benchmark</td>
+<td><code>iwm_total_ret</code></td>
+<td>IWM (ETF, total return)</td>
+</tr>
+<tr>
+<td>Value</td>
+<td><code>iwn_total_ret</code></td>
+<td>IWN (ETF, total return)</td>
+</tr>
+<tr>
+<td>Growth</td>
+<td><code>iwo_total_ret</code></td>
+<td>IWO (ETF, total return)</td>
+</tr>
+<tr>
+<td>Risk-free</td>
+<td><code>rf</code></td>
+<td>Fama-French one-month T-bill</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>These are ETF total returns (dividends in, fund fees out). Legacy uses index returns, so the two modes' benchmarks are not the same numbers.</li>
+<li>The Fama-French <code>rf</code> is published a few weeks late, so the newest month can be missing. A missing month is filled with that month end's 3-month T-bill yield divided by 12, <code>tbill_3m / 12</code>, and the result flags the filled months (<code>rf_filled_months</code>; decision 10).</li>
+<li><code>benchmark_index</code> is not part of a WRDS job: the benchmark is always IWM.</li>
+</ul>
+<h3 id="42-metrics">4.2 Metrics</h3>
+<p><code>src/wrds_metrics.py</code> returns the same metric keys as <code>compute_comprehensive_metrics</code>, so the Results tab's grids work unchanged. It works on period returns, with k periods per year (section 3.1):</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>WRDS definition</th>
+<th>Legacy (k = 1)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Period returns</td>
+<td>portfolio, benchmarks and rf per holding period</td>
+<td>yearly</td>
+</tr>
+<tr>
+<td>CAGR</td>
+<td><code>(final / initial) ** (k / n) - 1</code> for n periods</td>
+<td><code>n</code> years</td>
+</tr>
+<tr>
+<td>Volatility (raw, excess)</td>
+<td><code>std(ddof=1) * sqrt(k)</code></td>
+<td>the same with k = 1</td>
+</tr>
+<tr>
+<td>Sharpe</td>
+<td><code>mean(excess) / std(excess) * sqrt(k)</code></td>
+<td>the same with k = 1</td>
+</tr>
+<tr>
+<td>Information ratio</td>
+<td><code>mean(active) / std(active) * sqrt(k)</code></td>
+<td>the same with k = 1</td>
+</tr>
+<tr>
+<td>Beta</td>
+<td>slope of period excess returns (not annualized)</td>
+<td>the same</td>
+</tr>
+<tr>
+<td>Max drawdown</td>
+<td>on the portfolio value after each period</td>
+<td>the same</td>
+</tr>
+<tr>
+<td>Win rate</td>
+<td>share of periods beating the benchmark ("period win rate")</td>
+<td>yearly</td>
+</tr>
+<tr>
+<td>Calendar-year returns</td>
+<td>each calendar year's periods compounded (new)</td>
+<td>none</td>
+</tr>
+</tbody>
+</table>
+<p>With k = 1 the formulas are Legacy's. A test feeds the same returns to both functions and checks that every shared key matches (section 9.1). The result also says <code>frequency</code>, <code>periods_per_year</code> and <code>risk_free_rate_source: "Fama-French one-month T-bill"</code>.</p>
+<hr />
+<h2 id="5-jobs-cache-keys-saved-ids-and-holdings-files">5. Jobs, cache keys, saved IDs and holdings files</h2>
+<h3 id="51-wrds-jobs">5.1 WRDS jobs</h3>
+<p>A WRDS job is plain JSON like a Legacy job, built by <code>build_wrds_job</code> and checked by <code>validate_wrds_job</code> (<code>src/wrds_jobs.py</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Values</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>kind</code></td>
+<td><code>backtest</code>, <code>cohort</code>, <code>ranked</code></td>
+<td><code>ranked</code> is new (section 8)</td>
+</tr>
+<tr>
+<td><code>data_mode</code></td>
+<td><code>wrds</code></td>
+<td>absent in Legacy jobs</td>
+</tr>
+<tr>
+<td><code>wrds_job_version</code></td>
+<td><code>1</code></td>
+<td>for future changes to the schema</td>
+</tr>
+<tr>
+<td><code>factors</code></td>
+<td>allowlisted columns, in the order added</td>
+<td></td>
+</tr>
+<tr>
+<td><code>factor_directions</code></td>
+<td><code>{column: 'top' or 'bottom'}</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>factor_labels</code></td>
+<td><code>{column: display name}</code></td>
+<td>shown when an ID is opened</td>
+</tr>
+<tr>
+<td><code>frequency</code></td>
+<td><code>semiannual</code>, <code>quarterly</code>, <code>monthly</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>start_year</code>, <code>end_year</code></td>
+<td>2008-2026</td>
+<td>section 3.2</td>
+</tr>
+<tr>
+<td><code>initial_aum</code></td>
+<td>&gt; 0</td>
+<td></td>
+</tr>
+<tr>
+<td><code>top_pct</code></td>
+<td>10.0</td>
+<td>fixed, as in Legacy (decision 11)</td>
+</tr>
+<tr>
+<td><code>use_market_cap_weight</code></td>
+<td>bool</td>
+<td></td>
+</tr>
+<tr>
+<td><code>factor_combination</code></td>
+<td><code>mixing</code>, <code>integrating</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>restrict_fossil_fuels</code></td>
+<td>bool</td>
+<td>section 2.3</td>
+</tr>
+<tr>
+<td><code>selected_sectors</code></td>
+<td>sorted GICS sector names</td>
+<td></td>
+</tr>
+<tr>
+<td><code>cohort_pct</code></td>
+<td>number for <code>cohort</code>, else null</td>
+<td></td>
+</tr>
+<tr>
+<td><code>rebalance_date</code></td>
+<td><code>YYYY-MM</code> for <code>ranked</code>, else null</td>
+<td>must be one of the run's rebalance months</td>
+</tr>
+</tbody>
+</table>
+<p>There is no <code>delisting_strategy</code> (returns include delisting returns) and no <code>benchmark_index</code>.</p>
+<h3 id="52-cache-key">5.2 Cache key</h3>
+<p>The key is computed by the unchanged <code>job_hash(job, data_version, code_version)</code>, so it is the same kind of 64-character SHA-256 as Legacy's:</p>
+<ul>
+<li><code>job</code>: the WRDS job. Its <code>data_mode</code> key means it can never equal a Legacy job.</li>
+<li><code>data_version</code>: the WRDS folder name plus the S3 ETags of the three files the engine reads, for example <code>wrds_2026_10|factor_panel_monthly.parquet:&lt;etag&gt;|returns_monthly.parquet:&lt;etag&gt;|market_monthly.parquet:&lt;etag&gt;</code>. A new WRDS pull goes into a new folder, so it gives new keys.</li>
+<li><code>code_version</code>: a hash of <code>WRDS_ENGINE_SOURCES</code> (the <code>src/wrds_*.py</code> modules plus the shared files they import, such as <code>factor_utils.py</code>), computed the same way as <code>code_version()</code>.</li>
+</ul>
+<h3 id="53-where-results-are-stored">5.3 Where results are stored</h3>
+<table>
+<thead>
+<tr>
+<th>Object</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>backtest-results/&lt;hash&gt;.json</code></td>
+<td>the same envelope as Legacy, <code>{'format': 2, 'job': ..., 'result': ...}</code>. A WRDS backtest result holds everything except the holdings, plus <code>holdings: {'file', 'dates', 'rows', 'bytes'}</code></td>
+</tr>
+<tr>
+<td><code>backtest-results/&lt;hash&gt;.holdings.parquet</code></td>
+<td>WRDS backtest holdings, one row group per rebalance date (section 5.5)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Both are under <code>backtest-results/</code>, so the existing 90-day lifecycle rule and the Lambda role's write permission already cover them.</li>
+<li>The Parquet file is written <strong>before</strong> the JSON, so a cache hit (the JSON exists) normally has its holdings. A cached backtest whose holdings file is missing anyway (deleted by hand, or expired first) is computed again rather than shown without holdings. With the Lambda role's s3:ListBucket missing, S3 answers 403 for a missing file, which counts as missing too.</li>
+<li>The result JSON's <code>holdings</code> entry is <code>{'file': 'backtest-results/&lt;hash&gt;.holdings.parquet', 'bytes', 'dates', 'rows'}</code>: the row groups' dates (rebalance dates on which something was bought) in order, and their row counts.</li>
+<li>The WRDS code version hashes <code>WRDS_ENGINE_SOURCES</code> (<code>src/wrds_jobs.py</code>): the <code>wrds_*.py</code> modules plus the shared files they use (<code>backtest_jobs.py</code>, <code>performance_metrics.py</code>, <code>s3_client.py</code>). Legacy's <code>ENGINE_SOURCES</code> list is unchanged, so editing WRDS code never recomputes Legacy results.</li>
+<li>Without holdings, a monthly result is a few hundred kilobytes, well inside the inline limit, so the S3-link path is rarely needed.</li>
+</ul>
+<h3 id="54-saved-ids-old-and-new">5.4 Saved IDs, old and new</h3>
+<ul>
+<li><strong>Old IDs keep opening.</strong> Legacy files, their path, <code>decode_saved</code> and <code>SAVED_FORMAT</code> do not change. The app treats a saved job without <code>data_mode</code> as Legacy, exactly as today. Analyses saved before sharing still get today's message.</li>
+<li><strong>WRDS IDs</strong> open through the same "Open a saved analysis" box. <code>load_saved_analysis</code> reads them unchanged (their <code>kind</code> is <code>backtest</code>). <code>open_saved_analysis</code> builds a WRDS run from the job when <code>job.get('data_mode') == 'wrds'</code> (today it reads Legacy-only keys such as <code>delisting_strategy</code>).</li>
+<li><code>cohort</code> and <code>ranked</code> IDs are refused with today's message ("This ID belongs to a cohort comparison..."), with the wording widened to cover ranked lists.</li>
+</ul>
+<h3 id="55-holdings-as-parquet-loaded-per-date">5.5 Holdings as Parquet, loaded per date</h3>
+<p>The holdings file has one row per stock held per rebalance date, sorted by date and rank, with one row group per date.</p>
+<p>Columns: <code>rebalance_date</code>, <code>rank</code>, <code>permno</code>, <code>ticker</code>, <code>name</code>, <code>sector</code>, <code>picked_by</code> (Mixing), <code>score</code>, one column per factor (raw value at t), <code>weight</code>, <code>buy_price</code>, <code>dollar_value</code>, <code>period_return</code>, <code>contribution</code>, <code>delisted</code>.</p>
+<ul>
+<li>A stock picked by several Mixing sleeves is one row, merged the way <code>_build_holdings_rows</code> merges them today.</li>
+<li>The app renames the columns to Legacy's display headers (Rank, Ticker, Name, Sector, Picked By, Score, factor labels, Weight %, Shares, Buy Price, Dollar Value, Period Return %, Contribution %, Delisted) and adds PERMNO, because two securities can share a ticker on one date.</li>
+</ul>
+<p>When the user picks a date, the app reads the file's footer and that date's row group with ranged S3 GETs (<code>src/wrds_holdings.read_holdings_date</code>): one GET of the last 64 KB (the footer, plus a second GET if the footer is bigger), then one GET of exactly that row group's bytes. It caches the table per (file, date) with <code>st.cache_data</code>.</p>
+<p><strong>The app reads with its own S3 keys, not a presigned link from Lambda.</strong> The app already reads <code>backtest-results/</code> with its own keys to open saved analyses by ID. A presigned link expires (an hour today), so a shared ID opened later would need a new Lambda call just to get a fresh link. With its own keys, opening an ID and reading any date's holdings never calls Lambda, and nothing expires before the 90-day rule deletes the files. Opening a result therefore downloads only the small JSON, and each date costs one small read. For a 3-factor monthly Mixing run, the prototype's holdings file was 9.0 MB as Parquet (the same rows are about 44 MB as JSON), and reading one date back took about 0.02 s locally.</p>
+<hr />
+<h2 id="6-how-lambda-loads-the-wrds-data-with-measurements">6. How Lambda loads the WRDS data, with measurements</h2>
+<h3 id="61-files-and-columns">6.1 Files and columns</h3>
+<table>
+<thead>
+<tr>
+<th>File (under <code>factor-lake-data/wrds_2026_10/</code>)</th>
+<th>Columns read</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>factor_panel_monthly.parquet</code></td>
+<td><code>date</code>, <code>permno</code>, <code>ticker</code>, <code>security_name</code>, <code>sector_name</code>, <code>gsubind</code>, <code>siccd</code>, <code>prc</code>, <code>mkt_cap_musd</code>, <code>ret_next_1m</code>, and the 39 allowlisted factor columns (49 of 103)</td>
+<td>universe, factors, weights, one-month returns</td>
+</tr>
+<tr>
+<td><code>returns_monthly.parquet</code></td>
+<td><code>month_end</code>, <code>permno</code>, <code>ret_m</code>, <code>delisted_in_month</code></td>
+<td>returns for later months of a period, delisting months</td>
+</tr>
+<tr>
+<td><code>market_monthly.parquet</code></td>
+<td><code>month_end</code>, <code>iwm_total_ret</code>, <code>iwn_total_ret</code>, <code>iwo_total_ret</code>, <code>rf</code>, <code>tbill_3m</code></td>
+<td>benchmarks, risk-free rate</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>The panel is one zstd row group, so dates cannot be skipped inside the file. The Lambda downloads each file with one GET and decodes only the listed columns. Text columns become pandas categoricals.</li>
+<li>The Lambda builds a month by permno matrix of <code>ret_m</code> once per container.</li>
+<li>It keeps the frames for the life of the container, next to the Legacy universe, and reloads them only when the WRDS data version changes, as <code>_load_universe</code> does for Legacy.</li>
+<li>The folder name is <code>WRDS_DATA_DIR = 'wrds_2026_10'</code> in <code>src/wrds_data.py</code>, overridable with <code>FACTOR_LAKE_WRDS_DIR</code>, which the deploy script sets on the function.</li>
+<li><code>prices_daily/</code> is not needed: every rebalance is at a month end, so monthly returns are enough.</li>
+</ul>
+<h3 id="62-measured-on-the-real-files">6.2 Measured on the real files</h3>
+<p>These numbers come from a throwaway prototype of the vectorized engine (section 7), run locally on the files in <code>processed/final/</code>: Windows desktop, Python 3.10, pandas 2.3.3, pyarrow 24.0.0. "Peak" is the process's peak working set.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Time</th>
+<th>Memory</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Panel file (148.6 MB on disk) read into memory as bytes</td>
+<td>0.05 s</td>
+<td>220 MB process</td>
+</tr>
+<tr>
+<td>Decode the 49 needed columns</td>
+<td>0.14 s</td>
+<td>631 MB peak; the frame itself is 155 MB</td>
+</tr>
+<tr>
+<td>(for comparison) decode all 103 columns</td>
+<td>0.23 s</td>
+<td>862 MB process</td>
+</tr>
+<tr>
+<td><code>returns_monthly</code> (16.2 MB on disk) and <code>market_monthly</code>, plus the return matrix</td>
+<td>0.08 s</td>
+<td>about 500 MB after the bytes are freed</td>
+</tr>
+<tr>
+<td>Monthly, Integrating, 2 factors, equal weight (221 periods)</td>
+<td>0.73 s</td>
+<td></td>
+</tr>
+<tr>
+<td>Monthly, Mixing, 3 factors, cap weight</td>
+<td>1.09 s</td>
+<td></td>
+</tr>
+<tr>
+<td>Monthly, Mixing, 10 factors, equal weight</td>
+<td>2.86 s</td>
+<td>723 MB peak</td>
+</tr>
+<tr>
+<td>Quarterly, Integrating, 2 factors / Semi-annual, Mixing, 2 factors</td>
+<td>0.25 s / 0.15 s</td>
+<td></td>
+</tr>
+<tr>
+<td>Write a monthly 3-factor Mixing run's holdings as Parquet</td>
+<td>0.12 s</td>
+<td>9.0 MB file</td>
+</tr>
+<tr>
+<td>Whole session (load and 7 runs)</td>
+<td>8.0 s</td>
+<td>728 MB peak</td>
+</tr>
+</tbody>
+</table>
+<h3 id="63-estimates-for-lambda-monthly-run">6.3 Estimates for Lambda (monthly run)</h3>
+<p>Lambda at 3008 MB gets about 2 vCPUs, and pandas mostly uses one core. We assume a core about 1.5 to 2 times slower than the desktop above, and S3 reads in the same region at about 80 to 100 MB/s.</p>
+<table>
+<thead>
+<tr>
+<th>Case</th>
+<th>Estimate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cold container, first WRDS job: init (as today) + download 165 MB + decode + 3-factor monthly run + holdings write and PUT</td>
+<td>about 8 to 12 s</td>
+</tr>
+<tr>
+<td>Warm container, new 3-factor monthly job</td>
+<td>about 2 to 4 s</td>
+</tr>
+<tr>
+<td>Warm container, 10-factor monthly Mixing</td>
+<td>about 5 to 7 s</td>
+</tr>
+<tr>
+<td>Cohort comparison (two backtests, no holdings)</td>
+<td>about 2 times a backtest, without the holdings write</td>
+</tr>
+<tr>
+<td>Ranked list for one date</td>
+<td>under 1 s warm</td>
+</tr>
+<tr>
+<td>Cached repeat</td>
+<td>under 0.5 s, as today</td>
+</tr>
+<tr>
+<td>Peak memory</td>
+<td>about 0.8 GB for WRDS, about 1.0 to 1.2 GB with the Legacy universe also warm</td>
+</tr>
+</tbody>
+</table>
+<h3 id="64-measured-with-the-stage-3-engine">6.4 Measured with the stage 3 engine</h3>
+<p><code>scripts/check_wrds_engine.py &lt;processed/final folder&gt;</code> runs each case in a fresh process, as a Lambda invocation would, on the same Windows desktop:</p>
+<table>
+<thead>
+<tr>
+<th>Case (monthly, 2008-2026)</th>
+<th>Load</th>
+<th>Run</th>
+<th>Peak memory</th>
+<th>Holdings table in memory</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Whole universe, cap weighted (the IWM tracking check)</td>
+<td>0.4 s</td>
+<td>1.5 s</td>
+<td>0.95 GB</td>
+<td>41 MB</td>
+</tr>
+<tr>
+<td>Mixing, 3 factors, equal weight</td>
+<td>0.3 s</td>
+<td>1.4 s</td>
+<td>0.84 GB</td>
+<td>21 MB</td>
+</tr>
+<tr>
+<td>Mixing, 10 factors, equal weight</td>
+<td>0.4 s</td>
+<td>4.4 s</td>
+<td>1.05 GB</td>
+<td>57 MB</td>
+</tr>
+</tbody>
+</table>
+<p>The tracking check passed (correlation at least 0.99, tracking error at most 3% a year; the values are printed, not stored). Peak memory is above the 0.8 GB estimate of 6.3, because the holdings table and its merges are built in memory, and still about a third of the function's 3008 MB.</p>
+<p>On Windows, repeated runs in one process get slower: after one engine run, even a plain numpy <code>argsort</code> benchmark in the same process is about 4 times slower, so the cause is the process's memory allocator, not the engine. Lambda runs Linux, and stage 6 measures warm repeats there.</p>
+<h3 id="65-measured-in-the-dev-lambda-stage-4">6.5 Measured in the dev Lambda (stage 4)</h3>
+<p>The stage 4 code, deployed to the dev function <code>sysen5900-factor-lake-backtest-dev</code> (3008 MB, the course role), driven from the local app. The times are the Lambda REPORT lines, taken from the invocation log tail.</p>
+<table>
+<thead>
+<tr>
+<th>Job</th>
+<th>Lambda duration</th>
+<th>Max memory used</th>
+<th>Result JSON</th>
+<th>Holdings Parquet</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Monthly Mixing, 3 factors, 2008-2026, cold container (init 2.6 s, plus the first WRDS data load)</td>
+<td>6.8 s</td>
+<td>1013 MB</td>
+<td>87 KB</td>
+<td>23.2 MB</td>
+</tr>
+<tr>
+<td>The same job again (cache hit)</td>
+<td>0.09 s</td>
+<td>1013 MB</td>
+<td>87 KB</td>
+<td></td>
+</tr>
+<tr>
+<td>Quarterly Mixing, 3 factors, warm</td>
+<td>1.1 s</td>
+<td>1013 MB</td>
+<td>30 KB</td>
+<td>7.3 MB</td>
+</tr>
+<tr>
+<td>Quarterly cohort, 10% (two backtests)</td>
+<td>1.4 s</td>
+<td>1013 MB</td>
+<td>4 KB</td>
+<td></td>
+</tr>
+<tr>
+<td>Ranked list, one date</td>
+<td>0.3 s</td>
+<td>1013 MB</td>
+<td>0.9 MB</td>
+<td></td>
+</tr>
+<tr>
+<td>Legacy backtest, warm</td>
+<td>2.3 s</td>
+<td>1013 MB</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>The package is 61.7 MB zipped and 199 MB unzipped (Lambda allows 250 MB). The holdings file is bigger than the 9 MB prototype in 6.2: it has more text columns (name, sector, picked_by), and 221 small row groups compress less well than one large one. That only affects storage: a date is still read with two small ranged GETs. The Legacy result from the dev function matched <code>main</code>'s code run locally on the same S3 data, within the 1e-9 relative tolerance of <code>scripts/check_backtest_lambda.py</code> (the largest difference was rounding in the last binary digit, Linux vs Windows).</p>
+<p><strong>Recommendation:</strong> keep the function at 3008 MB and a 600 s timeout. The memory leaves plenty of headroom, and Lambda's CPU share grows with memory. The measured cold, warm, cached and concurrent runs (stage 6) are in <code>DOCS/AWS_LAMBDA_BACKTESTS.md</code>, section 9: at most about 1.15 GB of memory, a monthly 3-factor run in about 3 s warm, and no slowdown on repeated warm runs on Linux.</p>
+<hr />
+<h2 id="7-the-vectorized-engine-and-the-legacy-match-test">7. The vectorized engine and the Legacy match test</h2>
+<h3 id="71-engine">7.1 Engine</h3>
+<p><code>src/wrds_engine.py</code> works on whole frames, with no per-stock Python loops. It reproduces Legacy's math exactly.</p>
+<ol>
+<li><strong>Rebalance rows.</strong> The panel rows at the rebalance dates that are buyable and pass the sector and fossil fuel filters.</li>
+<li><strong>Scores</strong>, for each factor and date, as <code>normalize_series</code> computes them: values to numbers with inf as NaN, winsorized at the 1% and 99% quantiles (<code>groupby('date')[col].transform('quantile', q)</code>, the same linear interpolation as <code>Series.quantile</code>), negated for Lower, then z-scored with the date's mean and <code>std(ddof=1)</code>, with the same <code>sigma &gt; 1e-12</code> guard.</li>
+<li><strong>Selection.</strong> Integrating: the mean of the factors' z-scores for stocks that have every factor. Mixing: each factor's own z-score in its own sleeve. Within each date (and sleeve), stocks are sorted by score, highest first, with <strong>ties broken by <code>permno</code></strong>, so every machine picks the same stocks. The top <code>max(1, floor(n * top_pct / 100))</code> are kept, where n is the number of stocks with a score.</li>
+<li><strong>Weights.</strong> Equal, or <code>mkt_cap_musd</code> share, within the portfolio (Integrating) or within each sleeve, with each sleeve given <code>1 / number of factors</code> of the money (Mixing).</li>
+<li><strong>Returns.</strong> Each position's growth is the product of (1 + monthly return) over the period's months (section 3.3), with delisted money earning rf after the delisting month. The period return is <code>sum(weight * growth) - 1</code>: buy and hold within the period, rebalanced at each rebalance date.</li>
+<li><strong>Outputs.</strong> Period returns, values, holdings rows (merged per stock as in Legacy), counts of delisted positions and missing-return months, and the metrics (section 4).</li>
+</ol>
+<p>As built in stage 3:</p>
+<ul>
+<li><strong>Result.</strong> It has the Legacy result keys (per-period returns in percent under <code>yearly_returns</code>, metrics annualized by frequency). <code>years</code> holds the period boundary dates as <code>YYYY-MM-DD</code> strings, and each <code>yearly_comparisons</code> entry also has <code>period_start</code>, <code>period_end</code> and the year of its end. The extras are <code>rebalance_dates</code>, <code>period_end_dates</code>, <code>cagr</code>, <code>rf_returns</code>, <code>benchmark_labels</code>, <code>rf_filled_months</code>, <code>total_delisted_positions</code>, <code>missing_return_stock_months</code> and <code>empty_rebalance_dates</code>. The Results tab still turns <code>years</code> into ints, so stage 5 renders WRDS runs with dates.</li>
+<li><strong>Holdings DataFrame.</strong> One row per stock per rebalance date. Weights, returns and contributions are decimals (Legacy's rows are percent), and ticker, name and sector are categoricals. Factor values are under their column names; stage 5 maps them to display names.</li>
+<li><strong>A date with nothing to buy</strong> (for example a narrow sector filter): the money earns the risk-free rate for that period, and the date is listed in <code>empty_rebalance_dates</code>.</li>
+<li><strong>A holding period with a month without benchmark data</strong> is refused with an error.</li>
+<li><strong>Shared code.</strong> <code>performance_metrics.compute_comprehensive_metrics</code> gained <code>periods_per_year</code> (default 1: Legacy unchanged, which the pinned Legacy test checks), and <code>S3DataManager</code> gained a public <code>read_bytes</code>. Both files are in <code>ENGINE_SOURCES</code>, so Legacy's code version changes, as the review allowed.</li>
+</ul>
+<p>The core (steps 2 to 5) does not depend on the frequency: it takes rows of (date, id, factor values, cap, return for the period), so it can also be run on Legacy's annual data. That is what the match test does.</p>
+<h3 id="72-deliberate-differences-from-the-legacy-engine">7.2 Deliberate differences from the Legacy engine</h3>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Legacy</th>
+<th>WRDS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Stock id</td>
+<td>ticker (duplicate tickers are deduplicated)</td>
+<td><code>permno</code> (two securities can share a ticker)</td>
+</tr>
+<tr>
+<td>Ties</td>
+<td>sort order depends on the machine</td>
+<td>broken by <code>permno</code></td>
+</tr>
+<tr>
+<td>Stocks without a price</td>
+<td>ranked, then skipped when bought (n counts them)</td>
+<td>not buyable, so not ranked</td>
+</tr>
+<tr>
+<td>Cap weight with a missing cap</td>
+<td>weight 0</td>
+<td>not buyable</td>
+</tr>
+<tr>
+<td>Delisting</td>
+<td>three strategies, <code>Delist_Price</code> and date</td>
+<td>CRSP delisting return, then cash at rf until the next rebalance</td>
+</tr>
+</tbody>
+</table>
+<h3 id="73-the-match-test">7.3 The match test</h3>
+<p><code>tests/unit/test_wrds_engine_matches_legacy.py</code> builds a synthetic Legacy-style frame (<code>Year</code>, <code>Ticker</code>, <code>Ending_Price</code>, <code>Next-Years_Return</code>, <code>Market_Capitalization</code>, several factors with some NaN), with values chosen so that none of the differences in 7.2 apply: every stock has a price, a cap and a return, tickers are unique, and no cut falls inside a block of tied scores. It then:</p>
+<ul>
+<li>runs <code>rebalance_portfolio</code> (Legacy, <code>zero_return</code>), and</li>
+<li>runs the WRDS core on the same rows (date = <code>Year</code>, id = ticker code, return = <code>Next-Years_Return / 100</code>, cap = <code>Market_Capitalization</code>),</li>
+</ul>
+<p>for Mixing and Integrating, equal and cap weight, mixed directions, and <code>top_pct</code> 2, 10 and 50. It asserts that every year's stocks are the same set, each stock's weight, return and contribution are equal to a relative 1e-12, and the period returns and portfolio values are equal to a relative 1e-12. A second test runs a tied cut and checks that WRDS picks by <code>permno</code>. The metrics test in 4.2 covers the rest of the shared math.</p>
+<hr />
+<h2 id="8-each-feature-in-wrds-mode-and-the-app-without-lambda">8. Each feature in WRDS mode, and the app without Lambda</h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>WRDS mode</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sidebar</td>
+<td><strong>Data source</strong>: Legacy (default) or WRDS. WRDS shows <strong>Rebalancing</strong>: Semi-annual, Quarterly (default), Monthly; ESG filter; weighting; factor combination; the 11 GICS sectors; the period (2008-2026, with a caption naming the first rebalance and the last period end); initial AUM. The Delisting Strategy and <strong>Run backtests in AWS Lambda</strong> controls are hidden.</td>
+</tr>
+<tr>
+<td>Mode switch</td>
+<td>Changing the data source clears the factor selection and its direction widgets (an <code>on_change</code> callback), because the two factor lists differ. Saved run tabs stay.</td>
+</tr>
+<tr>
+<td>Analysis tab</td>
+<td>The WRDS factor list (section 2). Load Market Data is hidden. The caption says the backtest runs in AWS Lambda on the WRDS data. Run Portfolio Analysis sends a WRDS job.</td>
+</tr>
+<tr>
+<td>Results tab</td>
+<td>Legacy's sections, order, titles, widgets, tables and charts, drawn by Legacy's own render functions in <code>app/components/results_tab.py</code> with the WRDS result passed in the shape they expect (<code>app/components/wrds_results.py</code>, <code>app/wrds_tables.py</code>). Those functions take optional names (benchmarks, periods) and a date axis whose defaults give Legacy's output unchanged. Only the names that must differ do: "Period" for "Year", "Quarterly" for "Yearly", IWM / IWO (Growth) / IWN (Value) for Legacy's indices.</td>
+</tr>
+<tr>
+<td>Results header</td>
+<td>Legacy's captions in Legacy's order, plus <strong>Data Source:</strong> WRDS with the frequency, number of rebalances, first and last rebalance date. <strong>Delisting Strategy:</strong> CRSP delisting returns included, then the risk-free rate until the next rebalance. How it was computed and the Analysis ID.</td>
+</tr>
+<tr>
+<td>Performance Summary</td>
+<td>Legacy's four tiles: final value, total return, CAGR over calendar years (n / k), Cumulative Outperformance (its tooltip names IWM). Legacy's "Delisted positions encountered" caption, then captions only for WRDS counts that are not zero: stock-months without a return, filled risk-free months, rebalance dates with nothing to buy.</td>
+</tr>
+<tr>
+<td>Holdings and Ranks</td>
+<td>Legacy's picker (<strong>Rebalance date</strong>, newest by default, remembered per run), caption and table; only that date is read from the holdings Parquet (section 5.5). Legacy's columns, order and units (Rank, Ticker, Name, Sector, Picked By, Score, factor values, Weight %, Shares, Buy Price, Dollar Value, Period Return %, Contribution %, Delisted), then PERMNO and Months Without Return. Factor values use the WRDS display names: rates and returns in percent with a " %" header (like Legacy's "... %" columns), market cap in $M, other ratios as stored. CSV download of the date.</td>
+</tr>
+<tr>
+<td>Ranked stocks</td>
+<td>In an expander under the holdings table, <strong>Rank every stock on this date</strong> sends a <code>ranked</code> job for the picked date (decision 2). The holdings table's order, names and units: Rank (by composite score), Ticker, Name, Sector, Held, Score, per factor its value, z-score and (Mixing) own rank, then Weight %, Price, PERMNO. Cached by hash; CSV download.</td>
+</tr>
+<tr>
+<td>Portfolio Growth Over Time</td>
+<td>Legacy's growth chart (<code>plot_portfolio_growth</code>: colors, line styles, markers, legend, axis and hover formats) on a date axis with a tick per year and the date on hover; series of more than 60 points (monthly runs) are drawn without markers, which Legacy's yearly charts never reach. With "IWM (ETF, total return)", "Value: IWN (ETF, total return)" and "Growth: IWO (ETF, total return)". Below it, the one WRDS addition: each period's return (portfolio bars, the IWM line in Legacy's benchmark style, <code>Visualizations/wrds_plots.py</code>). No drawdown chart: max drawdown is in the statistics, as in Legacy.</td>
+</tr>
+<tr>
+<td>Period-by-Period Performance</td>
+<td>Legacy's Year-by-Year table, one row per period ("2026-03-31 to 2026-06-30"): Portfolio Value, Period Return, IWM, IWO (Growth) and IWN (Value) Returns. A <strong>By calendar year</strong> switch shows the same table by calendar year (each year's periods compounded; the first and last can be partial).</td>
+</tr>
+<tr>
+<td>Cohort</td>
+<td>Legacy's section, slider, table and chart (<code>plot_top_bottom_percent</code> on dates, with the ETFs). Generate Comparison sends a WRDS <code>cohort</code> job (same frequency, dates and filters). CAGR uses calendar years, not the number of periods (the old sub-annual branch had this bug).</td>
+</tr>
+<tr>
+<td>Advanced Backtest Statistics</td>
+<td>Legacy's grid of tiles with Legacy's names and formats ("Beta vs IWM", "Quarterly Win Rate (vs IWM)" for "Beta vs R2000", "Yearly Win Rate (vs R2000)"). The RF Rate Source tile reads "Fama-French 1-month T-bill", with the result's full description in its tooltip. A caption above gives the frequency, how volatility, Sharpe and information ratios are annualized (√k), and which ETF Benchmark, Growth and Value stand for.</td>
+</tr>
+<tr>
+<td>Win/Loss Summary</td>
+<td>Legacy's ledger, titled e.g. "Quarterly Win/Loss Summary": one row per period, the portfolio's return against IWM, IWO (Growth) and IWN (Value), each with ✅ / ❌.</td>
+</tr>
+<tr>
+<td>Saved runs</td>
+<td>Each run keeps <code>data_mode</code> and <code>frequency</code>; tabs read "Run 2: WRDS, Quarterly" ("(opened)" when opened by ID; the factors are in the header). Legacy labels are unchanged. Up to <code>MAX_SAVED_RUNS</code> tabs, Legacy and WRDS mixed.</td>
+</tr>
+<tr>
+<td>Share by ID</td>
+<td>As Legacy (section 5.4). An opened WRDS run loads its holdings and ranked lists the same way.</td>
+</tr>
+<tr>
+<td>Session history</td>
+<td>As today.</td>
+</tr>
+<tr>
+<td>Data Viewer</td>
+<td>Stays Legacy. In WRDS mode a one-line note says it shows the Legacy data, and to switch to Legacy and Load Market Data to use it.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Without Lambda</strong> (<code>FACTOR_LAKE_BACKTEST_LAMBDA</code> not set): the Data source control is shown but disabled on Legacy, with the note "WRDS mode runs in AWS Lambda, which is not configured for this app." Everything else is today's app. A WRDS analysis ID can still be opened if the app has S3 read access (results and holdings are read straight from S3). Its Ranked stocks and Generate Comparison buttons are then disabled with the same note.</p>
+<hr />
+<h2 id="9-test-plan-open-questions-and-risks">9. Test plan, open questions and risks</h2>
+<h3 id="91-tests-new-files-existing-tests-are-not-edited">9.1 Tests (new files; existing tests are not edited)</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Checks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_legacy_pinned.py</code></td>
+<td>fixed Legacy jobs give exactly the results they gave on <code>main</code> (section 1.2)</td>
+</tr>
+<tr>
+<td><code>test_wrds_calendar.py</code></td>
+<td>the rebalance dates in the section 3.2 table for each frequency; data bounds; <code>start == end</code>; out-of-range years rejected; trading-day dates used, not calendar month ends (stage 3, when dates come from the panel)</td>
+</tr>
+<tr>
+<td><code>test_wrds_factors.py</code></td>
+<td>the app's factor list and the Lambda allowlist match; keys, groups and tooltips; every Lower default says why; the 11 GICS sectors</td>
+</tr>
+<tr>
+<td><code>test_wrds_lookahead.py</code></td>
+<td>changing any row dated after t leaves the holdings at t unchanged; changing returns changes returns only, never the selection; non-allowlisted columns (<code>ret_next_1m</code>, <code>delisted_next_month</code>, ...) are rejected as factors; a stock that joins later is never held earlier; a stock that leaves mid-period is held to t' with <code>returns_monthly</code> returns; a period's return uses exactly the months in (t, t']</td>
+</tr>
+<tr>
+<td><code>test_wrds_engine.py</code></td>
+<td>the Legacy match of section 7.3 (stocks, ranks, scores, weights, returns, Picked By) and per-date z-scores equal to <code>normalize_series</code>; drift within a period, delisting then cash at rf, missing-return months at 0% and counted, rf fill from <code>tbill_3m / 12</code>, benchmarks compounded; sectors, fossil fuel GICS and SIC codes, buyable stocks, <code>permno</code> tie-break, at least one stock; rebalance dates and holding periods per frequency from the 2008 start to the 2026 end; the metrics default equals Legacy and k annualizes volatility, Sharpe and IR</td>
+</tr>
+<tr>
+<td><code>test_wrds_service.py</code></td>
+<td>the same data from a local folder and a fake S3, only the needed columns decoded; the runner equals the engine; data reused until a file is republished</td>
+</tr>
+<tr>
+<td><code>test_wrds_jobs.py</code></td>
+<td>build and validate; unknown factor or frequency rejected; <code>ranked</code> needs a scheduled date; WRDS and Legacy hashes never collide; the app and Lambda allowlists match</td>
+</tr>
+<tr>
+<td><code>test_wrds_service.py</code></td>
+<td>with a fake S3, as in <code>test_backtest_lambda.py</code>: dispatch on <code>data_mode</code>; data version from the WRDS ETags; holdings Parquet written before the JSON; cache hit returns the same result; one row group per date; the Legacy path still returns today's result</td>
+</tr>
+<tr>
+<td><code>test_wrds_mode_switch.py</code></td>
+<td>with Streamlit AppTest: Legacy by default; switching resets factors; WRDS disabled without Lambda; WRDS hides delisting, Load Market Data and the Lambda switch; Legacy shows no WRDS control; the factor groups and defaults; Legacy settings and Lambda jobs exactly as on <code>main</code>, also after a visit to WRDS</td>
+</tr>
+<tr>
+<td><code>test_wrds_saved.py</code></td>
+<td>a Legacy format-2 fixture, a pre-sharing fixture and a WRDS fixture open; WRDS cohort and ranked IDs are refused; holdings load per date</td>
+</tr>
+<tr>
+<td><code>scripts/check_backtest_lambda.py --wrds</code></td>
+<td>in AWS: each frequency end to end; a cached repeat equals the first run; the WRDS engine run locally on the S3 files equals the Lambda result</td>
+</tr>
+<tr>
+<td>Stage 6 validation</td>
+<td>a monthly cap-weighted run of the whole universe tracks IWM: correlation of monthly returns at least 0.99 and annualized tracking error at most 3%. The prototype passed; the measured numbers stay out of the repo</td>
+</tr>
+</tbody>
+</table>
+<p>Stages 3 to 6 run the full existing suite on every commit, so any change to a Legacy result shows up as a failing Legacy test.</p>
+<h3 id="92-open-questions">9.2 Open questions</h3>
+<p>All eleven questions from the stage 1 review are decided; see <a href="#decisions">Decisions</a>.</p>
+<h3 id="93-risks">9.3 Risks</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R1</td>
+<td>An edit to a shared file changes Legacy results</td>
+<td><code>test_legacy_pinned.py</code> compares whole Legacy results with <code>main</code>'s; WRDS code lives in new modules (a changed Legacy cache key alone is allowed)</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>Look-ahead creeps in through a new factor or filter</td>
+<td>factor allowlist; look-ahead tests that change future rows</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>The sector filter uses today's GICS</td>
+<td>documented in the UI tooltip and in this design; historical GICS would need a new pipeline pull</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>Licensed WRDS values are shown in the app (holdings, ranked lists, factor values) and in shared IDs</td>
+<td>same private bucket and access model as Legacy; no WRDS data in the repo; the Data Viewer stays Legacy; check the WRDS terms before the class demo</td>
+</tr>
+<tr>
+<td>R5</td>
+<td>Big holdings files for many-factor monthly Mixing runs</td>
+<td>Parquet with one row group per date, read per date, so the app never downloads the whole file</td>
+</tr>
+<tr>
+<td>R6</td>
+<td>Cold starts download about 165 MB</td>
+<td>one GET per file per container; warm reuse; at most a few seconds in region</td>
+</tr>
+<tr>
+<td>R7</td>
+<td>Rounding differs between the Mac and Lambda</td>
+<td>ties broken by <code>permno</code>; comparisons use a relative tolerance of 1e-9, as the Legacy check does</td>
+</tr>
+<tr>
+<td>R8</td>
+<td>The 2026-09 data end and the late Fama-French month</td>
+<td>data bounds in one place with a data test; rf fill flagged in the result</td>
+</tr>
+<tr>
+<td>R9</td>
+<td>Monthly plots and tables with 221 points</td>
+<td>one date tick per year; no markers over 60 points; scrolling tables; calendar-year view</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="10-stages-and-files">10. Stages and files</h2>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Commit</th>
+<th>New files</th>
+<th>Changed files</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>this design</td>
+<td><code>DOCS/WRDS_MODE_DESIGN.md</code></td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td>mode switch and WRDS factor list</td>
+<td><code>src/wrds_factors.py</code>, <code>src/wrds_calendar.py</code>, <code>tests/unit/test_legacy_pinned.py</code> with <code>tests/fixtures/legacy_pinned_results.json</code>, <code>test_wrds_mode_switch.py</code>, <code>test_wrds_calendar.py</code>, <code>test_wrds_factors.py</code></td>
+<td><code>app/components/sidebar.py</code>, <code>app/components/factor_selection.py</code>, <code>app/streamlit_config.py</code>, <code>app/streamlit_app.py</code> (WRDS Run shows a "coming in the next stage" note until stage 3); this design (decisions)</td>
+</tr>
+<tr>
+<td>3</td>
+<td>WRDS engine (not deployed)</td>
+<td><code>src/wrds_data.py</code>, <code>src/wrds_engine.py</code> (metrics included; no separate <code>wrds_metrics.py</code>), <code>src/wrds_service.py</code> (runner), <code>scripts/check_wrds_engine.py</code>, <code>tests/unit/wrds_fixtures.py</code>, <code>test_wrds_engine.py</code>, <code>test_wrds_lookahead.py</code>, <code>test_wrds_service.py</code></td>
+<td><code>src/performance_metrics.py</code> (<code>periods_per_year</code>), <code>src/s3_client.py</code> (<code>read_bytes</code>); the dispatch in <code>src/backtest_service.py</code> and <code>FACTOR_LAKE_WRDS_DIR</code> in the deploy script move to stage 4</td>
+</tr>
+<tr>
+<td>4</td>
+<td>jobs, cache, holdings, Lambda wiring (dev function only)</td>
+<td><code>src/wrds_jobs.py</code>, <code>src/wrds_holdings.py</code>, <code>app/components/wrds_results.py</code> (a first results view), <code>tests/fixtures/saved_main_*.json</code> (written by <code>main</code>'s code), <code>test_wrds_jobs.py</code>, <code>test_wrds_saved.py</code></td>
+<td><code>src/wrds_service.py</code> (the cached service), <code>src/wrds_engine.py</code> (<code>rank_stocks</code>), <code>src/backtest_service.py</code> (routing, shared <code>_respond</code>), <code>src/backtest_jobs.py</code> (<code>code_version(sources=...)</code>), <code>src/saved_analyses.py</code> (message names the job kind), <code>app/streamlit_utils.py</code>, <code>app/streamlit_app.py</code>, <code>app/components/results_tab.py</code> (one dispatch), <code>scripts/deploy_backtest_lambda.py</code> (<code>--leave-lifecycle-rules</code>, <code>--wrds-dir</code>)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>feature parity (no Lambda code changed, so no redeploy)</td>
+<td><code>app/wrds_tables.py</code>, <code>Visualizations/wrds_plots.py</code>, <code>tests/unit/results_snapshot.py</code> with <code>tests/fixtures/legacy_results_render_main.json</code> (Legacy's Results tab rendered by <code>main</code>'s code), <code>test_wrds_results.py</code></td>
+<td><code>app/components/wrds_results.py</code> (the full view), <code>app/streamlit_utils.py</code> (tab labels), <code>app/streamlit_config.py</code> (factor units), <code>app/streamlit_app.py</code> (Data Viewer note)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>validation and docs (dev function only)</td>
+<td></td>
+<td><code>DOCS/AWS_LAMBDA_BACKTESTS.md</code> (section 9 and the validation table), <code>DOCS/FACTOR_LAKE_USER_GUIDE.md</code> (section 15), <code>README.md</code>, <code>mkdocs.yml</code>, this design (status). The validation ran from scripts outside the repo (direct Lambda invokes and the app driven against the dev function) instead of a <code>--wrds</code> flag on <code>scripts/check_backtest_lambda.py</code>; <code>scripts/check_wrds_engine.py</code> is the repeatable local check</td>
+</tr>
+<tr>
+<td>follow-up</td>
+<td>WRDS results drawn by Legacy's render functions (UI only, no redeploy)</td>
+<td></td>
+<td><code>app/components/results_tab.py</code> and Legacy's two chart files (optional names, periods and a date axis; defaults unchanged), <code>app/components/wrds_results.py</code>, <code>app/wrds_tables.py</code>, <code>Visualizations/wrds_plots.py</code> (only the period returns chart), <code>test_wrds_results.py</code> (compared with <code>main</code>'s Legacy render), section 8</td>
+</tr>
+</tbody>
+</table>
+<p>Ideas taken from the old <code>feature/sub-annual-rebalancing</code> branch: month-end rebalance dates, date labels on the plots with thinned ticks, and cohort CAGR in calendar years. Avoided from it: an annual risk-free rate applied to every period, delisted positions at 0%, and a universe that was not point in time.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

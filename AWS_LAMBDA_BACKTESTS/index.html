@@ -1,0 +1,3058 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="API Reference and Guides for the Factor-Lake Portfolio Analysis System">
+      
+      
+      
+      
+        <link rel="prev" href="../AWS_S3_DATA/">
+      
+      
+        <link rel="next" href="../WRDS_MODE_DESIGN/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Backtests in AWS Lambda - Factor-Lake</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="red" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#backtests-in-aws-lambda" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Factor-Lake" class="md-header__button md-logo" aria-label="Factor-Lake" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Factor-Lake
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Backtests in AWS Lambda
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="red" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="red" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../FACTOR_LAKE_USER_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/src/backtest_engine/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Factor-Lake" class="md-nav__button md-logo" aria-label="Factor-Lake" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Factor-Lake
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../FACTOR_LAKE_USER_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Factor Lake User Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DEV_ONBOARDING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Onboarding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../STREAMLIT_ADMIN_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streamlit Admin Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DOCS_CONTRIBUTOR_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Contributor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DEPLOYMENT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AWS_S3_DATA/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS S3 Data Source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtests in AWS Lambda
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtests in AWS Lambda
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. How it works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-deploy-the-lambda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Deploy the Lambda
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Deploy the Lambda">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deploy-from-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploy from CI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-turn-it-on-in-the-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Turn it on in the app
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-check-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Check it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-demo-script-about-5-minutes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Demo script (about 5 minutes)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-share-an-analysis-by-its-id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Share an analysis by its ID
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-troubleshoot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Troubleshoot
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-cost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Cost
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-wrds-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. WRDS mode
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. WRDS mode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deploy-a-dev-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploy a dev function
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validation-on-the-dev-function-2026-10-28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation on the dev function (2026-10-28)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#admin-confirm-the-90-day-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Admin: confirm the 90-day rule
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../WRDS_MODE_DESIGN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WRDS Mode Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SUPABASE_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supabase Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SUPABASE_UPLOAD_TOOL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supabase Upload Tool
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SUPABASE_MAINTENANCE_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supabase Maintenance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../STREAMLIT_STYLING_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streamlit Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Bandit%20%26%20Safety/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security Scanning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../REORGANIZATION_SUMMARY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reorganization Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    src
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    src
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/backtest_engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    backtest_engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/backtest_jobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    backtest_jobs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/backtest_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    backtest_service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    benchmarks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/data_standardization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    data_standardization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/factor_registry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factor_registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/factor_utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factor_utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/factors_doc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factors_doc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/lambda_client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    lambda_client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/performance_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    performance_metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/portfolio/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    portfolio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/portfolio_filters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    portfolio_filters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/s3_client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    s3_client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/saved_analyses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    saved_analyses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/supabase_client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    supabase_client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/universe_selection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    universe_selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_calendar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_calendar
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_factors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_factors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_holdings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_holdings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_jobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_jobs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    app
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    app
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/analysis_history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    analysis_history
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_2" id="__nav_3_2_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    components
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    components
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/about/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    about
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/data_viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    data_viewer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/factor_selection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factor_selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/results_tab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    results_tab
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/sidebar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidebar
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/wrds_results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/holdings_table/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    holdings_table
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/saved_runs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    saved_runs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/streamlit_app/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_app
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/streamlit_config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/streamlit_css/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_css
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/streamlit_utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/viewer_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    viewer_data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/wrds_tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visualizations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Visualizations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/Visualizations/portfolio_growth_plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    portfolio_growth_plot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/Visualizations/top_bottom_portfolio_plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    top_bottom_portfolio_plot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/Visualizations/wrds_plots/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_plots
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. How it works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-deploy-the-lambda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Deploy the Lambda
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Deploy the Lambda">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deploy-from-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploy from CI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-turn-it-on-in-the-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Turn it on in the app
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-check-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Check it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-demo-script-about-5-minutes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Demo script (about 5 minutes)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-share-an-analysis-by-its-id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Share an analysis by its ID
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-troubleshoot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Troubleshoot
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-cost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Cost
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-wrds-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. WRDS mode
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. WRDS mode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deploy-a-dev-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploy a dev function
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validation-on-the-dev-function-2026-10-28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation on the dev function (2026-10-28)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#admin-confirm-the-90-day-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Admin: confirm the 90-day rule
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="backtests-in-aws-lambda">Backtests in AWS Lambda</h1>
+<p>Backtests can run in AWS Lambda instead of inside the Streamlit app. The app sends only the inputs (factors, directions and sidebar settings). Lambda reads the market data from S3, runs the same backtest code, and saves the result in S3, so the app never has to download or hold the market data to run a backtest.</p>
+<h2 id="1-how-it-works">1. How it works</h2>
+<pre><code>Streamlit app ──inputs──▶ Lambda factor-lake-backtest ──reads──▶ s3://.../factor-lake-data/*.parquet
+      ▲                         │
+      └──result or S3 link──────┴──saves──▶ s3://.../factor-lake-data/backtest-results/&lt;hash&gt;.json
+</code></pre>
+<ol>
+<li><strong>Inputs only.</strong> Run Portfolio Analysis (and Generate Comparison) sends a small JSON job: factors, directions, years, AUM, weighting, delisting strategy, factor combination, sectors and the fossil fuel filter. See <code>src/backtest_jobs.py</code>.</li>
+<li><strong>Same code, same results.</strong> Lambda filters the data with <code>src/universe_selection.py</code> (the code behind Load Market Data) and runs <code>src/backtest_engine.py</code>, the code the app runs locally.</li>
+<li><strong>Cached by hash.</strong> The result is saved under a SHA-256 hash of the inputs, the data version (the S3 ETags of the market data files) and the backtest code version (a hash of the engine's source files). Republishing the data or deploying new backtest code gives fresh results.</li>
+<li><strong>Repeats are instant.</strong> When a result with that hash exists, Lambda returns it without rerunning the backtest. Results are shared, so a run by any user is cached for everyone.</li>
+<li><strong>Result or link.</strong> Results up to 5 MB come back in the Lambda response (Lambda's limit is 6 MB). Bigger results come back as a temporary S3 link (valid for 1 hour), which the app downloads.</li>
+<li><strong>90-day expiry.</strong> An S3 lifecycle rule deletes saved results after 90 days.</li>
+</ol>
+<p>The Results tab shows how each run was produced, for example "Computed: Returned from the AWS Lambda result cache in 0.4 s (first computed 2026-10-22 18:03:11 UTC)".</p>
+<h2 id="2-deploy-the-lambda">2. Deploy the Lambda</h2>
+<p>Needs AWS keys that can create IAM roles and Lambda functions, and change the bucket's lifecycle rules.</p>
+<pre><code class="language-bash">uv run python scripts/deploy_backtest_lambda.py
+</code></pre>
+<p>It is safe to run again: it creates what is missing and updates the rest. It sets up:</p>
+<table>
+<thead>
+<tr>
+<th>Resource</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IAM role <code>factor-lake-backtest-lambda</code></td>
+<td>Read <code>factor-lake-data/*</code>, write <code>factor-lake-data/backtest-results/*</code>, CloudWatch logs</td>
+</tr>
+<tr>
+<td>Lambda <code>factor-lake-backtest</code></td>
+<td>Python 3.12, 3008 MB, 10-minute timeout. pandas, numpy and pyarrow are bundled in the package at the versions your environment runs (Linux builds fetched with <code>uv</code>; unused parts such as test suites and pyarrow's Flight libraries removed), so Lambda computes with the same libraries as the app and needs no Lambda layer. The package (about 62 MB zipped, 199 MB unzipped; Lambda allows 250 MB) is uploaded to <code>factor-lake-data/_deploy/</code> first, because direct uploads are limited to 50 MB</td>
+</tr>
+<tr>
+<td>S3 lifecycle rule <code>factor-lake-expire-backtest-results</code></td>
+<td>Deletes <code>factor-lake-data/backtest-results/</code> objects after 90 days. Other rules on the bucket are kept</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Keys without IAM access</strong> (such as the class <code>Sysen5900Student</code> user, which is denied all IAM actions) cannot create the role. Deploy with an existing role instead: <code>--role-arn &lt;the role's ARN&gt;</code> (the script then makes no IAM calls). In the class account that is the course's Lambda role:</p>
+<pre><code class="language-bash">uv run python scripts/deploy_backtest_lambda.py --role-arn arn:aws:iam::620832638024:role/Sysen5900LambdaExecRole --function-name sysen5900-factor-lake-backtest
+</code></pre>
+<p>Without a usable role, run <code>uv run python scripts/deploy_backtest_lambda.py --print-role-policy</code> and send the output to an AWS admin. If the keys may not change the bucket's lifecycle rules, the deploy still finishes and says what to ask an admin for.</p>
+<p>It finishes by pinging the function. Options: <code>--memory</code>, <code>--timeout</code>, <code>--function-name</code>, <code>--role-arn</code>, <code>--package-only out.zip</code> (build the zip without deploying).</p>
+<h3 id="deploy-from-ci">Deploy from CI</h3>
+<p>The app on Streamlit Cloud redeploys from <code>main</code> on every merge, and <code>.github/workflows/deploy-lambda.yml</code> keeps the Lambda in step with it. A push to <code>main</code> that changes <code>src/</code>, <code>aws_lambda/</code>, <code>scripts/deploy_backtest_lambda.py</code> or <code>uv.lock</code> (which sets the bundled pandas, numpy and pyarrow versions) runs:</p>
+<ol>
+<li><strong>Unit tests.</strong> The workflow calls <code>tests.yml</code>. Nothing is deployed unless the tests pass.</li>
+<li><strong>Deploy.</strong> It runs <code>uv sync --locked</code>, then the deploy command above with <code>--role-arn</code> and <code>--function-name</code> from the repository variables, plus <code>--leave-lifecycle-rules</code>, so CI never rewrites the shared bucket's lifecycle settings (it only checks them; the 90-day rule is an admin's, section 9). The Python version comes from <code>.python-version</code>, so the Lambda gets the library versions locked in <code>uv.lock</code>. The WRDS data folder is the code's default (<code>DEFAULT_WRDS_DIR</code> in <code>src/wrds_data.py</code>), so a new WRDS pull is one code change.</li>
+<li><strong>Check.</strong> It runs <code>scripts/check_backtest_lambda.py</code> (section 4) against the new function: the Legacy samples, then one quarterly WRDS backtest end to end.</li>
+</ol>
+<p>The run fails if any step fails, so a red run means the Lambda may be behind <code>main</code>. To redeploy by hand, open Actions → Deploy Backtest Lambda → Run workflow (only <code>main</code> deploys). Deploys never overlap. A push that arrives during a deploy waits for it to finish.</p>
+<p>A repository admin has to add these under Settings → Secrets and variables → Actions:</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Name</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Secret</td>
+<td><code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code></td>
+<td>Keys that may update the function, pass its role, upload to <code>factor-lake-data/_deploy/</code> and read the market data (the class <code>Sysen5900Student</code> keys can)</td>
+</tr>
+<tr>
+<td>Variable</td>
+<td><code>LAMBDA_ROLE_ARN</code></td>
+<td><code>arn:aws:iam::620832638024:role/Sysen5900LambdaExecRole</code></td>
+</tr>
+<tr>
+<td>Variable</td>
+<td><code>LAMBDA_FUNCTION_NAME</code></td>
+<td><code>sysen5900-factor-lake-backtest</code></td>
+</tr>
+</tbody>
+</table>
+<p>Until all four are set, the workflow stops at its first step and names what is missing. It never falls back to the script's default function name.</p>
+<p>Old packages are not deleted. Each package in <code>factor-lake-data/_deploy/</code> is named by its content hash, so a deploy with unchanged code reuses the same file, and only real changes add a new one (about 62 MB each). To clear them out, delete all but the newest few <code>backtest-lambda-*.zip</code> files in the S3 console, or ask an AWS admin for a lifecycle rule on <code>factor-lake-data/_deploy/</code>.</p>
+<h2 id="3-turn-it-on-in-the-app">3. Turn it on in the app</h2>
+<p>Set the function name next to the AWS keys, in <code>.env</code> locally or in the Streamlit Cloud secrets:</p>
+<pre><code>FACTOR_LAKE_BACKTEST_LAMBDA=&quot;factor-lake-backtest&quot;
+</code></pre>
+<p>The app's AWS key also needs <code>lambda:InvokeFunction</code> on that function. When the variable is set, the sidebar shows <strong>Run backtests in AWS Lambda</strong> (on by default). Turn it off to run backtests in the app as before (Load Market Data first). Without the variable, the app works exactly as before.</p>
+<h2 id="4-check-it">4. Check it</h2>
+<pre><code class="language-bash">uv run python scripts/check_backtest_lambda.py
+</code></pre>
+<p>For four sample backtests (Mixing and Integrating, every delisting strategy, equal and market cap weighting, the fossil fuel filter and a cohort comparison), it runs each one locally on the S3 data, then in Lambda, and compares every number. It then runs each one in Lambda again and checks that it came from the cache, unchanged. It uses new inputs each time, so the first Lambda call always computes. The Lambda uses the same library versions but runs on Linux x86, so numbers may differ in the last binary digit. The check allows a relative difference of 1e-9 and prints the largest difference it found.</p>
+<p>Then it checks one quarterly WRDS backtest (2008-2026, two factors) end to end. The function must read the WRDS folder the code expects (its <code>FACTOR_LAKE_WRDS_DIR</code>). The Lambda's result must match the same job run locally on the WRDS data in S3. The newest rebalance date's holdings, read from the Lambda's holdings file the way the app reads them (two ranged GETs), must match the local holdings of that date. A second Lambda call must come from the cache, unchanged. <code>--skip-wrds</code> leaves this part out.</p>
+<p>Holdings are compared stock by stock, leaving out <strong>Rank</strong> and <strong>Score</strong>. Winsorizing gives the top 1% of each factor exactly the same score, and the engine sorts those ties in an order that depends on the machine. So a Mac and Lambda can list tied stocks in a different order, and for a stock bought by several Mixing sleeves, show the Rank and Score from a different sleeve. The stocks held, shares, prices, weights, returns and contributions still have to match. When a percentage cuts through a tied block (for example a 1% cohort), the engine's choice of which tied stocks to buy also depends on the machine and on row order. That is a known engine issue, to be fixed separately with deterministic tie-breaking.</p>
+<p>The unit tests (<code>tests/unit/test_backtest_lambda.py</code>) run the same Lambda code against a fake S3 and drive the real app, checking that a Lambda run equals a local run for both factor combinations, each delisting strategy and the cohort comparison, and that a repeated run is served from the cache.</p>
+<h2 id="5-demo-script-about-5-minutes">5. Demo script (about 5 minutes)</h2>
+<p>Before the call: deploy (section 2), add <code>FACTOR_LAKE_BACKTEST_LAMBDA</code> to <code>.env</code>, and start the app with <code>uv run streamlit run app/streamlit_app.py</code>. To warm the Lambda up, run one backtest. To keep the "first run computes" moment for the call, pick inputs you have not run yet (for example a new AUM).</p>
+<ol>
+<li><strong>The switch.</strong> Point out <strong>Run backtests in AWS Lambda</strong> in the sidebar and the caption with the function name. On the Analysis tab, the caption says the market data does not need to be loaded.</li>
+<li><strong>First run computes in Lambda.</strong> Add two factors (for example ROE using 9/30 Data and ROA %), pick Integrating, and click <strong>Run Portfolio Analysis</strong> without loading data. The confirmation says "computed in AWS Lambda in N s". In the Results tab, the <strong>Computed</strong> line shows the result ID (the first 12 characters of its hash).</li>
+<li><strong>The repeat is cached.</strong> Click <strong>Run Portfolio Analysis</strong> again with the same settings. The new run shows the same result ID and "returned from the AWS Lambda result cache in 0.N s", with the time it was first computed.</li>
+<li><strong>Any change is a new backtest.</strong> Change the AUM or a factor direction and run again: it computes (new result ID).</li>
+<li><strong>Same results as before.</strong> Turn the Lambda switch off, click <strong>Load Market Data</strong>, and run the same settings as step 2. The new run tab shows the same final value, CAGR and holdings as the Lambda run. For the precise check, run <code>scripts/check_backtest_lambda.py</code> in a terminal: "match: yes" with the largest difference for each backtest, and "cached=True" for every repeat.</li>
+<li><strong>Cohort comparison.</strong> In a Lambda run's tab, open <strong>Run Cohort Comparison</strong> and click <strong>Generate Comparison</strong>: the caption says it ran in Lambda.</li>
+<li><strong>Where results live.</strong> In the AWS console: S3 → <code>sysen-5900-factor-lake</code> → <code>factor-lake-data/backtest-results/</code> shows one JSON file per result hash. Management → Lifecycle rules shows the 90-day expiry (in the class account an admin has to add it; see section 2). Lambda → <code>factor-lake-backtest</code> (<code>sysen5900-factor-lake-backtest</code> in the class account) → Monitor shows the invocations, and its CloudWatch logs show "Computed ..." and "Cache hit ..." lines.</li>
+</ol>
+<h2 id="6-share-an-analysis-by-its-id">6. Share an analysis by its ID</h2>
+<p>The hash a result is saved under doubles as its <strong>analysis ID</strong>. Each saved file holds the job (factors, directions, settings) next to the result, so the ID alone is enough to show the analysis again. The app reads it straight from S3 (<code>src/saved_analyses.py</code>), without calling the Lambda, so opening never reruns a backtest.</p>
+<ul>
+<li>Each Lambda run's tab shows the full ID with a copy button.</li>
+<li><strong>Results → Open a saved analysis</strong> opens an ID as a new tab with the original results and settings.</li>
+<li><strong>This session's analyses</strong> lists only the runs of the current browser session. Nothing is listed from S3, so nobody sees other people's analyses unless they're given an ID.</li>
+<li><strong>Earlier analyses on this browser</strong> (<code>app/analysis_history.py</code>) lists IDs from earlier sessions on the same browser. The app has no logins, so they are kept in the browser's <code>localStorage</code> (key <code>factor-lake-analyses</code>, newest 200). A small inline JavaScript component (<code>st.components.v2</code>) adds each session's IDs and reports the stored list to the app once per page load. Reporting more often would rerun the app and clear messages like "Analysis complete".</li>
+<li><strong>All saved analyses</strong> lists everyone's newest 20 from S3 (<code>list_saved_analyses</code>). It reads only the files' metadata (the Lambda saves a short <code>summary</code> and the <code>kind</code>, so cohort comparisons and WRDS ranked lists are left out), and only while expanded. Only <code>&lt;ID&gt;.json</code> results are listed, never the WRDS holdings files next to them. A WRDS analysis's summary starts with its data source and frequency, e.g. "WRDS, Quarterly | ROE (higher), ROA (higher) | Mixing | 2008-2026 | $1,000", and the session and browser lists show the same line under a WRDS run's label. The app's key needs <code>s3:ListBucket</code> on <code>backtest-results/</code>; without it the list explains that. Results saved before summaries existed show "Details not recorded".</li>
+<li>Errors: text that isn't a 64-character ID, an ID with no saved analysis (mistyped, or deleted by the 90-day rule), a result saved before sharing existed, or a cohort comparison's ID.</li>
+</ul>
+<p>Demo (about 2 minutes, after the steps in section 5):</p>
+<ol>
+<li>In a run's tab, copy its <strong>Analysis ID</strong>.</li>
+<li>Open the app in a second browser window (a private window works) to stand in for a colleague. Its <strong>Results</strong> tab shows <strong>Open a saved analysis</strong> and no runs.</li>
+<li>Paste the ID and click <strong>Open analysis</strong>. The same final value, CAGR, holdings and charts appear in a tab labelled "(opened)", with "Opened from a saved analysis (first computed …)". Generate Comparison also works there.</li>
+<li>Paste a wrong ID (for example drop the last character, or change one character) to show the errors: "is not an analysis ID" and "No saved analysis has the ID … deleted after 90 days".</li>
+<li>Back in the first window, <strong>This session's analyses</strong> lists your runs with their IDs. The second window lists only the analysis it opened.</li>
+<li>Close both windows, open the app again in the first browser, and go to <strong>Results → Earlier analyses on this browser</strong>: the analyses from before are listed with their IDs. Click <strong>Open</strong> on one, and it opens without pasting anything.</li>
+<li>Expand <strong>All saved analyses</strong> to show everyone's recent analyses with their factors and dates, and open one from there.</li>
+</ol>
+<h2 id="7-troubleshoot">7. Troubleshoot</h2>
+<table>
+<thead>
+<tr>
+<th>Message</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Could not call the backtest Lambda ... AccessDeniedException</code></td>
+<td>The app's AWS key needs <code>lambda:InvokeFunction</code> on the function</td>
+</tr>
+<tr>
+<td><code>... ResourceNotFoundException</code></td>
+<td>Deploy the function (section 2) or fix <code>FACTOR_LAKE_BACKTEST_LAMBDA</code></td>
+</tr>
+<tr>
+<td><code>The backtest Lambda failed: Task timed out</code></td>
+<td>Raise <code>--timeout</code> (up to 900 seconds) and redeploy</td>
+</tr>
+<tr>
+<td><code>... Runtime.OutOfMemory</code></td>
+<td>Raise <code>--memory</code> and redeploy</td>
+</tr>
+<tr>
+<td><code>The backtest Lambda could not run this backtest: ...</code></td>
+<td>The backtest itself failed; the message is the engine's error</td>
+</tr>
+</tbody>
+</table>
+<h2 id="8-cost">8. Cost</h2>
+<p>Each uncached backtest is one Lambda invocation of a few seconds. A cold start adds the time to download the 8 MB market data file. Cached repeats take well under a second, and saved results are small JSON files deleted after 90 days. Class use stays far inside the Lambda and S3 free tiers.</p>
+<h2 id="9-wrds-mode">9. WRDS mode</h2>
+<p>WRDS backtests (see the user guide, section 15, and <code>DOCS/WRDS_MODE_DESIGN.md</code>) run in the same function. A job with <code>data_mode: "wrds"</code> goes to <code>src/wrds_service.py</code>; every other job is a Legacy job, handled exactly as before.</p>
+<ul>
+<li><strong>Data.</strong> The function reads three files under <code>factor-lake-data/wrds_2026_10/</code> (<code>factor_panel_monthly</code>, <code>returns_monthly</code>, <code>market_monthly</code>), only the columns it needs, once per container. The folder is set by the function's <code>FACTOR_LAKE_WRDS_DIR</code> variable (the deploy script's <code>--wrds-dir</code>). A new WRDS pull goes into a new folder.</li>
+<li><strong>Cache.</strong> The key hashes the job, the S3 ETags of the three files and a WRDS code version. Legacy keeps its own code version, so WRDS changes never recompute Legacy results.</li>
+<li><strong>Holdings.</strong> A WRDS backtest writes <code>backtest-results/&lt;hash&gt;.holdings.parquet</code> (one row group per rebalance date) <strong>before</strong> <code>backtest-results/&lt;hash&gt;.json</code>. The app reads one date at a time with its own S3 keys, in two ranged GETs. A cached result whose holdings file is missing is computed again.</li>
+<li><strong>Listings.</strong> The result JSON's metadata has the job's <code>kind</code> and a summary starting "WRDS, <frequency>" (section 6). WRDS results saved before this (on the dev function) have none and show "Details not recorded" until the 90-day rule deletes them.</li>
+<li><strong>Live deploys</strong> come from CI (section 2, "Deploy from CI"), whose check step runs a WRDS backtest end to end.</li>
+</ul>
+<h3 id="deploy-a-dev-function">Deploy a dev function</h3>
+<p>Test changes on a separate function and leave the live one alone:</p>
+<pre><code class="language-bash">uv run python scripts/deploy_backtest_lambda.py --function-name sysen5900-factor-lake-backtest-dev \
+    --role-arn &lt;the course role's ARN&gt; --leave-lifecycle-rules
+</code></pre>
+<ul>
+<li><code>--leave-lifecycle-rules</code> does not write the bucket's lifecycle rules (a normal deploy rewrites them, and the bucket is shared with the live app). It only reads them and says whether <code>backtest-results/</code> expires.</li>
+<li><code>--wrds-dir wrds_YYYY_MM</code> points the function at another WRDS folder (default <code>wrds_2026_10</code>).</li>
+</ul>
+<p>To point a local app at the dev function, set the function name next to the AWS keys in <code>.streamlit/secrets.toml</code> (top level):</p>
+<pre><code>FACTOR_LAKE_BACKTEST_LAMBDA = &quot;sysen5900-factor-lake-backtest-dev&quot;
+</code></pre>
+<p>To check the WRDS engine locally on the pipeline's files (IWM tracking, run time and memory), run <code>uv run python scripts/check_wrds_engine.py "&lt;path&gt;/processed/final"</code>. It prints its results and stores none.</p>
+<h3 id="validation-on-the-dev-function-2026-10-28">Validation on the dev function (2026-10-28)</h3>
+<p>Lambda's own durations (from the invocation log tail), 3008 MB function, course role. All runs were computed (no cache) unless marked.</p>
+<table>
+<thead>
+<tr>
+<th>Job</th>
+<th>Container</th>
+<th>Duration</th>
+<th>Max memory</th>
+<th>Result JSON</th>
+<th>Holdings Parquet</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Monthly, whole universe, cap weighted (IWM tracking check)</td>
+<td>cold: init 2.5 s, plus loading the WRDS data</td>
+<td>10.2 s</td>
+<td>1154 MB</td>
+<td>85 KB</td>
+<td>47.9 MB</td>
+<td>PASS (correlation ≥ 0.99, tracking error ≤ 3%)</td>
+</tr>
+<tr>
+<td>Monthly, Mixing, 3 factors</td>
+<td>warm</td>
+<td>3.0 s</td>
+<td>1154 MB</td>
+<td>85 KB</td>
+<td>22.1 MB</td>
+<td></td>
+</tr>
+<tr>
+<td>Monthly, Integrating, 2 factors</td>
+<td>warm</td>
+<td>1.5 s</td>
+<td>1154 MB</td>
+<td>85 KB</td>
+<td>6.0 MB</td>
+<td></td>
+</tr>
+<tr>
+<td>Monthly, Mixing, 3 factors, cap weighted</td>
+<td>warm</td>
+<td>2.9 s</td>
+<td>1154 MB</td>
+<td>85 KB</td>
+<td>23.3 MB</td>
+<td></td>
+</tr>
+<tr>
+<td>Monthly, Mixing, 4 factors</td>
+<td>warm</td>
+<td>3.5 s</td>
+<td>1154 MB</td>
+<td>85 KB</td>
+<td>27.6 MB</td>
+<td></td>
+</tr>
+<tr>
+<td>Monthly, Mixing, 10 factors</td>
+<td>warm</td>
+<td>6.5 s</td>
+<td>1154 MB</td>
+<td>85 KB</td>
+<td>49.7 MB</td>
+<td></td>
+</tr>
+<tr>
+<td>The first one again</td>
+<td>warm, cache hit</td>
+<td>0.11 s</td>
+<td>1154 MB</td>
+<td>85 KB</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>3 jobs at once: semi-annual / quarterly / monthly</td>
+<td>1 warm, 2 cold (init 2.6 s)</td>
+<td>0.5 / 6.9 / 8.6 s</td>
+<td>1154 / 890 / 996 MB</td>
+<td>16 / 29 / 84 KB</td>
+<td>2.3 / 5.1 / 16.8 MB</td>
+<td>all finished, 9.6 s wall</td>
+</tr>
+<tr>
+<td>From the app: semi-annual / quarterly / monthly backtest</td>
+<td>warm</td>
+<td>0.7 / 1.1 / 2.9 s</td>
+<td>996 MB</td>
+<td>16 / 30 / 85 KB</td>
+<td>3.3 / 7.0 / 22.1 MB</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>From the app: cohort comparison (monthly, 10%)</td>
+<td>warm</td>
+<td>3.6 s</td>
+<td>996 MB</td>
+<td>11 KB</td>
+<td></td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>From the app: ranked list, one date</td>
+<td>warm</td>
+<td>0.3 s</td>
+<td>996 MB</td>
+<td>0.9 MB</td>
+<td></td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>From the app: Legacy backtest</td>
+<td>warm</td>
+<td>2.4 s</td>
+<td>996 MB</td>
+<td>2.3 MB</td>
+<td></td>
+<td>equals <code>main</code>'s result (≤ 1e-9 relative)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Warm repeats do not slow down on Linux.</strong> Five different monthly jobs in a row on one container took time in line with their number of factors, not their order. (On Windows, repeated engine runs in one process did get slower.)</li>
+<li><strong>Cold start</strong> for WRDS: about 2.5 s of Lambda init, plus a few seconds the first WRDS job of a container spends loading the WRDS data.</li>
+<li><strong>Memory</strong>: at most about 1.15 GB of the function's 3008 MB, with the Legacy and WRDS data both loaded.</li>
+<li><strong>Package</strong>: 61.7 MB zipped, 199 MB unzipped (Lambda allows 250 MB).</li>
+</ul>
+<h3 id="admin-confirm-the-90-day-rule">Admin: confirm the 90-day rule</h3>
+<p>Saved results and WRDS holdings both live under <code>factor-lake-data/backtest-results/</code>, so one lifecycle rule on that prefix expires both. The class keys cannot read the bucket's lifecycle rules, so <strong>an AWS admin must confirm</strong> that the rule <code>factor-lake-expire-backtest-results</code> (prefix <code>factor-lake-data/backtest-results/</code>, expire after 90 days) is enabled on <code>sysen-5900-factor-lake</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
