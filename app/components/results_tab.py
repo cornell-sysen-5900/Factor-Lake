@@ -8,12 +8,13 @@ VERSION: 3.8.0
 import streamlit as st
 import pandas as pd
 import numpy as np
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Callable, Dict, Any, List, Optional
 
 from Visualizations.portfolio_growth_plot import plot_portfolio_growth
 from Visualizations.top_bottom_portfolio_plot import plot_top_bottom_percent
 from app.streamlit_config import MAX_SAVED_RUNS
-from app.streamlit_utils import describe_compute, get_backtest_lambda_name, open_saved_analysis, run_cohort
+from app.streamlit_utils import (describe_compute, get_backtest_lambda_name, list_all_saved_analyses,
+                                 open_saved_analysis, run_cohort)
 from src.saved_analyses import SavedAnalysisError
 from app.saved_runs import remove_saved_run
 from app.holdings_table import (
@@ -22,6 +23,11 @@ from app.holdings_table import (
 )
 
 DIRECTION_LABELS = {'top': 'Higher is better', 'bottom': 'Lower is better'}
+# Column headers of the Year-by-Year and Win/Loss tables; WRDS runs pass their own
+YEAR_BY_YEAR_COLUMNS = ["Year", "Portfolio Value", "YoY Return", "Benchmark Returns", "Growth Returns",
+                        "Value Returns"]
+WIN_LOSS_COLUMNS = ['Year', 'Portfolio Return', 'Benchmark Return', 'Outperformed Benchmark',
+                    'Growth Index Return', 'Outperformed Growth', 'Value Index Return', 'Outperformed Value']
 RUN_TABS_KEY = "saved_run_tabs"
 # Copy of the open run tab that survives the Results tab being hidden
 OPEN_RUN_TAB_KEY = "saved_run_tabs_open"
@@ -101,6 +107,10 @@ def render_results_tab(run: Dict[str, Any]) -> None:
     if not results:
         st.warning("No backtest results found. Please execute the analysis.")
         return
+    if run.get('data_mode') == 'wrds':
+        from components.wrds_results import render_wrds_results
+        render_wrds_results(run)
+        return
     settings = run['settings']
 
     # 1. Header Information
@@ -157,35 +167,52 @@ def _render_holdings_table(run: Dict[str, Any]) -> None:
         st.info("No holdings are available for the selected factors and date range.")
         return
 
-    # Only the open run tab is rendered, and Streamlit drops the state of widgets
-    # that are not rendered, so keep a copy to restore the year after a tab switch.
-    saved_key = f"ranked_year_saved_{run['id']}"
-    saved_year = st.session_state.get(saved_key)
-    year = st.selectbox(
-        "Rebalance year",
-        options=years,
-        index=years.index(saved_year if saved_year in years else default_holdings_year(years)),
-        key=f"ranked_year_{run['id']}",
-    )
-    st.session_state[saved_key] = year
-
+    year = _pick_rebalance(run, "Rebalance year", years)
     rows = holdings_by_year[year]
-    method = FACTOR_COMBINATION_LABELS.get(results.get('factor_combination', 'mixing'), 'Mixing')
-    period_return = holdings_period_return(results, year)
-    return_str = f"{period_return:.2f}%" if period_return is not None else "n/a"
-    st.caption(
-        f"**Method:** {method} | **Holdings:** {len(rows)} | "
-        f"**Portfolio return ({year} to {year + 1}):** {return_str}"
-    )
+    _render_holdings_caption(results, len(rows), f"{year} to {year + 1}", holdings_period_return(results, year))
     if not rows:
         st.info("The backtest held no stocks this year.")
         return
 
     holdings_df = build_holdings_display_table(rows, run['factor_labels'])
+    _render_holdings_dataframe(run, holdings_df, holdings_number_formats(run['factor_labels']),
+                               f"holdings_{year}.csv")
+
+
+def _pick_rebalance(run: Dict[str, Any], label: str, options: List[Any]) -> Any:
+    """The rebalance year (or date, for WRDS runs) picker, newest by default."""
+    # Only the open run tab is rendered, and Streamlit drops the state of widgets
+    # that are not rendered, so keep a copy to restore the year after a tab switch.
+    saved_key = f"ranked_year_saved_{run['id']}"
+    saved_year = st.session_state.get(saved_key)
+    year = st.selectbox(
+        label,
+        options=options,
+        index=options.index(saved_year if saved_year in options else default_holdings_year(options)),
+        key=f"ranked_year_{run['id']}",
+    )
+    st.session_state[saved_key] = year
+    return year
+
+
+def _render_holdings_caption(results: Dict[str, Any], count: int, period: str,
+                             period_return: Optional[float]) -> None:
+    """Method, number of holdings and the portfolio's return over the holding period."""
+    method = FACTOR_COMBINATION_LABELS.get(results.get('factor_combination', 'mixing'), 'Mixing')
+    return_str = f"{period_return:.2f}%" if period_return is not None else "n/a"
+    st.caption(
+        f"**Method:** {method} | **Holdings:** {count} | "
+        f"**Portfolio return ({period}):** {return_str}"
+    )
+
+
+def _render_holdings_dataframe(run: Dict[str, Any], holdings_df: pd.DataFrame, number_formats: Dict[str, str],
+                               file_name: str, csv_key: str = "ranked_csv") -> None:
+    """A holdings table, rounded on screen only, with its CSV download."""
     # Round on screen only; the data (and the CSV) keep full precision
     column_config = {
         col: st.column_config.NumberColumn(format=fmt)
-        for col, fmt in holdings_number_formats(run['factor_labels']).items()
+        for col, fmt in number_formats.items()
         if col in holdings_df.columns
     }
     st.dataframe(holdings_df, width="stretch", hide_index=True, column_config=column_config)
@@ -193,18 +220,20 @@ def _render_holdings_table(run: Dict[str, Any]) -> None:
     st.download_button(
         "Download CSV",
         data=holdings_table_to_csv(holdings_df),
-        file_name=f"holdings_{year}.csv",
+        file_name=file_name,
         mime="text/csv",
-        key=f"ranked_csv_{run['id']}",
+        key=f"{csv_key}_{run['id']}",
         on_click="ignore",
     )
 
-def _render_year_by_year_table(res: Dict[str, Any]) -> None:
+def _render_year_by_year_table(res: Dict[str, Any], periods: Optional[List[Any]] = None,
+                               columns: List[str] = YEAR_BY_YEAR_COLUMNS) -> None:
     """
     Generates the primary performance table with standardized financial headers.
     
     The table includes longitudinal portfolio values and relative returns against 
-    core market benchmarks (Russell 2000, Growth, and Value).
+    core market benchmarks (Russell 2000, Growth, and Value). WRDS runs pass their
+    periods' labels and their own column headers.
     """
     years = res.get('years', [])
     port_vals = res.get('portfolio_values', [])
@@ -216,40 +245,46 @@ def _render_year_by_year_table(res: Dict[str, Any]) -> None:
     # Align data lengths for consistent reporting
     min_len = len(p_rets)
     
-    df = pd.DataFrame({
-        "Year": [int(y) for y in years[:min_len]],
-        "Portfolio Value": [f"${v:,.2f}" for v in port_vals[1:min_len+1]],
-        "YoY Return": [f"{r:.2f}%" for r in p_rets],
-        "Benchmark Returns": [f"{r:.2f}%" for r in b_rets[:min_len]],
-        "Growth Returns": [f"{r:.2f}%" for r in g_rets[:min_len]],
-        "Value Returns": [f"{r:.2f}%" for r in v_rets[:min_len]]
-    })
+    df = pd.DataFrame(dict(zip(columns, [
+        [int(y) for y in years[:min_len]] if periods is None else periods,
+        [f"${v:,.2f}" for v in port_vals[1:min_len+1]],
+        [f"{r:.2f}%" for r in p_rets],
+        [f"{r:.2f}%" for r in b_rets[:min_len]],
+        [f"{r:.2f}%" for r in g_rets[:min_len]],
+        [f"{r:.2f}%" for r in v_rets[:min_len]]
+    ])))
     st.dataframe(df, width="stretch", hide_index=True)
 
-def _render_win_loss_ledger(res: Dict[str, Any]) -> None:
+def _render_win_loss_ledger(res: Dict[str, Any], columns: List[str] = WIN_LOSS_COLUMNS,
+                            period: Callable[[Dict[str, Any]], Any] = lambda c: int(c.get('year'))) -> None:
     """
     Displays a comprehensive win/loss ledger using boolean performance indicators.
 
-    This ledger compares portfolio returns against multiple indices on a yearly 
-    basis, highlighting alpha generation through visual cues.
+    This ledger compares portfolio returns against multiple indices on a yearly
+    basis, highlighting alpha generation through visual cues. WRDS runs pass their
+    own column headers and label each row by its holding period.
     """
     if 'yearly_comparisons' in res:
         comps = res['yearly_comparisons']
-        df = pd.DataFrame({
-            'Year': [int(c.get('year')) for c in comps],
-            'Portfolio Return': [f"{c.get('p_ret', 0):.2f}%" for c in comps],
-            'Benchmark Return': [f"{c.get('b_ret', 0):.2f}%" for c in comps],
-            'Outperformed Benchmark': ['✅' if c.get('b_win') else '❌' for c in comps],
-            'Growth Index Return': [f"{c.get('g_ret', 0):.2f}%" for c in comps],
-            'Outperformed Growth': ['✅' if c.get('g_win') else '❌' for c in comps],
-            'Value Index Return': [f"{c.get('v_ret', 0):.2f}%" for c in comps],
-            'Outperformed Value': ['✅' if c.get('v_win') else '❌' for c in comps],
-        })
+        df = pd.DataFrame(dict(zip(columns, [
+            [period(c) for c in comps],
+            [f"{c.get('p_ret', 0):.2f}%" for c in comps],
+            [f"{c.get('b_ret', 0):.2f}%" for c in comps],
+            ['✅' if c.get('b_win') else '❌' for c in comps],
+            [f"{c.get('g_ret', 0):.2f}%" for c in comps],
+            ['✅' if c.get('g_win') else '❌' for c in comps],
+            [f"{c.get('v_ret', 0):.2f}%" for c in comps],
+            ['✅' if c.get('v_win') else '❌' for c in comps],
+        ])))
         st.dataframe(df, width="stretch", hide_index=True)
 
-def _render_advanced_stats_grid(res: Dict[str, Any]) -> None:
+def _render_advanced_stats_grid(res: Dict[str, Any], index: str = "R2000", period: str = "Yearly",
+                                rf_label: Optional[str] = None) -> None:
     """
     Renders a multi-row grid containing advanced risk and efficiency metrics.
+
+    WRDS runs name their benchmark (index="IWM") and their period ("Quarterly"), and
+    give a short risk-free label (rf_label) whose tooltip holds the full description.
     """
     # Row 1: Drawdowns
 # Row 1: Drawdowns
@@ -286,16 +321,20 @@ def _render_advanced_stats_grid(res: Dict[str, Any]) -> None:
 
     # Row 5: Beta
     b1, b2, b3, b4 = st.columns(4)
-    b1.metric("Beta vs R2000", f"{res.get('portfolio_beta', 0):.3f}")
+    b1.metric(f"Beta vs {index}", f"{res.get('portfolio_beta', 0):.3f}")
     b2.metric("Beta vs Growth", f"{res.get('portfolio_beta_growth', 0):.3f}")
     b3.metric("Beta vs Value", f"{res.get('portfolio_beta_value', 0):.3f}")
-    b4.write(f"**RF Rate Source**\n\n{res.get('risk_free_rate_source', 'FRED')}")
+    if rf_label:
+        # A short label, with the full description in the tooltip
+        b4.markdown(f"**RF Rate Source**\n\n{rf_label}", help=res.get('risk_free_rate_source'))
+    else:
+        b4.write(f"**RF Rate Source**\n\n{res.get('risk_free_rate_source', 'FRED')}")
 
     # Row 6: Win Rates (Restored)
     w1, w2, w3, w4 = st.columns(4)
-    w1.metric("Yearly Win Rate (vs R2000)", f"{res.get('win_rate', 0):.2%}")
-    w2.metric("Yearly Win Rate (vs Growth)", f"{res.get('win_rate_growth', 0):.2%}")
-    w3.metric("Yearly Win Rate (vs Value)", f"{res.get('win_rate_value', 0):.2%}")
+    w1.metric(f"{period} Win Rate (vs {index})", f"{res.get('win_rate', 0):.2%}")
+    w2.metric(f"{period} Win Rate (vs Growth)", f"{res.get('win_rate_growth', 0):.2%}")
+    w3.metric(f"{period} Win Rate (vs Value)", f"{res.get('win_rate_value', 0):.2%}")
     w4.empty()
 
     # Row 7: IR
@@ -306,9 +345,12 @@ def _render_advanced_stats_grid(res: Dict[str, Any]) -> None:
     i4.empty()
 
 
-def _render_header_captions(run: Dict[str, Any]) -> None:
+def _render_header_captions(run: Dict[str, Any], data_source: Optional[str] = None,
+                            delisting: Optional[str] = None) -> None:
     """
     Renders the settings this run was created with (from its snapshot).
+
+    WRDS runs add a data source caption and describe their delisting treatment.
     """
     settings = run['settings']
     directions = run['factor_directions']
@@ -322,7 +364,7 @@ def _render_header_captions(run: Dict[str, Any]) -> None:
         "hold_cash": "Hold Cash (risk-free rate)",
         "reinvest": "Reinvest (pro-rata)"
     }
-    delisting_str = delisting_labels.get(
+    delisting_str = delisting or delisting_labels.get(
         settings.get('delisting_strategy', 'zero_return'), 'Zero Return'
     )
 
@@ -331,6 +373,8 @@ def _render_header_captions(run: Dict[str, Any]) -> None:
         f"**Period:** {int(settings['start_year'])}-{int(settings['end_year'])} | "
         f"**Initial AUM:** ${settings['initial_aum']:,.0f}"
     )
+    if data_source:
+        st.caption(data_source)
     universe = run.get('universe') or {}
     if universe:
         sectors = universe.get('selected_sectors') or []
@@ -391,20 +435,104 @@ def render_analysis_history(history: List[Dict[str, Any]]) -> None:
         st.caption("Only analyses run or opened in this browser session. Copy an ID to reopen or share it.")
         for entry in reversed(history):
             st.markdown(f"**{entry['label']}** · {entry['how']} at {entry['time']}")
+            _caption_summary(entry)
             if entry.get('analysis_id'):
                 st.code(entry['analysis_id'], language=None)
             else:
                 st.caption("Not saved (computed in this app), so it has no ID.")
 
-def _render_summary_metrics(res: Dict[str, Any], settings: Dict[str, Any]) -> None:
+
+# How many rows each list of saved analyses shows
+LISTED_ANALYSES = 20
+# Message shown at the top of Results after opening an analysis from a list
+OPENED_MESSAGE_KEY = "opened_analysis_message"
+
+
+def render_earlier_analyses(entries: Optional[List[Dict[str, Any]]]) -> None:
+    """
+    Analyses from earlier sessions in this browser (see app/analysis_history.py), newest
+    first, each with its ID and an Open button. Hidden until there is one.
+    """
+    if not entries:
+        return
+    with st.expander(f"Earlier analyses on this browser ({len(entries)})", key="earlier_analyses_expander"):
+        st.caption("Analyses you ran or opened in earlier sessions on this browser. They are kept in this "
+                   "browser only, so they don't appear on another computer or after clearing site data.")
+        for entry in entries[:LISTED_ANALYSES]:
+            when = (entry.get('saved_at') or '').replace('T', ' ').rstrip('Z')
+            st.markdown(f"**{entry.get('label', 'Analysis')}** · {entry.get('how', 'saved')} on {when} UTC")
+            _caption_summary(entry)
+            _render_listed_analysis(entry['analysis_id'], 'earlier')
+        _caption_hidden_rows(len(entries))
+
+
+def render_all_saved_analyses() -> None:
+    """
+    Everyone's saved analyses in S3, newest first, loaded only while the expander is open
+    (it reruns the app when opened or closed).
+    """
+    expander = st.expander("All saved analyses", key="all_analyses_expander", on_change="rerun")
+    with expander:
+        if not expander.open:
+            return
+        st.caption("Every analysis saved by anyone using this app, newest first. Saved analyses are "
+                   "deleted after 90 days.")
+        try:
+            with st.spinner("Listing saved analyses in S3..."):
+                listing = list_all_saved_analyses(LISTED_ANALYSES)
+        except SavedAnalysisError as e:
+            st.error(str(e))
+            return
+        if not listing['entries']:
+            st.info("No saved analyses yet. Run one with AWS Lambda backtests on.")
+            return
+        for entry in listing['entries']:
+            summary = entry['summary'] or "Details not recorded (saved before listings had summaries)"
+            st.markdown(f"**{summary}** · saved {entry['saved_at']:%Y-%m-%d %H:%M} UTC")
+            _render_listed_analysis(entry['analysis_id'], 'all')
+        if listing['total'] > len(listing['entries']):
+            st.caption(f"Showing the newest {len(listing['entries'])}. Older ones can still be opened by their ID.")
+
+
+def _render_listed_analysis(analysis_id: str, list_name: str) -> None:
+    """One listed analysis: its ID (with a copy button) and an Open button."""
+    id_col, button_col = st.columns([5, 1], vertical_alignment="center")
+    with id_col:
+        st.code(analysis_id, language=None)
+    with button_col:
+        if st.button("Open", key=f"open_{list_name}_{analysis_id}"):
+            try:
+                run = open_saved_analysis(analysis_id)
+            except SavedAnalysisError as e:
+                st.error(str(e))
+                return
+            # Rerun so the lists above show the analysis as this session's, with the message on top
+            st.session_state[OPENED_MESSAGE_KEY] = f"Opened as \"{run['label']}\"."
+            st.rerun()
+
+
+def _caption_summary(entry: Dict[str, Any]) -> None:
+    """A WRDS entry's summary (e.g. "WRDS, Quarterly | ROE (higher), ..."); Legacy entries have none."""
+    if entry.get('summary'):
+        st.caption(entry['summary'])
+
+
+def _caption_hidden_rows(total: int) -> None:
+    if total > LISTED_ANALYSES:
+        st.caption(f"Showing the newest {LISTED_ANALYSES} of {total}.")
+
+def _render_summary_metrics(res: Dict[str, Any], settings: Dict[str, Any],
+                            outperformance_help: Optional[str] = None) -> None:
     """
     Calculates and displays core summary metrics for the reporting period.
+
+    The CAGR counts years as periods / periods_per_year (WRDS runs have 2, 4 or 12).
     """
     col1, col2, col3, col4 = st.columns(4)
     initial_aum = settings.get('initial_aum', 1000000.0)
     final_value = res.get('final_value', initial_aum)
     
-    n_years = len(res.get('yearly_returns', []))
+    n_years = len(res.get('yearly_returns', [])) / res.get('periods_per_year', 1)
     cagr = (((final_value / initial_aum) ** (1 / n_years)) - 1) if n_years > 0 else 0
     
     bench_rets = res.get('benchmark_returns', [])
@@ -414,11 +542,15 @@ def _render_summary_metrics(res: Dict[str, Any], settings: Dict[str, Any]) -> No
     col1.metric("Final Portfolio Value", f"${final_value:,.2f}")
     col2.metric("Total Return", f"{((final_value/initial_aum)-1):.2%}")
     col3.metric("CAGR", f"{cagr:.2%}")
-    col4.metric("Cumulative Outperformance", f"{cum_outperformance:.2%}")
+    col4.metric("Cumulative Outperformance", f"{cum_outperformance:.2%}", help=outperformance_help)
 
-def _render_cohort_analysis_section(run: Dict[str, Any]) -> None:
+def _render_cohort_analysis_section(run: Dict[str, Any], n_years: Optional[float] = None,
+                                    chart: Optional[Dict[str, Any]] = None) -> None:
     """
     Runs and shows a comparison between the top and bottom factor cohorts.
+
+    WRDS runs pass their number of years for the CAGR and their chart options
+    (benchmark values and labels, a date axis).
 
     Uses the run's own data, factor columns, directions and settings (in AWS
     Lambda for Lambda runs, see run_cohort). The
@@ -466,7 +598,7 @@ def _render_cohort_analysis_section(run: Dict[str, Any]) -> None:
         # --- THE 4 STATS BLOCK ---
         st.write(f"### Cohort Performance Summary (top vs bottom {cohort['pct']}%)")
         init_aum = settings['initial_aum']
-        num_years = len(results['years'])
+        num_years = len(results['years']) if n_years is None else n_years
 
         stats_df = pd.DataFrame({
             "Metric": ["Total Return (%)", "Final Value ($)", "CAGR (%)"],
@@ -484,23 +616,29 @@ def _render_cohort_analysis_section(run: Dict[str, Any]) -> None:
         st.table(stats_df)
         # -------------------------
 
+        benchmarks = dict(
+            benchmark_returns=results.get('benchmark_returns'),
+            value_returns=_build_wealth_series(results.get('value_benchmark_returns'), init_aum),
+            growth_returns=_build_wealth_series(results.get('growth_benchmark_returns'), init_aum)
+        )
         fig = plot_top_bottom_percent(
             years=results['years'],
             percent=cohort['pct'],
             show_bottom=True,
-            benchmark_returns=results.get('benchmark_returns'),
             initial_investment=init_aum,
             baseline_portfolio_values=results['portfolio_values'],
             precomputed_top=res_top,
             precomputed_bot=res_bot,
-            value_returns=_build_wealth_series(results.get('value_benchmark_returns'), init_aum),
-            growth_returns=_build_wealth_series(results.get('growth_benchmark_returns'), init_aum)
+            **{**benchmarks, **(chart or {})}
         )
         st.plotly_chart(fig, width="stretch")
 
-def _render_growth_plot(res: Dict[str, Any], settings: Dict[str, Any], factor_labels: List[str]) -> None:
+def _render_growth_plot(res: Dict[str, Any], settings: Dict[str, Any], factor_labels: List[str],
+                        **chart: Any) -> None:
     """
     Visualizes the growth of $1 (or initial AUM) across the portfolio and benchmarks.
+
+    WRDS runs pass chart options (benchmark names, a date axis) to plot_portfolio_growth.
     """
     initial = settings.get('initial_aum', 1000000.0)
     
@@ -510,6 +648,7 @@ def _render_growth_plot(res: Dict[str, Any], settings: Dict[str, Any], factor_la
         bench_vals=_build_wealth_series(res.get('benchmark_returns'), initial),
         val_vals=_build_wealth_series(res.get('value_benchmark_returns'), initial),
         gro_vals=_build_wealth_series(res.get('growth_benchmark_returns'), initial),
-        factor_names=factor_labels
+        factor_names=factor_labels,
+        **chart
     )
     st.plotly_chart(fig, width="stretch")

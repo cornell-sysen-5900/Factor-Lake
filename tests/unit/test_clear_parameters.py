@@ -37,6 +37,8 @@ def test_clear_restores_every_analysis_input_and_factor_direction(at):
     # The server must tell the browser to replace the old visible values, not
     # just return defaults internally (AppTest has no actual browser frontend).
     for widget in list(at.sidebar.checkbox) + list(at.sidebar.radio) + list(at.sidebar.number_input):
+        if widget.key == 'data_mode_input':     # the data source is kept, like the Lambda preference
+            continue
         assert widget.proto.set_value, f'{widget.label} did not send its reset to the browser'
     assert not at.checkbox(key='restrict_fossil_fuels_input').value
     assert at.radio(key='weighting_method_input').value == 'Equal Weight'

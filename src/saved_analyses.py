@@ -12,7 +12,7 @@ import re
 from typing import Any, Dict, Optional
 
 from .backtest_jobs import decode_result, decode_saved
-from .backtest_service import RESULT_RETENTION_DAYS, result_file
+from .backtest_service import RESULT_RETENTION_DAYS, RESULTS_DIR, result_file
 from .s3_client import S3DataManager
 
 ANALYSIS_ID_PATTERN = re.compile(r'^[0-9a-f]{64}$')
@@ -33,6 +33,53 @@ def normalize_analysis_id(text: Optional[str]) -> str:
             f"An ID is 64 characters of 0-9 and a-f; use the copy button next to a result's Analysis ID."
         )
     return analysis_id
+
+
+def list_saved_analyses(manager: Optional[S3DataManager] = None, limit: int = 30) -> Dict[str, Any]:
+    """
+    Everyone's saved analyses in S3, newest first, without downloading them.
+
+    Returns:
+        {'entries': [{'analysis_id', 'saved_at' (UTC datetime), 'summary' (None when the
+        analysis was saved before summaries were recorded)}], 'total': number of saved
+        results found}. At most `limit` entries; cohort comparisons and WRDS ranked lists are
+        left out, and so is every file that is not a saved result (e.g. WRDS holdings Parquet).
+
+    Raises:
+        SavedAnalysisError: the bucket cannot be listed with these AWS keys.
+    """
+    manager = manager or S3DataManager()
+    prefix = manager.object_key(RESULTS_DIR) + '/'
+    found = []
+    token = None
+    try:
+        while True:
+            page = manager.client.list_objects_v2(Bucket=manager.bucket, Prefix=prefix,
+                                                  **({'ContinuationToken': token} if token else {}))
+            for obj in page.get('Contents', []):
+                name = obj['Key'][len(prefix):]
+                if name.endswith('.json') and ANALYSIS_ID_PATTERN.match(name[:-5]):
+                    found.append((obj['LastModified'], name[:-5]))
+            token = page.get('NextContinuationToken')
+            if not page.get('IsTruncated') or not token:
+                break
+    except Exception as e:
+        code = str(getattr(e, 'response', {}).get('Error', {}).get('Code', ''))
+        if code in ('AccessDenied', '403'):
+            raise SavedAnalysisError("This app's AWS key may not list saved analyses (it needs s3:ListBucket on "
+                                     f"{manager.s3_uri(RESULTS_DIR)}/). Open one by its ID instead.") from e
+        raise SavedAnalysisError(f"Could not list saved analyses in S3: {e}") from e
+
+    entries = []
+    for saved_at, analysis_id in sorted(found, reverse=True):
+        if len(entries) >= limit:
+            break
+        metadata = manager.client.head_object(Bucket=manager.bucket,
+                                              Key=manager.object_key(result_file(analysis_id))).get('Metadata') or {}
+        if metadata.get('kind') in ('cohort', 'ranked'):
+            continue
+        entries.append({'analysis_id': analysis_id, 'saved_at': saved_at, 'summary': metadata.get('summary')})
+    return {'entries': entries, 'total': len(found)}
 
 
 def load_saved_analysis(text: Optional[str], manager: Optional[S3DataManager] = None) -> Dict[str, Any]:
@@ -72,8 +119,9 @@ def load_saved_analysis(text: Optional[str], manager: Optional[S3DataManager] = 
             "Run it again to get an ID you can share."
         )
     if job.get('kind') != 'backtest':
+        what = {'cohort': 'a cohort comparison', 'ranked': 'a ranked stock list'}.get(job.get('kind'), 'another job')
         raise SavedAnalysisError(
-            "This ID belongs to a cohort comparison, not an analysis. Share the ID shown with the analysis instead."
+            f"This ID belongs to {what}, not an analysis. Share the ID shown with the analysis instead."
         )
     metadata = response.get('Metadata') or {}
     return {

@@ -49,10 +49,12 @@ class FakeS3:
     a role without s3:ListBucket: missing objects give AccessDenied instead of NoSuchKey.
     """
 
-    def __init__(self, can_list=True):
+    def __init__(self, can_list=True, page_size=1000):
         self.objects = {}   # key -> (body, metadata)
+        self.modified = {}  # key -> LastModified (each put is one second after the previous)
         self.puts = []
         self.can_list = can_list
+        self.page_size = page_size
 
     def get_object(self, Bucket, Key):
         if Key not in self.objects:
@@ -63,12 +65,26 @@ class FakeS3:
     def head_object(self, Bucket, Key):
         if Key not in self.objects:
             raise ClientError({'Error': {'Code': '404'}}, 'HeadObject')
-        body = self.objects[Key][0]
-        return {'ETag': f'"{hashlib.sha256(body).hexdigest()[:32]}"', 'ContentLength': len(body)}
+        body, metadata = self.objects[Key]
+        return {'ETag': f'"{hashlib.sha256(body).hexdigest()[:32]}"', 'ContentLength': len(body),
+                'Metadata': dict(metadata), 'LastModified': self.modified[Key]}
 
     def put_object(self, Bucket, Key, Body, ContentType=None, Metadata=None):
+        from datetime import datetime, timedelta, timezone
         self.objects[Key] = (bytes(Body), dict(Metadata or {}))
+        self.modified[Key] = datetime(2026, 10, 1, tzinfo=timezone.utc) + timedelta(seconds=len(self.puts))
         self.puts.append(Key)
+
+    def list_objects_v2(self, Bucket, Prefix, ContinuationToken=None):
+        if not self.can_list:
+            raise ClientError({'Error': {'Code': 'AccessDenied'}}, 'ListObjectsV2')
+        keys = sorted(k for k in self.objects if k.startswith(Prefix))
+        start = int(ContinuationToken or 0)
+        page = keys[start:start + self.page_size]
+        more = start + self.page_size < len(keys)
+        return {'Contents': [{'Key': k, 'LastModified': self.modified[k], 'Size': len(self.objects[k][0])}
+                             for k in page],
+                'IsTruncated': more, **({'NextContinuationToken': str(start + self.page_size)} if more else {})}
 
     def generate_presigned_url(self, operation, Params, ExpiresIn):
         return f"https://fake-s3.example/{Params['Key']}?expires={ExpiresIn}"
@@ -405,7 +421,7 @@ def test_check_script_compares_lambda_with_local(monkeypatch, manager, capsys, l
     fake = lambda_class(BacktestService(manager))
     monkeypatch.setattr(check, 'S3DataManager', lambda: manager)
     monkeypatch.setattr(check, 'BacktestLambdaClient', lambda name: BacktestLambdaClient(name, client=fake))
-    assert check.main([]) == exit_code
+    assert check.main(["--skip-wrds"]) == exit_code              # the WRDS check: test_wrds_check_script.py
     out = capsys.readouterr().out
     assert out.count('cached=True') == 4                        # every repeat came from the cache
     assert ('All checks passed.' in out) == (exit_code == 0)

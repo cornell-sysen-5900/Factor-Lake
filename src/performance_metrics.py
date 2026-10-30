@@ -2,18 +2,27 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: src/performance_metrics.py
 PURPOSE: Mathematical core with comprehensive index coverage.
-VERSION: 1.2.0
+VERSION: 1.3.0
 """
 
 import numpy as np
-import pandas as pd
 from typing import Dict, List, Any
 
 def compute_comprehensive_metrics(p_ret: np.ndarray, b_ret: np.ndarray, g_ret: np.ndarray,
                                  v_ret: np.ndarray, rf: np.ndarray,
-                                 p_vals: List[float], start: int, end: int) -> Dict[str, Any]:
-    """Calculates risk/return metrics across all benchmarks."""
-    
+                                 p_vals: List[float], start: int, end: int,
+                                 periods_per_year: int = 1) -> Dict[str, Any]:
+    """
+    Calculates risk/return metrics across all benchmarks.
+
+    The returns are per period. periods_per_year (k) annualizes the volatilities,
+    Sharpe ratios and information ratios by sqrt(k). With the default k = 1 (annual
+    periods, as in Legacy) they are left exactly as computed.
+    """
+
+    def annualize(value):
+        return value * np.sqrt(periods_per_year) if periods_per_year != 1 else value
+
     # Excess Returns
     excess_p, excess_b = p_ret - rf, b_ret - rf
     excess_g, excess_v = g_ret - rf, v_ret - rf
@@ -73,22 +82,22 @@ def compute_comprehensive_metrics(p_ret: np.ndarray, b_ret: np.ndarray, g_ret: n
         'max_drawdown_benchmark': get_mdd(build_wealth(b_ret)),
         'max_drawdown_growth': get_mdd(build_wealth(g_ret)),
         'max_drawdown_value': get_mdd(build_wealth(v_ret)),
-        'sharpe_portfolio': get_sharpe(excess_p, get_vols(excess_p)),
-        'sharpe_benchmark': get_sharpe(excess_b, get_vols(excess_b)),
-        'sharpe_growth': get_sharpe(excess_g, get_vols(excess_g)),
-        'sharpe_value': get_sharpe(excess_v, get_vols(excess_v)),
-        'vol_raw_portfolio': get_vols(p_ret),
-        'vol_raw_benchmark': get_vols(b_ret),
-        'vol_raw_growth': get_vols(g_ret),
-        'vol_raw_value': get_vols(v_ret),
-        'vol_excess_portfolio': get_vols(excess_p),
-        'vol_excess_benchmark': get_vols(excess_b),
-        'vol_excess_growth': get_vols(excess_g),
-        'vol_excess_value': get_vols(excess_v),
+        'sharpe_portfolio': annualize(get_sharpe(excess_p, get_vols(excess_p))),
+        'sharpe_benchmark': annualize(get_sharpe(excess_b, get_vols(excess_b))),
+        'sharpe_growth': annualize(get_sharpe(excess_g, get_vols(excess_g))),
+        'sharpe_value': annualize(get_sharpe(excess_v, get_vols(excess_v))),
+        'vol_raw_portfolio': annualize(get_vols(p_ret)),
+        'vol_raw_benchmark': annualize(get_vols(b_ret)),
+        'vol_raw_growth': annualize(get_vols(g_ret)),
+        'vol_raw_value': annualize(get_vols(v_ret)),
+        'vol_excess_portfolio': annualize(get_vols(excess_p)),
+        'vol_excess_benchmark': annualize(get_vols(excess_b)),
+        'vol_excess_growth': annualize(get_vols(excess_g)),
+        'vol_excess_value': annualize(get_vols(excess_v)),
         'yearly_comparisons': comparisons,
-        'information_ratio': get_ir(p_ret, b_ret),
-        'information_ratio_growth': get_ir(p_ret, g_ret),
-        'information_ratio_value': get_ir(p_ret, v_ret),
+        'information_ratio': annualize(get_ir(p_ret, b_ret)),
+        'information_ratio_growth': annualize(get_ir(p_ret, g_ret)),
+        'information_ratio_value': annualize(get_ir(p_ret, v_ret)),
         'win_rate': float(np.mean(p_ret > b_ret)) if len(p_ret) > 0 else 0.0,
         'win_rate_growth': float(np.mean(p_ret > g_ret)) if len(p_ret) > 0 else 0.0,
         'win_rate_value': float(np.mean(p_ret > v_ret)) if len(p_ret) > 0 else 0.0,

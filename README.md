@@ -51,11 +51,12 @@ Then open http://localhost:8501
 - Sector filtering (configurable sector universe)
 - Market data loaded from AWS S3 (Parquet), shared by all sessions, with Supabase as a fallback
 - Annual rebalancing backtest (configurable period, currently 2002-2024 in UI)
+- WRDS mode: point-in-time WRDS data with semi-annual, quarterly or monthly rebalancing, run in AWS Lambda (user guide section 15; design in `DOCS/WRDS_MODE_DESIGN.md`)
 - Benchmark comparison vs Russell 2000, Growth, and Value
 - Performance metrics: CAGR, yearly returns, drawdown, Sharpe, Information Ratio, win rate
 - Ranked-stock table and top-vs-bottom cohort analysis
 - Saved runs: each backtest run is kept as its own tab in Results (newest first, last 5; cleared when the page is refreshed), shows the settings that produced it, and can be removed
-- Clear and rerun: on the Analysis tab, click **Clear Parameters** to remove selected factors and restore the analysis settings to their defaults. Choose new inputs, then **Run Portfolio Analysis**. For local backtests, click **Load Market Data** first to apply the new filters using the cached source data. Saved runs, analysis history, and the Lambda execution preference are kept; no page refresh or app restart is needed.
+- Clear and rerun: on the Analysis tab, click **Clear Parameters** to remove selected factors and restore the analysis settings to their defaults. Choose new inputs, then **Run Portfolio Analysis**. For local backtests, click **Load Market Data** first to apply the new filters using the cached source data. Saved runs, analysis history, the Lambda execution preference and the data source (Legacy or WRDS) are kept; in WRDS mode the frequency and years return to Quarterly, 2008-2026. No page refresh or app restart is needed.
 - Data Viewer tab: filter the loaded market data by date range, sector and industry, view it, and download it as CSV (no extra data downloads)
 
 ## Project Layout

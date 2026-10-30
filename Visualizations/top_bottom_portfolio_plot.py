@@ -9,6 +9,8 @@ VERSION: 3.0.0
 import plotly.graph_objects as go
 from typing import List, Optional, Dict, Any, Union
 
+from Visualizations.portfolio_growth_plot import date_axis, line_mode
+
 HOVER_TEMPLATE = '%{fullData.name}: $%{y:,.0f}<extra></extra>'
 
 
@@ -23,15 +25,21 @@ def plot_top_bottom_percent(
     initial_investment: float = 1000000.0,
     baseline_portfolio_values: Optional[List[float]] = None,
     precomputed_top: Optional[Union[Dict[str, Any], List[float]]] = None,
-    precomputed_bot: Optional[Union[Dict[str, Any], List[float]]] = None
+    precomputed_bot: Optional[Union[Dict[str, Any], List[float]]] = None,
+    growth_label: str = 'Growth Index',
+    value_label: str = 'Value Index',
+    dates: bool = False
 ) -> go.Figure:
     """
     Constructs a wealth-index chart comparing performance of top and bottom cohorts.
+
+    WRDS runs pass their ETFs' labels, and dates=True when `years` are dates.
 
     Returns:
         go.Figure: The generated Plotly figure object.
     """
     fig = go.Figure()
+    mode = line_mode(len(years))
 
     def _get_trajectory(series: Optional[List[float]]) -> Optional[List[float]]:
         if series is None:
@@ -57,8 +65,8 @@ def plot_top_bottom_percent(
     # 1. Index Trajectories (Benchmark, Growth, Value)
     indices = [
         (benchmark_returns, benchmark_label, '#d62728', 'dash', 'x'),
-        (growth_returns, 'Growth Index', '#ff7f0e', 'dot', 'diamond'),
-        (value_returns, 'Value Index', '#17becf', 'dot', 'square')
+        (growth_returns, growth_label, '#ff7f0e', 'dot', 'diamond'),
+        (value_returns, value_label, '#17becf', 'dot', 'square')
     ]
 
     for rets, label, color, style, marker in indices:
@@ -66,7 +74,7 @@ def plot_top_bottom_percent(
         if vals and len(vals) == len(years):
             fig.add_trace(go.Scatter(
                 x=years, y=vals, name=label,
-                mode='lines+markers',
+                mode=mode,
                 line=dict(color=color, dash=style, width=1.2),
                 marker=dict(symbol=marker, size=3),
                 opacity=0.6, hovertemplate=HOVER_TEMPLATE
@@ -78,7 +86,7 @@ def plot_top_bottom_percent(
         if len(bot_vals) >= len(years):
             fig.add_trace(go.Scatter(
                 x=years, y=bot_vals[:len(years)], name=f'Bottom {percent}%',
-                mode='lines+markers',
+                mode=mode,
                 line=dict(color='#9467bd', width=1.5),
                 marker=dict(symbol='triangle-down', size=4),
                 opacity=0.6, hovertemplate=HOVER_TEMPLATE
@@ -90,7 +98,7 @@ def plot_top_bottom_percent(
         if len(top_vals) >= len(years):
             fig.add_trace(go.Scatter(
                 x=years, y=top_vals[:len(years)], name=f'Top {percent}%',
-                mode='lines+markers',
+                mode=mode,
                 line=dict(color='#2ca02c', width=2.0),
                 marker=dict(symbol='triangle-up', size=5),
                 hovertemplate=HOVER_TEMPLATE
@@ -102,7 +110,7 @@ def plot_top_bottom_percent(
         fig.add_trace(go.Scatter(
             x=years[:common_len], y=baseline_portfolio_values[:common_len],
             name='Active Strategy',
-            mode='lines+markers',
+            mode=mode,
             line=dict(color='#003366', width=2.5),
             marker=dict(symbol='circle', size=4),
             hovertemplate=HOVER_TEMPLATE
@@ -125,14 +133,17 @@ def plot_top_bottom_percent(
         showgrid=True,
         griddash='dash'
     )
-    fig.update_xaxes(
-        title=dict(text='Year', font=dict(size=11)),
-        tickformat='d',
-        hoverformat='d',
-        dtick=1,
-        showgrid=True,
-        griddash='dash'
-    )
+    if dates:
+        date_axis(fig, font_size=11)
+    else:
+        fig.update_xaxes(
+            title=dict(text='Year', font=dict(size=11)),
+            tickformat='d',
+            hoverformat='d',
+            dtick=1,
+            showgrid=True,
+            griddash='dash'
+        )
 
     fig.add_hline(y=initial_investment, line_color='#000000', line_dash='solid',
                   line_width=0.8, opacity=0.2)
