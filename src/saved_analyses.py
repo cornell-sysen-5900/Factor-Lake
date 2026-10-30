@@ -42,7 +42,8 @@ def list_saved_analyses(manager: Optional[S3DataManager] = None, limit: int = 30
     Returns:
         {'entries': [{'analysis_id', 'saved_at' (UTC datetime), 'summary' (None when the
         analysis was saved before summaries were recorded)}], 'total': number of saved
-        results found}. At most `limit` entries; cohort comparisons are left out.
+        results found}. At most `limit` entries; cohort comparisons and WRDS ranked lists are
+        left out, and so is every file that is not a saved result (e.g. WRDS holdings Parquet).
 
     Raises:
         SavedAnalysisError: the bucket cannot be listed with these AWS keys.
@@ -75,7 +76,7 @@ def list_saved_analyses(manager: Optional[S3DataManager] = None, limit: int = 30
             break
         metadata = manager.client.head_object(Bucket=manager.bucket,
                                               Key=manager.object_key(result_file(analysis_id))).get('Metadata') or {}
-        if metadata.get('kind') == 'cohort':
+        if metadata.get('kind') in ('cohort', 'ranked'):
             continue
         entries.append({'analysis_id': analysis_id, 'saved_at': saved_at, 'summary': metadata.get('summary')})
     return {'entries': entries, 'total': len(found)}
@@ -118,8 +119,9 @@ def load_saved_analysis(text: Optional[str], manager: Optional[S3DataManager] = 
             "Run it again to get an ID you can share."
         )
     if job.get('kind') != 'backtest':
+        what = {'cohort': 'a cohort comparison', 'ranked': 'a ranked stock list'}.get(job.get('kind'), 'another job')
         raise SavedAnalysisError(
-            "This ID belongs to a cohort comparison, not an analysis. Share the ID shown with the analysis instead."
+            f"This ID belongs to {what}, not an analysis. Share the ID shown with the analysis instead."
         )
     metadata = response.get('Metadata') or {}
     return {

@@ -7,9 +7,35 @@ VERSION: 3.0.0
 """
 
 import plotly.graph_objects as go
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 HOVER_TEMPLATE = '%{fullData.name}: $%{y:,.0f}<extra></extra>'
+# Legacy's benchmark names; WRDS runs pass their ETFs' names instead
+BENCHMARK_NAMES = {'benchmark': 'Russell 2000', 'value': 'Value Index', 'growth': 'Growth Index'}
+# Series longer than this (monthly WRDS runs) are drawn without markers; Legacy's never are
+MARKER_LIMIT = 60
+
+
+def line_mode(n_points: int) -> str:
+    """Lines with markers, or lines only for a series of more than MARKER_LIMIT points."""
+    return 'lines+markers' if n_points <= MARKER_LIMIT else 'lines'
+
+
+def date_axis(fig: go.Figure, font_size: int) -> go.Figure:
+    """
+    An x axis of dates (WRDS runs) that looks like Legacy's year axis: a tick at each
+    year, with the full date on hover.
+    """
+    fig.update_xaxes(
+        title=dict(text='Date', font=dict(size=font_size)),
+        type='date',
+        tickformat='%Y',
+        hoverformat='%Y-%m-%d',
+        dtick='M12',
+        showgrid=True,
+        griddash='dash'
+    )
+    return fig
 
 
 def plot_portfolio_growth(
@@ -18,7 +44,9 @@ def plot_portfolio_growth(
     bench_vals: Optional[List[float]] = None,
     val_vals: Optional[List[float]] = None,
     gro_vals: Optional[List[float]] = None,
-    factor_names: Optional[List[str]] = None
+    factor_names: Optional[List[str]] = None,
+    names: Optional[Dict[str, str]] = None,
+    dates: bool = False
 ) -> go.Figure:
     """
     Constructs a time-series line chart comparing strategy growth against multiple benchmarks.
@@ -33,11 +61,15 @@ def plot_portfolio_growth(
         val_vals: Optional cumulative values for the Russell 2000 Value Index.
         gro_vals: Optional cumulative values for the Russell 2000 Growth Index.
         factor_names: A list of active factor labels to be included in the chart title.
+        names: Benchmark names by role ('benchmark', 'value', 'growth'), Legacy's by default.
+        dates: True when `years` are dates (WRDS runs): a date axis with a tick per year.
 
     Returns:
         go.Figure: The generated Plotly figure object.
     """
     fig = go.Figure()
+    names = {**BENCHMARK_NAMES, **(names or {})}
+    mode = line_mode(len(years))
 
     # Benchmarks are added first so the portfolio line is drawn on top of them;
     # legendrank keeps the legend in the original order (Portfolio first).
@@ -47,8 +79,8 @@ def plot_portfolio_growth(
         fig.add_trace(go.Scatter(
             x=years,
             y=bench_vals,
-            name='Russell 2000',
-            mode='lines+markers',
+            name=names['benchmark'],
+            mode=mode,
             line=dict(color='#ff7f0e', width=2, dash='dash'),
             marker=dict(symbol='square', size=4),
             opacity=0.8,
@@ -61,8 +93,8 @@ def plot_portfolio_growth(
         fig.add_trace(go.Scatter(
             x=years,
             y=val_vals,
-            name='Value Index',
-            mode='lines+markers',
+            name=names['value'],
+            mode=mode,
             line=dict(color='#2ca02c', width=1.5, dash='dot'),
             marker=dict(symbol='triangle-up', size=4),
             opacity=0.6,
@@ -75,8 +107,8 @@ def plot_portfolio_growth(
         fig.add_trace(go.Scatter(
             x=years,
             y=gro_vals,
-            name='Growth Index',
-            mode='lines+markers',
+            name=names['growth'],
+            mode=mode,
             line=dict(color='#d62728', width=1.5, dash='dot'),
             marker=dict(symbol='diamond', size=4),
             opacity=0.6,
@@ -89,7 +121,7 @@ def plot_portfolio_growth(
         x=years,
         y=port_vals,
         name='Portfolio',
-        mode='lines+markers',
+        mode=mode,
         line=dict(color='#1f77b4', width=2.5),
         marker=dict(symbol='circle', size=6),
         legendrank=1,
@@ -119,6 +151,9 @@ def plot_portfolio_growth(
         showgrid=True,
         griddash='dash'
     )
+
+    if dates:
+        return date_axis(fig, font_size=12)
 
     # Ensure X-axis utilizes integer year ticks
     fig.update_xaxes(

@@ -421,7 +421,7 @@ def test_check_script_compares_lambda_with_local(monkeypatch, manager, capsys, l
     fake = lambda_class(BacktestService(manager))
     monkeypatch.setattr(check, 'S3DataManager', lambda: manager)
     monkeypatch.setattr(check, 'BacktestLambdaClient', lambda name: BacktestLambdaClient(name, client=fake))
-    assert check.main([]) == exit_code
+    assert check.main(["--skip-wrds"]) == exit_code              # the WRDS check: test_wrds_check_script.py
     out = capsys.readouterr().out
     assert out.count('cached=True') == 4                        # every repeat came from the cache
     assert ('All checks passed.' in out) == (exit_code == 0)

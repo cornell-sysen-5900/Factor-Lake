@@ -62,6 +62,7 @@ nav:
     - Deployment: DEPLOYMENT.md
     - AWS S3 Data Source: AWS_S3_DATA.md
     - Backtests in AWS Lambda: AWS_LAMBDA_BACKTESTS.md
+    - WRDS Mode Design: WRDS_MODE_DESIGN.md
     - Supabase Setup: SUPABASE_SETUP.md
     - Supabase Upload Tool: SUPABASE_UPLOAD_TOOL.md
     - Supabase Maintenance: SUPABASE_MAINTENANCE_GUIDE.md

@@ -2,12 +2,14 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/components/factor_selection.py
 PURPOSE: UI component for building the factor list and choosing each factor's direction (tilt).
-VERSION: 3.0.0
+VERSION: 3.1.0
 """
+
+import math
 
 import streamlit as st
 import streamlit_config as config
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 HIGHER = "Higher is better"
 LOWER = "Lower is better"
@@ -30,12 +32,34 @@ SELECTED_KEY = 'factor_builder_selected'
 # backtest's summation order exactly as before.
 _OUTPUT_GROUP_ORDER = ['Momentum', 'Profitability', 'Growth', 'Value', 'Quality']
 
+# At most this many category columns side by side; more groups wrap onto a second row
+_MAX_GROUP_COLUMNS = 5
 
-def render_factor_selection() -> Tuple[List[str], Dict[str, str]]:
+
+def _catalog(data_mode: str) -> Tuple[Dict[str, Dict[str, Any]], List[str]]:
+    """(factor metadata, group order) of a data mode ('legacy' or 'wrds')."""
+    if data_mode == 'wrds':
+        return config.WRDS_FACTOR_METADATA, config.WRDS_FACTOR_GROUPS
+    return config.FACTOR_METADATA, config.FACTOR_GROUPS
+
+
+def reset_factor_selection() -> None:
+    """
+    Clears the added factors and their direction controls. Called when the data
+    source changes, because Legacy and WRDS offer different factors.
+    """
+    st.session_state[SELECTED_KEY] = {}
+    for metadata, _ in (_catalog('legacy'), _catalog('wrds')):
+        for meta in metadata.values():
+            st.session_state.pop(f"factor_dir_{meta['key']}", None)
+
+
+def render_factor_selection(data_mode: str = 'legacy') -> Tuple[List[str], Dict[str, str]]:
     """
     Renders the factor builder: the available factors grouped by category
     (one click adds a factor), one row per added factor with its direction
-    control, and a summary of the strategy.
+    control, and a summary of the strategy. data_mode picks the factor list:
+    Legacy's FACTOR_METADATA or WRDS_FACTOR_METADATA.
 
     Returns:
         Tuple[List[str], Dict[str, str]]: A list of selected factor names and
@@ -48,12 +72,12 @@ def render_factor_selection() -> Tuple[List[str], Dict[str, str]]:
     st.write("Click the factors you want to add, then choose which direction the portfolio should favor.")
     st.caption(":material/lightbulb: Tip: hover over a factor to see its full description.")
 
-    _render_add_factors(selected)
+    _render_add_factors(selected, data_mode)
 
     if not selected:
         st.caption("No factors added yet. Click one above.")
     for name in list(selected):
-        _render_factor_row(name, selected)
+        _render_factor_row(name, selected, data_mode)
 
     st.write("---")
 
@@ -65,54 +89,62 @@ def render_factor_selection() -> Tuple[List[str], Dict[str, str]]:
 
     st.write("---")
 
-    selected_names = sorted(selected, key=_output_sort_key)
+    if data_mode == 'wrds':
+        selected_names = sorted(selected, key=config.WRDS_FACTOR_OPTIONS.index)
+    else:
+        selected_names = sorted(selected, key=_output_sort_key)
     return selected_names, {name: selected[name] for name in selected_names}
 
 
-def _render_add_factors(selected: Dict[str, str]) -> None:
+def _render_add_factors(selected: Dict[str, str], data_mode: str) -> None:
     """
-    The factors not yet added, one column per category. Clicking a factor adds it
-    straight to the selected list with its default direction.
+    The factors not yet added, one column per category, in rows of at most
+    _MAX_GROUP_COLUMNS. Clicking a factor adds it straight to the selected list
+    with its default direction.
     """
-    group_names = {
-        group: [name for name, meta in config.FACTOR_METADATA.items() if meta['group'] == group]
-        for group in config.FACTOR_GROUPS
-    }
-    # Size each column by its longest factor name so the buttons are not truncated
-    widths = [max(18, *(len(n) for n in names)) for names in group_names.values()]
-    for col, (group, names) in zip(st.columns(widths), group_names.items()):
-        remaining = [name for name in names if name not in selected]
-        with col:
-            st.markdown(f"**{group}**")
-            for name in remaining:
-                meta = config.FACTOR_METADATA[name]
-                st.button(
-                    name,
-                    icon=":material/add:",
-                    help=meta['tooltip'],
-                    key=f"factor_add_{meta['key']}",
-                    on_click=_add_factor,
-                    args=(name,),
-                )
-            if not remaining:
-                st.caption("All added")
+    metadata, groups = _catalog(data_mode)
+    group_names = [
+        (group, [name for name, meta in metadata.items() if meta['group'] == group])
+        for group in groups
+    ]
+    per_row = math.ceil(len(group_names) / math.ceil(len(group_names) / _MAX_GROUP_COLUMNS))
+    for start in range(0, len(group_names), per_row):
+        row = group_names[start:start + per_row]
+        # Size each column by its longest factor name so the buttons are not truncated
+        widths = [max(18, *(len(n) for n in names)) for _, names in row]
+        for col, (group, names) in zip(st.columns(widths), row):
+            remaining = [name for name in names if name not in selected]
+            with col:
+                st.markdown(f"**{group}**")
+                for name in remaining:
+                    meta = metadata[name]
+                    st.button(
+                        name,
+                        icon=":material/add:",
+                        help=meta['tooltip'],
+                        key=f"factor_add_{meta['key']}",
+                        on_click=_add_factor,
+                        args=(name, data_mode),
+                    )
+                if not remaining:
+                    st.caption("All added")
 
 
-def _add_factor(name: str) -> None:
+def _add_factor(name: str, data_mode: str = 'legacy') -> None:
     """on_click callback: adds the factor with its default direction."""
     selected = st.session_state[SELECTED_KEY]
     if name in selected:
         return
-    default = HIGHER if config.FACTOR_METADATA[name]['higher_is_better'] else LOWER
+    default = HIGHER if _catalog(data_mode)[0][name]['higher_is_better'] else LOWER
     selected[name] = DIRECTION_TO_ENGINE[default]
     # Seed the row's direction control with the factor's default
-    st.session_state[_direction_key(name)] = default
+    st.session_state[_direction_key(name, data_mode)] = default
 
 
-def _render_factor_row(name: str, selected: Dict[str, str]) -> None:
+def _render_factor_row(name: str, selected: Dict[str, str], data_mode: str) -> None:
     """One added factor: name with tooltip, group beneath, direction control, remove button."""
-    meta = config.FACTOR_METADATA[name]
-    dir_key = _direction_key(name)
+    meta = _catalog(data_mode)[0][name]
+    dir_key = _direction_key(name, data_mode)
     # Re-seed the control from the stored direction if Streamlit dropped its state
     if dir_key not in st.session_state:
         st.session_state[dir_key] = ENGINE_TO_DIRECTION[selected[name]]
@@ -146,8 +178,8 @@ def _on_direction_change(name: str, dir_key: str) -> None:
         selected[name] = DIRECTION_TO_ENGINE[choice]
 
 
-def _direction_key(name: str) -> str:
-    return f"factor_dir_{config.FACTOR_METADATA[name]['key']}"
+def _direction_key(name: str, data_mode: str = 'legacy') -> str:
+    return f"factor_dir_{_catalog(data_mode)[0][name]['key']}"
 
 
 def _output_sort_key(name: str) -> Tuple[int, int]:

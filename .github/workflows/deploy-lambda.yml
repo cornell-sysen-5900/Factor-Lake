@@ -68,14 +68,21 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      # --leave-lifecycle-rules: CI never rewrites the shared bucket's lifecycle settings (the
+      # 90-day rule on backtest-results/ is an admin's job); the script only checks them.
+      # The WRDS data folder is the code's (src/wrds_data.DEFAULT_WRDS_DIR, as --wrds-dir defaults
+      # to it here, where FACTOR_LAKE_WRDS_DIR is unset), so a new WRDS pull is one code change;
+      # the check step fails if the function reads any other folder.
       - name: Deploy the Lambda
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           uv run python scripts/deploy_backtest_lambda.py \
-            --role-arn "$LAMBDA_ROLE_ARN" --function-name "$LAMBDA_FUNCTION_NAME"
+            --role-arn "$LAMBDA_ROLE_ARN" --function-name "$LAMBDA_FUNCTION_NAME" \
+            --leave-lifecycle-rules
 
+      # Legacy backtests against local runs, then one quarterly WRDS backtest end to end
       - name: Check the Lambda against local runs and its cache
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}

@@ -94,6 +94,10 @@ class S3DataManager:
         """Downloads one Parquet data file into a DataFrame."""
         return pd.read_parquet(io.BytesIO(self._read_bytes(filename)))
 
+    def read_bytes(self, filename: str) -> bytes:
+        """Downloads one object under the prefix. Raises S3DataError on failure."""
+        return self._read_bytes(filename)
+
     def read_daily_manifest(self) -> Dict[str, Any]:
         """Returns the manifest of the published daily data (years, row counts, columns)."""
         return json.loads(self._read_bytes(DAILY_MANIFEST_FILE))
