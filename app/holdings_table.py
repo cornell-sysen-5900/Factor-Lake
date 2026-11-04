@@ -18,6 +18,9 @@ FACTOR_COMBINATION_LABELS = {'mixing': 'Mixing', 'integrating': 'Integrating'}
 NUMBER_COLUMNS = ['Score', 'Weight %', 'Traded %', 'Shares', 'Buy Price', 'Dollar Value',
                   'Period Return %', 'Contribution %']
 
+# Tooltip on every turnover label (statistics tile, table columns, holdings Traded %)
+TURNOVER_HELP = "Counts buys and sells, so replacing the whole portfolio is 200%."
+
 
 def default_holdings_year(years: List[int]) -> Optional[int]:
     """Newest year with holdings, or None when there are none."""

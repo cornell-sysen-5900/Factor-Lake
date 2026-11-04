@@ -20,7 +20,7 @@ from src.trading_costs import has_trading_costs, job_trading_cost
 from app.saved_runs import remove_saved_run
 from app.holdings_table import (
     FACTOR_COMBINATION_LABELS, build_holdings_display_table, default_holdings_year,
-    holdings_number_formats, holdings_period_return, holdings_table_to_csv
+    TURNOVER_HELP, holdings_number_formats, holdings_period_return, holdings_table_to_csv
 )
 
 DIRECTION_LABELS = {'top': 'Higher is better', 'bottom': 'Lower is better'}
@@ -221,7 +221,7 @@ def _render_holdings_dataframe(run: Dict[str, Any], holdings_df: pd.DataFrame, n
     """A holdings table, rounded on screen only, with its CSV download."""
     # Round on screen only; the data (and the CSV) keep full precision
     column_config = {
-        col: st.column_config.NumberColumn(format=fmt)
+        col: st.column_config.NumberColumn(format=fmt, **({'help': TURNOVER_HELP} if col == 'Traded %' else {}))
         for col, fmt in number_formats.items()
         if col in holdings_df.columns
     }
@@ -266,7 +266,10 @@ def _render_year_by_year_table(res: Dict[str, Any], periods: Optional[List[Any]]
     if has_trading_costs(res):
         df['Turnover %'] = [f"{t:.2f}" for t in res['turnover_pct'][:min_len]]
         df['Cost %'] = [f"{c:.2f}" for c in res['trading_cost_pct'][:min_len]]
-    st.dataframe(df, width="stretch", hide_index=True)
+        st.dataframe(df, width="stretch", hide_index=True,
+                     column_config={'Turnover %': st.column_config.TextColumn(help=TURNOVER_HELP)})
+    else:
+        st.dataframe(df, width="stretch", hide_index=True)
 
 def _render_win_loss_ledger(res: Dict[str, Any], columns: List[str] = WIN_LOSS_COLUMNS,
                             period: Callable[[Dict[str, Any]], Any] = lambda c: int(c.get('year'))) -> None:
@@ -363,7 +366,7 @@ def _render_advanced_stats_grid(res: Dict[str, Any], index: str = "R2000", perio
         t1, t2, t3, t4 = st.columns(4)
         t1.metric("Avg Turnover per Rebalance", f"{res.get('average_turnover_pct', 0):.2f}%",
                   help="Sum of |target weight - weight after drift| over all stocks, averaged over the "
-                       "rebalances. The first purchase (from cash) counts as 100%.")
+                       "rebalances. The first purchase (from cash) counts as 100%. " + TURNOVER_HELP)
         t2.metric("Total Trading Cost Paid", f"${res.get('total_trading_cost', 0):,.2f}",
                   help="The dollars paid on every buy and sell over the whole backtest.")
         t3.metric("Annualized Cost Drag", f"{res.get('cost_drag', 0):.2%}",

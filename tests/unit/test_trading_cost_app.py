@@ -11,6 +11,7 @@ import io
 import pandas as pd
 import pytest
 
+from app.holdings_table import TURNOVER_HELP
 from tests.unit.test_holdings_table import _downloaded_csv, served_files  # noqa: F401 (fixture)
 from tests.unit.test_saved_runs import (_add_factor, _assert_clean, _captions, _click, _click_main_tab, _metric,
                                         _run_tab_labels, at)  # noqa: F401 (fixture)
@@ -56,6 +57,15 @@ def _metric_labels(at):
     return [m.label for m in at.metric]
 
 
+def _assert_turnover_tooltips(at):
+    """The turnover tile, the period table's Turnover % and the holdings' Traded % all explain 200%."""
+    import json
+    tile = next(m for m in at.metric if m.label == 'Avg Turnover per Rebalance')
+    assert tile.proto.help.endswith(TURNOVER_HELP)
+    assert json.loads(at.dataframe[0].proto.columns)['Traded %']['help'] == TURNOVER_HELP
+    assert json.loads(at.dataframe[1].proto.columns)['Turnover %']['help'] == TURNOVER_HELP
+
+
 def test_the_sidebar_input_has_its_default_range_step_and_tooltip(at):
     widget = at.sidebar.number_input(key=COST_KEY)
     assert widget.label == 'Trading cost (bps per trade)' and widget.value == 0
@@ -98,6 +108,7 @@ def test_a_legacy_run_at_25_bps_shows_its_costs_everywhere(at, served_files):
     yearly = at.dataframe[1].value
     assert list(yearly.columns[-2:]) == ['Turnover %', 'Cost %']
     assert yearly['Turnover %'].iloc[0] == '100.00'
+    _assert_turnover_tooltips(at)
 
 
 def test_a_legacy_run_at_0_bps_has_no_cost_views(at):
@@ -181,12 +192,14 @@ def test_a_wrds_run_at_25_bps_shows_its_costs_everywhere(new_session):
     period_table = at.dataframe[1].value
     assert list(period_table.columns[-2:]) == ['Turnover %', 'Cost %']
     assert len(period_table) == len(results['turnover_pct'])
+    _assert_turnover_tooltips(at)
 
     # Calendar years: turnover summed, cost compounded
     at.button_group(key=f"wrds_period_view_{run['id']}").set_value('By calendar year').run()
     _assert_clean(at)
     by_year = at.dataframe[1].value
     assert list(by_year.columns[-2:]) == ['Turnover %', 'Cost %']
+    _assert_turnover_tooltips(at)
 
     # Ranked lists ignore the cost (same job as at 0 bps); the cohort pays it
     at.button(key=f"wrds_rank_btn_{run['id']}").click().run()
