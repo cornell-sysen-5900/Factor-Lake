@@ -91,7 +91,7 @@ def test_the_checked_job_is_a_quarterly_wrds_backtest_over_the_whole_data():
 def test_wrds_check(monkeypatch, manager, synthetic_job, capsys, lambda_class, failures, failed_line):
     fake = lambda_class(BacktestService(manager))
     monkeypatch.setattr(check, 'S3DataManager', lambda: manager)
-    assert check.check_wrds(BacktestLambdaClient('factor-lake-backtest', client=fake), unique=True) == failures
+    assert check.check_wrds(BacktestLambdaClient('factor-lake-backtest', client=fake), unique=True)[0] == failures
     out = capsys.readouterr().out
     assert 'rows read with ranged GETs' in out and 'cached=True' in out
     if failed_line:
@@ -100,3 +100,22 @@ def test_wrds_check(monkeypatch, manager, synthetic_job, capsys, lambda_class, f
         assert 'NO' not in out
     holdings_gets = [r for k, r in manager.client.gets if k.endswith('.holdings.parquet')]
     assert holdings_gets and all(r is not None for r in holdings_gets)      # only ranged GETs, as the app
+
+
+def test_wrds_check_at_25_bps_needs_its_cost_fields_and_a_lower_final_value(monkeypatch, manager, synthetic_job,
+                                                                            capsys):
+    client = BacktestLambdaClient('factor-lake-backtest', client=ConfiguredLambda(BacktestService(manager)))
+    monkeypatch.setattr(check, 'S3DataManager', lambda: manager)
+    job = check.wrds_sample_job(unique=True)
+    failures, free = check.check_wrds(client, unique=True, job=job)
+    assert failures == 0
+    costly = dict(job, trading_cost_bps=check.CHECK_TRADING_COST_BPS)
+    failures, final_value = check.check_wrds(client, unique=True, job=costly, free_final_value=free)
+    out = capsys.readouterr().out
+    assert failures == 0 and final_value < free
+    assert ', 25 bps' in out and 'costs:  25 bps, average turnover' in out and 'final value below 0 bps: yes' in out
+    # A result that does not get lower with costs fails the check
+    assert check.check_costs(costly, {'trading_cost_bps': 25.0, 'turnover_pct': [100.0], 'final_value': free,
+                                      'average_turnover_pct': 100.0, 'total_trading_cost': 1.0,
+                                      'cost_drag': 0.0}, free) == 1
+    assert check.check_costs(costly, {'final_value': 1.0}, free) == 1                     # no cost fields
