@@ -16,8 +16,8 @@ import pandas as pd
 import streamlit as st
 
 from app.analysis_history import merge_entries
-from app.compare import (MAX_COMPARED, MIN_COMPARED, SORT_OPTIONS, column_titles, compact_analysis,
-                         comparison_table, growth_series, short_id, sort_order)
+from app.compare import (GROWTH_BASE, MAX_COMPARED, MIN_COMPARED, SORT_OPTIONS, chart_series, column_titles,
+                         compact_analysis, comparison_table, short_id, sort_order)
 from app.streamlit_utils import load_compared_analysis
 from src.saved_analyses import SavedAnalysisError, normalize_analysis_id
 from Visualizations.compare_growth_plot import COMPARE_COLORS, plot_compare_growth
@@ -204,17 +204,20 @@ def _render_comparison(analyses: List[Dict[str, Any]]) -> None:
                "Volatility, Sharpe and information ratio are annualized, so they compare across frequencies as "
                "they are. Best and worst period and turnover per rebalance are each analysis's own periods "
                "(years, half-years, quarters or months), so they are only highlighted when every analysis has "
-               "the same frequency.")
+               "the same frequency. Final value and total cost paid are in dollars, so they are only highlighted "
+               "when every analysis has the same initial AUM.")
 
     st.subheader("Portfolio Growth Over Time")
     titles = column_titles(analyses)
-    st.plotly_chart(plot_compare_growth([growth_series(a) for a in analyses], titles,
-                                        [short_id(a['id']) for a in analyses], order=order),
+    series, scaled = chart_series(analyses)
+    st.plotly_chart(plot_compare_growth(series, titles, [short_id(a['id']) for a in analyses], order=order,
+                                        growth_of=GROWTH_BASE if scaled else None),
                     width="stretch", key="compare_growth_chart")
     notes = ["Each analysis after its trading costs, with its own benchmark dashed in the same color. "
              "Legacy's yearly values are placed on September 30 (it rebalances on the 9/30 data)."]
-    if len({float(a['job']['initial_aum']) for a in analyses}) > 1:
-        notes.append("The analyses start with different initial AUMs, so the lines start at different values.")
+    if scaled:
+        notes.append(f"The analyses start with different initial AUMs, so every line (each portfolio and its "
+                     f"benchmark) is scaled to start at ${GROWTH_BASE:,.0f}.")
     st.caption(" ".join(notes))
 
 

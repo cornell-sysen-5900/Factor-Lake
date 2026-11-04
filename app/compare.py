@@ -198,6 +198,9 @@ class Row:
     such as beta); `decimals` is the precision shown, so values that look the same tie.
     `per_period` rows (a period's return, turnover per rebalance) only have a best value
     among analyses of the same frequency: a best year and a best month do not compare.
+    `in_dollars` rows (final value, cost paid) only have a best value when every compared
+    analysis has the same initial AUM: dollars from $1,000 and from $1,000,000 do not
+    compare. Rates (returns, CAGR, ratios, cost drag) are always compared.
     """
     group: str
     name: str
@@ -206,6 +209,7 @@ class Row:
     best: Optional[str] = None
     decimals: int = 4
     per_period: bool = False
+    in_dollars: bool = False
 
 
 def _pct(v: float) -> str:
@@ -231,7 +235,8 @@ ROWS: Tuple[Row, ...] = (
     Row('Settings', 'Delisting Strategy', _delisting),
     Row('Settings', 'Benchmark', _benchmark),
     Row('Settings', 'Trading Cost', lambda a: f"{job_trading_cost(a['job']):g} bps"),
-    Row('Performance', 'Final Portfolio Value', final_value, lambda v: f"${v:,.2f}", 'higher', 2),
+    Row('Performance', 'Final Portfolio Value', final_value, lambda v: f"${v:,.2f}", 'higher', 2,
+        in_dollars=True),
     Row('Performance', 'Total Return', total_return, _pct, 'higher'),
     Row('Performance', 'CAGR', cagr, _pct, 'higher'),
     Row('Performance', 'Cumulative Outperformance', outperformance, _pct, 'higher'),
@@ -246,7 +251,7 @@ ROWS: Tuple[Row, ...] = (
     Row('Costs', 'CAGR Before Costs', cagr_before_costs, _pct, 'higher'),
     Row('Costs', 'Avg Turnover per Rebalance', average_turnover, lambda v: f"{v:.2f}%", 'lower', 2,
         per_period=True),
-    Row('Costs', 'Total Trading Cost Paid', total_cost, lambda v: f"${v:,.2f}", 'lower', 2),
+    Row('Costs', 'Total Trading Cost Paid', total_cost, lambda v: f"${v:,.2f}", 'lower', 2, in_dollars=True),
     Row('Costs', 'Annualized Cost Drag', cost_drag, _pct, 'lower'),
 )
 ROWS_BY_NAME = {row.name: row for row in ROWS}
@@ -283,11 +288,13 @@ def _key(row: Row, value: Any) -> Optional[float]:
     return round(number, row.decimals)
 
 
-def best_index(row: Row, values: Sequence[Any], frequencies: Optional[Sequence[str]] = None) -> Optional[int]:
+def best_index(row: Row, values: Sequence[Any], frequencies: Optional[Sequence[str]] = None,
+               initial_aums: Optional[Sequence[float]] = None) -> Optional[int]:
     """
     The position of the row's best value, or None: for settings and rows with no better
-    side, when fewer than 2 values are numbers (n/a is never best), on a tie for best, and
-    for per-period rows when the analyses with a value differ in frequency.
+    side, when fewer than 2 values are numbers (n/a is never best), on a tie for best, for
+    per-period rows when the analyses with a value differ in frequency, and for dollar rows
+    when the compared analyses differ in initial AUM.
     """
     if row.best is None:
         return None
@@ -297,9 +304,16 @@ def best_index(row: Row, values: Sequence[Any], frequencies: Optional[Sequence[s
         return None
     if row.per_period and frequencies is not None and len({frequencies[i] for i, _ in keys}) > 1:
         return None
+    if row.in_dollars and initial_aums is not None and not same_initial_aum(initial_aums):
+        return None
     target = (max if row.best == 'higher' else min)(k for _, k in keys)
     winners = [i for i, k in keys if k == target]
     return winners[0] if len(winners) == 1 else None
+
+
+def same_initial_aum(initial_aums: Sequence[float]) -> bool:
+    """True when every analysis starts with the same initial AUM (to the cent)."""
+    return len({round(float(v), 2) for v in initial_aums}) <= 1
 
 
 def display(row: Row, value: Any) -> str:
@@ -319,7 +333,8 @@ def comparison_rows(analyses: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
         values = [row.value(a) for a in analyses]
         shown = [display(row, v) for v in values]
         rows.append({'group': row.group, 'name': row.name, 'values': shown,
-                     'best': best_index(row, values, [a['frequency'] for a in analyses]),
+                     'best': best_index(row, values, [a['frequency'] for a in analyses],
+                                        [_initial(a) for a in analyses]),
                      'differs': len(set(shown)) > 1})
     return rows
 
@@ -365,6 +380,28 @@ def growth_series(a: Dict[str, Any]) -> Dict[str, Any]:
     return {'dates': dates, 'portfolio': list(r.get('portfolio_values') or []),
             'benchmark': wealth_series(r.get('benchmark_returns'), _initial(a)),
             'benchmark_name': _benchmark(a)}
+
+
+# Lines of analyses with different initial AUMs are drawn as the growth of this amount
+GROWTH_BASE = 1000.0
+
+
+def chart_series(analyses: Sequence[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], bool]:
+    """
+    Every analysis's growth_series for the chart, and whether they were scaled: when the
+    initial AUMs differ, each portfolio and its benchmark are scaled to start at
+    GROWTH_BASE ("Growth of $1,000"), so the lines compare; when they match, the dollar
+    values are kept.
+    """
+    series = [growth_series(a) for a in analyses]
+    if same_initial_aum([_initial(a) for a in analyses]):
+        return series, False
+    for s, a in zip(series, analyses):
+        scale = GROWTH_BASE / _initial(a)
+        s['portfolio'] = [v * scale for v in s['portfolio']]
+        if s['benchmark']:
+            s['benchmark'] = [v * scale for v in s['benchmark']]
+    return series, True
 
 
 # ---- The table ------------------------------------------------------------------------

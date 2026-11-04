@@ -19,7 +19,7 @@ COMPARE_COLORS = ('#2a78d6', '#eb6834', '#1baf7a', '#eda100')
 
 
 def plot_compare_growth(series: Sequence[Dict[str, Any]], names: Sequence[str], tags: Sequence[str],
-                        order: Optional[List[int]] = None) -> go.Figure:
+                        order: Optional[List[int]] = None, growth_of: Optional[float] = None) -> go.Figure:
     """
     Args:
         series: per analysis, in the order entered: {'dates', 'portfolio', 'benchmark',
@@ -28,6 +28,8 @@ def plot_compare_growth(series: Sequence[Dict[str, Any]], names: Sequence[str], 
         tags: per analysis, a short tag (its short ID) added to its benchmark's legend name.
         order: the positions as sorted (the legend lists them in this order); the order
             entered by default. Colors stay with the position entered.
+        growth_of: the amount every line was scaled to start at (analyses with different
+            initial AUMs), named in the title and axis; None for dollar values.
     """
     fig = go.Figure()
     order = list(range(len(series))) if order is None else list(order)
@@ -48,13 +50,16 @@ def plot_compare_growth(series: Sequence[Dict[str, Any]], names: Sequence[str], 
             marker=dict(symbol='circle', size=6), hovertemplate=HOVER_TEMPLATE))
 
     fig.update_layout(
-        title=dict(text='<b>Cumulative Wealth: compared analyses</b>', font=dict(size=14)),
+        title=dict(text=(f'<b>Growth of ${growth_of:,.0f}: compared analyses, each scaled to start at '
+                         f'${growth_of:,.0f}</b>' if growth_of else '<b>Cumulative Wealth: compared analyses</b>'),
+                   font=dict(size=14)),
         height=500,
         hovermode='x unified',
         legend=dict(x=0.01, y=0.99, xanchor='left', yanchor='top'),
     )
     fig.update_yaxes(
-        title=dict(text='Portfolio Value (USD)', font=dict(size=12)),
+        title=dict(text=f'Growth of ${growth_of:,.0f} (USD)' if growth_of else 'Portfolio Value (USD)',
+                   font=dict(size=12)),
         tickprefix='$', tickformat=',.0f', showgrid=True, griddash='dash',
     )
     return date_axis(fig, font_size=12)

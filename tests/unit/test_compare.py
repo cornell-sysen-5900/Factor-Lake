@@ -5,8 +5,9 @@ series, and the table the tab shows (app/components/compare_tab.comparison_table
 """
 import pytest
 
-from app.compare import (MAX_COMPARED, NA, ROWS, ROWS_BY_NAME, SORT_OPTIONS, best_index, cagr, column_titles,
-                         compact_analysis, comparison_rows, growth_series, outperformance, sort_order)
+from app.compare import (GROWTH_BASE, MAX_COMPARED, NA, ROWS, ROWS_BY_NAME, SORT_OPTIONS, best_index, cagr,
+                         chart_series, column_titles, compact_analysis, comparison_rows, growth_series,
+                         outperformance, sort_order)
 from app.compare import comparison_table
 from Visualizations.compare_growth_plot import COMPARE_COLORS, plot_compare_growth
 
@@ -182,6 +183,38 @@ def test_best_period_compares_returns_not_their_period_names():
     assert best_index(row, [(0.1, '2009'), (0.2, '2003'), None]) == 1
 
 
+def _costs(total, drag=0.001):
+    return dict(trading_cost_bps=10.0, cagr_before_costs=0.1, average_turnover_pct=100.0, total_trading_cost=total,
+                cost_drag=drag, turnover_pct=[100] * 3, trading_cost_pct=[0.1] * 3,
+                portfolio_values_before_costs=[1.0] * 4)
+
+
+def test_dollar_rows_are_highlighted_only_when_every_initial_aum_is_the_same():
+    small = _legacy('a' * 64, returns=(10.0, 10.0, 10.0), aum=1000.0, bps=10.0, **_costs(3.0, 0.001))
+    big = _legacy('b' * 64, returns=(5.0, 5.0, 5.0), aum=1_000_000.0, bps=10.0, **_costs(2500.0, 0.002))
+    best = {r['name']: r['best'] for r in comparison_rows([small, big])}
+    # $1,157,625 beats $1,331 and $3 of costs beats $2,500 only because of the AUMs: no highlight
+    assert best['Final Portfolio Value'] is None and best['Total Trading Cost Paid'] is None
+    # Rates are always compared
+    assert best['Total Return'] == 0 and best['CAGR'] == 0 and best['Annualized Cost Drag'] == 0
+    assert best['Cumulative Outperformance'] == 0
+    # The same AUM: dollars compare again
+    same = _legacy('c' * 64, returns=(5.0, 5.0, 5.0), aum=1000.0, bps=10.0, **_costs(2.5, 0.002))
+    best = {r['name']: r['best'] for r in comparison_rows([small, same])}
+    assert best['Final Portfolio Value'] == 0 and best['Total Trading Cost Paid'] == 1
+    # Every compared analysis counts, even one whose value is n/a
+    third = _legacy('d' * 64, aum=50_000.0, final_value=None)
+    assert {r['name']: r['best'] for r in comparison_rows([small, same, third])}['Final Portfolio Value'] is None
+
+
+@pytest.mark.parametrize('aums, expected', [
+    ([1000.0, 1000.0], 0), ([1000.0, 1000.004], 0), ([1000.0, 1001.0], None), (None, 0)])
+def test_best_index_with_initial_aums(aums, expected):
+    assert best_index(ROWS_BY_NAME['Final Portfolio Value'], [2000.0, 1500.0], initial_aums=aums) == expected
+    # A rate row ignores the AUMs
+    assert best_index(ROWS_BY_NAME['CAGR'], [0.2, 0.1], initial_aums=aums) == 0
+
+
 # ---------------------------------------------------------------------------
 # Differences
 # ---------------------------------------------------------------------------
@@ -287,6 +320,36 @@ def test_growth_series_put_legacy_years_and_wrds_dates_on_one_axis():
     s = growth_series(w)
     assert s['dates'][0] == '2010-03-31' and len(s['dates']) == len(s['portfolio']) == len(s['benchmark'])
     assert s['benchmark_name'] == 'IWM'
+
+
+def test_the_chart_keeps_dollar_values_when_every_initial_aum_is_the_same():
+    analyses = [_legacy('a' * 64), _wrds('b' * 64)]
+    series, scaled = chart_series(analyses)
+    assert scaled is False
+    assert series == [growth_series(a) for a in analyses]
+    fig = plot_compare_growth(series, column_titles(analyses), ['a', 'b'])
+    assert fig.layout.title.text == '<b>Cumulative Wealth: compared analyses</b>'
+    assert fig.layout.yaxis.title.text == 'Portfolio Value (USD)'
+
+
+def test_the_chart_shows_growth_of_1000_when_initial_aums_differ():
+    small = _legacy('a' * 64, aum=1000.0)
+    big = _legacy('b' * 64, returns=(5.0, 5.0, 5.0), aum=1_000_000.0)
+    series, scaled = chart_series([small, big, _wrds('c' * 64)])
+    assert scaled is True and GROWTH_BASE == 1000.0
+    for s, a in zip(series, (small, big)):
+        raw = growth_series(a)
+        # Each portfolio and its own benchmark start at $1,000 and keep their growth
+        assert s['portfolio'][0] == pytest.approx(1000.0) and s['benchmark'][0] == pytest.approx(1000.0)
+        assert s['portfolio'] == pytest.approx([v * 1000.0 / a['job']['initial_aum'] for v in raw['portfolio']])
+        assert s['benchmark'] == pytest.approx([v * 1000.0 / a['job']['initial_aum'] for v in raw['benchmark']])
+        assert s['dates'] == raw['dates']
+    assert series[1]['portfolio'][-1] == pytest.approx(1000.0 * 1.05 ** 3)
+    fig = plot_compare_growth(series, ['a', 'b', 'c'], ['a', 'b', 'c'], growth_of=GROWTH_BASE)
+    assert fig.layout.title.text.startswith('<b>Growth of $1,000: compared analyses')
+    assert fig.layout.yaxis.title.text == 'Growth of $1,000 (USD)'
+    # The loaded analyses are not changed
+    assert big['result']['portfolio_values'][0] == 1_000_000.0
 
 
 def test_the_chart_keeps_each_analysis_color_and_orders_the_legend_by_the_sort():

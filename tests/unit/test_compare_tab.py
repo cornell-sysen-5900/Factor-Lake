@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from app.compare import column_titles, compact_analysis
+from app.compare import column_titles, compact_analysis, comparison_table
 from src.saved_analyses import load_saved_analysis
 from tests.unit.test_saved_runs import _add_factor, _assert_clean, _click, _click_main_tab
 from Visualizations.compare_growth_plot import COMPARE_COLORS
@@ -141,6 +141,36 @@ def test_the_best_value_of_a_row_is_highlighted_green(saved, manager):
     # Pandas writes one CSS rule per style, listing its cells: one green cell per row with a best value
     green = [rule for rule in styles.split('}') if BEST_STYLE.split(';')[0] in rule]
     assert best_rows and len(green) == 1 and green[0].count('#T_') == len(best_rows)
+
+
+def test_mixed_initial_aums_compare_rates_and_chart_the_growth_of_1000(new_session, manager):
+    at = new_session()
+    at.sidebar.number_input(key='initial_aum_input').set_value(1_000_000.0).run()
+    big = _run_legacy(at)
+    at.sidebar.number_input(key='initial_aum_input').set_value(1000.0).run()
+    small = _run_wrds_at(at, 'Quarterly', 25, 'w_roe')
+    _compare(at, big, small)
+    _assert_clean(at)
+    table = _table(at)
+    assert _row(table, 'Initial AUM').tolist() == ['$1,000,000', '$1,000']
+    best = comparison_table([compact_analysis(load_saved_analysis(i, manager)) for i in (big, small)],
+                            [0, 1], False).attrs['best']
+    assert not {'Final Portfolio Value ≠', 'Total Trading Cost Paid ≠'} & set(best)
+    assert 'CAGR ≠' in best and 'Total Return ≠' in best
+    chart = json.loads(at.get('plotly_chart')[0].proto.spec)
+    assert chart['layout']['title']['text'].startswith('<b>Growth of $1,000: compared analyses')
+    lines = [t for t in chart['data'] if t['name'] in column_titles([compact_analysis(load_saved_analysis(i, manager))
+                                                                      for i in (big, small)])]
+    assert [t['y'][0] for t in lines] == pytest.approx([1000.0, 1000.0])
+    assert any('scaled to start at $1,000' in c.value for c in at.caption)
+
+    # The same AUM again: dollar values and the usual title
+    at.sidebar.number_input(key='initial_aum_input').set_value(1_000_000.0).run()
+    other = _run_wrds_at(at, 'Quarterly', 0)
+    _compare(at, big, other)
+    chart = json.loads(at.get('plotly_chart')[0].proto.spec)
+    assert chart['layout']['title']['text'] == '<b>Cumulative Wealth: compared analyses</b>'
+    assert not any('scaled to start at' in c.value for c in at.caption)
 
 
 # ---------------------------------------------------------------------------
