@@ -283,7 +283,7 @@ def test_earlier_analyses_on_this_browser_can_be_added(saved):
     assert _boxes(at)[0].value == ids['main'] and _add_button(at, 'earlier', ids['main']).label == 'Added'
 
 
-def test_all_saved_analyses_can_be_added_and_cohorts_cannot(saved):
+def test_all_saved_analyses_can_be_added_and_hide_cohorts(saved):
     at, ids = saved
     # A cohort comparison of the Legacy run, saved by the Lambda as kind 'cohort'
     _click_main_tab(at, 'Results')
@@ -298,11 +298,10 @@ def test_all_saved_analyses_can_be_added_and_cohorts_cannot(saved):
     at.session_state['compare_all_analyses_expander'] = True
     at.run()
     _assert_clean(at)
-    cohort = _add_button(at, 'all', cohort_id)
-    assert cohort.label == 'Add to comparison' and cohort.proto.disabled
-    assert cohort.proto.help == ("This ID is a cohort comparison, not an analysis: "
-                                 "only analyses can be compared.")
-    assert any(m.value.startswith('**Cohort comparison: ') for m in at.markdown)
+    # As in Results, the list holds analyses only: the cohort is not listed
+    listed = [b.key for b in at.button if (b.key or '').startswith('compare_add_all_')]
+    assert f'compare_add_all_{ids["monthly"]}' in listed
+    assert f'compare_add_all_{cohort_id}' not in listed and cohort_id not in [c.value for c in at.code]
     at.session_state['compare_all_analyses_expander'] = True               # the browser keeps sending it
     _add_button(at, 'all', ids['monthly']).click().run()
     _assert_clean(at)
@@ -310,6 +309,22 @@ def test_all_saved_analyses_can_be_added_and_cohorts_cannot(saved):
     at.session_state['compare_all_analyses_expander'] = True
     at.run()
     assert _add_button(at, 'all', ids['monthly']).label == 'Added'
+    # Pasted, the cohort's ID gets its box's error
+    _boxes(at)[1].set_value(cohort_id).run()
+    assert [e.value for e in at.error] == ["This ID is a cohort comparison, not an analysis."]
+
+    # A WRDS ranked list: not listed either, and its pasted ID gets the box error too
+    quarterly_run = next(r for r in at.session_state['saved_runs'] if r['compute']['hash'] == ids['quarterly'])
+    _open_run(at, ids['quarterly'])
+    at.button(key=f"wrds_rank_btn_{quarterly_run['id']}").click().run()
+    _assert_clean(at)
+    ranked_id = at.session_state[f"wrds_ranked_{quarterly_run['id']}"]['compute']['hash']
+    _open_compare(at)
+    at.session_state['compare_all_analyses_expander'] = True
+    at.run()
+    assert f'compare_add_all_{ranked_id}' not in [b.key for b in at.button]
+    _boxes(at)[1].set_value(ranked_id).run()
+    assert [e.value for e in at.error] == ["This ID is a ranked stock list, not an analysis."]
 
 
 def test_adding_to_a_full_comparison_shows_a_message(saved):

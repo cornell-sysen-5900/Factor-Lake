@@ -23,8 +23,7 @@ from app.compare import (GROWTH_BASE, MAX_COMPARED, MIN_COMPARED, SORT_OPTIONS, 
 from app.compare_state import (FULL_MESSAGE, IDS_KEY, MESSAGE_KEY, add_slot, add_to_comparison, box_text,
                                id_key, ids_in_comparison, remove_slot, slots)
 from app.streamlit_utils import load_compared_analysis
-from components.results_tab import (KIND_LABELS, render_all_saved_analyses, render_analysis_history,
-                                    render_earlier_analyses)
+from components.results_tab import render_all_saved_analyses, render_analysis_history, render_earlier_analyses
 from src.saved_analyses import SavedAnalysisError, normalize_analysis_id
 from Visualizations.compare_growth_plot import COMPARE_COLORS, plot_compare_growth
 
@@ -113,13 +112,12 @@ def _add_from_list(analysis_id: str) -> None:
 
 
 def _list_button(analysis_id: str, list_name: str, entry: Dict[str, Any]) -> None:
-    """A history list entry's button: Add to comparison, Added, or disabled for a cohort or ranked list."""
+    """
+    A history list entry's button: Add to comparison, or Added when it is compared. The lists
+    hold analyses only (as in Results); a pasted cohort or ranked ID gets its box's error.
+    """
     key = f"compare_add_{list_name}_{analysis_id}"
-    kind = entry.get('kind')
-    if kind in KIND_LABELS:
-        st.button("Add to comparison", key=key, disabled=True,
-                  help=f"This ID is a {KIND_LABELS[kind].lower()}, not an analysis: only analyses can be compared.")
-    elif analysis_id in ids_in_comparison():
+    if analysis_id in ids_in_comparison():
         st.button("Added", key=key, disabled=True, help="This analysis is already in the comparison.")
     else:
         st.button("Add to comparison", key=key, on_click=_add_from_list, args=(analysis_id,))
@@ -169,7 +167,7 @@ def render_compare_tab(session_entries: List[Dict[str, Any]],
     # Your analyses, as in the Results tab, each with Add to comparison
     render_analysis_history(session_entries, button=_list_button, key_prefix=LIST_KEY_PREFIX)
     render_earlier_analyses(earlier_entries, button=_list_button, key_prefix=LIST_KEY_PREFIX)
-    render_all_saved_analyses(button=_list_button, key_prefix=LIST_KEY_PREFIX, include_other_kinds=True)
+    render_all_saved_analyses(button=_list_button, key_prefix=LIST_KEY_PREFIX)
 
     analyses = [entries[s]['analysis'] for s in box_slots if 'analysis' in entries.get(s, {})]
     if len(analyses) < MIN_COMPARED:

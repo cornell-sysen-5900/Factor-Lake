@@ -46,19 +46,15 @@ def normalize_analysis_id(text: Optional[str]) -> str:
     return analysis_id
 
 
-def list_saved_analyses(manager: Optional[S3DataManager] = None, limit: int = 30,
-                        include_other_kinds: bool = False) -> Dict[str, Any]:
+def list_saved_analyses(manager: Optional[S3DataManager] = None, limit: int = 30) -> Dict[str, Any]:
     """
     Everyone's saved analyses in S3, newest first, without downloading them.
 
     Returns:
         {'entries': [{'analysis_id', 'saved_at' (UTC datetime), 'summary' (None when the
-        analysis was saved before summaries were recorded), 'kind' (the job's kind, None when
-        not recorded)}], 'total': number of saved results found}. At most `limit` analyses;
-        cohort comparisons and WRDS ranked lists are left out unless include_other_kinds, which
-        also lists those saved since the oldest analysis listed (at most `limit` of them, so
-        they never take an analysis's place). Every file that is not a saved result (e.g. WRDS
-        holdings Parquet) is always left out.
+        analysis was saved before summaries were recorded)}], 'total': number of saved
+        results found}. At most `limit` entries; cohort comparisons and WRDS ranked lists are
+        left out, and so is every file that is not a saved result (e.g. WRDS holdings Parquet).
 
     Raises:
         SavedAnalysisError: the bucket cannot be listed with these AWS keys.
@@ -85,18 +81,15 @@ def list_saved_analyses(manager: Optional[S3DataManager] = None, limit: int = 30
                                      f"{manager.s3_uri(RESULTS_DIR)}/). Open one by its ID instead.") from e
         raise SavedAnalysisError(f"Could not list saved analyses in S3: {e}") from e
 
-    entries, analyses, others = [], 0, 0
+    entries = []
     for saved_at, analysis_id in sorted(found, reverse=True):
-        if analyses >= limit:
+        if len(entries) >= limit:
             break
         metadata = manager.client.head_object(Bucket=manager.bucket,
                                               Key=manager.object_key(result_file(analysis_id))).get('Metadata') or {}
-        other = metadata.get('kind') in ('cohort', 'ranked')
-        if other and (not include_other_kinds or others >= limit):
+        if metadata.get('kind') in ('cohort', 'ranked'):
             continue
-        analyses, others = analyses + (not other), others + other
-        entries.append({'analysis_id': analysis_id, 'saved_at': saved_at, 'summary': metadata.get('summary'),
-                        'kind': metadata.get('kind')})
+        entries.append({'analysis_id': analysis_id, 'saved_at': saved_at, 'summary': metadata.get('summary')})
     return {'entries': entries, 'total': len(found)}
 
 

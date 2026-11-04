@@ -541,17 +541,11 @@ def render_earlier_analyses(entries: Optional[List[Dict[str, Any]]], button: Opt
         _caption_hidden_rows(len(entries))
 
 
-# How listings name the saved jobs that are not analyses (listed with include_other_kinds)
-KIND_LABELS = {'cohort': 'Cohort comparison', 'ranked': 'Ranked stock list'}
-
-
-def render_all_saved_analyses(button: Optional[ListButton] = None, key_prefix: str = '',
-                              include_other_kinds: bool = False) -> None:
+def render_all_saved_analyses(button: Optional[ListButton] = None, key_prefix: str = '') -> None:
     """
     Everyone's saved analyses in S3, newest first, loaded only while the expander is open
     (it reruns the app when opened or closed). Other tabs pass a button to draw beside each
-    ID (in place of Open) and a key prefix; include_other_kinds also lists cohort
-    comparisons and ranked lists, named as such.
+    ID (in place of Open) and a key prefix.
     """
     expander = st.expander("All saved analyses", key=f"{key_prefix}all_analyses_expander", on_change="rerun")
     with expander:
@@ -561,7 +555,7 @@ def render_all_saved_analyses(button: Optional[ListButton] = None, key_prefix: s
                    "deleted after 90 days.")
         try:
             with st.spinner("Listing saved analyses in S3..."):
-                listing = list_all_saved_analyses(LISTED_ANALYSES, include_other_kinds)
+                listing = list_all_saved_analyses(LISTED_ANALYSES)
         except SavedAnalysisError as e:
             st.error(str(e))
             return
@@ -570,8 +564,6 @@ def render_all_saved_analyses(button: Optional[ListButton] = None, key_prefix: s
             return
         for entry in listing['entries']:
             summary = entry['summary'] or "Details not recorded (saved before listings had summaries)"
-            if entry.get('kind') in KIND_LABELS:
-                summary = f"{KIND_LABELS[entry['kind']]}: {summary}"
             st.markdown(f"**{summary}** · saved {entry['saved_at']:%Y-%m-%d %H:%M} UTC")
             _render_listed_analysis(entry['analysis_id'], 'all', entry, button)
         if listing['total'] > len(listing['entries']):

@@ -65,27 +65,6 @@ def test_listing_is_newest_first_with_summaries_and_without_cohorts(manager, s3)
     assert listing['entries'][1]['saved_at'] > listing['entries'][2]['saved_at']
 
 
-def test_listing_other_kinds_never_takes_an_analysiss_place(manager, s3):
-    service = BacktestService(manager)
-    oldest = service.run(_job())['hash']
-    service.run(_job('cohort', cohort_pct=10))                              # older than the 2 listed analyses
-    middle = service.run(_job(factor_combination='integrating'))['hash']
-    cohort = service.run(_job('cohort', cohort_pct=20))['hash']
-    newest = service.run(_job(initial_aum=5000))['hash']
-    # Without other kinds: analyses only, as the Results tab lists them
-    plain = list_saved_analyses(manager, limit=2)['entries']
-    assert [e['analysis_id'] for e in plain] == [newest, middle]
-    assert [e['kind'] for e in plain] == ['backtest', 'backtest']
-    # With them (the Compare tab): still 2 analyses, and the cohort saved between them
-    listed = list_saved_analyses(manager, limit=2, include_other_kinds=True)['entries']
-    assert [e['analysis_id'] for e in listed] == [newest, cohort, middle]
-    assert [e['kind'] for e in listed] == ['backtest', 'cohort', 'backtest']
-    assert oldest not in [e['analysis_id'] for e in listed]
-    # Other kinds are capped at the limit too
-    capped = list_saved_analyses(manager, limit=1, include_other_kinds=True)['entries']
-    assert [e['analysis_id'] for e in capped] == [newest]
-
-
 def test_listing_reads_every_page_and_respects_the_limit(manager, s3):
     s3.page_size = 2
     for i in range(5):
