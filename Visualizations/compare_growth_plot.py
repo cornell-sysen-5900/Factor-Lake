@@ -2,9 +2,9 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: visualizations/compare_growth_plot.py
 PURPOSE: The Compare tab's growth chart: each compared analysis's portfolio (after costs)
-         and its own benchmark on one date axis, in the style of the Results tab's growth
-         chart (portfolio_growth_plot.py).
-VERSION: 1.0.0
+         and each distinct benchmark once, on one date axis, in the style of the Results
+         tab's growth chart (portfolio_growth_plot.py).
+VERSION: 1.1.0
 """
 
 from typing import Any, Dict, List, Optional, Sequence
@@ -14,18 +14,23 @@ import plotly.graph_objects as go
 from Visualizations.portfolio_growth_plot import HOVER_TEMPLATE, date_axis, line_mode
 
 # One hue per compared analysis, in the order entered (never by rank, so a sort never
-# repaints a line); its benchmark is the same hue, dashed and lighter
+# repaints a line)
 COMPARE_COLORS = ('#2a78d6', '#eb6834', '#1baf7a', '#eda100')
+# Benchmarks are neutral grey and dotted, one style per benchmark (by name, so a sort never
+# restyles one)
+BENCHMARK_STYLES = (('#5f6368', 'dot'), ('#9aa0a6', 'dashdot'), ('#3c4043', 'longdashdot'), ('#bdc1c6', 'dot'))
 
 
-def plot_compare_growth(series: Sequence[Dict[str, Any]], names: Sequence[str], tags: Sequence[str],
-                        order: Optional[List[int]] = None, growth_of: Optional[float] = None) -> go.Figure:
+def plot_compare_growth(series: Sequence[Dict[str, Any]], names: Sequence[str],
+                        benchmarks: Sequence[Dict[str, Any]], order: Optional[List[int]] = None,
+                        growth_of: Optional[float] = None) -> go.Figure:
     """
     Args:
-        series: per analysis, in the order entered: {'dates', 'portfolio', 'benchmark',
-            'benchmark_name'} (app/compare.growth_series).
+        series: per analysis, in the order entered: {'dates', 'portfolio', ...}
+            (app/compare.chart_series).
         names: per analysis, the legend name of its portfolio line.
-        tags: per analysis, a short tag (its short ID) added to its benchmark's legend name.
+        benchmarks: each distinct benchmark once, in the legend's order: {'name', 'dates',
+            'values'} (app/compare.benchmark_lines).
         order: the positions as sorted (the legend lists them in this order); the order
             entered by default. Colors stay with the position entered.
         growth_of: the amount every line was scaled to start at (analyses with different
@@ -34,18 +39,19 @@ def plot_compare_growth(series: Sequence[Dict[str, Any]], names: Sequence[str], 
     fig = go.Figure()
     order = list(range(len(series))) if order is None else list(order)
     rank = {i: place for place, i in enumerate(order)}
-    # Benchmarks first, so every portfolio line is drawn on top of them
-    for i, s in enumerate(series):
-        if s['benchmark'] and len(s['benchmark']) == len(s['dates']):
-            fig.add_trace(go.Scatter(
-                x=s['dates'], y=s['benchmark'], name=f"{s['benchmark_name']} · {tags[i]}",
-                mode=line_mode(len(s['dates'])), legendgroup=str(i), legendrank=10 * rank[i] + 2,
-                line=dict(color=COMPARE_COLORS[i], width=1.5, dash='dash'),
-                marker=dict(symbol='square', size=4), opacity=0.55, hovertemplate=HOVER_TEMPLATE))
+    styles = {name: BENCHMARK_STYLES[k % len(BENCHMARK_STYLES)]
+              for k, name in enumerate(sorted({b['name'] for b in benchmarks}))}
+    # Benchmarks first, so every portfolio line is drawn on top of them; listed after the portfolios
+    for place, b in enumerate(benchmarks):
+        color, dash = styles[b['name']]
+        fig.add_trace(go.Scatter(
+            x=b['dates'], y=b['values'], name=b['name'], mode='lines',
+            legendrank=100 + place, line=dict(color=color, width=1.8, dash=dash),
+            hovertemplate=HOVER_TEMPLATE))
     for i, s in enumerate(series):
         fig.add_trace(go.Scatter(
             x=s['dates'], y=s['portfolio'], name=names[i],
-            mode=line_mode(len(s['dates'])), legendgroup=str(i), legendrank=10 * rank[i] + 1,
+            mode=line_mode(len(s['dates'])), legendrank=1 + rank[i],
             line=dict(color=COMPARE_COLORS[i], width=2.5),
             marker=dict(symbol='circle', size=6), hovertemplate=HOVER_TEMPLATE))
 

@@ -5,11 +5,11 @@ series, and the table the tab shows (app/components/compare_tab.comparison_table
 """
 import pytest
 
-from app.compare import (GROWTH_BASE, MAX_COMPARED, NA, ROWS, ROWS_BY_NAME, SORT_OPTIONS, best_positions, cagr,
-                         chart_series, column_titles, compact_analysis, comparison_rows, growth_series,
+from app.compare import (GROWTH_BASE, MAX_COMPARED, NA, ROWS, ROWS_BY_NAME, SORT_OPTIONS, benchmark_lines,
+                         best_positions, cagr, chart_series, column_titles, compact_analysis, comparison_rows, growth_series,
                          outperformance, sort_order)
 from app.compare import comparison_table
-from Visualizations.compare_growth_plot import COMPARE_COLORS, plot_compare_growth
+from Visualizations.compare_growth_plot import BENCHMARK_STYLES, COMPARE_COLORS, plot_compare_growth
 
 
 def _legacy(analysis_id='a' * 64, returns=(10.0, -5.0, 20.0), bench=(5.0, 5.0, 5.0), aum=1000.0, bps=0.0,
@@ -343,7 +343,7 @@ def test_the_chart_keeps_dollar_values_when_every_initial_aum_is_the_same():
     series, scaled = chart_series(analyses)
     assert scaled is False
     assert series == [growth_series(a) for a in analyses]
-    fig = plot_compare_growth(series, column_titles(analyses), ['a', 'b'])
+    fig = plot_compare_growth(series, column_titles(analyses), benchmark_lines(series, [0, 1]))
     assert fig.layout.title.text == '<b>Cumulative Wealth: compared analyses</b>'
     assert fig.layout.yaxis.title.text == 'Portfolio Value (USD)'
 
@@ -355,33 +355,60 @@ def test_the_chart_shows_growth_of_1000_when_initial_aums_differ():
     assert scaled is True and GROWTH_BASE == 1000.0
     for s, a in zip(series, (small, big)):
         raw = growth_series(a)
-        # Each portfolio and its own benchmark start at $1,000 and keep their growth
+        # Each portfolio and its benchmark start at $1,000 and keep their growth
         assert s['portfolio'][0] == pytest.approx(1000.0) and s['benchmark'][0] == pytest.approx(1000.0)
         assert s['portfolio'] == pytest.approx([v * 1000.0 / a['job']['initial_aum'] for v in raw['portfolio']])
         assert s['benchmark'] == pytest.approx([v * 1000.0 / a['job']['initial_aum'] for v in raw['benchmark']])
         assert s['dates'] == raw['dates']
     assert series[1]['portfolio'][-1] == pytest.approx(1000.0 * 1.05 ** 3)
-    fig = plot_compare_growth(series, ['a', 'b', 'c'], ['a', 'b', 'c'], growth_of=GROWTH_BASE)
+    fig = plot_compare_growth(series, ['a', 'b', 'c'], benchmark_lines(series, [0, 1, 2]), growth_of=GROWTH_BASE)
     assert fig.layout.title.text.startswith('<b>Growth of $1,000: compared analyses')
     assert fig.layout.yaxis.title.text == 'Growth of $1,000 (USD)'
     # The loaded analyses are not changed
     assert big['result']['portfolio_values'][0] == 1_000_000.0
 
 
-def test_the_chart_keeps_each_analysis_color_and_orders_the_legend_by_the_sort():
-    analyses = _three()
-    series = [growth_series(a) for a in analyses]
-    names, tags = column_titles(analyses), ['a', 'b', 'c']
-    for order in ([0, 1, 2], [2, 0, 1]):
-        fig = plot_compare_growth(series, names, tags, order=order)
+def test_each_distinct_benchmark_is_one_line_from_the_first_analysis_in_the_order():
+    # Legacy (Russell 2000), WRDS quarterly (IWM), another Legacy and a WRDS monthly (IWM)
+    l1, q = _legacy('a' * 64), _wrds('b' * 64)
+    l2 = _legacy('c' * 64, bench=(1.0, 2.0, 3.0))
+    m = _wrds('d' * 64, frequency='monthly', benchmark_returns=[2.0] * 4)
+    series, _ = chart_series([l1, q, l2, m])
+    lines = benchmark_lines(series, [0, 1, 2, 3])
+    assert [(b['name'], b['source']) for b in lines] == [('Russell 2000', 0), ('IWM', 1)]
+    assert lines[0]['values'] == series[0]['benchmark'] and lines[1]['dates'] == series[1]['dates']
+    # The current order decides which analysis a benchmark comes from, and the legend order
+    lines = benchmark_lines(series, [3, 2, 1, 0])
+    assert [(b['name'], b['source']) for b in lines] == [('IWM', 3), ('Russell 2000', 2)]
+    assert lines[0]['values'] == series[3]['benchmark'] and lines[1]['values'] == series[2]['benchmark']
+    # Scaled like the source analysis's portfolio when the AUMs differ
+    big = _legacy('e' * 64, aum=1_000_000.0)
+    series, scaled = chart_series([big, q])
+    lines = benchmark_lines(series, [0, 1])
+    assert scaled and lines[0]['values'][0] == pytest.approx(1000.0) and lines[0]['source'] == 0
+    assert lines[0]['values'] == pytest.approx([v / 1000.0 for v in growth_series(big)['benchmark']])
+
+
+def test_the_chart_draws_one_grey_dotted_line_per_benchmark_and_keeps_portfolio_colors():
+    analyses = [_legacy('a' * 64), _wrds('b' * 64), _legacy('c' * 64), _wrds('d' * 64, frequency='monthly')]
+    series, _ = chart_series(analyses)
+    names = column_titles(analyses)
+    for order in ([0, 1, 2, 3], [3, 1, 0, 2]):
+        fig = plot_compare_growth(series, names, benchmark_lines(series, order), order=order)
         traces = {t.name: t for t in fig.data}
-        assert len(fig.data) == 6
+        assert len(fig.data) == 4 + 2                        # 4 portfolios, 1 Russell 2000 and 1 IWM line
+        assert sorted(n for n in traces if n not in names) == ['IWM', 'Russell 2000']
+        for name in ('IWM', 'Russell 2000'):
+            color, dash = traces[name].line.color, traces[name].line.dash
+            assert (color, dash) in BENCHMARK_STYLES and dash in ('dot', 'dashdot')
+            assert color not in COMPARE_COLORS
+        # A benchmark keeps its style when the order changes (by name, not by place)
+        assert traces['IWM'].line.dash == 'dot' and traces['Russell 2000'].line.dash == 'dashdot'
         for i, name in enumerate(names):
-            line, bench = traces[name], traces[f"{series[i]['benchmark_name']} · {tags[i]}"]
-            assert line.line.color == bench.line.color == COMPARE_COLORS[i]
-            assert bench.line.dash == 'dash' and line.line.dash is None
-            assert line.legendgroup == bench.legendgroup == str(i)
-        ranked = sorted((t.legendrank, t.name) for t in fig.data if t.name in names)
-        assert [n for _, n in ranked] == [names[i] for i in order]
+            assert traces[name].line.color == COMPARE_COLORS[i] and traces[name].line.dash is None
+        ranked = [t.name for t in sorted(fig.data, key=lambda t: t.legendrank)]
+        assert ranked[:4] == [names[i] for i in order]       # portfolios first, in the sort order
+        first = series[order[0]]['benchmark_name']
+        assert ranked[4] == first                            # then benchmarks, by first use in that order
     assert fig.layout.xaxis.type == 'date' and fig.layout.yaxis.tickprefix == '$'
     assert len(COMPARE_COLORS) == MAX_COMPARED

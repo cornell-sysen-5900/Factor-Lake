@@ -16,8 +16,8 @@ import pandas as pd
 import streamlit as st
 
 from app.analysis_history import merge_entries
-from app.compare import (GROWTH_BASE, MAX_COMPARED, MIN_COMPARED, SORT_OPTIONS, chart_series, column_titles,
-                         compact_analysis, comparison_table, short_id, sort_order)
+from app.compare import (GROWTH_BASE, MAX_COMPARED, MIN_COMPARED, SORT_OPTIONS, benchmark_lines, chart_series,
+                         column_titles, compact_analysis, comparison_table, short_id, sort_order)
 from app.streamlit_utils import load_compared_analysis
 from src.saved_analyses import SavedAnalysisError, normalize_analysis_id
 from Visualizations.compare_growth_plot import COMPARE_COLORS, plot_compare_growth
@@ -211,10 +211,11 @@ def _render_comparison(analyses: List[Dict[str, Any]]) -> None:
     st.subheader("Portfolio Growth Over Time")
     titles = column_titles(analyses)
     series, scaled = chart_series(analyses)
-    st.plotly_chart(plot_compare_growth(series, titles, [short_id(a['id']) for a in analyses], order=order,
+    st.plotly_chart(plot_compare_growth(series, titles, benchmark_lines(series, order), order=order,
                                         growth_of=GROWTH_BASE if scaled else None),
                     width="stretch", key="compare_growth_chart")
-    notes = ["Each analysis after its trading costs, with its own benchmark dashed in the same color. "
+    notes = ["Each analysis after its trading costs, in its own color. Each benchmark is drawn once, grey and "
+             "dotted, from the first analysis in the current order that uses it. "
              "Legacy's yearly values are placed on September 30 (it rebalances on the 9/30 data)."]
     if scaled:
         notes.append(f"The analyses start with different initial AUMs, so every line (each portfolio and its "

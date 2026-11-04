@@ -5,7 +5,7 @@ PURPOSE: Pure helpers for the Compare tab: saved analyses (Legacy or WRDS) side 
          as rows of settings and metrics with the best value of each row, the rows that
          differ, the sort order and each analysis's growth series on a date axis.
          No Streamlit calls, so they can be unit tested directly.
-VERSION: 1.0.0
+VERSION: 1.1.0
 
 Everything comes from the saved results (src/saved_analyses.load_saved_analysis): nothing
 is recomputed, and the metrics use the same formulas, names and formats as the Results tab.
@@ -403,6 +403,21 @@ def chart_series(analyses: Sequence[Dict[str, Any]]) -> Tuple[List[Dict[str, Any
         if s['benchmark']:
             s['benchmark'] = [v * scale for v in s['benchmark']]
     return series, True
+
+
+def benchmark_lines(series: Sequence[Dict[str, Any]], order: Sequence[int]) -> List[Dict[str, Any]]:
+    """
+    Each distinct benchmark once (one Russell 2000 line, one IWM line), in the current order:
+    {'name', 'dates', 'values', 'source'}, with the values of the first analysis in `order`
+    that uses it (`source`), scaled like that analysis's portfolio (chart_series).
+    """
+    lines, seen = [], set()
+    for i in order:
+        s = series[i]
+        if s['benchmark'] and len(s['benchmark']) == len(s['dates']) and s['benchmark_name'] not in seen:
+            seen.add(s['benchmark_name'])
+            lines.append({'name': s['benchmark_name'], 'dates': s['dates'], 'values': s['benchmark'], 'source': i})
+    return lines
 
 
 # ---- The table ------------------------------------------------------------------------

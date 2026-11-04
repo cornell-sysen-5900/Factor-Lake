@@ -95,8 +95,10 @@ def test_two_three_and_four_analyses_compare_one_column_each(saved, manager, s3)
         table = _table(at)
         assert list(table.columns) == _expected_titles(manager, *order[:n])
         assert len(at.get('plotly_chart')) == 1
-        traces = at.get('plotly_chart')[0].proto.spec
-        assert traces.count('"legendgroup"') == 2 * n          # a portfolio and its benchmark each
+        traces = json.loads(at.get('plotly_chart')[0].proto.spec)['data']
+        # A line per portfolio, and one per distinct benchmark: Russell 2000 (Legacy) and IWM (WRDS)
+        assert len(traces) == n + 2
+        assert sorted(t['name'] for t in traces if t['line']['color'] not in COMPARE_COLORS) == ['IWM', 'Russell 2000']
     # Comparing ran no backtest and read only saved results
     assert at.fake_lambda.invocations == invocations
     assert all(key.split('/')[-2] == 'backtest-results' and key.endswith('.json') for key, _ in s3.gets[market_gets:])
