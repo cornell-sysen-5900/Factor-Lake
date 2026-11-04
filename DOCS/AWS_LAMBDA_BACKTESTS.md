@@ -10,7 +10,7 @@ Streamlit app ──inputs──▶ Lambda factor-lake-backtest ──reads─�
       └──result or S3 link──────┴──saves──▶ s3://.../factor-lake-data/backtest-results/<hash>.json
 ```
 
-1. **Inputs only.** Run Portfolio Analysis (and Generate Comparison) sends a small JSON job: factors, directions, years, AUM, weighting, delisting strategy, factor combination, sectors and the fossil fuel filter. See `src/backtest_jobs.py`.
+1. **Inputs only.** Run Portfolio Analysis (and Generate Comparison) sends a small JSON job: factors, directions, years, AUM, weighting, delisting strategy, factor combination, sectors, the fossil fuel filter and, above 0 bps, the trading cost (section 10). See `src/backtest_jobs.py`.
 2. **Same code, same results.** Lambda filters the data with `src/universe_selection.py` (the code behind Load Market Data) and runs `src/backtest_engine.py`, the code the app runs locally.
 3. **Cached by hash.** The result is saved under a SHA-256 hash of the inputs, the data version (the S3 ETags of the market data files) and the backtest code version (a hash of the engine's source files). Republishing the data or deploying new backtest code gives fresh results.
 4. **Repeats are instant.** When a result with that hash exists, Lambda returns it without rerunning the backtest. Results are shared, so a run by any user is cached for everyone.
@@ -83,9 +83,11 @@ The app's AWS key also needs `lambda:InvokeFunction` on that function. When the 
 uv run python scripts/check_backtest_lambda.py
 ```
 
-For four sample backtests (Mixing and Integrating, every delisting strategy, equal and market cap weighting, the fossil fuel filter and a cohort comparison), it runs each one locally on the S3 data, then in Lambda, and compares every number. It then runs each one in Lambda again and checks that it came from the cache, unchanged. It uses new inputs each time, so the first Lambda call always computes. The Lambda uses the same library versions but runs on Linux x86, so numbers may differ in the last binary digit. The check allows a relative difference of 1e-9 and prints the largest difference it found.
+For five sample backtests (Mixing and Integrating, every delisting strategy, equal and market cap weighting, the fossil fuel filter, a cohort comparison, and the first one again at 25 bps trading cost), it runs each one locally on the S3 data, then in Lambda, and compares every number. It then runs each one in Lambda again and checks that it came from the cache, unchanged. It uses new inputs each time, so the first Lambda call always computes. The Lambda uses the same library versions but runs on Linux x86, so numbers may differ in the last binary digit. The check allows a relative difference of 1e-9 and prints the largest difference it found.
 
-Then it checks one quarterly WRDS backtest (2008-2026, two factors) end to end. The function must read the WRDS folder the code expects (its `FACTOR_LAKE_WRDS_DIR`). The Lambda's result must match the same job run locally on the WRDS data in S3. The newest rebalance date's holdings, read from the Lambda's holdings file the way the app reads them (two ranged GETs), must match the local holdings of that date. A second Lambda call must come from the cache, unchanged. `--skip-wrds` leaves this part out.
+Then it checks one quarterly WRDS backtest (2008-2026, two factors) end to end, at 0 bps and again at 25 bps. The function must read the WRDS folder the code expects (its `FACTOR_LAKE_WRDS_DIR`). The Lambda's result must match the same job run locally on the WRDS data in S3. The newest rebalance date's holdings, read from the Lambda's holdings file the way the app reads them (two ranged GETs), must match the local holdings of that date. A second Lambda call must come from the cache, unchanged. `--skip-wrds` leaves this part out.
+
+Each 25 bps run must also come back with its trading cost fields and a lower final value than the same job at 0 bps; the check prints its average turnover, total cost and annual cost drag.
 
 Holdings are compared stock by stock, leaving out **Rank** and **Score**. Winsorizing gives the top 1% of each factor exactly the same score, and the engine sorts those ties in an order that depends on the machine. So a Mac and Lambda can list tied stocks in a different order, and for a stock bought by several Mixing sleeves, show the Rank and Score from a different sleeve. The stocks held, shares, prices, weights, returns and contributions still have to match. When a percentage cuts through a tied block (for example a 1% cohort), the engine's choice of which tied stocks to buy also depends on the machine and on row order. That is a known engine issue, to be fixed separately with deterministic tie-breaking.
 
@@ -195,3 +197,34 @@ Lambda's own durations (from the invocation log tail), 3008 MB function, course 
 ### Admin: confirm the 90-day rule
 
 Saved results and WRDS holdings both live under `factor-lake-data/backtest-results/`, so one lifecycle rule on that prefix expires both. The class keys cannot read the bucket's lifecycle rules, so **an AWS admin must confirm** that the rule `factor-lake-expire-backtest-results` (prefix `factor-lake-data/backtest-results/`, expire after 90 days) is enabled on `sysen-5900-factor-lake`.
+
+## 10. Trading costs
+
+Both job types take an optional **`trading_cost_bps`**: the cost of every buy and sell in basis points of its value, a number from 0 to 500 (anything else is refused with a readable error). The engines charge it on each rebalance's turnover; see the user guide, section 16, and `src/trading_costs.py`.
+
+```json
+{"kind": "backtest", "factors": ["ROE_using_9-30_Data", "ROA"], "...": "...", "trading_cost_bps": 25.0}
+```
+
+- **Only above 0.** The app adds the field only when the cost is above 0, and `job_hash` drops an explicit `0`. A 0 bps job is therefore exactly the job it was before trading costs existed, and so is its hash input. WRDS ranked lists never carry the field (ranks do not depend on costs).
+- **Cache keys.** The job part of the key is unchanged at 0 bps (pinned in `tests/unit/test_trading_cost_jobs.py` against keys computed with the previous `main`). The key also includes the code version (a hash of the engine files), which this change updates, as every engine change does: after this deploy, a 0 bps job is computed once more and gets a new ID, with the same results as before. IDs saved earlier still open, because opening reads S3 by ID and never recomputes.
+- **Old IDs** have no `trading_cost_bps` in their job and no cost fields in their result. They open at 0 bps, with no turnover views.
+- **Results** above 0 bps add `trading_cost_bps`, `turnover_pct`, `trading_cost_pct` and `trading_cost_dollars` (per period), `returns_before_costs`, `portfolio_values_before_costs`, `average_turnover_pct`, `total_trading_cost`, `cagr_before_costs`, `cagr_after_costs` and `cost_drag`. Legacy holdings rows add `Traded %`; WRDS holdings Parquet files add a `traded` column. At 0 bps none of these are added, and results are identical to before.
+- **Summaries** (the S3 metadata the saved-analysis list reads) end with "| 25 bps" above 0.
+
+### Validation on the dev function (2026-11-03)
+
+Deployed to `sysen5900-factor-lake-backtest-dev` with `--leave-lifecycle-rules` (Legacy code version `c4daff7be0a3c34a`). Runs from the local app pointed at the dev function, two factors (Legacy: ROE using 9/30 Data and ROA %, 2002-2024; WRDS: ROE and 12-1 Mo Momentum, 2008-2026), Mixing, equal weight, $1,000. Times are the app's round trip, computed (not cached), with the backtest's own time in brackets.
+
+| Run | Cost | Final value | CAGR | Avg turnover / rebalance | Total cost | Cost drag / yr | Time | 0 bps vs `main` |
+|---|---|---|---|---|---|---|---|---|
+| Legacy, annual | 0 bps | $9,460.16 | 10.75% | | | | 2.3 s (1.6 s) | equal (≤ 5e-16 relative) |
+| Legacy, annual | 25 bps | $8,931.01 | 10.46% | 104.5% | $228.36 | 0.29% | 2.3 s (1.7 s) | |
+| WRDS, quarterly | 0 bps | $4,857.67 | 9.05% | | | | 1.2 s (1.0 s) | equal (≤ 2.2e-16), all 73 holdings dates equal |
+| WRDS, quarterly | 25 bps | $4,229.49 | 8.22% | 75.8% | $264.19 | 0.82% | 1.2 s (1.0 s) | |
+| WRDS, monthly | 25 bps | $5,510.90 | 9.71% | 44.4% | $575.07 | 1.47% | 3.2 s (3.0 s) | |
+| Cohort of the quarterly 25 bps run, 10% | 25 bps | top $4,229.49 / bottom $1,970.82 | | | | | 1.6 s (1.4 s) | |
+
+- "0 bps vs `main`" ran `main`'s code (faeca5c) locally on the same S3 data and compared every number with the dev function's result (relative 1e-9, as the check script).
+- The before-cost values of the 25 bps runs equal the 0 bps runs' final values ($9,460.16 and $4,857.67).
+- `scripts/check_backtest_lambda.py --function-name sysen5900-factor-lake-backtest-dev`: all checks passed, including the Legacy (102.9% average turnover, 0.28% drag) and WRDS (75.8%, 0.82%) runs at 25 bps.
