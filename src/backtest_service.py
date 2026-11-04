@@ -24,6 +24,7 @@ import pandas as pd
 from .backtest_jobs import code_version, decode_saved, describe_job, encode_saved, job_hash, run_job, validate_job
 from .data_standardization import validate_universe
 from .s3_client import DELISTING_FILE, UNIVERSE_FILE, S3DataManager
+from .trading_costs import describe_trading_cost, job_trading_cost
 
 logger = logging.getLogger(__name__)
 
@@ -44,13 +45,16 @@ def result_file(key: str) -> str:
 def summarize_job(job: Dict[str, Any]) -> str:
     """
     A short description of a job for listings, e.g. "ROE using 9/30 Data (higher), ROA % (higher)
-    | Mixing | 2002-2024 | $1,000". Stored as S3 metadata, so it is kept ASCII and short.
+    | Mixing | 2002-2024 | $1,000", ending "| 25 bps" with a trading cost. Stored as S3
+    metadata, so it is kept ASCII and short.
     """
     factors = ', '.join(
         f"{job['factor_labels'].get(f, f)} ({'higher' if job['factor_directions'][f] == 'top' else 'lower'})"
         for f in job['factors'])
     text = (f"{factors} | {job['factor_combination'].capitalize()} | "
             f"{job['start_year']}-{job['end_year']} | ${job['initial_aum']:,.0f}")
+    if job_trading_cost(job) > 0:
+        text += f" | {describe_trading_cost(job_trading_cost(job))}"
     return text.encode('ascii', 'replace').decode()[:500]
 
 

@@ -12,7 +12,8 @@ jobs (src/backtest_jobs.py) never have, so the two can never share a cache key.
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from .backtest_jobs import code_version
+from .backtest_jobs import add_trading_cost, code_version
+from .trading_costs import describe_trading_cost, job_trading_cost, validate_trading_cost_bps
 from .wrds_calendar import FREQUENCIES, period_boundaries
 from .wrds_engine import FACTOR_COMBINATIONS
 from .wrds_factors import WRDS_FACTOR_COLUMNS, WRDS_SECTORS
@@ -24,6 +25,9 @@ WRDS_JOB_FIELDS = ('kind', 'data_mode', 'wrds_job_version', 'factors', 'factor_d
                    'frequency', 'start_year', 'end_year', 'initial_aum', 'top_pct', 'use_market_cap_weight',
                    'factor_combination', 'restrict_fossil_fuels', 'selected_sectors', 'cohort_pct',
                    'rebalance_date')
+# Keys a WRDS job has only when they are set: trading_cost_bps, for backtests and cohorts
+# above 0 bps (see src/backtest_jobs.OPTIONAL_JOB_FIELDS)
+WRDS_OPTIONAL_JOB_FIELDS = ('trading_cost_bps',)
 # Top % of every WRDS backtest (fixed, as in Legacy)
 WRDS_TOP_PCT = 10.0
 
@@ -55,6 +59,8 @@ def build_wrds_job(kind: str, factors: List[str], factor_directions: Dict[str, s
 
     Values are normalized (ints, floats, sorted sectors) so equal inputs always give an
     identical job and therefore the same cache key. Factor order is kept.
+    settings['trading_cost_bps'] is added to backtests and cohorts only when it is not 0;
+    ranked lists have no returns, so they never have it (and keep their cache keys).
     """
     labels = factor_labels or {}
     factors = list(factors)
@@ -77,6 +83,8 @@ def build_wrds_job(kind: str, factors: List[str], factor_directions: Dict[str, s
         'cohort_pct': float(cohort_pct) if kind == 'cohort' and cohort_pct is not None else None,
         'rebalance_date': rebalance_date if kind == 'ranked' else None,
     }
+    if kind != 'ranked':
+        add_trading_cost(job, settings)
     validate_wrds_job(job)
     return job
 
@@ -87,7 +95,7 @@ def validate_wrds_job(job: Dict[str, Any]) -> None:
         raise ValueError("A WRDS backtest request must be a JSON object.")
     if missing := [k for k in WRDS_JOB_FIELDS if k not in job]:
         raise ValueError(f"The WRDS backtest request is missing {missing}.")
-    if unknown := [k for k in job if k not in WRDS_JOB_FIELDS]:
+    if unknown := [k for k in job if k not in WRDS_JOB_FIELDS + WRDS_OPTIONAL_JOB_FIELDS]:
         raise ValueError(f"The WRDS backtest request has unknown fields {unknown}.")
     if job['data_mode'] != 'wrds':
         raise ValueError("A WRDS backtest request needs data_mode 'wrds'.")
@@ -145,6 +153,10 @@ def validate_wrds_job(job: Dict[str, Any]) -> None:
                              f"({months[0]} to {months[-2]}, {job['frequency']}).")
     elif job['rebalance_date'] is not None:
         raise ValueError("rebalance_date is only for ranked lists.")
+    if 'trading_cost_bps' in job:
+        validate_trading_cost_bps(job['trading_cost_bps'])
+        if job['kind'] == 'ranked':
+            raise ValueError("trading_cost_bps is only for backtests and cohort comparisons.")
 
 
 def _is_number(value: Any) -> bool:
@@ -156,6 +168,7 @@ def engine_arguments(job: Dict[str, Any]) -> Tuple[List[str], Dict[str, str], Di
     options = {k: job[k] for k in ('frequency', 'start_year', 'end_year', 'initial_aum', 'top_pct',
                                    'use_market_cap_weight', 'factor_combination', 'restrict_fossil_fuels',
                                    'selected_sectors', 'factor_labels')}
+    options['trading_cost_bps'] = job_trading_cost(job)
     return list(job['factors']), dict(job['factor_directions']), options
 
 
@@ -164,5 +177,7 @@ def describe_wrds_job(job: Dict[str, Any]) -> str:
     factors = ', '.join(f"{job['factor_labels'].get(f, f)} ({job['factor_directions'][f]})" for f in job['factors'])
     extra = (f", cohort {job['cohort_pct']:g}%" if job['kind'] == 'cohort'
              else f", ranked {job['rebalance_date']}" if job['kind'] == 'ranked' else '')
+    if job_trading_cost(job) > 0:
+        extra += f", {describe_trading_cost(job_trading_cost(job))}"
     return (f"wrds {job['kind']} {job['frequency']} {job['start_year']}-{job['end_year']} "
             f"{job['factor_combination']}: {factors}{extra}")
