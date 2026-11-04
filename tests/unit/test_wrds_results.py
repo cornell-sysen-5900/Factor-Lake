@@ -327,7 +327,9 @@ def test_a_wrds_run_looks_like_legacys_results(new_session, legacy):
     assert shown['selectbox'][0][2] == results['rebalance_dates'][-1]                       # newest, as Legacy
     assert [s[0] for s in shown['slider']] == [s[0] for s in legacy['slider']]
     assert _is_subsequence(legacy['button'], shown['button'])
-    assert set(shown['button']) - set(legacy['button']) == {'Rank every stock on this date'}
+    # The snapshot's runs were computed in the app (no ID); this WRDS run has an ID, so it also has
+    # the Add to comparison button beside its Analysis ID (the one new button in Results)
+    assert set(shown['button']) - set(legacy['button']) == {'Rank every stock on this date', 'Add to comparison'}
     def uncounted(labels):          # "This session's analyses (2)": main's snapshot had two runs
         return [re.sub(r' \(\d+\)$', '', label) for label in labels]
     assert _is_subsequence(uncounted(legacy['expander']), uncounted(shown['expander']))
@@ -414,6 +416,12 @@ def test_the_data_viewer_says_it_shows_legacy_data_in_wrds_mode(new_session):
 def test_legacy_results_tab_renders_exactly_as_on_main():
     expected = json.loads((FIXTURES / 'legacy_results_render_main.json').read_text(encoding='utf-8'))
     actual = json.loads(json.dumps(legacy_results_snapshot(), sort_keys=True))
+    # The one change: the main tab bar's new Compare tab, right after Results (and its run tabs).
+    # Everything else, including every other tab, is compared with main's snapshot unchanged.
+    for step, render in actual.items():
+        assert render['tabs'].count('Compare') == 1, step
+        assert render['tabs'].index('Compare') == render['tabs'].index('Data Viewer') - 1, step
+        render['tabs'].remove('Compare')
     # Text, widgets and table cells must be equal; numbers to the Lambda check's relative 1e-9
     # (main's snapshot was rendered on Windows, CI renders on Linux)
     difference, where = max_difference(comparable(actual), comparable(expected))
