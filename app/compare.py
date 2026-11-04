@@ -288,27 +288,28 @@ def _key(row: Row, value: Any) -> Optional[float]:
     return round(number, row.decimals)
 
 
-def best_index(row: Row, values: Sequence[Any], frequencies: Optional[Sequence[str]] = None,
-               initial_aums: Optional[Sequence[float]] = None) -> Optional[int]:
+def best_positions(row: Row, values: Sequence[Any], frequencies: Optional[Sequence[str]] = None,
+                   initial_aums: Optional[Sequence[float]] = None) -> List[int]:
     """
-    The position of the row's best value, or None: for settings and rows with no better
-    side, when fewer than 2 values are numbers (n/a is never best), on a tie for best, for
-    per-period rows when the analyses with a value differ in frequency, and for dollar rows
-    when the compared analyses differ in initial AUM.
+    The positions of the row's best value: every analysis that ties for best (as shown).
+    None are best (an empty list) for settings and rows with no better side, when fewer
+    than 2 values are numbers (n/a is never best), when every number ties, for per-period
+    rows when the analyses with a value differ in frequency, and for dollar rows when the
+    compared analyses differ in initial AUM.
     """
     if row.best is None:
-        return None
+        return []
     keys = [(i, _key(row, v)) for i, v in enumerate(values)]
     keys = [(i, k) for i, k in keys if k is not None]
     if len(keys) < 2:
-        return None
+        return []
     if row.per_period and frequencies is not None and len({frequencies[i] for i, _ in keys}) > 1:
-        return None
+        return []
     if row.in_dollars and initial_aums is not None and not same_initial_aum(initial_aums):
-        return None
+        return []
     target = (max if row.best == 'higher' else min)(k for _, k in keys)
     winners = [i for i, k in keys if k == target]
-    return winners[0] if len(winners) == 1 else None
+    return winners if len(winners) < len(keys) else []
 
 
 def same_initial_aum(initial_aums: Sequence[float]) -> bool:
@@ -326,14 +327,14 @@ def display(row: Row, value: Any) -> str:
 def comparison_rows(analyses: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Every row for these analyses (in this order): {'group', 'name', 'values' (shown text,
-    one per analysis), 'best' (position of the best value or None), 'differs'}.
+    one per analysis), 'best' (positions of the best value, empty for none), 'differs'}.
     """
     rows = []
     for row in ROWS:
         values = [row.value(a) for a in analyses]
         shown = [display(row, v) for v in values]
         rows.append({'group': row.group, 'name': row.name, 'values': shown,
-                     'best': best_index(row, values, [a['frequency'] for a in analyses],
+                     'best': best_positions(row, values, [a['frequency'] for a in analyses],
                                         [_initial(a) for a in analyses]),
                      'differs': len(set(shown)) > 1})
     return rows
@@ -412,7 +413,7 @@ def comparison_table(analyses: List[Dict[str, Any]], order: List[int],
     The table shown: one row per setting or metric under its group's row, one column per
     analysis in the sorted order, a ≠ after the name of rows that differ. With
     differences_only, the rows that are the same (and empty groups) are left out.
-    Each row's best column is in df.attrs['best'] ({row name: column}). None if no row is left.
+    Each row's best columns are in df.attrs['best'] ({row name: [columns]}). None if no row is left.
     """
     titles = column_titles(analyses)
     columns = [titles[i] for i in order]
@@ -429,8 +430,8 @@ def comparison_table(analyses: List[Dict[str, Any]], order: List[int],
             name = r['name'] + (DIFFERS_MARK if r['differs'] else '')
             index.append(name)
             data.append([r['values'][i] for i in order])
-            if r['best'] is not None:
-                best[name] = titles[r['best']]
+            if r['best']:
+                best[name] = [titles[i] for i in r['best']]
     if not index:
         return None
     table = pd.DataFrame(data, index=index, columns=columns)

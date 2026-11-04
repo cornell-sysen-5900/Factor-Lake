@@ -138,9 +138,9 @@ def test_the_best_value_of_a_row_is_highlighted_green(saved, manager):
     styles = at.table[0].proto.arrow_data.styler.styles
     best_rows = comparison_table([compact_analysis(load_saved_analysis(i, manager))
                                   for i in (ids['legacy'], ids['quarterly'])], [0, 1], False).attrs['best']
-    # Pandas writes one CSS rule per style, listing its cells: one green cell per row with a best value
+    # Pandas writes one CSS rule per style, listing its cells: one green cell per best value
     green = [rule for rule in styles.split('}') if BEST_STYLE.split(';')[0] in rule]
-    assert best_rows and len(green) == 1 and green[0].count('#T_') == len(best_rows)
+    assert best_rows and len(green) == 1 and green[0].count('#T_') == sum(map(len, best_rows.values()))
 
 
 def test_mixed_initial_aums_compare_rates_and_chart_the_growth_of_1000(new_session, manager):

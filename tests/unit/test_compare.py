@@ -5,7 +5,7 @@ series, and the table the tab shows (app/components/compare_tab.comparison_table
 """
 import pytest
 
-from app.compare import (GROWTH_BASE, MAX_COMPARED, NA, ROWS, ROWS_BY_NAME, SORT_OPTIONS, best_index, cagr,
+from app.compare import (GROWTH_BASE, MAX_COMPARED, NA, ROWS, ROWS_BY_NAME, SORT_OPTIONS, best_positions, cagr,
                          chart_series, column_titles, compact_analysis, comparison_rows, growth_series,
                          outperformance, sort_order)
 from app.compare import comparison_table
@@ -133,54 +133,59 @@ def test_the_best_value_follows_each_metrics_rule():
     a, w = _legacy(), _wrds()
     best = {r['name']: r['best'] for r in comparison_rows([a, w])}
     # Higher is better
-    assert best['Final Portfolio Value'] == 0 and best['Total Return'] == 0 and best['CAGR'] == 0
-    assert best['Sharpe'] == 1 and best['Information Ratio'] == 1
+    assert best['Final Portfolio Value'] == [0] and best['Total Return'] == [0] and best['CAGR'] == [0]
+    assert best['Sharpe'] == [1] and best['Information Ratio'] == [1]
     # Lower is better (a drawdown is negative, so the smallest loss is the highest value)
-    assert best['Volatility (Raw)'] == 1 and best['Max Drawdown'] == 1
-    assert best['Total Trading Cost Paid'] == 0 and best['Annualized Cost Drag'] == 0
+    assert best['Volatility (Raw)'] == [1] and best['Max Drawdown'] == [1]
+    assert best['Total Trading Cost Paid'] == [0] and best['Annualized Cost Drag'] == [0]
     # Never: settings, beta, and turnover with one n/a (one number left)
-    assert all(best[r.name] is None for r in ROWS if r.group == 'Settings')
-    assert best['Beta vs Benchmark'] is None
-    assert best['Avg Turnover per Rebalance'] is None
+    assert all(best[r.name] == [] for r in ROWS if r.group == 'Settings')
+    assert best['Beta vs Benchmark'] == []
+    assert best['Avg Turnover per Rebalance'] == []
     # A best year and a best quarter do not compare: per-period rows need one frequency
-    assert best['Best Period'] is None and best['Worst Period'] is None
+    assert best['Best Period'] == [] and best['Worst Period'] == []
 
 
 def test_per_period_rows_have_a_best_value_within_one_frequency():
     q1 = _wrds('b' * 64)
     q2 = _wrds('c' * 64, yearly_returns=[4.0, -3.0, 1.0, 1.0], average_turnover_pct=60.0)
     best = {r['name']: r['best'] for r in comparison_rows([q1, q2])}
-    assert best['Best Period'] == 1 and best['Worst Period'] == 0     # -1% is the smaller loss
-    assert best['Avg Turnover per Rebalance'] == 1
+    assert best['Best Period'] == [1] and best['Worst Period'] == [0]     # -1% is the smaller loss
+    assert best['Avg Turnover per Rebalance'] == [1]
     # n/a does not count: a monthly run without turnover leaves the two quarterly runs comparable
     monthly = _wrds('d' * 64, frequency='monthly', bps=0.0)
     best = {r['name']: r['best'] for r in comparison_rows([q1, monthly, q2])}
-    assert best['Avg Turnover per Rebalance'] == 2
-    assert best['Best Period'] is None
+    assert best['Avg Turnover per Rebalance'] == [2]
+    assert best['Best Period'] == []
     # Two Legacy runs (both annual) compare too
     a, b = _legacy('a' * 64), _legacy('c' * 64, returns=(10.0, -8.0, 30.0))
     best = {r['name']: r['best'] for r in comparison_rows([a, b])}
-    assert best['Best Period'] == 1 and best['Worst Period'] == 0
+    assert best['Best Period'] == [1] and best['Worst Period'] == [0]
 
 
 @pytest.mark.parametrize('values, rule, expected', [
-    ([1.0, 2.0, 3.0], 'higher', 2),
-    ([1.0, 2.0, 3.0], 'lower', 0),
-    ([3.0, None, 1.0], 'higher', 0),        # n/a is skipped
-    ([None, None, 1.0], 'higher', None),    # one number: nothing to compare
-    ([2.0, 2.0, 1.0], 'higher', None),      # tie for best
-    ([2.0, 1.0, 1.0], 'higher', 0),         # a tie that is not for best
-    ([0.123401, 0.12340, 0.1], 'higher', None),   # same as shown (12.34%) is a tie
-    ([float('nan'), 1.0, 2.0], 'lower', 1),
+    ([1.0, 2.0, 3.0], 'higher', [2]),
+    ([1.0, 2.0, 3.0], 'lower', [0]),
+    ([3.0, None, 1.0], 'higher', [0]),      # n/a is skipped
+    ([None, None, 1.0], 'higher', []),      # one number: nothing to compare
+    ([2.0, 2.0, 1.0], 'higher', [0, 1]),    # a tie for best: both are best
+    ([1.0, 3.0, 2.0, 3.0], 'higher', [1, 3]),
+    ([1.0, 1.0, 2.0], 'lower', [0, 1]),
+    ([2.0, 1.0, 1.0], 'higher', [0]),       # a tie that is not for best
+    ([0.123401, 0.12340, 0.1], 'higher', [0, 1]),   # same as shown (12.34%) is a tie
+    ([2.0, 2.0, 2.0], 'higher', []),        # every analysis ties: none is best
+    ([0.123401, 0.12340], 'lower', []),     # ... also when they only look the same
+    ([2.0, 2.0, None], 'higher', []),       # every number ties (n/a is never best)
+    ([float('nan'), 1.0, 2.0], 'lower', [1]),
 ])
-def test_best_index_rules(values, rule, expected):
+def test_best_positions_rules(values, rule, expected):
     row = ROWS_BY_NAME['CAGR'] if rule == 'higher' else ROWS_BY_NAME['Volatility (Raw)']
-    assert best_index(row, values) == expected
+    assert best_positions(row, values) == expected
 
 
 def test_best_period_compares_returns_not_their_period_names():
     row = ROWS_BY_NAME['Best Period']
-    assert best_index(row, [(0.1, '2009'), (0.2, '2003'), None]) == 1
+    assert best_positions(row, [(0.1, '2009'), (0.2, '2003'), None]) == [1]
 
 
 def _costs(total, drag=0.001):
@@ -194,25 +199,25 @@ def test_dollar_rows_are_highlighted_only_when_every_initial_aum_is_the_same():
     big = _legacy('b' * 64, returns=(5.0, 5.0, 5.0), aum=1_000_000.0, bps=10.0, **_costs(2500.0, 0.002))
     best = {r['name']: r['best'] for r in comparison_rows([small, big])}
     # $1,157,625 beats $1,331 and $3 of costs beats $2,500 only because of the AUMs: no highlight
-    assert best['Final Portfolio Value'] is None and best['Total Trading Cost Paid'] is None
+    assert best['Final Portfolio Value'] == [] and best['Total Trading Cost Paid'] == []
     # Rates are always compared
-    assert best['Total Return'] == 0 and best['CAGR'] == 0 and best['Annualized Cost Drag'] == 0
-    assert best['Cumulative Outperformance'] == 0
+    assert best['Total Return'] == [0] and best['CAGR'] == [0] and best['Annualized Cost Drag'] == [0]
+    assert best['Cumulative Outperformance'] == [0]
     # The same AUM: dollars compare again
     same = _legacy('c' * 64, returns=(5.0, 5.0, 5.0), aum=1000.0, bps=10.0, **_costs(2.5, 0.002))
     best = {r['name']: r['best'] for r in comparison_rows([small, same])}
-    assert best['Final Portfolio Value'] == 0 and best['Total Trading Cost Paid'] == 1
+    assert best['Final Portfolio Value'] == [0] and best['Total Trading Cost Paid'] == [1]
     # Every compared analysis counts, even one whose value is n/a
     third = _legacy('d' * 64, aum=50_000.0, final_value=None)
-    assert {r['name']: r['best'] for r in comparison_rows([small, same, third])}['Final Portfolio Value'] is None
+    assert {r['name']: r['best'] for r in comparison_rows([small, same, third])}['Final Portfolio Value'] == []
 
 
 @pytest.mark.parametrize('aums, expected', [
-    ([1000.0, 1000.0], 0), ([1000.0, 1000.004], 0), ([1000.0, 1001.0], None), (None, 0)])
-def test_best_index_with_initial_aums(aums, expected):
-    assert best_index(ROWS_BY_NAME['Final Portfolio Value'], [2000.0, 1500.0], initial_aums=aums) == expected
+    ([1000.0, 1000.0], [0]), ([1000.0, 1000.004], [0]), ([1000.0, 1001.0], []), (None, [0])])
+def test_best_positions_with_initial_aums(aums, expected):
+    assert best_positions(ROWS_BY_NAME['Final Portfolio Value'], [2000.0, 1500.0], initial_aums=aums) == expected
     # A rate row ignores the AUMs
-    assert best_index(ROWS_BY_NAME['CAGR'], [0.2, 0.1], initial_aums=aums) == 0
+    assert best_positions(ROWS_BY_NAME['CAGR'], [0.2, 0.1], initial_aums=aums) == [0]
 
 
 # ---------------------------------------------------------------------------
@@ -227,7 +232,7 @@ def test_rows_differ_only_when_their_shown_values_differ():
     assert not rows['Worst Period']['differs']
     # The same analysis twice (as values): nothing differs, nothing is best
     same = comparison_rows([a, _legacy('d' * 64)])
-    assert not any(r['differs'] for r in same) and all(r['best'] is None for r in same)
+    assert not any(r['differs'] for r in same) and all(r['best'] == [] for r in same)
 
 
 def test_the_table_marks_differences_and_can_show_only_them():
@@ -252,9 +257,20 @@ def test_the_table_columns_follow_the_order_and_keep_each_best_cell():
     titles = column_titles([a, w, l2])
     table = comparison_table([a, w, l2], [2, 0, 1], differences_only=False)
     assert list(table.columns) == [titles[2], titles[0], titles[1]]
-    assert table.attrs['best']['Sharpe ≠' if 'Sharpe ≠' in table.index else 'Sharpe'] == titles[1]
-    assert table.attrs['best']['CAGR ≠'] == titles[0]
+    assert table.attrs['best']['Sharpe ≠' if 'Sharpe ≠' in table.index else 'Sharpe'] == [titles[1]]
+    assert table.attrs['best']['CAGR ≠'] == [titles[0]]
     assert table.loc['CAGR ≠', titles[0]] == _row([a, w, l2], 'CAGR')['values'][0]
+
+
+def test_a_tie_for_best_is_green_in_every_tied_column():
+    a, b = _legacy('a' * 64, sharpe_portfolio=0.8), _legacy('b' * 64, sharpe_portfolio=0.80001)
+    c = _wrds('c' * 64, sharpe_portfolio=0.3)
+    titles = column_titles([a, b, c])
+    best = comparison_table([a, b, c], [2, 1, 0], differences_only=False).attrs['best']
+    assert best['Sharpe ≠'] == [titles[0], titles[1]]        # 0.8000 and 0.8000 tie, 0.3000 is lower
+    # Every analysis ties: no row entry, so no green cell
+    best = comparison_table([a, b], [0, 1], differences_only=False).attrs['best']
+    assert 'Sharpe' not in best and 'Sharpe ≠' not in best
 
 
 # ---------------------------------------------------------------------------

@@ -236,7 +236,7 @@ Only saved analysis IDs work, so only runs done in AWS Lambda can be compared. A
 
 **Reading it:**
 
-- The best value of each row is green: higher CAGR, return, Sharpe and information ratio; the smallest drawdown; lower volatility, turnover, cost paid and cost drag. Settings and beta are never highlighted, and neither is a tie (values that look the same) or n/a.
+- The best value of each row is green: higher CAGR, return, Sharpe and information ratio; the smallest drawdown; lower volatility, turnover, cost paid and cost drag. When analyses tie for the best value (they look the same), all of them are green; when every analysis ties, none is. Settings, beta and n/a are never highlighted.
 - Volatility, Sharpe and information ratio are annualized, so they compare across frequencies as they are. Best and worst period and turnover per rebalance are each analysis's own periods (a year, half-year, quarter or month), so they are highlighted only when the analyses have the same frequency. Likewise, final portfolio value and total trading cost paid are in dollars, so they are highlighted only when every analysis has the same initial AUM; returns, CAGR, ratios and cost drag are always compared.
 - A ≠ after a row's name means its values differ. **Show only differences** hides the rows that are the same.
 - **Sort by** reorders the columns best first by CAGR, total return, Sharpe, max drawdown, volatility, information ratio or cost drag (n/a last, ties in the order entered). **Entered order** puts them back. Sorting never reloads the results.

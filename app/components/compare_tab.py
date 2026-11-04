@@ -200,7 +200,8 @@ def _render_comparison(analyses: List[Dict[str, Any]]) -> None:
     order = sort_order(analyses, option)
     _render_headers(analyses, order)
     _render_table(analyses, order, differences_only)
-    st.caption("Green: the best value in the row (none on a tie or n/a). ≠: the values in the row differ. "
+    st.caption("Green: the best value in the row; analyses that tie for best are all green, and nothing is when "
+               "every analysis ties or for n/a. ≠: the values in the row differ. "
                "Volatility, Sharpe and information ratio are annualized, so they compare across frequencies as "
                "they are. Best and worst period and turnover per rebalance are each analysis's own periods "
                "(years, half-years, quarters or months), so they are only highlighted when every analysis has "
@@ -237,7 +238,7 @@ def _style(table: pd.DataFrame):
     best, groups = table.attrs['best'], table.attrs['groups']
 
     def cells(column: pd.Series) -> List[str]:
-        return [GROUP_STYLE if name in groups else BEST_STYLE if best.get(name) == column.name else ''
+        return [GROUP_STYLE if name in groups else BEST_STYLE if column.name in best.get(name, ()) else ''
                 for name in column.index]
     return table.style.apply(cells, axis=0)
 
