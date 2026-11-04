@@ -134,7 +134,6 @@ def test_the_best_value_follows_each_metrics_rule():
     # Higher is better
     assert best['Final Portfolio Value'] == 0 and best['Total Return'] == 0 and best['CAGR'] == 0
     assert best['Sharpe'] == 1 and best['Information Ratio'] == 1
-    assert best['Best Period'] == 0 and best['Worst Period'] == 1     # -1% is the smaller loss
     # Lower is better (a drawdown is negative, so the smallest loss is the highest value)
     assert best['Volatility (Raw)'] == 1 and best['Max Drawdown'] == 1
     assert best['Total Trading Cost Paid'] == 0 and best['Annualized Cost Drag'] == 0
@@ -142,6 +141,25 @@ def test_the_best_value_follows_each_metrics_rule():
     assert all(best[r.name] is None for r in ROWS if r.group == 'Settings')
     assert best['Beta vs Benchmark'] is None
     assert best['Avg Turnover per Rebalance'] is None
+    # A best year and a best quarter do not compare: per-period rows need one frequency
+    assert best['Best Period'] is None and best['Worst Period'] is None
+
+
+def test_per_period_rows_have_a_best_value_within_one_frequency():
+    q1 = _wrds('b' * 64)
+    q2 = _wrds('c' * 64, yearly_returns=[4.0, -3.0, 1.0, 1.0], average_turnover_pct=60.0)
+    best = {r['name']: r['best'] for r in comparison_rows([q1, q2])}
+    assert best['Best Period'] == 1 and best['Worst Period'] == 0     # -1% is the smaller loss
+    assert best['Avg Turnover per Rebalance'] == 1
+    # n/a does not count: a monthly run without turnover leaves the two quarterly runs comparable
+    monthly = _wrds('d' * 64, frequency='monthly', bps=0.0)
+    best = {r['name']: r['best'] for r in comparison_rows([q1, monthly, q2])}
+    assert best['Avg Turnover per Rebalance'] == 2
+    assert best['Best Period'] is None
+    # Two Legacy runs (both annual) compare too
+    a, b = _legacy('a' * 64), _legacy('c' * 64, returns=(10.0, -8.0, 30.0))
+    best = {r['name']: r['best'] for r in comparison_rows([a, b])}
+    assert best['Best Period'] == 1 and best['Worst Period'] == 0
 
 
 @pytest.mark.parametrize('values, rule, expected', [

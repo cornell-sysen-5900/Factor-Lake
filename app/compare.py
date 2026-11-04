@@ -196,6 +196,8 @@ class Row:
     One row of the comparison. `value` gives a number (None for n/a) or, for settings,
     text. `best` is 'higher', 'lower' or None (settings, and metrics with no better side
     such as beta); `decimals` is the precision shown, so values that look the same tie.
+    `per_period` rows (a period's return, turnover per rebalance) only have a best value
+    among analyses of the same frequency: a best year and a best month do not compare.
     """
     group: str
     name: str
@@ -203,6 +205,7 @@ class Row:
     show: Callable[[Any], str] = str
     best: Optional[str] = None
     decimals: int = 4
+    per_period: bool = False
 
 
 def _pct(v: float) -> str:
@@ -232,8 +235,8 @@ ROWS: Tuple[Row, ...] = (
     Row('Performance', 'Total Return', total_return, _pct, 'higher'),
     Row('Performance', 'CAGR', cagr, _pct, 'higher'),
     Row('Performance', 'Cumulative Outperformance', outperformance, _pct, 'higher'),
-    Row('Performance', 'Best Period', best_period, _period_pct, 'higher'),
-    Row('Performance', 'Worst Period', worst_period, _period_pct, 'higher'),
+    Row('Performance', 'Best Period', best_period, _period_pct, 'higher', per_period=True),
+    Row('Performance', 'Worst Period', worst_period, _period_pct, 'higher', per_period=True),
     Row('Risk', 'Volatility (Raw)', _result('vol_raw_portfolio'), _pct, 'lower'),
     Row('Risk', 'Sharpe', _result('sharpe_portfolio'), lambda v: f"{v:.4f}", 'higher'),
     # Drawdowns are negative: the best is the smallest loss, the highest value
@@ -241,7 +244,8 @@ ROWS: Tuple[Row, ...] = (
     Row('Risk', 'Beta vs Benchmark', _result('portfolio_beta'), lambda v: f"{v:.3f}", None, 3),
     Row('Risk', 'Information Ratio', _result('information_ratio'), lambda v: f"{v:.4f}", 'higher'),
     Row('Costs', 'CAGR Before Costs', cagr_before_costs, _pct, 'higher'),
-    Row('Costs', 'Avg Turnover per Rebalance', average_turnover, lambda v: f"{v:.2f}%", 'lower', 2),
+    Row('Costs', 'Avg Turnover per Rebalance', average_turnover, lambda v: f"{v:.2f}%", 'lower', 2,
+        per_period=True),
     Row('Costs', 'Total Trading Cost Paid', total_cost, lambda v: f"${v:,.2f}", 'lower', 2),
     Row('Costs', 'Annualized Cost Drag', cost_drag, _pct, 'lower'),
 )
@@ -279,16 +283,19 @@ def _key(row: Row, value: Any) -> Optional[float]:
     return round(number, row.decimals)
 
 
-def best_index(row: Row, values: Sequence[Any]) -> Optional[int]:
+def best_index(row: Row, values: Sequence[Any], frequencies: Optional[Sequence[str]] = None) -> Optional[int]:
     """
     The position of the row's best value, or None: for settings and rows with no better
-    side, when fewer than 2 values are numbers (n/a is never best), and on a tie for best.
+    side, when fewer than 2 values are numbers (n/a is never best), on a tie for best, and
+    for per-period rows when the analyses with a value differ in frequency.
     """
     if row.best is None:
         return None
     keys = [(i, _key(row, v)) for i, v in enumerate(values)]
     keys = [(i, k) for i, k in keys if k is not None]
     if len(keys) < 2:
+        return None
+    if row.per_period and frequencies is not None and len({frequencies[i] for i, _ in keys}) > 1:
         return None
     target = (max if row.best == 'higher' else min)(k for _, k in keys)
     winners = [i for i, k in keys if k == target]
@@ -312,7 +319,8 @@ def comparison_rows(analyses: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
         values = [row.value(a) for a in analyses]
         shown = [display(row, v) for v in values]
         rows.append({'group': row.group, 'name': row.name, 'values': shown,
-                     'best': best_index(row, values), 'differs': len(set(shown)) > 1})
+                     'best': best_index(row, values, [a['frequency'] for a in analyses]),
+                     'differs': len(set(shown)) > 1})
     return rows
 
 

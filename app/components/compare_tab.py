@@ -147,19 +147,21 @@ def render_compare_tab(session_entries: List[Dict[str, Any]],
 
     for number, (col, slot) in enumerate(zip(st.columns(len(slots)), slots), start=1):
         with col:
-            title, remove = st.columns([4, 1], vertical_alignment="center")
-            title.markdown(f"**Analysis {number}**")
-            if number > MIN_COMPARED:
-                remove.button("✕", key=f"compare_remove_{slot}", on_click=_remove_slot, args=(slot,),
-                              help="Remove this analysis")
+            st.markdown(f"**Analysis {number}**")
             if _id_key(slot) not in st.session_state and slot in saved_ids:
                 st.session_state[_id_key(slot)] = saved_ids[slot]
-            saved_ids[slot] = st.text_input("Analysis ID", key=_id_key(slot),
-                                            placeholder="Paste a 64-character analysis ID")
+            # Boxes beyond the first 2 have a remove button beside the ID, so every box lines up
+            id_col, remove_col = (st.columns([6, 1], vertical_alignment="bottom") if number > MIN_COMPARED
+                                  else (st.container(), None))
+            saved_ids[slot] = id_col.text_input("Analysis ID", key=_id_key(slot),
+                                                placeholder="Paste a 64-character analysis ID")
+            if remove_col is not None:
+                remove_col.button("✕", key=f"compare_remove_{slot}", on_click=_remove_slot, args=(slot,),
+                                  help="Remove this analysis", type="tertiary")
             st.selectbox("Or pick one of your analyses", options=list(labels), index=None,
                          format_func=lambda i: labels.get(i, i), key=f"compare_pick_{slot}",
                          on_change=_picked, args=(slot,), disabled=not labels,
-                         placeholder="Your analyses" if labels else "No analyses in this browser yet")
+                         placeholder="Your analyses" if labels else "No analyses yet")
             entry = loaded['entries'].get(slot)
             if entry and entry.get('error'):
                 st.error(entry['error'])
@@ -200,8 +202,9 @@ def _render_comparison(analyses: List[Dict[str, Any]]) -> None:
     _render_table(analyses, order, differences_only)
     st.caption("Green: the best value in the row (none on a tie or n/a). ≠: the values in the row differ. "
                "Volatility, Sharpe and information ratio are annualized, so they compare across frequencies as "
-               "they are; best and worst period are each analysis's own periods (years, half-years, quarters "
-               "or months).")
+               "they are. Best and worst period and turnover per rebalance are each analysis's own periods "
+               "(years, half-years, quarters or months), so they are only highlighted when every analysis has "
+               "the same frequency.")
 
     st.subheader("Portfolio Growth Over Time")
     titles = column_titles(analyses)
