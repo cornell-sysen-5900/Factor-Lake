@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: src/saved_analyses.py
 PURPOSE: Opens a saved analysis (a backtest the Lambda saved in S3) by its analysis ID.
-VERSION: 1.0.0
+VERSION: 1.1.0
 
 The analysis ID is the hash the backtest Lambda saves each result under
 (see src/backtest_service.py), so anyone with the ID can open the same results.
@@ -19,18 +19,29 @@ ANALYSIS_ID_PATTERN = re.compile(r'^[0-9a-f]{64}$')
 
 
 class SavedAnalysisError(ValueError):
-    """An analysis ID that cannot be opened, with a message for the user."""
+    """
+    An analysis ID that cannot be opened, with a message for the user. `reason` says why,
+    for pages that show a shorter message: 'empty', 'not_an_id', 'not_found' (mistyped or
+    expired), 'unreadable', 'not_shared' (saved before analyses could be shared) or 'kind'
+    (a cohort comparison or ranked list, named by `kind`).
+    """
+
+    def __init__(self, message: str, reason: str = 'unreadable', kind: Optional[str] = None):
+        super().__init__(message)
+        self.reason = reason
+        self.kind = kind
 
 
 def normalize_analysis_id(text: Optional[str]) -> str:
     """The ID without surrounding spaces or quotes, lowercased. Raises SavedAnalysisError if it is not an ID."""
     analysis_id = (text or '').strip().strip('`"\'').strip().lower()
     if not analysis_id:
-        raise SavedAnalysisError("Paste an analysis ID first.")
+        raise SavedAnalysisError("Paste an analysis ID first.", reason='empty')
     if not ANALYSIS_ID_PATTERN.match(analysis_id):
         raise SavedAnalysisError(
             f"\"{analysis_id[:20]}{'…' if len(analysis_id) > 20 else ''}\" is not an analysis ID. "
-            f"An ID is 64 characters of 0-9 and a-f; use the copy button next to a result's Analysis ID."
+            f"An ID is 64 characters of 0-9 and a-f; use the copy button next to a result's Analysis ID.",
+            reason='not_an_id',
         )
     return analysis_id
 
@@ -108,7 +119,8 @@ def load_saved_analysis(text: Optional[str], manager: Optional[S3DataManager] = 
             raise SavedAnalysisError(
                 f"No saved analysis has the ID {analysis_id[:8]}…{analysis_id[-4:]}. Check that the whole ID was copied. "
                 f"Saved analyses are deleted after {RESULT_RETENTION_DAYS} days, so an older one has expired; "
-                f"run it again to get a new ID."
+                f"run it again to get a new ID.",
+                reason='not_found',
             ) from e
         raise SavedAnalysisError(f"Could not read the saved analysis from S3: {e}") from e
 
@@ -116,12 +128,14 @@ def load_saved_analysis(text: Optional[str], manager: Optional[S3DataManager] = 
     if job is None:
         raise SavedAnalysisError(
             "This analysis was saved before analyses could be shared, so its settings were not kept. "
-            "Run it again to get an ID you can share."
+            "Run it again to get an ID you can share.",
+            reason='not_shared',
         )
     if job.get('kind') != 'backtest':
         what = {'cohort': 'a cohort comparison', 'ranked': 'a ranked stock list'}.get(job.get('kind'), 'another job')
         raise SavedAnalysisError(
-            f"This ID belongs to {what}, not an analysis. Share the ID shown with the analysis instead."
+            f"This ID belongs to {what}, not an analysis. Share the ID shown with the analysis instead.",
+            reason='kind', kind=job.get('kind'),
         )
     metadata = response.get('Metadata') or {}
     return {
