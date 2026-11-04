@@ -15,6 +15,7 @@ import pandas as pd
 
 from app.holdings_table import holdings_number_formats
 from app.streamlit_config import WRDS_MILLIONS_FACTORS, WRDS_PERCENT_FACTORS
+from src.trading_costs import has_trading_costs
 from src.wrds_calendar import FREQUENCY_LABELS  # noqa: F401 (the app's frequency names)
 
 # The three benchmark roles of a WRDS result, its result keys, and the short role name
@@ -63,7 +64,8 @@ def calendar_year_results(results: Dict[str, Any]) -> Tuple[List[int], Dict[str,
     The periods compounded by the calendar year they end in, as (years, a result in
     Legacy's shape) for Legacy's Year-by-Year table: the portfolio value at each year's
     last period end, and each year's portfolio and benchmark returns in percent.
-    The first and last years can be partial.
+    The first and last years can be partial. With trading costs, each year's turnover
+    is the sum of its rebalances' and its cost their compounded cost (both percent).
     """
     n = len(results['yearly_returns'])
     ends = np.array([int(d[:4]) for d in results['period_end_dates'][:n]])
@@ -78,6 +80,12 @@ def calendar_year_results(results: Dict[str, Any]) -> Tuple[List[int], Dict[str,
     by_year = {'portfolio_values': [values[0]] + [values[i + 1] for i in last],
                'yearly_returns': compound(results['yearly_returns'])}
     by_year.update({key: compound(results[key]) for _, key, _ in BENCHMARKS})
+    if has_trading_costs(results):
+        turnover = np.asarray(results['turnover_pct'][:n], dtype=float)
+        kept = 1.0 - np.asarray(results['trading_cost_pct'][:n], dtype=float) / 100.0
+        by_year.update(trading_cost_bps=results['trading_cost_bps'],
+                       turnover_pct=[float(turnover[ends == year].sum()) for year in years],
+                       trading_cost_pct=[float((1.0 - np.prod(kept[ends == year])) * 100.0) for year in years])
     return years, by_year
 
 
@@ -110,6 +118,8 @@ def holdings_display_table(holdings: pd.DataFrame, factors: List[str], labels: D
     for f in factors:
         table[factor_header(f, labels.get(f, f))] = _factor_values(holdings[f], f).to_numpy()
     table['Weight %'] = holdings['weight'] * 100.0
+    if 'traded' in holdings.columns:          # runs with trading costs: |target - drifted weight|
+        table['Traded %'] = pd.to_numeric(holdings['traded']) * 100.0
     table['Shares'] = holdings['shares']
     table['Buy Price'] = holdings['buy_price']
     table['Dollar Value'] = holdings['dollar_value']
@@ -147,7 +157,7 @@ def ranked_display_table(rows: pd.DataFrame, factors: List[str], labels: Dict[st
 def table_number_formats(table: pd.DataFrame, factors: List[str], labels: Dict[str, str]) -> Dict[str, str]:
     """On-screen number formats: Legacy's holdings formats, plus the WRDS-only columns."""
     headers = [factor_header(f, labels.get(f, f)) for f in factors]
-    formats = holdings_number_formats(headers)
+    formats = holdings_number_formats(headers, traded='Traded %' in table.columns)
     formats.update({'PERMNO': '%d', 'Months Without Return': '%d', 'Price': 'dollar'})
     formats.update({c: '%.4f' for c in table.columns if c.endswith(' Z-Score')})
     formats.update({c: '%d' for c in table.columns if c.startswith('Rank by ')})

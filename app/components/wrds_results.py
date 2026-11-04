@@ -119,7 +119,7 @@ def _render_holdings(run: Dict[str, Any]) -> None:
     period, period_return = period_label(date, results['period_end_dates'][i]), results['yearly_returns'][i]
     holdings = results.get('holdings') or {}
     if date not in holdings.get('dates', []):
-        _render_holdings_caption(results, 0, period, period_return)
+        _render_holdings_caption(results, 0, period, period_return, index=i)
         st.info("The backtest held no stocks on this date; the money earned the risk-free rate.")
     else:
         try:
@@ -129,7 +129,7 @@ def _render_holdings(run: Dict[str, Any]) -> None:
             raw = None
         if raw is not None:
             table = holdings_display_table(raw, run['factors'], labels)
-            _render_holdings_caption(results, len(table), period, period_return)
+            _render_holdings_caption(results, len(table), period, period_return, index=i)
             _render_holdings_dataframe(run, table, table_number_formats(table, run['factors'], labels),
                                        f"holdings_{date}.csv")
 

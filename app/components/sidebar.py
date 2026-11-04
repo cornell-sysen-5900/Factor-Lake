@@ -9,12 +9,17 @@ import streamlit as st
 import streamlit_config as config
 from typing import Callable, Dict, Any, List, Optional
 
+from src.trading_costs import MAX_TRADING_COST_BPS
 from src.wrds_calendar import FIRST_YEAR as WRDS_FIRST_YEAR, LAST_YEAR as WRDS_LAST_YEAR, describe_schedule
 from src.wrds_factors import WRDS_SECTORS
 
 # Widget key of the Legacy / WRDS switch
 DATA_MODE_KEY = "data_mode_input"
 WRDS_NEEDS_LAMBDA = "WRDS mode runs in AWS Lambda, which is not configured for this app."
+# Widget key of the trading cost input (shared by both data sources)
+TRADING_COST_KEY = "trading_cost_bps_input"
+TRADING_COST_HELP = ("Charged on every buy and sell. Russell 2000 stocks often cost roughly 20-60 bps "
+                     "per side, more for the smallest names.")
 
 
 def _render_data_mode(backtest_lambda: str, on_change: Optional[Callable[[], None]]) -> bool:
@@ -51,6 +56,7 @@ PARAMETER_DEFAULTS = {
     'start_year_input': 2002,
     'end_year_input': 2024,
     'initial_aum_input': 1000.0,
+    TRADING_COST_KEY: 0,
 }
 # WRDS mode's inputs: the shared ones, with its frequency and years in place of Legacy's
 # delisting strategy and years
@@ -97,7 +103,8 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
     Returns:
         Dict[str, Any]: Standardized dictionary of user-defined parameters. Legacy
             settings are exactly as before WRDS mode (no data_mode key); WRDS settings
-            have data_mode 'wrds' and frequency, and no delisting strategy.
+            have data_mode 'wrds' and frequency, and no delisting strategy. Both have
+            trading_cost_bps only when it is above 0, so settings at 0 bps are as before.
     """
     with st.sidebar:
         st.header("Configuration")
@@ -199,6 +206,20 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
 
         st.divider()
 
+        # Trading costs, charged on every buy and sell at each rebalance
+        st.subheader("Trading Costs")
+        trading_cost_bps = st.number_input(
+            "Trading cost (bps per trade)",
+            min_value=0,
+            max_value=int(MAX_TRADING_COST_BPS),
+            value=0,
+            step=5,
+            key=TRADING_COST_KEY,
+            help=TRADING_COST_HELP
+        )
+
+        st.divider()
+
         # Sector Exposure Configuration
         st.subheader("Sector Selection")
         sector_filter_enabled = st.checkbox(
@@ -252,6 +273,7 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
             help="Starting portfolio value."
         )
 
+    costs = {"trading_cost_bps": float(trading_cost_bps)} if trading_cost_bps > 0 else {}
     if wrds:
         return {
             "data_mode": "wrds",
@@ -264,7 +286,8 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
             "start_year": start_year,
             "end_year": end_year,
             "initial_aum": initial_aum,
-            "use_lambda": use_lambda
+            "use_lambda": use_lambda,
+            **costs
         }
     return {
         "restrict_fossil_fuels": restrict_fossil_fuels,
@@ -276,7 +299,8 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
         "end_year": end_year,
         "initial_aum": initial_aum,
         "delisting_strategy": delisting_strategy_key,
-        "use_lambda": use_lambda
+        "use_lambda": use_lambda,
+        **costs
     }
 
 

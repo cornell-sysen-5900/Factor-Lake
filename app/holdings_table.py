@@ -15,7 +15,7 @@ import pandas as pd
 FACTOR_COMBINATION_LABELS = {'mixing': 'Mixing', 'integrating': 'Integrating'}
 
 # Columns converted to numbers for display (factor value columns are added per run)
-NUMBER_COLUMNS = ['Score', 'Weight %', 'Shares', 'Buy Price', 'Dollar Value',
+NUMBER_COLUMNS = ['Score', 'Weight %', 'Traded %', 'Shares', 'Buy Price', 'Dollar Value',
                   'Period Return %', 'Contribution %']
 
 
@@ -41,12 +41,13 @@ def build_holdings_display_table(rows: List[Dict[str, Any]], factor_headers: Lis
     return holdings_df
 
 
-def holdings_number_formats(factor_headers: List[str]) -> Dict[str, str]:
-    """On-screen number formats for the holdings table columns."""
+def holdings_number_formats(factor_headers: List[str], traded: bool = False) -> Dict[str, str]:
+    """On-screen number formats for the holdings table columns; traded adds Traded % (runs with trading costs)."""
     formats = {'Rank': '%d', 'Score': '%.4f'}
     formats.update({header: '%.4f' for header in factor_headers})
     formats.update({
         'Weight %': '%.2f',
+        **({'Traded %': '%.2f'} if traded else {}),
         'Shares': '%.4f',
         'Buy Price': 'dollar',
         'Dollar Value': 'dollar',

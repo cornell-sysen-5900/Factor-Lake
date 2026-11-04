@@ -16,6 +16,7 @@ from app.streamlit_config import MAX_SAVED_RUNS
 from app.streamlit_utils import (describe_compute, get_backtest_lambda_name, list_all_saved_analyses,
                                  open_saved_analysis, run_cohort)
 from src.saved_analyses import SavedAnalysisError
+from src.trading_costs import has_trading_costs, job_trading_cost
 from app.saved_runs import remove_saved_run
 from app.holdings_table import (
     FACTOR_COMBINATION_LABELS, build_holdings_display_table, default_holdings_year,
@@ -169,13 +170,15 @@ def _render_holdings_table(run: Dict[str, Any]) -> None:
 
     year = _pick_rebalance(run, "Rebalance year", years)
     rows = holdings_by_year[year]
-    _render_holdings_caption(results, len(rows), f"{year} to {year + 1}", holdings_period_return(results, year))
+    _render_holdings_caption(results, len(rows), f"{year} to {year + 1}", holdings_period_return(results, year),
+                             index=years.index(year))
     if not rows:
         st.info("The backtest held no stocks this year.")
         return
 
     holdings_df = build_holdings_display_table(rows, run['factor_labels'])
-    _render_holdings_dataframe(run, holdings_df, holdings_number_formats(run['factor_labels']),
+    _render_holdings_dataframe(run, holdings_df,
+                               holdings_number_formats(run['factor_labels'], traded='Traded %' in holdings_df),
                                f"holdings_{year}.csv")
 
 
@@ -196,14 +199,21 @@ def _pick_rebalance(run: Dict[str, Any], label: str, options: List[Any]) -> Any:
 
 
 def _render_holdings_caption(results: Dict[str, Any], count: int, period: str,
-                             period_return: Optional[float]) -> None:
-    """Method, number of holdings and the portfolio's return over the holding period."""
+                             period_return: Optional[float], index: Optional[int] = None) -> None:
+    """
+    Method, number of holdings and the portfolio's return over the holding period (after
+    trading costs). With trading costs, also the rebalance's turnover and cost (index is
+    the period's position in the results).
+    """
     method = FACTOR_COMBINATION_LABELS.get(results.get('factor_combination', 'mixing'), 'Mixing')
     return_str = f"{period_return:.2f}%" if period_return is not None else "n/a"
-    st.caption(
-        f"**Method:** {method} | **Holdings:** {count} | "
-        f"**Portfolio return ({period}):** {return_str}"
-    )
+    text = (f"**Method:** {method} | **Holdings:** {count} | "
+            f"**Portfolio return ({period}):** {return_str}")
+    turnover = results.get('turnover_pct') or []
+    if has_trading_costs(results) and index is not None and index < len(turnover):
+        text += (f" | **Turnover:** {turnover[index]:.2f}% | "
+                 f"**Trading cost:** {results['trading_cost_pct'][index]:.2f}%")
+    st.caption(text)
 
 
 def _render_holdings_dataframe(run: Dict[str, Any], holdings_df: pd.DataFrame, number_formats: Dict[str, str],
@@ -253,6 +263,9 @@ def _render_year_by_year_table(res: Dict[str, Any], periods: Optional[List[Any]]
         [f"{r:.2f}%" for r in g_rets[:min_len]],
         [f"{r:.2f}%" for r in v_rets[:min_len]]
     ])))
+    if has_trading_costs(res):
+        df['Turnover %'] = [f"{t:.2f}" for t in res['turnover_pct'][:min_len]]
+        df['Cost %'] = [f"{c:.2f}" for c in res['trading_cost_pct'][:min_len]]
     st.dataframe(df, width="stretch", hide_index=True)
 
 def _render_win_loss_ledger(res: Dict[str, Any], columns: List[str] = WIN_LOSS_COLUMNS,
@@ -344,6 +357,19 @@ def _render_advanced_stats_grid(res: Dict[str, Any], index: str = "R2000", perio
     i3.metric("IR (vs Value)", f"{res.get('information_ratio_value', 0):.4f}")
     i4.empty()
 
+    # Row 8: Trading costs (only for runs with a trading cost)
+    if has_trading_costs(res):
+        st.write(f"**Trading Costs ({res['trading_cost_bps']:g} bps per trade)**")
+        t1, t2, t3, t4 = st.columns(4)
+        t1.metric("Avg Turnover per Rebalance", f"{res.get('average_turnover_pct', 0):.2f}%",
+                  help="Sum of |target weight - weight after drift| over all stocks, averaged over the "
+                       "rebalances. The first purchase (from cash) counts as 100%.")
+        t2.metric("Total Trading Cost Paid", f"${res.get('total_trading_cost', 0):,.2f}",
+                  help="The dollars paid on every buy and sell over the whole backtest.")
+        t3.metric("Annualized Cost Drag", f"{res.get('cost_drag', 0):.2%}",
+                  help="CAGR before costs minus CAGR after costs.")
+        t4.metric("CAGR Before Costs", f"{res.get('cagr_before_costs', 0):.2%}")
+
 
 def _render_header_captions(run: Dict[str, Any], data_source: Optional[str] = None,
                             delisting: Optional[str] = None) -> None:
@@ -389,6 +415,8 @@ def _render_header_captions(run: Dict[str, Any], data_source: Optional[str] = No
     st.caption(f"**Factor Combination:** {combination_descriptions.get(combination, combination_descriptions['mixing'])}")
     st.caption(f"**Weighting:** {weighting_str}")
     st.caption(f"**Delisting Strategy:** {delisting_str}")
+    if job_trading_cost(settings) > 0:
+        st.caption(f"**Trading Cost:** {job_trading_cost(settings):g} bps per trade")
     compute = run.get('compute')
     if compute:
         how = describe_compute(compute)
@@ -543,6 +571,11 @@ def _render_summary_metrics(res: Dict[str, Any], settings: Dict[str, Any],
     col2.metric("Total Return", f"{((final_value/initial_aum)-1):.2%}")
     col3.metric("CAGR", f"{cagr:.2%}")
     col4.metric("Cumulative Outperformance", f"{cum_outperformance:.2%}", help=outperformance_help)
+    if has_trading_costs(res):
+        before = res['portfolio_values_before_costs'][-1]
+        st.caption(f"After trading costs of {res['trading_cost_bps']:g} bps per trade. "
+                   f"Before costs: final value ${before:,.2f}, total return {before / initial_aum - 1:.2%}, "
+                   f"CAGR {res['cagr_before_costs']:.2%}.")
 
 def _render_cohort_analysis_section(run: Dict[str, Any], n_years: Optional[float] = None,
                                     chart: Optional[Dict[str, Any]] = None) -> None:
@@ -614,6 +647,8 @@ def _render_cohort_analysis_section(run: Dict[str, Any], n_years: Optional[float
             ]
         })
         st.table(stats_df)
+        if job_trading_cost(settings) > 0:
+            st.caption(f"Both cohorts pay the run's trading cost of {job_trading_cost(settings):g} bps per trade.")
         # -------------------------
 
         benchmarks = dict(
@@ -639,8 +674,11 @@ def _render_growth_plot(res: Dict[str, Any], settings: Dict[str, Any], factor_la
     Visualizes the growth of $1 (or initial AUM) across the portfolio and benchmarks.
 
     WRDS runs pass chart options (benchmark names, a date axis) to plot_portfolio_growth.
+    Runs with trading costs add the portfolio before costs.
     """
     initial = settings.get('initial_aum', 1000000.0)
+    if has_trading_costs(res):
+        chart['before_costs_vals'] = res.get('portfolio_values_before_costs')
     
     fig = plot_portfolio_growth(
         years=res.get('years', []),
