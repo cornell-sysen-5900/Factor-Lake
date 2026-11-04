@@ -172,8 +172,8 @@ def _assert_clean(at):
     assert not at.error, [e.value for e in at.error]
 
 
-def test_data_viewer_tab_sits_between_results_and_about(at):
-    assert [t.label for t in at.tabs][:4] == ['Analysis', 'Results', 'Data Viewer', 'About']
+def test_data_viewer_tab_sits_between_compare_and_about(at):
+    assert [t.label for t in at.tabs][:5] == ['Analysis', 'Results', 'Compare', 'Data Viewer', 'About']
 
 
 def test_viewer_asks_for_market_data_first(at):

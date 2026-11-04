@@ -535,6 +535,14 @@ def open_saved_analysis(text: str) -> Dict[str, Any]:
     add_to_history(run)
     return run
 
+def load_compared_analysis(analysis_id: str) -> Dict[str, Any]:
+    """
+    A saved analysis for the Compare tab (src/saved_analyses.load_saved_analysis): read from
+    S3 only, nothing is run. Raises SavedAnalysisError (with its reason) if it cannot be opened.
+    """
+    from src.saved_analyses import load_saved_analysis
+    return load_saved_analysis(analysis_id, get_results_store())
+
 @st.cache_resource(show_spinner=False)
 def get_results_store():
     """The S3 location saved analyses are read from (the market data's bucket and prefix)."""
