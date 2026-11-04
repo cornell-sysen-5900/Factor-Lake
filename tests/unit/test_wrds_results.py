@@ -327,7 +327,9 @@ def test_a_wrds_run_looks_like_legacys_results(new_session, legacy):
     assert shown['selectbox'][0][2] == results['rebalance_dates'][-1]                       # newest, as Legacy
     assert [s[0] for s in shown['slider']] == [s[0] for s in legacy['slider']]
     assert _is_subsequence(legacy['button'], shown['button'])
-    assert set(shown['button']) - set(legacy['button']) == {'Rank every stock on this date'}
+    # The snapshot's runs were computed in the app (no ID); this WRDS run has an ID, so it also has
+    # the Add to comparison button beside its Analysis ID (the one new button in Results)
+    assert set(shown['button']) - set(legacy['button']) == {'Rank every stock on this date', 'Add to comparison'}
     def uncounted(labels):          # "This session's analyses (2)": main's snapshot had two runs
         return [re.sub(r' \(\d+\)$', '', label) for label in labels]
     assert _is_subsequence(uncounted(legacy['expander']), uncounted(shown['expander']))

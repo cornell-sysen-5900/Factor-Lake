@@ -36,6 +36,7 @@ from components.results_tab import (OPENED_MESSAGE_KEY, render_all_saved_analyse
                                     render_saved_runs)
 from analysis_history import BROWSER_ANALYSES_KEY, earlier_analyses, sync_browser_analyses
 from components.compare_tab import render_compare_tab
+from compare_state import OPEN_COMPARE_KEY
 from components.data_viewer import render_data_viewer_tab, clear_viewer_data
 from components.about import render_about_tab
 
@@ -172,6 +173,9 @@ def main():
     # before st.tabs is drawn, so the run requests it and reruns (see below).
     if RUN_COMPLETE_KEY in st.session_state and st.session_state.get(MAIN_TABS_KEY) != "Results":
         _open_main_tab("Results")
+    # Add to comparison in a run tab opens the Compare tab the same way
+    if st.session_state.pop(OPEN_COMPARE_KEY, False):
+        _open_main_tab("Compare")
 
     # Define primary application layout. Only the open tab is rendered.
     main_tabs = st.tabs(MAIN_TABS, key=_main_tabs_widget_key(), on_change=_on_main_tab_change)

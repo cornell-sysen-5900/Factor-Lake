@@ -326,7 +326,9 @@ def test_adding_to_a_full_comparison_shows_a_message(saved):
 def test_the_results_tabs_lists_keep_their_open_buttons(saved):
     at, ids = saved
     _click_main_tab(at, 'Results')
-    assert not [b for b in at.button if b.key.startswith('compare_add_')]
+    # No list entry has Add to comparison there (the run tab's own button is compare_add_run_)
+    assert not [b for b in at.button if (b.key or '').startswith(('compare_add_session_', 'compare_add_earlier_',
+                                                                   'compare_add_all_'))]
     at.session_state['all_analyses_expander'] = True
     at.run()
     assert at.button(key=f"open_all_{ids['monthly']}").label == 'Open'
@@ -411,3 +413,71 @@ def test_show_only_differences_hides_the_rows_that_are_the_same(saved):
     only = _table(at)
     assert 'Initial AUM' not in only.index and 'Frequency ≠' in only.index
     assert all(n.endswith(' ≠') or n in ('SETTINGS', 'PERFORMANCE', 'RISK', 'COSTS') for n in only.index)
+
+
+# ---------------------------------------------------------------------------
+# Add to comparison from Results
+# ---------------------------------------------------------------------------
+
+def _open_run(at, analysis_id):
+    """Opens the Results tab on the run with this ID."""
+    from tests.unit.test_saved_runs import _open_tab
+    _click_main_tab(at, 'Results')
+    run = next(r for r in at.session_state['saved_runs'] if r['compute']['hash'] == analysis_id)
+    _open_tab(at, run['label'])
+    _assert_clean(at)
+
+
+def _run_button(at, analysis_id):
+    return at.button(key=f'compare_add_run_{analysis_id}')
+
+
+def test_add_to_comparison_in_results_adds_the_run_and_opens_compare(saved):
+    at, ids = saved
+    for analysis_id in (ids['legacy'], ids['quarterly']):                # a Legacy and a WRDS run
+        _open_run(at, analysis_id)
+        button = _run_button(at, analysis_id)
+        assert button.label == 'Add to comparison' and not button.proto.disabled
+        # Beside the Analysis ID line: the ID (st.code) and the button share a row
+        assert analysis_id in [c.value for c in at.code]
+        button.click().run()
+        _assert_clean(at)
+        assert at.session_state['main_tabs'] == 'Compare'
+    assert [b.value for b in _boxes(at)] == [ids['legacy'], ids['quarterly']]
+    assert len(_table(at).columns) == 2                                  # compared as soon as 2 are in
+
+    # Back in Results, the run shows In comparison
+    _open_run(at, ids['legacy'])
+    assert _run_button(at, ids['legacy']).label == 'In comparison'
+    assert _run_button(at, ids['legacy']).proto.disabled
+    assert at.session_state['main_tabs'] == 'Results'
+
+
+def test_add_to_comparison_in_results_with_every_box_full_shows_a_message(saved):
+    at, ids = saved
+    _compare(at, ids['quarterly'], ids['main'], OLD_IDS['cohort'], OLD_IDS['pre_sharing'])
+    _open_run(at, ids['legacy'])
+    _run_button(at, ids['legacy']).click().run()
+    _assert_clean(at)
+    assert at.session_state['main_tabs'] == 'Results'                    # no switch
+    assert [w.value for w in at.warning] == ["The comparison already has 4 analyses. Remove one to add another."]
+    _open_compare(at)
+    assert ids['legacy'] not in [b.value for b in _boxes(at)]
+
+
+def test_runs_computed_in_the_app_have_no_add_to_comparison(monkeypatch):
+    from streamlit.testing.v1 import AppTest
+    from tests.unit.test_saved_runs import APP_DIR, _add_roe_and_load, _run_analysis, _synthetic_universe
+    from tests.unit.test_saved_runs import browser_like_widget_states
+    monkeypatch.setenv('FACTOR_LAKE_BACKTEST_LAMBDA', '')
+    monkeypatch.syspath_prepend(str(APP_DIR))
+    browser_like_widget_states(monkeypatch)
+    at = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=60)
+    at.session_state['raw_data'] = _synthetic_universe()
+    at.run()
+    _add_roe_and_load(at)
+    _run_analysis(at)
+    _assert_clean(at)
+    assert at.session_state['saved_runs'][0]['compute'] is None
+    assert not [b for b in at.button if (b.key or '').startswith('compare_add_run_')]
+    assert not [b for b in at.button if b.label in ('Add to comparison', 'In comparison')]

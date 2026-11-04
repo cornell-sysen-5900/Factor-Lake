@@ -18,6 +18,7 @@ from app.streamlit_utils import (describe_compute, get_backtest_lambda_name, lis
 from src.saved_analyses import SavedAnalysisError
 from src.trading_costs import has_trading_costs, job_trading_cost
 from app.saved_runs import remove_saved_run
+from app.compare_state import FULL_MESSAGE, OPEN_COMPARE_KEY, add_to_comparison, ids_in_comparison
 from app.holdings_table import (
     FACTOR_COMBINATION_LABELS, build_holdings_display_table, default_holdings_year,
     TURNOVER_HELP, holdings_number_formats, holdings_period_return, holdings_table_to_csv
@@ -427,16 +428,47 @@ def _render_header_captions(run: Dict[str, Any], data_source: Optional[str] = No
     _render_analysis_id(compute)
 
 
+# Set when Add to comparison finds all the boxes full: the run's ID, to show the message under it
+COMPARE_FULL_KEY = "compare_full_from_results"
+
+
 def _render_analysis_id(compute: Optional[Dict[str, Any]]) -> None:
-    """The run's analysis ID, with a copy button (st.code's), to reopen or share it."""
+    """
+    The run's analysis ID, with a copy button (st.code's), to reopen or share it, and an
+    Add to comparison button beside it (runs computed in the app have no ID, so neither).
+    """
     analysis_id = (compute or {}).get('hash')
     if analysis_id:
         st.caption("**Analysis ID:** copy it (button on the right) to open this analysis again "
                    "or share it, under Open a saved analysis.")
-        st.code(analysis_id, language=None)
+        id_col, button_col = st.columns([5, 1], vertical_alignment="center")
+        id_col.code(analysis_id, language=None)
+        with button_col:
+            _render_add_to_comparison(analysis_id)
+        if st.session_state.get(COMPARE_FULL_KEY) == analysis_id:
+            del st.session_state[COMPARE_FULL_KEY]
+            st.warning(FULL_MESSAGE)
     elif get_backtest_lambda_name():
         st.caption("**Analysis ID:** none. This run was computed in the app, so it was not saved. "
                    "Turn on **Run backtests in AWS Lambda** to get an ID you can share.")
+
+
+def _render_add_to_comparison(analysis_id: str) -> None:
+    """Add to comparison (adds the ID and opens the Compare tab), or In comparison when it is there."""
+    key = f"compare_add_run_{analysis_id}"
+    if analysis_id in ids_in_comparison():
+        st.button("In comparison", key=key, disabled=True, help="This analysis is in the Compare tab.")
+    else:
+        st.button("Add to comparison", key=key, on_click=_add_run_to_comparison, args=(analysis_id,),
+                  help="Add this analysis to the Compare tab and open it.")
+
+
+def _add_run_to_comparison(analysis_id: str) -> None:
+    """on_click: adds the run's ID to the comparison and opens the Compare tab, unless every box is full."""
+    if add_to_comparison(analysis_id) == 'full':
+        st.session_state[COMPARE_FULL_KEY] = analysis_id
+    else:
+        st.session_state[OPEN_COMPARE_KEY] = True
 
 
 def render_open_saved_analysis(has_runs: bool) -> None:
