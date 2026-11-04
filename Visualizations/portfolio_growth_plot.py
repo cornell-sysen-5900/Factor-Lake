@@ -46,7 +46,8 @@ def plot_portfolio_growth(
     gro_vals: Optional[List[float]] = None,
     factor_names: Optional[List[str]] = None,
     names: Optional[Dict[str, str]] = None,
-    dates: bool = False
+    dates: bool = False,
+    before_costs_vals: Optional[List[float]] = None
 ) -> go.Figure:
     """
     Constructs a time-series line chart comparing strategy growth against multiple benchmarks.
@@ -63,6 +64,8 @@ def plot_portfolio_growth(
         factor_names: A list of active factor labels to be included in the chart title.
         names: Benchmark names by role ('benchmark', 'value', 'growth'), Legacy's by default.
         dates: True when `years` are dates (WRDS runs): a date axis with a tick per year.
+        before_costs_vals: Optional values of the portfolio before trading costs (runs
+            with a trading cost), drawn as a dashed "Before costs" line.
 
     Returns:
         go.Figure: The generated Plotly figure object.
@@ -113,6 +116,20 @@ def plot_portfolio_growth(
             marker=dict(symbol='diamond', size=4),
             opacity=0.6,
             legendrank=4,
+            hovertemplate=HOVER_TEMPLATE
+        ))
+
+    # 5. The portfolio before trading costs, under the portfolio line
+    if before_costs_vals and len(years) == len(before_costs_vals):
+        fig.add_trace(go.Scatter(
+            x=years,
+            y=before_costs_vals,
+            name='Before costs',
+            mode=mode,
+            line=dict(color='#1f77b4', width=2, dash='dash'),
+            marker=dict(symbol='circle-open', size=4),
+            opacity=0.7,
+            legendrank=1.5,
             hovertemplate=HOVER_TEMPLATE
         ))
 

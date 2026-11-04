@@ -2,13 +2,13 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: scripts/check_backtest_lambda.py
 PURPOSE: Checks the deployed backtest Lambda against the app's local backtest, and its result cache.
-VERSION: 2.0.0
+VERSION: 2.1.0
 
 Usage (from the project root, after scripts/deploy_backtest_lambda.py):
     uv run python scripts/check_backtest_lambda.py
 
 For a few sample backtests (both factor combinations, every delisting strategy, a
-cohort comparison) it:
+cohort comparison, and one backtest at 25 bps trading cost) it:
 1. runs the backtest locally on the S3 data, exactly as the app does without Lambda;
 2. runs it in Lambda and compares every number (relative difference at most 1e-9:
    Lambda runs the same library versions on Linux x86, so the last binary digit can differ);
@@ -21,13 +21,17 @@ their row order and Rank, and for a stock bought by several Mixing sleeves which
 sleeve's Rank and Score the table shows. Which stocks are held, their shares,
 prices, weights, returns and contributions must still match.
 
-Then one quarterly WRDS backtest end to end (--skip-wrds to leave it out):
+Then one quarterly WRDS backtest end to end, at 0 and at 25 bps trading cost
+(--skip-wrds to leave them out):
 1. the function reads the WRDS folder this code expects (its FACTOR_LAKE_WRDS_DIR);
 2. it runs locally on the WRDS data in S3 and in Lambda, and the results must match
    (same tolerance; WRDS breaks ties by permno, so holdings are compared row by row);
 3. the newest rebalance date's holdings are read from the Lambda's holdings file the way
    the app reads them (two ranged GETs) and must match the local holdings of that date;
 4. it runs in Lambda again and must come from the cache, unchanged.
+
+Runs with a trading cost must also come back with their cost fields (turnover and cost
+drag, which are printed) and with a lower final value than the same job at 0 bps.
 """
 
 import argparse
@@ -52,6 +56,8 @@ from src.wrds_jobs import build_wrds_job, describe_wrds_job  # noqa: E402
 from src.wrds_service import WrdsBacktestRunner  # noqa: E402
 
 TOLERANCE = 1e-9
+# Trading cost of the checked cost runs, in bps per trade
+CHECK_TRADING_COST_BPS = 25.0
 # Holdings columns that depend on the order of exactly tied stocks (see comparable)
 TIE_ORDER_COLUMNS = ('Rank', 'Score')
 LABELS = {'ROE_using_9-30_Data': 'ROE using 9/30 Data', 'ROA': 'ROA %', '6-Mo_Momentum': '6-Mo Momentum %'}
@@ -67,7 +73,7 @@ def sample_jobs(unique: bool) -> List[dict]:
     two = ['ROE_using_9-30_Data', 'ROA']
     three = two + ['6-Mo_Momentum']
     tops = {f: 'top' for f in three}
-    return [
+    jobs = [
         build_job('backtest', two, tops, dict(BASE, initial_aum=aum, factor_combination='mixing',
                                                delisting_strategy='zero_return'), LABELS),
         build_job('backtest', three, dict(tops, ROA='bottom'),
@@ -78,6 +84,8 @@ def sample_jobs(unique: bool) -> List[dict]:
         build_job('cohort', two, tops, dict(BASE, initial_aum=aum, factor_combination='integrating',
                                              delisting_strategy='zero_return'), LABELS, cohort_pct=20),
     ]
+    jobs.append(dict(jobs[0], trading_cost_bps=CHECK_TRADING_COST_BPS))   # the first job, with a trading cost
+    return jobs
 
 
 def wrds_sample_job(unique: bool) -> dict:
@@ -88,6 +96,25 @@ def wrds_sample_job(unique: bool) -> dict:
                           factor_labels=WRDS_LABELS)
 
 
+def check_costs(job: dict, result: dict, free_final_value: Optional[float]) -> int:
+    """
+    For a job with a trading cost: prints its turnover and cost drag, and returns 1 when
+    the result has no cost fields or is not below the same job at 0 bps (free_final_value).
+    """
+    bps = job.get('trading_cost_bps') or 0
+    if not bps:
+        return 0
+    if result.get('trading_cost_bps') != bps or 'turnover_pct' not in result:
+        print(f"  costs:  NO trading cost fields in the result for {bps:g} bps")
+        return 1
+    lower = free_final_value is None or result['final_value'] < free_final_value
+    print(f"  costs:  {bps:g} bps, average turnover {result['average_turnover_pct']:.1f}% per rebalance, "
+          f"total ${result['total_trading_cost']:,.0f}, cost drag {result['cost_drag']:.2%} a year"
+          + ('' if free_final_value is None else
+             f", final value below 0 bps: {'yes' if lower else 'NO'}"))
+    return 0 if lower else 1
+
+
 def plain_rows(frame) -> dict:
     """Holdings rows as plain values by column (dates as text, categories as their values)."""
     frame = frame.reset_index(drop=True)
@@ -96,10 +123,15 @@ def plain_rows(frame) -> dict:
             for col in frame.columns}
 
 
-def check_wrds(client: BacktestLambdaClient, unique: bool) -> int:
-    """The WRDS checks in the module docstring. Returns the number that failed."""
+def check_wrds(client: BacktestLambdaClient, unique: bool, job: Optional[dict] = None,
+               free_final_value: Optional[float] = None) -> Tuple[int, float]:
+    """
+    The WRDS checks in the module docstring for job (default: wrds_sample_job). free_final_value
+    is the final value of the same job at 0 bps, when known. Returns (number of checks that
+    failed, the final value).
+    """
     import pandas as pd
-    job = wrds_sample_job(unique)
+    job = job or wrds_sample_job(unique)
     print(f"\n{describe_wrds_job(job)}")
 
     config = client.client.get_function_configuration(FunctionName=client.function_name)
@@ -140,7 +172,8 @@ def check_wrds(client: BacktestLambdaClient, unique: bool) -> int:
     cached = second['cached'] and second['hash'] == first['hash']
     print(f"  repeat: {second['round_trip_seconds']:6.2f} s  cached={second['cached']}  "
           f"identical={'yes' if same else 'NO'}")
-    return (not folder_ok) + (not match) + (not held_ok) + (not cached) + (not same)
+    costs = check_costs(job, remote, free_final_value)
+    return (not folder_ok) + (not match) + (not held_ok) + (not cached) + (not same) + costs, remote['final_value']
 
 
 def comparable(result: dict) -> dict:
@@ -192,8 +225,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     universe = S3DataManager().fetch_all_data()
     client = BacktestLambdaClient(function_name)
     failures = 0
+    jobs = sample_jobs(unique=not args.reuse_cache)
+    free_final_value = None   # the first job's final value: the cost run is the same job at 25 bps
 
-    for job in sample_jobs(unique=not args.reuse_cache):
+    for job in jobs:
         print(f"\n{describe_job(job)}")
         started = time.perf_counter()
         local = run_job(universe, job)
@@ -213,9 +248,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"  repeat: {second['round_trip_seconds']:6.2f} s  cached={second['cached']}  "
               f"identical={'yes' if same else 'NO'}")
         failures += (not match) + (not cached) + (not same)
+        failures += check_costs(job, remote, free_final_value)
+        if job is jobs[0]:
+            free_final_value = remote['final_value']
 
     if not args.skip_wrds:
-        failures += check_wrds(client, unique=not args.reuse_cache)
+        job = wrds_sample_job(unique=not args.reuse_cache)
+        free_failures, wrds_free = check_wrds(client, unique=False, job=job)
+        cost_failures, _ = check_wrds(client, unique=False, free_final_value=wrds_free,
+                                      job=dict(job, trading_cost_bps=CHECK_TRADING_COST_BPS))
+        failures += free_failures + cost_failures
 
     print(f"\n{'All checks passed.' if not failures else f'{failures} check(s) failed.'}")
     return 1 if failures else 0

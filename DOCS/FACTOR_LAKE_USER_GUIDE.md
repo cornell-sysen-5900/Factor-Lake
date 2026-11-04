@@ -35,6 +35,7 @@ The steps below are for the default **Legacy** data source. For WRDS data with s
 5. Set the start and end years.
 6. Set the initial investment amount.
 7. Pick the delisting strategy you want to test.
+8. Set the trading cost in basis points per trade, or leave it at 0. See [16. Trading costs](#16-trading-costs).
 
 ## 5. Choose factors and directions
 
@@ -88,6 +89,8 @@ When backtests run in AWS Lambda, every analysis is saved for 90 days under an *
 6. Review Top vs Bottom Cohort Analysis. It uses the settings of the run tab it is in.
 7. Review Advanced Backtest Statistics.
 8. Review Yearly Win/Loss Summary.
+
+With a trading cost above 0, every number is after costs, and the views add what the costs did: see [16. Trading costs](#16-trading-costs).
 
 ### Check the raw data
 
@@ -183,3 +186,32 @@ The results have Legacy's sections, tiles, tables and charts, on dates instead o
 - **The benchmarks are ETF total returns** (IWM, IWN, IWO): they include dividends and are net of the funds' fees. They differ slightly from the index returns Legacy uses, so do not compare Legacy and WRDS numbers directly.
 - **The data runs from April 2008 to September 2026.** A backtest ending in 2026 holds until September 2026 (semi-annual: June 2026), and one starting in 2008 starts with the first rebalance month in the data.
 - The Data Viewer shows Legacy data only.
+
+## 16. Trading costs
+
+Set **Trading cost (bps per trade)** in the sidebar (0 to 500, default 0) to see returns after trading costs and how much each strategy's turnover costs it. It works in Legacy and WRDS mode, including the cohort comparison.
+
+**What is charged.** Every buy and every sell at each rebalance pays the cost on its dollar value. That includes the first purchase (the backtest starts in cash, so it buys 100% of the portfolio) and putting a delisted stock's cash back into stocks at the next rebalance. Nothing is charged for the delisting itself, for holding cash, or for selling at the end of the backtest.
+
+**The formula.** At each rebalance:
+
+- The weights after drift are last period's weights grown by each stock's return, as shares of the portfolio's value now. A delisted stock's money counts as cash, not as a stock.
+- Turnover = the sum over all stocks of |target weight − weight after drift|. Buys and sells both count, so selling one stock to buy another is 2 × its weight. A stock held by two Mixing sleeves is one position.
+- Cost = bps / 10,000 × turnover × portfolio value. It comes out of the portfolio at the rebalance, before the next period's return: return after costs = (1 − cost / value) × (1 + return before costs) − 1.
+
+For example, at 25 bps a rebalance that turns over 100% of a $10,000 portfolio costs $25 (0.25%).
+
+**Typical range.** Russell 2000 stocks often cost roughly **20 to 60 bps per side**, and more for the smallest and least liquid names. 0 bps gives exactly the results the app gave before trading costs existed.
+
+**What the results show** (only when the cost is above 0):
+
+- The Performance Summary is after costs, with a caption giving the cost and the final value, total return and CAGR before costs. CAGR, Sharpe, drawdown and every other statistic use the returns after costs.
+- The growth chart adds a dashed **Before costs** line.
+- **Advanced Backtest Statistics** adds a Trading Costs row: average turnover per rebalance, total cost paid ($), annualized cost drag (CAGR before costs minus CAGR after) and CAGR before costs.
+- The Year-by-Year (WRDS: Period-by-Period) table adds **Turnover %** and **Cost %** (percent of the portfolio's value at that rebalance). By calendar year, turnover is summed and cost compounded over the year's rebalances.
+- **Holdings and Ranks** adds **Traded %** (the stock's |target − weight after drift|) to the table and its CSV, and the caption gives that rebalance's turnover and cost.
+- The run tab, its header captions and the saved-analysis summaries show the cost, e.g. "Run 3: ROA % +1 | 25 bps".
+
+Analyses saved before trading costs existed open at 0 bps.
+
+**Limitation.** The cost is the same for every stock. Real costs are higher for small, illiquid stocks and for large trades; costs by stock size or liquidity are not modelled yet.

@@ -273,6 +273,7 @@ def run_backtest_logic(user_settings: Dict[str, Any],
     """
     from src.backtest_engine import rebalance_portfolio
     from src.backtest_jobs import build_job
+    from src.trading_costs import job_trading_cost
     from app.streamlit_config import FACTOR_METADATA, MAX_SAVED_RUNS
     from app.saved_runs import add_saved_run, build_run_label
 
@@ -315,7 +316,8 @@ def run_backtest_logic(user_settings: Dict[str, Any],
                 use_market_cap_weight=user_settings.get('use_market_cap_weight', False),
                 delisting_strategy=user_settings.get('delisting_strategy', 'zero_return'),
                 factor_combination=user_settings.get('factor_combination', 'mixing'),
-                factor_labels=column_labels
+                factor_labels=column_labels,
+                trading_cost_bps=job_trading_cost(user_settings)
             )
     except Exception as e:
         st.error(f"Backtest Execution Error: {str(e)}")
@@ -332,7 +334,7 @@ def run_backtest_logic(user_settings: Dict[str, Any],
     run_id = st.session_state.next_run_id
     run = {
         'id': run_id,
-        'label': build_run_label(run_id, factor_labels),
+        'label': build_run_label(run_id, factor_labels, job_trading_cost(user_settings)),
         'factor_labels': factor_labels,
         'factors': internal_factor_cols,
         'factor_directions': internal_directions,
@@ -350,10 +352,14 @@ def run_backtest_logic(user_settings: Dict[str, Any],
     add_to_history(run)
     return run
 
-def _wrds_run_label(run_id: int, factor_labels: List[str], frequency: str) -> str:
-    """A WRDS run's tab label, e.g. "Run 2: WRDS, Quarterly" (the factors are in its header)."""
+def _wrds_run_label(run_id: int, factor_labels: List[str], frequency: str, trading_cost_bps: float = 0.0) -> str:
+    """
+    A WRDS run's tab label, e.g. "Run 2: WRDS, Quarterly" (the factors are in its header),
+    or "Run 2: WRDS, Quarterly | 25 bps" with a trading cost.
+    """
+    from app.saved_runs import trading_cost_suffix
     from app.wrds_tables import FREQUENCY_LABELS
-    return f"Run {run_id}: WRDS, {FREQUENCY_LABELS.get(frequency, frequency)}"
+    return f"Run {run_id}: WRDS, {FREQUENCY_LABELS.get(frequency, frequency)}" + trading_cost_suffix(trading_cost_bps)
 
 
 def _run_wrds_job(run: Dict[str, Any], kind: str, cohort_pct: Optional[float] = None,
@@ -420,7 +426,7 @@ def run_wrds_backtest_logic(user_settings: Dict[str, Any], factor_names: List[st
     run_id = st.session_state.next_run_id
     run = {
         'id': run_id,
-        'label': _wrds_run_label(run_id, factor_labels, job['frequency']),
+        'label': _wrds_run_label(run_id, factor_labels, job['frequency'], job.get('trading_cost_bps', 0.0)),
         'data_mode': 'wrds',
         'factor_labels': factor_labels,
         'factors': columns,
@@ -479,6 +485,8 @@ def open_saved_analysis(text: str) -> Dict[str, Any]:
 
     saved = load_saved_analysis(text, get_results_store())
     job = saved['job']
+    # Jobs saved before trading costs (or at 0 bps) have none: they open at 0 bps, with settings as before
+    costs = {'trading_cost_bps': job['trading_cost_bps']} if job.get('trading_cost_bps') else {}
     factor_labels = [job['factor_labels'].get(f, f) for f in job['factors']]
     run_id = st.session_state.next_run_id
     compute = {'hash': saved['id'], 'opened': True, 'cached': True,
@@ -486,14 +494,14 @@ def open_saved_analysis(text: str) -> Dict[str, Any]:
     if job.get('data_mode') == 'wrds':
         run = {
             'id': run_id,
-            'label': f"{_wrds_run_label(run_id, factor_labels, job['frequency'])} (opened)",
+            'label': f"{_wrds_run_label(run_id, factor_labels, job['frequency'], job.get('trading_cost_bps'))} (opened)",
             'data_mode': 'wrds',
             'factor_labels': factor_labels,
             'factors': list(job['factors']),
             'factor_directions': dict(job['factor_directions']),
             'settings': {'data_mode': 'wrds', **{k: job[k] for k in (
                 'frequency', 'start_year', 'end_year', 'initial_aum', 'use_market_cap_weight',
-                'factor_combination', 'restrict_fossil_fuels', 'selected_sectors')}},
+                'factor_combination', 'restrict_fossil_fuels', 'selected_sectors')}, **costs},
             'universe': {'restrict_fossil_fuels': job['restrict_fossil_fuels'],
                          'selected_sectors': list(job['selected_sectors'])},
             'data': None,
@@ -507,13 +515,13 @@ def open_saved_analysis(text: str) -> Dict[str, Any]:
         return run
     run = {
         'id': run_id,
-        'label': f"{build_run_label(run_id, factor_labels)} (opened)",
+        'label': f"{build_run_label(run_id, factor_labels, job.get('trading_cost_bps'))} (opened)",
         'factor_labels': factor_labels,
         'factors': list(job['factors']),
         'factor_directions': dict(job['factor_directions']),
-        'settings': {k: job[k] for k in (
+        'settings': {**{k: job[k] for k in (
             'start_year', 'end_year', 'initial_aum', 'benchmark_index', 'top_pct', 'use_market_cap_weight',
-            'delisting_strategy', 'factor_combination', 'restrict_fossil_fuels', 'selected_sectors')},
+            'delisting_strategy', 'factor_combination', 'restrict_fossil_fuels', 'selected_sectors')}, **costs},
         'universe': {'restrict_fossil_fuels': job['restrict_fossil_fuels'],
                      'selected_sectors': list(job['selected_sectors'])},
         'data': None,

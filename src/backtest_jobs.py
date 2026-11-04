@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 
 from .backtest_engine import FACTOR_COMBINATIONS, rebalance_portfolio, run_cohort_comparison
+from .trading_costs import describe_trading_cost, job_trading_cost, validate_trading_cost_bps
 from .universe_selection import select_universe
 
 JOB_KINDS = ('backtest', 'cohort')
@@ -31,13 +32,17 @@ DELISTING_STRATEGIES = ('zero_return', 'hold_cash', 'reinvest')
 JOB_FIELDS = ('kind', 'factors', 'factor_directions', 'factor_labels', 'start_year', 'end_year',
               'initial_aum', 'benchmark_index', 'top_pct', 'use_market_cap_weight', 'delisting_strategy',
               'factor_combination', 'restrict_fossil_fuels', 'selected_sectors', 'cohort_pct')
+# Keys a job has only when they are set. trading_cost_bps is left out at 0 bps, so a job
+# without trading costs (and its cache key) is exactly as before trading costs existed,
+# and jobs saved before then still open, at 0 bps.
+OPTIONAL_JOB_FIELDS = ('trading_cost_bps',)
 
 # Source files whose code decides a backtest's results. Their contents are part of the
 # cache key, so deploying changed backtest code never returns results from the old code.
 ENGINE_SOURCES = (
     'backtest_engine.py', 'backtest_jobs.py', 'benchmarks.py', 'data_standardization.py',
     'factor_registry.py', 'factor_utils.py', 'performance_metrics.py', 'portfolio.py',
-    'portfolio_filters.py', 's3_client.py', 'universe_selection.py',
+    'portfolio_filters.py', 's3_client.py', 'trading_costs.py', 'universe_selection.py',
 )
 
 
@@ -50,7 +55,8 @@ def build_job(kind: str, factors: List[str], factor_directions: Dict[str, str],
 
     Values are normalized (ints, floats, sorted sectors) so equal inputs always give
     an identical job and therefore the same cache key. Factor order is kept: it sets
-    the column order of the holdings table.
+    the column order of the holdings table. settings['trading_cost_bps'] is added only
+    when it is not 0 (see OPTIONAL_JOB_FIELDS).
     """
     if kind not in JOB_KINDS:
         raise ValueError(f"kind must be one of {JOB_KINDS}, not '{kind}'.")
@@ -75,8 +81,21 @@ def build_job(kind: str, factors: List[str], factor_directions: Dict[str, str],
         'selected_sectors': sorted(settings.get('selected_sectors') or []),
         'cohort_pct': float(cohort_pct) if kind == 'cohort' else None,
     }
+    add_trading_cost(job, settings)
     validate_job(job)
     return job
+
+
+def add_trading_cost(job: Dict[str, Any], settings: Dict[str, Any]) -> None:
+    """Adds settings' trading_cost_bps to a job unless it is 0 or absent (a bad value is kept, for validation)."""
+    bps = settings.get('trading_cost_bps')
+    if bps is None or (_is_number(bps) and bps == 0):
+        return
+    job['trading_cost_bps'] = float(bps) if _is_number(bps) else bps
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def validate_job(job: Dict[str, Any]) -> None:
@@ -97,6 +116,8 @@ def validate_job(job: Dict[str, Any]) -> None:
         raise ValueError("Initial AUM must be greater than $0.")
     if job['kind'] == 'cohort' and not job.get('cohort_pct'):
         raise ValueError("A cohort comparison needs cohort_pct.")
+    if 'trading_cost_bps' in job:
+        validate_trading_cost_bps(job['trading_cost_bps'])
 
 
 def run_job(raw: pd.DataFrame, job: Dict[str, Any]) -> Dict[str, Any]:
@@ -118,7 +139,7 @@ def run_job(raw: pd.DataFrame, job: Dict[str, Any]) -> Dict[str, Any]:
             selected_factors=job['factors'],
             factor_directions=job['factor_directions'],
             cohort_pct=job['cohort_pct'],
-            user_settings=job,   # has the start/end year, AUM, weighting, delisting and combination keys
+            user_settings=job,   # has the start/end year, AUM, weighting, delisting, combination and cost keys
         )
         return {'top': list(top), 'bottom': list(bottom)}
     return rebalance_portfolio(
@@ -134,6 +155,7 @@ def run_job(raw: pd.DataFrame, job: Dict[str, Any]) -> Dict[str, Any]:
         delisting_strategy=job['delisting_strategy'],
         factor_combination=job['factor_combination'],
         factor_labels=job['factor_labels'],
+        trading_cost_bps=job_trading_cost(job),
     )
 
 
@@ -151,7 +173,12 @@ def job_hash(job: Dict[str, Any], data_version: str, code: Optional[str] = None)
     """
     The cache key of a job's result: a hash of its inputs, the version of the data it
     reads and the version of the backtest code. Any change to one of them changes it.
+
+    A trading cost of 0 bps is left out, so a job with trading_cost_bps 0 has the key
+    of the same job without the field (as every job had before trading costs).
     """
+    if 'trading_cost_bps' in job and job['trading_cost_bps'] == 0:
+        job = {k: v for k, v in job.items() if k != 'trading_cost_bps'}
     payload = json.dumps({'job': job, 'data_version': data_version, 'code_version': code or code_version()},
                          sort_keys=True, separators=(',', ':'))
     return hashlib.sha256(payload.encode()).hexdigest()
@@ -237,5 +264,6 @@ def describe_job(job: Dict[str, Any]) -> str:
     """One-line summary of a job, for logs."""
     factors = ', '.join(f"{job['factor_labels'].get(f, f)} ({job['factor_directions'][f]})" for f in job['factors'])
     return (f"{job['kind']} {job['start_year']}-{job['end_year']} {job['factor_combination']}: {factors}"
-            + (f", cohort {job['cohort_pct']:g}%" if job['kind'] == 'cohort' else ''))
+            + (f", cohort {job['cohort_pct']:g}%" if job['kind'] == 'cohort' else '')
+            + (f", {describe_trading_cost(job_trading_cost(job))}" if job_trading_cost(job) > 0 else ''))
 

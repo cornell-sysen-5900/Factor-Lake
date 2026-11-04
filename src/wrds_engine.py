@@ -18,6 +18,10 @@ See DOCS/WRDS_MODE_DESIGN.md, sections 3, 4 and 7. At each rebalance date t:
    monthly returns (delisting returns included). After a stock's delisting month its
    money earns the risk-free rate until t'. A month without a return, before any
    delisting, counts as 0% and is counted in missing_return_stock_months.
+5. Trading costs (trading_cost_bps, src/trading_costs.py): each rebalance's turnover
+   (target weights vs the weights after drift; the delisted stocks' cash counts as no
+   stock) is charged at the rebalance, before the period's return. A date with nothing
+   to buy sells everything into cash; the cash period costs nothing.
 
 Stocks are keyed on permno (two securities can share a ticker on one date).
 """
@@ -28,6 +32,8 @@ import numpy as np
 import pandas as pd
 
 from .performance_metrics import compute_comprehensive_metrics
+from .trading_costs import (cost_fraction, cost_results, drifted_weights, net_return, turnover,
+                            validate_trading_cost_bps)
 from .wrds_calendar import FIRST_MONTH, LAST_MONTH, PERIODS_PER_YEAR, period_boundaries
 from .wrds_data import WrdsData
 from .wrds_factors import WRDS_FACTOR_COLUMNS, WRDS_SECTORS
@@ -229,12 +235,14 @@ def run_periods(data: WrdsData, dates: List[pd.Timestamp], factors: List[str],
                 frequency: Optional[str] = None, top_pct: float = 10.0,
                 use_market_cap_weight: bool = False, factor_combination: str = 'mixing',
                 restrict_fossil_fuels: bool = False, selected_sectors: Optional[Iterable[str]] = None,
-                factor_labels: Optional[Dict[str, str]] = None) -> Tuple[Dict[str, Any], pd.DataFrame]:
+                factor_labels: Optional[Dict[str, str]] = None,
+                trading_cost_bps: float = 0.0) -> Tuple[Dict[str, Any], pd.DataFrame]:
     """
     Backtests the holding periods between consecutive dates (rebalancing at every date
     but the last). See run_wrds_backtest for the arguments and the results.
     """
     validate_inputs(factors, factor_directions, factor_combination, top_pct, selected_sectors)
+    trading_cost_bps = validate_trading_cost_bps(trading_cost_bps)
     if len(dates) < 2:
         raise ValueError("A backtest needs at least one holding period.")
     factor_labels = factor_labels or {}
@@ -256,6 +264,11 @@ def run_periods(data: WrdsData, dates: List[pd.Timestamp], factors: List[str],
     period_returns, rf_period, growth_rows = [], [], []
     benchmarks = {role: [] for role in BENCHMARK_COLUMNS}
     used_months = np.zeros(len(data.months), dtype=bool)
+    # Trading costs: the weights after drift at the end of the last period (empty = all
+    # cash, before the first purchase), each period's return before costs, its turnover
+    # and cost (fraction of the value), and |target - drifted| of every stock bought
+    drifted = pd.Series(dtype=float)
+    gross_returns, turnovers, costs, traded_rows = [], [], [], []
     for start, end in zip(rebalance_dates, period_ends):
         months = _month_range(data, start, end)
         used_months[months] = True
@@ -268,12 +281,26 @@ def run_periods(data: WrdsData, dates: List[pd.Timestamp], factors: List[str],
 
         held = by_date.get(start)
         if held is None:          # nothing to buy (e.g. a narrow sector filter): the money earns rf
-            period_returns.append(rf_period[-1])
-            continue
-        growth = holding_period_growth(data, held['permno'].unique(), start, end, rf_monthly)
-        growth_rows.append(growth.assign(date=start))
-        g = held['permno'].map(growth.set_index('permno')['growth'])
-        period_returns.append(float((held['weight'] * g).sum() - 1.0))
+            gross = rf_period[-1]
+            target = end_weights = pd.Series(dtype=float)     # sold into cash, held as cash
+        else:
+            growth = holding_period_growth(data, held['permno'].unique(), start, end, rf_monthly)
+            growth_rows.append(growth.assign(date=start))
+            g = held['permno'].map(growth.set_index('permno')['growth'])
+            gross = float((held['weight'] * g).sum() - 1.0)
+            by_permno = growth.set_index('permno')
+            target = held.groupby('permno')['weight'].sum()   # Mixing sleeves netted: one position per stock
+            end_weights = drifted_weights(target, by_permno['growth'], by_permno['delisted'])
+        period_turnover, traded = turnover(target, drifted)
+        cost = cost_fraction(trading_cost_bps, period_turnover)
+        if held is not None:
+            traded_rows.append(pd.DataFrame({'date': start, 'permno': target.index,
+                                             'traded': traded.reindex(target.index).to_numpy()}))
+        drifted = end_weights
+        gross_returns.append(gross)
+        turnovers.append(period_turnover)
+        costs.append(cost)
+        period_returns.append(net_return(gross, cost))
 
     values = [float(initial_aum)]
     for r in period_returns:
@@ -307,18 +334,29 @@ def run_periods(data: WrdsData, dates: List[pd.Timestamp], factors: List[str],
         missing_return_stock_months=int(growth['missing_return_months'].sum()),
         empty_rebalance_dates=[d.strftime('%Y-%m-%d') for d in rebalance_dates if d not in by_date],
     )
-    holdings = _holdings_table(positions, growth, panel, values, rebalance_dates, factors,
-                               factor_combination, factor_labels)
+    traded = None     # holdings get a 'traded' column only with trading costs
+    if trading_cost_bps > 0:
+        results.update(cost_results(trading_cost_bps, gross_returns, turnovers, values, periods_per_year))
+        traded = pd.concat(traded_rows, ignore_index=True) if traded_rows else None
+    # Positions are bought with what is left after paying the rebalance's cost
+    invested = [v * (1.0 - c) for v, c in zip(values, costs)] + values[len(costs):]
+    holdings = _holdings_table(positions, growth, panel, invested, rebalance_dates, factors,
+                               factor_combination, factor_labels, traded)
     return results, holdings
 
 
 def _holdings_table(positions: pd.DataFrame, growth: pd.DataFrame, panel: pd.DataFrame,
                     values: List[float], rebalance_dates: List[pd.Timestamp], factors: List[str],
-                    factor_combination: str, factor_labels: Dict[str, str]) -> pd.DataFrame:
+                    factor_combination: str, factor_labels: Dict[str, str],
+                    traded: Optional[pd.DataFrame] = None) -> pd.DataFrame:
     """
     One row per stock held per rebalance date, merged over Mixing sleeves the way
     Legacy's holdings table merges them: weights summed, rank and score from the sleeve
     where it ranked best, picked_by listing every sleeve that bought it.
+
+    values are the money invested at each rebalance date (after its trading cost).
+    traded (date, permno, traded: |target - drifted weight|), given for runs with
+    trading costs, adds a 'traded' column after 'weight'.
 
     Weights, returns and contributions are decimals (Legacy's table shows percent).
     """
@@ -337,6 +375,9 @@ def _holdings_table(positions: pd.DataFrame, growth: pd.DataFrame, panel: pd.Dat
     attributes = panel[['date', 'permno', 'ticker', 'security_name', 'sector_name', 'prc']
                        + list(dict.fromkeys(factors))]
     table = table.merge(attributes, on=['date', 'permno'], how='left').merge(growth, on=['date', 'permno'], how='left')
+    if traded is not None:
+        table = table.merge(traded.astype({'permno': table['permno'].dtype}), on=['date', 'permno'], how='left')
+    with_traded = traded is not None
 
     start_value = pd.Series(values[:-1], index=rebalance_dates)
     table['dollar_value'] = table['weight'] * table['date'].map(start_value)
@@ -350,7 +391,8 @@ def _holdings_table(positions: pd.DataFrame, growth: pd.DataFrame, panel: pd.Dat
     columns = (['rebalance_date', 'rank', 'permno', 'ticker', 'name', 'sector']
                + (['picked_by'] if factor_combination == 'mixing' else []) + ['score']
                + list(dict.fromkeys(factors))
-               + ['weight', 'shares', 'buy_price', 'dollar_value', 'period_return', 'contribution',
+               + ['weight'] + (['traded'] if with_traded else [])
+               + ['shares', 'buy_price', 'dollar_value', 'period_return', 'contribution',
                   'delisted', 'missing_return_months'])
     for col in ('ticker', 'name', 'sector'):     # only the values still used
         table[col] = table[col].cat.remove_unused_categories()
@@ -364,7 +406,8 @@ def run_wrds_backtest(data: WrdsData, factors: List[str], factor_directions: Dic
                       selected_sectors: Optional[Iterable[str]] = None,
                       factor_labels: Optional[Dict[str, str]] = None,
                       first_month: str = FIRST_MONTH,
-                      last_month: str = LAST_MONTH) -> Tuple[Dict[str, Any], pd.DataFrame]:
+                      last_month: str = LAST_MONTH,
+                      trading_cost_bps: float = 0.0) -> Tuple[Dict[str, Any], pd.DataFrame]:
     """
     Backtests factor portfolios on the WRDS data, rebalanced at the frequency's month
     ends over the calendar years start_year to end_year (src/wrds_calendar.py).
@@ -376,6 +419,9 @@ def run_wrds_backtest(data: WrdsData, factors: List[str], factor_directions: Dic
         factor_labels: column -> display name, for picked_by in the holdings.
         first_month: the data's first month, 'YYYY-MM' (tests use shorter data).
         last_month: the data's last month with returns, 'YYYY-MM'.
+        trading_cost_bps: cost of every buy and sell in basis points (0 to 500), charged on
+            each rebalance's turnover (see src/trading_costs.py). Metrics use the returns
+            after costs.
 
     Returns:
         (results, holdings). results has the keys of compute_comprehensive_metrics, with
@@ -383,12 +429,15 @@ def run_wrds_backtest(data: WrdsData, factors: List[str], factor_directions: Dic
         metrics annualized by frequency, 'years' as the period boundary dates, plus
         rebalance_dates, period_end_dates, cagr, benchmark_labels, rf_returns,
         rf_filled_months, total_delisted_positions, missing_return_stock_months and
-        empty_rebalance_dates. holdings is one row per stock held per rebalance date
-        (see _holdings_table).
+        empty_rebalance_dates, and above 0 bps the fields of
+        src/trading_costs.cost_results. holdings is one row per stock held per rebalance
+        date (see _holdings_table), with a 'traded' column above 0 bps. At 0 bps both are
+        exactly what they are without trading costs.
     """
     months = period_boundaries(frequency, start_year, end_year, first_month, last_month)
     dates = [data.month_date(m) for m in months]
     return run_periods(data, dates, factors, factor_directions, initial_aum, PERIODS_PER_YEAR[frequency],
                        frequency=frequency, top_pct=top_pct, use_market_cap_weight=use_market_cap_weight,
                        factor_combination=factor_combination, restrict_fossil_fuels=restrict_fossil_fuels,
-                       selected_sectors=selected_sectors, factor_labels=factor_labels)
+                       selected_sectors=selected_sectors, factor_labels=factor_labels,
+                       trading_cost_bps=trading_cost_bps)

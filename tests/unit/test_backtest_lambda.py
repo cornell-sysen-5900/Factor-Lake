@@ -388,6 +388,8 @@ def test_check_script_uses_new_inputs_each_run():
     first, second = sample_jobs(unique=True), sample_jobs(unique=True)
     assert all(a['initial_aum'] != b['initial_aum'] for a, b in zip(first, second))
     assert sample_jobs(unique=False) == sample_jobs(unique=False)
+    jobs = sample_jobs(unique=True)
+    assert jobs[-1] == dict(jobs[0], trading_cost_bps=25.0)            # the first job at 25 bps
 
 
 class ReorderedLambda(FakeLambda):
@@ -423,8 +425,10 @@ def test_check_script_compares_lambda_with_local(monkeypatch, manager, capsys, l
     monkeypatch.setattr(check, 'BacktestLambdaClient', lambda name: BacktestLambdaClient(name, client=fake))
     assert check.main(["--skip-wrds"]) == exit_code              # the WRDS check: test_wrds_check_script.py
     out = capsys.readouterr().out
-    assert out.count('cached=True') == 4                        # every repeat came from the cache
+    assert out.count('cached=True') == 5                        # every repeat came from the cache
     assert ('All checks passed.' in out) == (exit_code == 0)
+    # The first job again at 25 bps: its cost fields, and a final value below the job at 0 bps
+    assert 'costs:  25 bps, average turnover' in out and 'final value below 0 bps: yes' in out
 
 
 # ---------------------------------------------------------------------------
