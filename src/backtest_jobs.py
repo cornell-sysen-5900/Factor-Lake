@@ -37,7 +37,7 @@ JOB_FIELDS = ('kind', 'factors', 'factor_directions', 'factor_labels', 'start_ye
 ENGINE_SOURCES = (
     'backtest_engine.py', 'backtest_jobs.py', 'benchmarks.py', 'data_standardization.py',
     'factor_registry.py', 'factor_utils.py', 'performance_metrics.py', 'portfolio.py',
-    'portfolio_filters.py', 's3_client.py', 'universe_selection.py',
+    'portfolio_filters.py', 's3_client.py', 'trading_costs.py', 'universe_selection.py',
 )
 
 

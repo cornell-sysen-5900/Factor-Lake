@@ -30,8 +30,8 @@ WRDS_TOP_PCT = 10.0
 # Source files whose code decides a WRDS result: part of its cache key. Legacy's
 # ENGINE_SOURCES are kept separate, so changing WRDS code never recomputes Legacy results.
 WRDS_ENGINE_SOURCES = (
-    'backtest_jobs.py', 'performance_metrics.py', 's3_client.py', 'wrds_calendar.py', 'wrds_data.py',
-    'wrds_engine.py', 'wrds_factors.py', 'wrds_holdings.py', 'wrds_jobs.py', 'wrds_service.py',
+    'backtest_jobs.py', 'performance_metrics.py', 's3_client.py', 'trading_costs.py', 'wrds_calendar.py',
+    'wrds_data.py', 'wrds_engine.py', 'wrds_factors.py', 'wrds_holdings.py', 'wrds_jobs.py', 'wrds_service.py',
 )
 
 _MONTH = re.compile(r'^\d{4}-(0[1-9]|1[0-2])$')
