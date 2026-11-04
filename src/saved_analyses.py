@@ -46,15 +46,17 @@ def normalize_analysis_id(text: Optional[str]) -> str:
     return analysis_id
 
 
-def list_saved_analyses(manager: Optional[S3DataManager] = None, limit: int = 30) -> Dict[str, Any]:
+def list_saved_analyses(manager: Optional[S3DataManager] = None, limit: int = 30,
+                        include_other_kinds: bool = False) -> Dict[str, Any]:
     """
     Everyone's saved analyses in S3, newest first, without downloading them.
 
     Returns:
         {'entries': [{'analysis_id', 'saved_at' (UTC datetime), 'summary' (None when the
-        analysis was saved before summaries were recorded)}], 'total': number of saved
-        results found}. At most `limit` entries; cohort comparisons and WRDS ranked lists are
-        left out, and so is every file that is not a saved result (e.g. WRDS holdings Parquet).
+        analysis was saved before summaries were recorded), 'kind' (the job's kind, None when
+        not recorded)}], 'total': number of saved results found}. At most `limit` entries;
+        cohort comparisons and WRDS ranked lists are left out unless include_other_kinds, and
+        every file that is not a saved result (e.g. WRDS holdings Parquet) always is.
 
     Raises:
         SavedAnalysisError: the bucket cannot be listed with these AWS keys.
@@ -87,9 +89,10 @@ def list_saved_analyses(manager: Optional[S3DataManager] = None, limit: int = 30
             break
         metadata = manager.client.head_object(Bucket=manager.bucket,
                                               Key=manager.object_key(result_file(analysis_id))).get('Metadata') or {}
-        if metadata.get('kind') in ('cohort', 'ranked'):
+        if metadata.get('kind') in ('cohort', 'ranked') and not include_other_kinds:
             continue
-        entries.append({'analysis_id': analysis_id, 'saved_at': saved_at, 'summary': metadata.get('summary')})
+        entries.append({'analysis_id': analysis_id, 'saved_at': saved_at, 'summary': metadata.get('summary'),
+                        'kind': metadata.get('kind')})
     return {'entries': entries, 'total': len(found)}
 
 

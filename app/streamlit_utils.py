@@ -550,7 +550,10 @@ def get_results_store():
     return S3DataManager()
 
 @st.cache_data(ttl=60, show_spinner=False)
-def list_all_saved_analyses(limit: int) -> Dict[str, Any]:
-    """The newest `limit` saved analyses of everyone (src/saved_analyses.list_saved_analyses), reused for a minute."""
+def list_all_saved_analyses(limit: int, include_other_kinds: bool = False) -> Dict[str, Any]:
+    """
+    The newest `limit` saved analyses of everyone (src/saved_analyses.list_saved_analyses),
+    reused for a minute; with include_other_kinds, cohort comparisons and ranked lists too.
+    """
     from src.saved_analyses import list_saved_analyses
-    return list_saved_analyses(get_results_store(), limit=limit)
+    return list_saved_analyses(get_results_store(), limit=limit, include_other_kinds=include_other_kinds)

@@ -3,11 +3,14 @@ PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/components/compare_tab.py
 PURPOSE: The Compare tab: 2-4 saved analyses (Legacy, WRDS or both) side by side, one
          column each, with the best value of each row highlighted, the rows that differ
-         marked, a Sort by menu and one growth chart.
-VERSION: 1.0.0
+         marked, a Sort by menu and one growth chart. The Results tab's history lists are
+         shown below the ID boxes, each entry with an "Add to comparison" button.
+VERSION: 1.1.0
 
 Comparing only reads saved results from S3 (src/saved_analyses): it runs no backtest and
-loads no market data. The table and chart come from app/compare.py.
+loads no market data. Each result is read once and cached by ID for the session, so adding,
+removing or sorting never reads one again. The table and chart come from app/compare.py,
+the boxes' state from app/compare_state.py.
 """
 
 from typing import Any, Dict, List, Optional
@@ -15,66 +18,27 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 import streamlit as st
 
-from app.analysis_history import merge_entries
 from app.compare import (GROWTH_BASE, MAX_COMPARED, MIN_COMPARED, SORT_OPTIONS, benchmark_lines, chart_series,
                          column_titles, compact_analysis, comparison_table, short_id, sort_order)
+from app.compare_state import (FULL_MESSAGE, IDS_KEY, MESSAGE_KEY, add_slot, add_to_comparison, box_text,
+                               id_key, ids_in_comparison, remove_slot, slots)
 from app.streamlit_utils import load_compared_analysis
+from components.results_tab import (KIND_LABELS, render_all_saved_analyses, render_analysis_history,
+                                    render_earlier_analyses)
 from src.saved_analyses import SavedAnalysisError, normalize_analysis_id
 from Visualizations.compare_growth_plot import COMPARE_COLORS, plot_compare_growth
 
-# The ID boxes (a list of box numbers, in order) and the next box number
-SLOTS_KEY = "compare_slots"
-NEXT_SLOT_KEY = "compare_next_slot"
-# Copies of the widget values. Only the open main tab is drawn, and Streamlit drops the
-# state of widgets that are not drawn, so the IDs, sort and switch are restored from these.
-IDS_KEY = "compare_ids"
 SORT_KEY, SORT_SAVED_KEY = "compare_sort", "compare_sort_saved"
 DIFF_KEY, DIFF_SAVED_KEY = "compare_differences_only", "compare_differences_only_saved"
-# What the last Compare click loaded: {'slots': [...], 'entries': {slot: {'id', 'analysis' or 'error'}}}
-LOADED_KEY = "compare_loaded"
+# Loaded results by analysis ID ({'analysis': ...} or {'error': ...}), most recently used
+# last; the IDs in the boxes are always kept, and at most CACHE_LIMIT in all
+CACHE_KEY = "compare_cache"
+CACHE_LIMIT = 12
+# Key prefix of the history lists' widgets (the Results tab's have none)
+LIST_KEY_PREFIX = "compare_"
 
 BEST_STYLE = "background-color: #d3f3dc; color: #0b5d1e; font-weight: 600"
 GROUP_STYLE = "background-color: #f0f2f6; font-weight: 700"
-
-
-def _id_key(slot: int) -> str:
-    return f"compare_id_{slot}"
-
-
-def _slots() -> List[int]:
-    if SLOTS_KEY not in st.session_state:
-        st.session_state[SLOTS_KEY] = list(range(MIN_COMPARED))
-        st.session_state[NEXT_SLOT_KEY] = MIN_COMPARED
-    return st.session_state[SLOTS_KEY]
-
-
-def _add_slot() -> None:
-    """on_click: one more ID box (up to MAX_COMPARED)."""
-    slots = _slots()
-    if len(slots) < MAX_COMPARED:
-        st.session_state[SLOTS_KEY] = slots + [st.session_state[NEXT_SLOT_KEY]]
-        st.session_state[NEXT_SLOT_KEY] += 1
-
-
-def _remove_slot(slot: int) -> None:
-    """on_click: removes an ID box, its ID and its column."""
-    st.session_state[SLOTS_KEY] = [s for s in _slots() if s != slot]
-    st.session_state.get(IDS_KEY, {}).pop(slot, None)
-    st.session_state.pop(_id_key(slot), None)
-    loaded = st.session_state.get(LOADED_KEY)
-    if loaded:
-        loaded['entries'].pop(slot, None)
-        loaded['slots'] = [s for s in loaded['slots'] if s != slot]
-
-
-def _picked(slot: int) -> None:
-    """on_change of a box's picker: puts the picked analysis's ID in the box."""
-    pick_key = f"compare_pick_{slot}"
-    picked = st.session_state.get(pick_key)
-    if picked:
-        st.session_state[_id_key(slot)] = picked
-        st.session_state.setdefault(IDS_KEY, {})[slot] = picked
-    st.session_state[pick_key] = None
 
 
 def short_error(error: SavedAnalysisError) -> str:
@@ -91,15 +55,41 @@ def short_error(error: SavedAnalysisError) -> str:
     return str(error)
 
 
-def load_comparison(slots: List[int], texts: Dict[int, str]) -> Dict[str, Any]:
+def _cached(analysis_id: str) -> Dict[str, Any]:
     """
-    Reads the saved analyses in the boxes from S3 (nothing else is loaded or run). Empty
-    boxes are skipped; a bad, expired, duplicate, cohort or ranked ID gets a short error.
+    An analysis from the session's cache, read from S3 only the first time. A failed read
+    is cached too (a mistyped or expired ID stays so), except an S3 error, which is retried.
+    """
+    cache: Dict[str, Dict[str, Any]] = st.session_state.setdefault(CACHE_KEY, {})
+    if analysis_id in cache:
+        cache[analysis_id] = cache.pop(analysis_id)            # most recently used last
+        return cache[analysis_id]
+    try:
+        entry = {'analysis': compact_analysis(load_compared_analysis(analysis_id))}
+    except SavedAnalysisError as e:
+        entry = {'error': short_error(e)}
+        if e.reason == 'unreadable':
+            return entry
+    cache[analysis_id] = entry
+    return entry
+
+
+def _trim_cache(keep: set) -> None:
+    cache = st.session_state.get(CACHE_KEY, {})
+    for analysis_id in [i for i in cache if i not in keep][:max(0, len(cache) - CACHE_LIMIT)]:
+        del cache[analysis_id]
+
+
+def resolve_boxes(box_slots: List[int]) -> Dict[int, Dict[str, Any]]:
+    """
+    Each box with text: {'id', 'analysis'} or {'id', 'error'} (a short message), from the
+    cache or read from S3. Empty boxes are skipped; a bad, duplicate, expired, cohort or
+    ranked ID gets an error.
     """
     entries: Dict[int, Dict[str, Any]] = {}
     seen: Dict[str, int] = {}
-    for number, slot in enumerate(slots, start=1):
-        text = (texts.get(slot) or '').strip()
+    for number, slot in enumerate(box_slots, start=1):
+        text = box_text(slot).strip()
         if not text:
             continue
         try:
@@ -111,17 +101,28 @@ def load_comparison(slots: List[int], texts: Dict[int, str]) -> Dict[str, Any]:
             entries[slot] = {'id': analysis_id, 'error': f"Same analysis as box {seen[analysis_id]}."}
             continue
         seen[analysis_id] = number
-        try:
-            entries[slot] = {'id': analysis_id,
-                             'analysis': compact_analysis(load_compared_analysis(analysis_id))}
-        except SavedAnalysisError as e:
-            entries[slot] = {'id': analysis_id, 'error': short_error(e)}
-    return {'slots': list(slots), 'entries': entries}
+        entries[slot] = {'id': analysis_id, **_cached(analysis_id)}
+    _trim_cache(set(seen))
+    return entries
 
 
-def _compare_clicked() -> None:
-    """on_click of Compare: reads the analyses in the boxes from S3."""
-    st.session_state[LOADED_KEY] = load_comparison(_slots(), st.session_state.get(IDS_KEY, {}))
+def _add_from_list(analysis_id: str) -> None:
+    """on_click of a list's Add to comparison."""
+    if add_to_comparison(analysis_id) == 'full':
+        st.session_state[MESSAGE_KEY] = FULL_MESSAGE
+
+
+def _list_button(analysis_id: str, list_name: str, entry: Dict[str, Any]) -> None:
+    """A history list entry's button: Add to comparison, Added, or disabled for a cohort or ranked list."""
+    key = f"compare_add_{list_name}_{analysis_id}"
+    kind = entry.get('kind')
+    if kind in KIND_LABELS:
+        st.button("Add to comparison", key=key, disabled=True,
+                  help=f"This ID is a {KIND_LABELS[kind].lower()}, not an analysis: only analyses can be compared.")
+    elif analysis_id in ids_in_comparison():
+        st.button("Added", key=key, disabled=True, help="This analysis is already in the comparison.")
+    else:
+        st.button("Add to comparison", key=key, on_click=_add_from_list, args=(analysis_id,))
 
 
 def _restore(widget_key: str, saved_key: str, default: Any) -> None:
@@ -133,51 +134,47 @@ def render_compare_tab(session_entries: List[Dict[str, Any]],
                        earlier_entries: Optional[List[Dict[str, Any]]]) -> None:
     """
     The Compare tab. session_entries and earlier_entries are this session's and earlier
-    sessions' analyses (as listed in the Results tab), offered in each box's picker.
+    sessions' analyses, listed as in the Results tab below the boxes.
     """
     st.header("Compare analyses")
-    st.caption("Enter 2 to 4 saved analysis IDs (Legacy, WRDS or both) and click Compare to see them side "
-               "by side. Paste an ID, or pick one of your analyses. Comparing only reads the saved results: "
-               "no backtest runs.")
-    slots = _slots()
-    picks = merge_entries(session_entries, earlier_entries)
-    labels = {e['analysis_id']: f"{e.get('label', 'Analysis')} · {short_id(e['analysis_id'])}" for e in picks}
-    loaded = st.session_state.get(LOADED_KEY) or {'slots': [], 'entries': {}}
+    st.caption("Enter 2 to 4 saved analysis IDs (Legacy, WRDS or both): paste an ID in a box, or add one from "
+               "your analyses below or from a run in Results. The comparison appears as soon as 2 are valid. "
+               "Comparing only reads the saved results: no backtest runs.")
+    if MESSAGE_KEY in st.session_state:
+        st.warning(st.session_state.pop(MESSAGE_KEY))
+    box_slots = slots()
+    with st.spinner("Loading the saved analyses from S3..."):
+        entries = resolve_boxes(box_slots)
     saved_ids = st.session_state.setdefault(IDS_KEY, {})
 
-    for number, (col, slot) in enumerate(zip(st.columns(len(slots)), slots), start=1):
+    for number, (col, slot) in enumerate(zip(st.columns(len(box_slots)), box_slots), start=1):
         with col:
             st.markdown(f"**Analysis {number}**")
-            if _id_key(slot) not in st.session_state and slot in saved_ids:
-                st.session_state[_id_key(slot)] = saved_ids[slot]
+            if id_key(slot) not in st.session_state and slot in saved_ids:
+                st.session_state[id_key(slot)] = saved_ids[slot]
             # Boxes beyond the first 2 have a remove button beside the ID, so every box lines up
             id_col, remove_col = (st.columns([6, 1], vertical_alignment="bottom") if number > MIN_COMPARED
                                   else (st.container(), None))
-            saved_ids[slot] = id_col.text_input("Analysis ID", key=_id_key(slot),
+            saved_ids[slot] = id_col.text_input("Analysis ID", key=id_key(slot),
                                                 placeholder="Paste a 64-character analysis ID")
             if remove_col is not None:
-                remove_col.button("✕", key=f"compare_remove_{slot}", on_click=_remove_slot, args=(slot,),
+                remove_col.button("✕", key=f"compare_remove_{slot}", on_click=remove_slot, args=(slot,),
                                   help="Remove this analysis", type="tertiary")
-            st.selectbox("Or pick one of your analyses", options=list(labels), index=None,
-                         format_func=lambda i: labels.get(i, i), key=f"compare_pick_{slot}",
-                         on_change=_picked, args=(slot,), disabled=not labels,
-                         placeholder="Your analyses" if labels else "No analyses yet")
-            entry = loaded['entries'].get(slot)
+            entry = entries.get(slot)
             if entry and entry.get('error'):
                 st.error(entry['error'])
 
-    add, run = st.columns([1, 1])
-    add.button("+ Add analysis", key="compare_add", on_click=_add_slot, disabled=len(slots) >= MAX_COMPARED,
-               width="stretch")
-    # Loads before the script reruns, so the boxes show their errors in the same run
-    run.button("Compare", type="primary", key="compare_btn", width="stretch", on_click=_compare_clicked)
+    st.button("+ Add analysis", key="compare_add", on_click=add_slot, disabled=len(box_slots) >= MAX_COMPARED)
 
-    analyses = [loaded['entries'][s]['analysis'] for s in loaded['slots']
-                if 'analysis' in loaded['entries'].get(s, {})]
-    if not loaded['entries']:
-        return
+    # Your analyses, as in the Results tab, each with Add to comparison
+    render_analysis_history(session_entries, button=_list_button, key_prefix=LIST_KEY_PREFIX)
+    render_earlier_analyses(earlier_entries, button=_list_button, key_prefix=LIST_KEY_PREFIX)
+    render_all_saved_analyses(button=_list_button, key_prefix=LIST_KEY_PREFIX, include_other_kinds=True)
+
+    analyses = [entries[s]['analysis'] for s in box_slots if 'analysis' in entries.get(s, {})]
     if len(analyses) < MIN_COMPARED:
-        st.info(f"Enter at least {MIN_COMPARED} valid analysis IDs to compare.")
+        if entries:
+            st.info(f"Enter at least {MIN_COMPARED} valid analysis IDs to compare.")
         return
     st.divider()
     _render_comparison(analyses)

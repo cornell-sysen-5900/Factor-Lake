@@ -458,16 +458,26 @@ def render_open_saved_analysis(has_runs: bool) -> None:
                 st.error(str(e))
 
 
-def render_analysis_history(history: List[Dict[str, Any]]) -> None:
-    """This session's analyses, newest first, with their IDs (only this session's: nothing is listed from S3)."""
+# A listed analysis's button, drawn beside its ID in place of Open: (analysis ID, list name, entry)
+ListButton = Callable[[str, str, Dict[str, Any]], None]
+
+
+def render_analysis_history(history: List[Dict[str, Any]], button: Optional[ListButton] = None,
+                            key_prefix: str = '') -> None:
+    """
+    This session's analyses, newest first, with their IDs (only this session's: nothing is
+    listed from S3). Other tabs pass a button to draw beside each ID, and a key prefix.
+    """
     if not history:
         return
-    with st.expander(f"This session's analyses ({len(history)})", key="analysis_history_expander"):
+    with st.expander(f"This session's analyses ({len(history)})", key=f"{key_prefix}analysis_history_expander"):
         st.caption("Only analyses run or opened in this browser session. Copy an ID to reopen or share it.")
         for entry in reversed(history):
             st.markdown(f"**{entry['label']}** · {entry['how']} at {entry['time']}")
             _caption_summary(entry)
-            if entry.get('analysis_id'):
+            if entry.get('analysis_id') and button is not None:
+                _render_listed_analysis(entry['analysis_id'], 'session', entry, button)
+            elif entry.get('analysis_id'):
                 st.code(entry['analysis_id'], language=None)
             else:
                 st.caption("Not saved (computed in this app), so it has no ID.")
@@ -479,30 +489,39 @@ LISTED_ANALYSES = 20
 OPENED_MESSAGE_KEY = "opened_analysis_message"
 
 
-def render_earlier_analyses(entries: Optional[List[Dict[str, Any]]]) -> None:
+def render_earlier_analyses(entries: Optional[List[Dict[str, Any]]], button: Optional[ListButton] = None,
+                            key_prefix: str = '') -> None:
     """
     Analyses from earlier sessions in this browser (see app/analysis_history.py), newest
-    first, each with its ID and an Open button. Hidden until there is one.
+    first, each with its ID and an Open button (or the button passed). Hidden until there is one.
     """
     if not entries:
         return
-    with st.expander(f"Earlier analyses on this browser ({len(entries)})", key="earlier_analyses_expander"):
+    with st.expander(f"Earlier analyses on this browser ({len(entries)})",
+                     key=f"{key_prefix}earlier_analyses_expander"):
         st.caption("Analyses you ran or opened in earlier sessions on this browser. They are kept in this "
                    "browser only, so they don't appear on another computer or after clearing site data.")
         for entry in entries[:LISTED_ANALYSES]:
             when = (entry.get('saved_at') or '').replace('T', ' ').rstrip('Z')
             st.markdown(f"**{entry.get('label', 'Analysis')}** · {entry.get('how', 'saved')} on {when} UTC")
             _caption_summary(entry)
-            _render_listed_analysis(entry['analysis_id'], 'earlier')
+            _render_listed_analysis(entry['analysis_id'], 'earlier', entry, button)
         _caption_hidden_rows(len(entries))
 
 
-def render_all_saved_analyses() -> None:
+# How listings name the saved jobs that are not analyses (listed with include_other_kinds)
+KIND_LABELS = {'cohort': 'Cohort comparison', 'ranked': 'Ranked stock list'}
+
+
+def render_all_saved_analyses(button: Optional[ListButton] = None, key_prefix: str = '',
+                              include_other_kinds: bool = False) -> None:
     """
     Everyone's saved analyses in S3, newest first, loaded only while the expander is open
-    (it reruns the app when opened or closed).
+    (it reruns the app when opened or closed). Other tabs pass a button to draw beside each
+    ID (in place of Open) and a key prefix; include_other_kinds also lists cohort
+    comparisons and ranked lists, named as such.
     """
-    expander = st.expander("All saved analyses", key="all_analyses_expander", on_change="rerun")
+    expander = st.expander("All saved analyses", key=f"{key_prefix}all_analyses_expander", on_change="rerun")
     with expander:
         if not expander.open:
             return
@@ -510,7 +529,7 @@ def render_all_saved_analyses() -> None:
                    "deleted after 90 days.")
         try:
             with st.spinner("Listing saved analyses in S3..."):
-                listing = list_all_saved_analyses(LISTED_ANALYSES)
+                listing = list_all_saved_analyses(LISTED_ANALYSES, include_other_kinds)
         except SavedAnalysisError as e:
             st.error(str(e))
             return
@@ -519,18 +538,24 @@ def render_all_saved_analyses() -> None:
             return
         for entry in listing['entries']:
             summary = entry['summary'] or "Details not recorded (saved before listings had summaries)"
+            if entry.get('kind') in KIND_LABELS:
+                summary = f"{KIND_LABELS[entry['kind']]}: {summary}"
             st.markdown(f"**{summary}** · saved {entry['saved_at']:%Y-%m-%d %H:%M} UTC")
-            _render_listed_analysis(entry['analysis_id'], 'all')
+            _render_listed_analysis(entry['analysis_id'], 'all', entry, button)
         if listing['total'] > len(listing['entries']):
             st.caption(f"Showing the newest {len(listing['entries'])}. Older ones can still be opened by their ID.")
 
 
-def _render_listed_analysis(analysis_id: str, list_name: str) -> None:
-    """One listed analysis: its ID (with a copy button) and an Open button."""
-    id_col, button_col = st.columns([5, 1], vertical_alignment="center")
+def _render_listed_analysis(analysis_id: str, list_name: str, entry: Optional[Dict[str, Any]] = None,
+                            button: Optional[ListButton] = None) -> None:
+    """One listed analysis: its ID (with a copy button) and an Open button, or the button passed."""
+    id_col, button_col = st.columns([5, 1] if button is None else [4, 1], vertical_alignment="center")
     with id_col:
         st.code(analysis_id, language=None)
     with button_col:
+        if button is not None:
+            button(analysis_id, list_name, entry or {})
+            return
         if st.button("Open", key=f"open_{list_name}_{analysis_id}"):
             try:
                 run = open_saved_analysis(analysis_id)

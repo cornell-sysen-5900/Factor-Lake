@@ -1,9 +1,10 @@
 """
 The Compare tab in the real app (AppTest), with an in-process Lambda and a fake S3: saved
 Legacy and WRDS analyses (with and without trading costs, and one saved by main's code)
-compared 2, 3 and 4 at a time; adding and removing boxes; the picker; bad, duplicate,
-expired, cohort and pre-sharing IDs; sorting and the differences switch without reloads;
-and the tab only reading saved results (no backtest, no market data).
+compared 2, 3 and 4 at a time, as soon as 2 IDs are valid; adding and removing boxes;
+adding from the history lists (Added, full, cohort); bad, duplicate, expired, cohort and
+pre-sharing IDs; sorting, adding and the differences switch without reloads; and the tab
+only reading saved results (no backtest, no market data).
 """
 import json
 
@@ -59,14 +60,20 @@ def _boxes(at):
 
 
 def _compare(at, *ids):
-    """Fills the boxes (adding boxes as needed) and clicks Compare."""
+    """Fills the boxes (adding boxes as needed, emptying the rest): the comparison updates by itself."""
     _open_compare(at)
     while len(_boxes(at)) < len(ids):
         at.button(key='compare_add').click().run()
-    for box, analysis_id in zip(_boxes(at), ids):
-        box.set_value(analysis_id).run()
-    at.button(key='compare_btn').click().run()
+    for k, box in enumerate(_boxes(at)):
+        value = ids[k] if k < len(ids) else ''
+        if box.value != value:
+            box.set_value(value).run()
     assert not at.exception, [e.value for e in at.exception]
+
+
+def _result_gets(s3, since=0):
+    """The saved results read from S3 since a point, by analysis ID."""
+    return [key.split('/')[-1][:-5] for key, _ in s3.gets[since:] if key.split('/')[-2] == 'backtest-results']
 
 
 def _table(at):
@@ -191,7 +198,6 @@ def test_boxes_start_at_two_add_up_to_four_and_can_be_removed(saved):
                                                                                   'compare_remove_3']
     for box, analysis_id in zip(_boxes(at), (ids['legacy'], ids['quarterly'], ids['monthly'], ids['main'])):
         box.set_value(analysis_id).run()
-    at.button(key='compare_btn').click().run()
     assert len(_table(at).columns) == 4
 
     # Removing the third box removes its ID and its column, and Add works again
@@ -203,18 +209,127 @@ def test_boxes_start_at_two_add_up_to_four_and_can_be_removed(saved):
     assert [b.key for b in _boxes(at)][-1] == 'compare_id_4' and _boxes(at)[-1].value == ''
 
 
-def test_the_picker_lists_this_sessions_analyses_and_fills_the_box(saved):
+def test_the_comparison_appears_as_soon_as_two_ids_are_valid(saved):
     at, ids = saved
     _open_compare(at)
-    picker = at.selectbox(key='compare_pick_1')
-    # This session's three runs, each named by its label and short ID
-    assert sorted(o.split(' · ')[-1] for o in picker.options) == sorted(
-        ids[k][:8] for k in ('legacy', 'quarterly', 'monthly'))
-    assert any(o.startswith('Run 2: WRDS, Quarterly | 25 bps · ') for o in picker.options)
-    picker.set_value(ids['quarterly']).run()
+    assert not [b for b in at.button if b.key == 'compare_btn']             # no Compare button
+    assert not [s for s in at.selectbox if s.key.startswith('compare_pick_')]   # no picker: the lists replace it
+    _boxes(at)[0].set_value(ids['legacy']).run()
+    assert not at.table and not at.error
+    assert any(i.value == "Enter at least 2 valid analysis IDs to compare." for i in at.info)
+    _boxes(at)[1].set_value(ids['quarterly']).run()
     _assert_clean(at)
-    assert at.text_input(key='compare_id_1').value == ids['quarterly']
-    assert at.selectbox(key='compare_pick_1').value is None
+    assert len(_table(at).columns) == 2
+
+
+def test_adding_removing_and_sorting_never_reload_a_loaded_analysis(saved, s3):
+    at, ids = saved
+    start = len(s3.gets)
+    _compare(at, ids['legacy'], ids['quarterly'])
+    assert sorted(_result_gets(s3, start)) == sorted([ids['legacy'], ids['quarterly']])   # each read once
+    # Adding a third reads only the third
+    mark = len(s3.gets)
+    at.button(key='compare_add').click().run()
+    _boxes(at)[2].set_value(ids['monthly']).run()
+    assert _result_gets(s3, mark) == [ids['monthly']] and len(_table(at).columns) == 3
+    # Sorting, the switch, removing a box and adding it back read nothing
+    mark = len(s3.gets)
+    at.selectbox(key='compare_sort').set_value('Sharpe').run()
+    at.toggle(key='compare_differences_only').set_value(True).run()
+    at.button(key='compare_remove_2').click().run()
+    assert len(_table(at).columns) == 2
+    at.button(key='compare_add').click().run()
+    _boxes(at)[2].set_value(ids['monthly']).run()
+    assert len(_table(at).columns) == 3 and _result_gets(s3, mark) == []
+
+
+# ---------------------------------------------------------------------------
+# The history lists
+# ---------------------------------------------------------------------------
+
+def _add_button(at, list_name, analysis_id):
+    return at.button(key=f'compare_add_{list_name}_{analysis_id}')
+
+
+def test_this_sessions_analyses_can_be_added_and_show_added(saved):
+    at, ids = saved
+    _open_compare(at)
+    # The Results tab's list, with Add to comparison in place of the bare ID
+    assert any(e.label == "This session's analyses (3)" for e in at.expander)
+    button = _add_button(at, 'session', ids['quarterly'])
+    assert button.label == 'Add to comparison' and not button.proto.disabled
+    button.click().run()
+    _assert_clean(at)
+    assert [b.value for b in _boxes(at)] == [ids['quarterly'], '']          # the first empty box
+    assert _add_button(at, 'session', ids['quarterly']).label == 'Added'
+    assert _add_button(at, 'session', ids['quarterly']).proto.disabled
+    _add_button(at, 'session', ids['legacy']).click().run()
+    assert [b.value for b in _boxes(at)] == [ids['quarterly'], ids['legacy']]
+    assert len(_table(at).columns) == 2                                     # compared at once
+    # Every box is full: a third adds a box
+    _add_button(at, 'session', ids['monthly']).click().run()
+    assert [b.value for b in _boxes(at)] == [ids['quarterly'], ids['legacy'], ids['monthly']]
+    assert len(_table(at).columns) == 3
+
+
+def test_earlier_analyses_on_this_browser_can_be_added(saved):
+    at, ids = saved
+    at.session_state['browser_analyses'] = [{'analysis_id': ids['main'], 'label': 'Run 1: ROE using 9/30 Data',
+                                             'how': 'computed in Lambda', 'saved_at': '2026-10-20T10:00:00Z'}]
+    _open_compare(at)
+    assert any(e.label == 'Earlier analyses on this browser (1)' for e in at.expander)
+    _add_button(at, 'earlier', ids['main']).click().run()
+    _assert_clean(at)
+    assert _boxes(at)[0].value == ids['main'] and _add_button(at, 'earlier', ids['main']).label == 'Added'
+
+
+def test_all_saved_analyses_can_be_added_and_cohorts_cannot(saved):
+    at, ids = saved
+    # A cohort comparison of the Legacy run, saved by the Lambda as kind 'cohort'
+    _click_main_tab(at, 'Results')
+    from tests.unit.test_saved_runs import _open_tab
+    legacy_run = next(r for r in at.session_state['saved_runs'] if r['compute']['hash'] == ids['legacy'])
+    _open_tab(at, legacy_run['label'])
+    at.button(key=f"cohort_btn_{legacy_run['id']}").click().run()
+    _assert_clean(at)
+    cohort_id = legacy_run['cohort']['compute']['hash']
+
+    _open_compare(at)
+    at.session_state['compare_all_analyses_expander'] = True
+    at.run()
+    _assert_clean(at)
+    cohort = _add_button(at, 'all', cohort_id)
+    assert cohort.label == 'Add to comparison' and cohort.proto.disabled
+    assert cohort.proto.help == ("This ID is a cohort comparison, not an analysis: "
+                                 "only analyses can be compared.")
+    assert any(m.value.startswith('**Cohort comparison: ') for m in at.markdown)
+    at.session_state['compare_all_analyses_expander'] = True               # the browser keeps sending it
+    _add_button(at, 'all', ids['monthly']).click().run()
+    _assert_clean(at)
+    assert _boxes(at)[0].value == ids['monthly']
+    at.session_state['compare_all_analyses_expander'] = True
+    at.run()
+    assert _add_button(at, 'all', ids['monthly']).label == 'Added'
+
+
+def test_adding_to_a_full_comparison_shows_a_message(saved):
+    at, ids = saved
+    _compare(at, ids['legacy'], ids['quarterly'], ids['main'], OLD_IDS['cohort'])
+    before = [b.value for b in _boxes(at)]
+    _add_button(at, 'session', ids['monthly']).click().run()
+    assert [b.value for b in _boxes(at)] == before
+    assert [w.value for w in at.warning] == ["The comparison already has 4 analyses. Remove one to add another."]
+    at.run()
+    assert not at.warning                                                   # shown once
+
+
+def test_the_results_tabs_lists_keep_their_open_buttons(saved):
+    at, ids = saved
+    _click_main_tab(at, 'Results')
+    assert not [b for b in at.button if b.key.startswith('compare_add_')]
+    at.session_state['all_analyses_expander'] = True
+    at.run()
+    assert at.button(key=f"open_all_{ids['monthly']}").label == 'Open'
 
 
 def test_the_ids_sort_and_switch_survive_a_tab_switch(saved):
@@ -245,7 +360,6 @@ def test_bad_duplicate_expired_cohort_and_pre_sharing_ids_show_an_error_in_their
 
     # The rest still compare when at least 2 are valid
     _boxes(at)[3].set_value(ids['quarterly']).run()
-    at.button(key='compare_btn').click().run()
     assert len(at.error) == 2
     assert len(_table(at).columns) == 2
 
