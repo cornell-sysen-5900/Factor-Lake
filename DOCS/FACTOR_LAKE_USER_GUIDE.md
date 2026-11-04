@@ -78,6 +78,7 @@ When backtests run in AWS Lambda, every analysis is saved for 90 days under an *
 5. **All saved analyses** lists everyone's saved analyses (newest 20), with their factors, method, period and starting amount, and an **Open** button. It loads only when you expand it. WRDS analyses start with "WRDS" and their frequency, e.g. "WRDS, Quarterly | ROE (higher), ROA (higher) | ...", and the two lists above show the same line under a WRDS run.
 6. Runs computed in the app (with the Lambda switch off) are not saved, so they have no ID.
 7. An ID that is mistyped, or older than 90 days, shows an error saying no saved analysis has that ID.
+8. To see 2 to 4 saved analyses side by side, use the **Compare** tab ([17. Compare analyses](#17-compare-analyses)).
 
 ## 8. Read the results in order
 
@@ -215,3 +216,29 @@ For example, at 25 bps a rebalance that turns over 100% of a $10,000 portfolio c
 Analyses saved before trading costs existed open at 0 bps.
 
 **Limitation.** The cost is the same for every stock. Real costs are higher for small, illiquid stocks and for large trades; costs by stock size or liquidity are not modelled yet.
+
+## 17. Compare analyses
+
+The **Compare** tab, after Results, shows 2 to 4 saved analyses side by side, like comparing phones before buying one. Legacy and WRDS analyses can be compared together.
+
+1. Open **Compare**. It starts with 2 boxes; **+ Add analysis** adds one, up to 4, and boxes 3 and 4 have a remove button (✕).
+2. In each box, paste an analysis ID, or pick one of your analyses (this session's and earlier ones on this browser) from the list under it.
+3. Click **Compare**. The saved results are read from S3: no backtest runs and no market data is loaded.
+
+Only saved analysis IDs work, so only runs done in AWS Lambda can be compared. A box with a mistyped or expired ID, the same ID as another box, or the ID of a cohort comparison or ranked list shows a short error, and the other analyses still compare as long as at least 2 are valid. Empty boxes are skipped.
+
+**The table** has one column per analysis, headed by its label and short ID; above the table each analysis has its color, its data source and frequency, and its full ID with a copy button. The rows are grouped:
+
+- **Settings**: data source, frequency, period, initial AUM, factors with their directions, factor combination, weighting, sectors, fossil fuels, delisting strategy, benchmark and trading cost.
+- **Performance**: final portfolio value, total return, CAGR, cumulative outperformance against the analysis's own benchmark (Russell 2000 for Legacy, IWM for WRDS), and its best and worst period.
+- **Risk**: volatility (raw), Sharpe, max drawdown, beta and information ratio, with the same names and formats as Results. Sortino and tracking error are not in the backtest statistics, so they are not shown.
+- **Costs**: CAGR before costs, average turnover per rebalance, total trading cost paid and annualized cost drag. Analyses run without a trading cost, or saved before trading costs existed, show 0 bps, n/a turnover, $0 cost and 0% drag.
+
+**Reading it:**
+
+- The best value of each row is green: higher CAGR, return, Sharpe and information ratio; the smallest drawdown; lower volatility, turnover, cost paid and cost drag. Settings and beta are never highlighted, and neither is a tie (values that look the same) or n/a.
+- Volatility, Sharpe and information ratio are annualized, so they compare across frequencies as they are. Best and worst period and turnover per rebalance are each analysis's own periods (a year, half-year, quarter or month), so they are highlighted only when the analyses have the same frequency.
+- A ≠ after a row's name means its values differ. **Show only differences** hides the rows that are the same.
+- **Sort by** reorders the columns best first by CAGR, total return, Sharpe, max drawdown, volatility, information ratio or cost drag (n/a last, ties in the order entered). **Entered order** puts them back. Sorting never reloads the results.
+
+**The chart** overlays every analysis's portfolio after costs (solid) and its own benchmark (dashed, in a lighter shade of the same color) on one date axis. Each analysis keeps its color when you sort; the legend follows the sort. Legacy's yearly values are placed on September 30, since Legacy rebalances on the 9/30 data.
