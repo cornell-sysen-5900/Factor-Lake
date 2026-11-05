@@ -118,10 +118,12 @@ def test_rows_are_cleaned_counted_and_split_by_year(built):
     assert manifest['rows_written'] == 11
     assert manifest['cleaning'] == {'rows_read': 17, 'dropped_missing_date': 2, 'dropped_before_start': 0,
                                     'dropped_missing_price': 2, 'dropped_missing_id': 1, 'dropped_duplicates': 1,
-                                    'ticker_date_conflicts': 0}
+                                    'ticker_date_conflicts': 0, 'delisting_returns_applied': 0,
+                                    'delistings_ignored': 0}
     assert manifest['start_date'] is None
     assert manifest['security_key'] == 'permno'
-    assert manifest['ignored_csv_columns'] == ['COMNAM']
+    assert manifest['ignored_csv_columns'] == []
+    assert manifest['delisted_securities'] == 0     # no DLSTCD column: unknown, not "delisted"
     assert manifest['date_range'] == ['2007-12-31', '2009-12-31']
     assert manifest['securities'] == 6
     assert {y: v['securities'] for y, v in manifest['years'].items()} == {'2007': 1, '2008': 2, '2009': 5}
@@ -173,6 +175,171 @@ def test_last_prices_and_the_ended_early_boundary(built):
     flags = last['ended_early'].astype(bool).to_dict()
     assert flags == {10001: False, 10002: True, 10004: False, 10005: False, 10006: False, 10007: True}
     assert manifest['ended_early_securities'] == 2
+
+
+def test_columns_missing_from_the_csv_are_empty_and_ret_total_is_ret(built):
+    out, _ = built
+    y2008 = _year(out, 2008)
+    assert y2008['comnam'].tolist() == ['Alpha', 'Alpha', 'Alpha', 'Beta', 'Beta']
+    assert y2008[['cusip', 'naics']].isna().all().all() and y2008[['shrcd', 'dlstcd']].isna().all().all()
+    pd.testing.assert_series_equal(y2008['ret_total'], y2008['ret'], check_names=False)
+    last = pd.read_parquet(out / DAILY_LAST_PRICES_FILE)
+    assert last['delisted'].isna().all() and last['delist_ret'].isna().all()
+
+
+# ---------------------------------------------------------------------------
+# The other CRSP columns and delisting returns (the real file's lower-case header)
+# ---------------------------------------------------------------------------
+
+CRSP_HEADER = ('permno,permco,date,ticker,comnam,cusip,shrcd,exchcd,siccd,naics,prc,openprc,askhi,bidlo,'
+               'bid,ask,vol,ret,shrout,cfacpr,dlstcd,dlret,shares_held,notes\n')
+CRSP_ROWS = [
+    # 20001: code 100 (active) while trading, then the delisting code and return on a final row with
+    # no price (CRSP's usual layout). A second row that day comes later in the file and is ignored.
+    '20001,501,2015-03-02,aaa, Alpha Inc ,00123456,11,3,Z,334413,10,9.9,-10.2,9.8,9.95,10.05,100,0.01,50,1,100,,7,x',
+    '20001,501,2015-03-03,aaa,Alpha Inc,00123456,11,3,3674,334413,11,0,11.5,-10.5,10.9,11.1,100,0.1,50,1,100,,7,x',
+    '20001,501,2015-03-10,aaa,Alpha Inc,00123456,11,3,3674,334413,,,,,,,,,50,1,552,-0.5,,x',
+    '20001,501,2015-03-10,aaa,Alpha Inc,00123456,11,3,3674,334413,,,,,,,,,50,1,560,-0.9,,x',
+    # 20002: delisting code and return repeated on every row; no return on the last day
+    '20002,502,2015-03-02,bbb,Beta,00999999,10,1,2834,,5,5,5,5,5,5,10,0.0,20,2,233,0.2,,',
+    '20002,502,2015-03-03,bbb,Beta,00999999,10,1,2834,,6,0,0,0,0,0,10,,20,2,233,0.2,,',
+    # 20003: still active (code 100) until the data ends
+    '20003,503,2015-03-02,ccc,Gamma,11111111,11,2,6020,522110,8,8,8,8,8,8,10,0.0,30,1,100,,,',
+    '20003,503,2015-03-03,ccc,Gamma,11111111,11,2,6020,522110,8,8,8,8,8,8,10,0.0,30,1,100,,,',
+    # 20004: delisted, but the delisting return is a CRSP missing code (letter, then -55)
+    '20004,504,2015-03-02,ddd,Delta,22222222,11,-2,7372,,4,4,4,4,4,4,10,0.05,40,1,331,S,,',
+    '20004,504,2015-03-03,ddd,Delta,22222222,11,-2,7372,,4,4,4,4,4,4,10,0.02,40,1,331,-55,,',
+    # 20005: no delisting information at all; codes written as decimals
+    '20005,505,2015-03-03,eee,Epsilon,33333333,12.0,3.5,1311,,9,9,9,9,9,9,10,0.03,50,1,,,,',
+]
+
+
+@pytest.fixture
+def crsp(tmp_path):
+    path = tmp_path / 'crsp.csv'
+    path.write_text(CRSP_HEADER + '\n'.join(CRSP_ROWS) + '\n')
+    out = tmp_path / 'out'
+    # chunk_rows=2 puts 20001's unpriced delisting row in a different chunk from its last priced day
+    manifest = daily.build_daily_dataset(path, out, chunk_rows=2)
+    return _year(out, 2015), pd.read_parquet(out / DAILY_LAST_PRICES_FILE).set_index('permno'), manifest
+
+
+def test_crsp_identifier_and_code_columns_are_kept(crsp):
+    df, _, manifest = crsp
+    assert manifest['ignored_csv_columns'] == ['notes']
+    assert list(df.columns) == daily.OUTPUT_COLUMNS
+    alpha = _row(df, 20001, '2015-03-02')
+    assert (alpha['permco'], alpha['cusip'], alpha['comnam'], alpha['naics']) == (501, '00123456', 'Alpha Inc', '334413')
+    assert (alpha['shrcd'], alpha['exchcd'], alpha['shares_held']) == (11, 3, 7.0)
+    assert pd.isna(alpha['siccd'])                                   # letter code Z -> missing
+    assert _row(df, 20001, '2015-03-03')['siccd'] == 3674
+    assert _row(df, 20004, '2015-03-02')['exchcd'] == -2             # a real CRSP code (halted), not missing
+    epsilon = _row(df, 20005, '2015-03-03')
+    assert epsilon['shrcd'] == 12 and pd.isna(epsilon['exchcd'])     # 12.0 is a code; 3.5 is not
+    for col in daily.CODE_COLUMNS:                                    # same types in every year's file
+        assert str(df[col].dtype) == 'Int64', col
+
+
+def test_crsp_quote_columns(crsp):
+    df, _, _ = crsp
+    alpha = _row(df, 20001, '2015-03-02')
+    assert (alpha['openprc'], alpha['askhi'], alpha['bidlo'], alpha['bid'], alpha['ask']) == (9.9, 10.2, 9.8, 9.95, 10.05)
+    later = _row(df, 20001, '2015-03-03')
+    assert np.isnan(later['openprc']) and later['bidlo'] == 10.5      # 0 -> missing; negative bidlo made positive
+    assert _row(df, 20002, '2015-03-03')[['openprc', 'askhi', 'bidlo', 'bid', 'ask']].isna().all()
+
+
+def test_delisting_return_is_applied_once_on_the_last_trading_day(crsp):
+    df, _, manifest = crsp
+    # Unpriced final row: the row itself is dropped, its -50% lands on the last priced day
+    assert _row(df, 20001, '2015-03-02')['ret_total'] == pytest.approx(0.01)
+    assert _row(df, 20001, '2015-03-03')['ret_total'] == pytest.approx(1.1 * 0.5 - 1)
+    assert len(df[df['permno'] == 20001]) == 2
+    # Repeated on every row: applied only on the last day, alone because ret is missing there
+    assert _row(df, 20002, '2015-03-02')['ret_total'] == pytest.approx(0.0)
+    assert _row(df, 20002, '2015-03-03')['ret_total'] == pytest.approx(0.2)
+    assert _row(df, 20002, '2015-03-02')['dlret'] == pytest.approx(0.2)   # dlret column stays as in the CSV
+    # Missing-value codes are not returns
+    assert _row(df, 20004, '2015-03-03')['ret_total'] == pytest.approx(0.02)
+    assert df.loc[df['permno'] == 20004, 'dlret'].isna().all()
+    assert manifest['cleaning']['delisting_returns_applied'] == 2
+    assert manifest['cleaning']['dropped_missing_price'] == 2
+
+
+def test_last_prices_carry_the_crsp_delisting_code(crsp):
+    _, last, manifest = crsp
+    assert last['delist_code'].tolist() == [552, 233, 100, 331, pd.NA]
+    assert last['delisted'].tolist() == [True, True, False, True, pd.NA]   # code 200+; unknown without a code
+    assert last.loc[20001, 'delist_ret'] == -0.5 and np.isnan(last.loc[20004, 'delist_ret'])
+    assert str(last.loc[20001, 'last_date'].date()) == '2015-03-03'      # the last day with a price
+    assert last.loc[20001, 'comnam'] == 'Alpha Inc'
+    assert manifest['delisted_securities'] == 3
+    assert not last['ended_early'].any()
+
+
+def test_delisting_rows_before_the_start_date_are_ignored(tmp_path):
+    path = tmp_path / 'crsp.csv'
+    path.write_text(CRSP_HEADER
+                    + '30001,1,2009-12-30,old,Old,1,11,3,1,,5,5,5,5,5,5,1,0.0,1,1,552,-0.9,,\n'
+                    + '30001,1,2010-01-04,old,Old,1,11,3,1,,5,5,5,5,5,5,1,0.0,1,1,,,,\n')
+    manifest = daily.build_daily_dataset(path, tmp_path / 'out', start=date(2010, 1, 1))
+    assert _year(tmp_path / 'out', 2010)['ret_total'].tolist() == [0.0]
+    assert manifest['delisted_securities'] == 0
+
+
+def _crsp_build(tmp_path, rows, **kwargs):
+    path = tmp_path / 'crsp.csv'
+    path.write_text(CRSP_HEADER + '\n'.join(rows) + '\n')
+    out = tmp_path / 'out'
+    manifest = daily.build_daily_dataset(path, out, **kwargs)
+    frames = pd.concat([_year(out, int(y)) for y in manifest['years']], ignore_index=True)
+    return frames, pd.read_parquet(out / DAILY_LAST_PRICES_FILE), manifest
+
+
+def _crsp(permno, day, prc, ret, dlstcd='', dlret='', ticker='abc'):
+    return f'{permno},1,{day},{ticker},Co,1,11,3,1,,{prc},{prc},{prc},{prc},{prc},{prc},1,{ret},1,1,{dlstcd},{dlret},,'
+
+
+def test_delisting_return_lands_on_the_last_day_across_years_and_chunks(tmp_path):
+    # The file is out of date order and each row is its own chunk: the 2015 rows come first,
+    # so the last day has to be the latest date seen in any chunk, not the latest chunk's
+    rows = [_crsp(40001, '2015-01-05', 6, '0.03', 552, '0.2'), _crsp(40001, '2015-01-02', 6, '0.02', 552, '0.2'),
+            _crsp(40001, '2014-12-31', 5, '0.01', 552, '0.2'), _crsp(40001, '2014-12-30', 5, '0.0', 552, '0.2')]
+    df, last, manifest = _crsp_build(tmp_path, rows, chunk_rows=1)
+    expected = {'2014-12-30': 0.0, '2014-12-31': 0.01, '2015-01-02': 0.02, '2015-01-05': 1.03 * 1.2 - 1}
+    got = dict(zip(df['date'].dt.strftime('%Y-%m-%d'), df['ret_total']))
+    assert got == pytest.approx(expected)
+    assert manifest['cleaning']['delisting_returns_applied'] == 1
+
+
+def test_latest_delisting_row_wins_by_date_then_by_file_order(tmp_path):
+    rows = [_crsp(50001, '2016-03-10', '', '', 574, '-1.0'),     # the real delisting, first in the file
+            _crsp(50001, '2016-03-10', '', '', 552, '-0.3'),     # same day, later in the file: ignored
+            _crsp(50001, '2016-03-01', 7, '0.01', 100, ''),      # an earlier active code later in the file
+            _crsp(50001, '2016-03-02', 8, '0.02', 100, '')]
+    df, last, manifest = _crsp_build(tmp_path, rows, chunk_rows=1)
+    assert (last.loc[0, 'delist_code'], last.loc[0, 'delist_ret'], last.loc[0, 'delisted']) == (574, -1.0, True)
+    assert df['ret_total'].tolist() == pytest.approx([0.01, -1.0])   # a -100% delisting return is kept
+
+
+def test_ticker_reuse_and_shared_tickers_do_not_borrow_a_delisting(tmp_path):
+    path = tmp_path / 'tickers.csv'
+    path.write_text('date,ticker,comnam,prc,ret,dlstcd,dlret\n'
+                    '2011-05-02,ABC,Old Co,5,0.01,,\n'
+                    '2011-05-10,ABC,Old Co,,,552,-0.5\n'      # Old Co delists...
+                    '2012-01-03,ABC,New Co,20,0.02,,\n'       # ...and New Co reuses the ticker
+                    '2018-12-31,ABC,New Co,21,0.04,,\n'
+                    '2018-12-28,SHR,Class A,5,0.01,,\n'       # two share classes end on the same day
+                    '2018-12-28,SHR,Class B,6,0.02,,\n'
+                    '2019-01-04,SHR,Class A,,,552,-0.5\n')
+    out = tmp_path / 'out'
+    manifest = daily.build_daily_dataset(path, out)
+    df = pd.concat([_year(out, 2011), _year(out, 2018)], ignore_index=True)
+    pd.testing.assert_series_equal(df['ret_total'], df['ret'], check_names=False)
+    last = pd.read_parquet(out / DAILY_LAST_PRICES_FILE).set_index('ticker')
+    assert last['delist_code'].isna().all() and last['delisted'].isna().all()
+    assert manifest['cleaning']['delistings_ignored'] == 2
+    assert manifest['cleaning']['delisting_returns_applied'] == 0
 
 
 def test_ticker_only_csv_drops_exact_copies_and_reports_conflicts(tmp_path):
@@ -252,6 +419,10 @@ def test_publish_uploads_years_then_manifest_and_reads_back(built):
     assert len(manager.read_daily_prices()) == 11
     with pytest.raises(S3DataError, match=r"No daily data published for \[2015\]"):
         manager.read_daily_prices(years=[2015])
+    some = manager.read_daily_prices(years=[2009], columns=['permno', 'date', 'ret_total'])
+    assert list(some.columns) == ['permno', 'date', 'ret_total'] and len(some) == 5
+    with pytest.raises(S3DataError, match=r"Unknown daily data columns \['price'\]"):
+        manager.read_daily_prices(columns=['permno', 'price'])
 
 
 def test_size_mismatch_stops_before_the_manifest(built):
