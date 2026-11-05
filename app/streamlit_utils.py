@@ -5,14 +5,15 @@ PURPOSE: Utility functions for session management, authentication, and data orch
 VERSION: 3.4.0
 """
 
+import hmac
 import os
 import sys
-import hmac
-import pandas as pd
-import streamlit as st
 from datetime import timedelta
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
+import streamlit as st
 
 # Where market data can come from (see get_data_source)
 DATA_SOURCES = ('s3', 'supabase')
@@ -24,13 +25,13 @@ BACKTEST_LAMBDA_ENV = 'FACTOR_LAKE_BACKTEST_LAMBDA'
 def initialize_environment() -> None:
     """
     Configures the system path and environment variables.
-    
-    Ensures the project root is accessible to the Python interpreter and 
+
+    Ensures the project root is accessible to the Python interpreter and
     loads local environment variables if a .env file is present.
     """
     current_dir = Path(__file__).resolve().parent
     project_root = current_dir.parent
-    
+
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
 
@@ -54,8 +55,8 @@ def initialize_environment() -> None:
 # def check_password(secrets_map: Dict[str, Any]) -> bool:
 #     """
 #     Implements an HMAC-based authentication gatekeeper.
-#     
-#     Validates user credentials against configured secrets before 
+#
+#     Validates user credentials against configured secrets before
 #     allowing access to the application logic.
 #     """
 #     configured_password = secrets_map.get("password") or os.environ.get("ADMIN_PASSWORD")
@@ -86,8 +87,8 @@ def check_password(secrets_map: Dict[str, Any]) -> bool:
 def initialize_session_state() -> None:
     """
     Initializes the global Streamlit session state object.
-    
-    Sets default values for data containers, factor selections, and 
+
+    Sets default values for data containers, factor selections, and
     analysis results to ensure cross-component stability.
     """
     default_state = {
@@ -148,8 +149,8 @@ def load_shared_universe(source: str) -> pd.DataFrame:
 def load_and_process_data(user_settings: Dict[str, Any]) -> None:
     """
     Orchestrates data fetching and universe filtering.
-    
-    Applies ESG restrictions, sector filters, and date constraints 
+
+    Applies ESG restrictions, sector filters, and date constraints
     to the raw dataset retrieved from the configured data source.
 
     raw_data is shared by every session (st.cache_resource), so it is never
@@ -254,8 +255,8 @@ def run_cohort(run: Dict[str, Any], cohort_pct: float):
     result, info = get_lambda_client(function_name).run(job)
     return result['top'], result['bottom'], info
 
-def run_backtest_logic(user_settings: Dict[str, Any], 
-                       factor_names: List[str], 
+def run_backtest_logic(user_settings: Dict[str, Any],
+                       factor_names: List[str],
                        factor_dirs: Dict[str, str]) -> Optional[Dict[str, Any]]:
     """
     Executes the portfolio backtesting engine and saves the run.
@@ -272,11 +273,11 @@ def run_backtest_logic(user_settings: Dict[str, Any],
     Returns:
         The saved run, or None if the run was rejected or failed (nothing is saved).
     """
+    from app.saved_runs import add_saved_run, build_run_label
+    from app.streamlit_config import FACTOR_METADATA, MAX_SAVED_RUNS
     from src.backtest_engine import rebalance_portfolio
     from src.backtest_jobs import build_job
     from src.trading_costs import job_trading_cost
-    from app.streamlit_config import FACTOR_METADATA, MAX_SAVED_RUNS
-    from app.saved_runs import add_saved_run, build_run_label
 
     factor_labels = [f for f in factor_names if f in FACTOR_METADATA]
     if not factor_labels:
@@ -404,9 +405,9 @@ def run_wrds_backtest_logic(user_settings: Dict[str, Any], factor_names: List[st
     Returns:
         The saved run, or None if the run was rejected or failed (nothing is saved).
     """
-    from src.wrds_jobs import build_wrds_job
-    from app.streamlit_config import MAX_SAVED_RUNS, WRDS_FACTOR_METADATA
     from app.saved_runs import add_saved_run
+    from app.streamlit_config import MAX_SAVED_RUNS, WRDS_FACTOR_METADATA
+    from src.wrds_jobs import build_wrds_job
 
     factor_labels = [f for f in factor_names if f in WRDS_FACTOR_METADATA]
     if not factor_labels:
@@ -484,9 +485,9 @@ def open_saved_analysis(text: str) -> Dict[str, Any]:
     Raises:
         SavedAnalysisError: with a message for the user (not an ID, expired, ...).
     """
-    from src.saved_analyses import load_saved_analysis
-    from app.streamlit_config import MAX_SAVED_RUNS
     from app.saved_runs import add_saved_run, build_run_label
+    from app.streamlit_config import MAX_SAVED_RUNS
+    from src.saved_analyses import load_saved_analysis
 
     saved = load_saved_analysis(text, get_results_store())
     job = saved['job']
@@ -499,7 +500,8 @@ def open_saved_analysis(text: str) -> Dict[str, Any]:
     if job.get('data_mode') == 'wrds':
         run = {
             'id': run_id,
-            'label': f"{_wrds_run_label(run_id, factor_labels, job['frequency'], job.get('trading_cost_bps'))} (opened)",
+            'label': (f"{_wrds_run_label(run_id, factor_labels, job['frequency'], job.get('trading_cost_bps'))}"
+                      " (opened)"),
             'data_mode': 'wrds',
             'factor_labels': factor_labels,
             'factors': list(job['factors']),

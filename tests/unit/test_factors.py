@@ -2,9 +2,10 @@
 Test suite for factor_registry.py and factor_utils.py
 Tests registry completeness, column resolution, and signal normalization.
 """
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
+
 from src.factor_registry import FACTOR_REGISTRY, get_factor_column
 from src.factor_utils import normalize_series
 

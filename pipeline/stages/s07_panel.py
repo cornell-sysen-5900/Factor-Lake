@@ -26,14 +26,35 @@ import numpy as np
 import pandas as pd
 
 from pipeline.checks import PASS, WARN, Check, check
-from pipeline.config import (BETA_DAYS, BETA_MONTHS, COMPUSTAT_FLAG_MIN_MONTHS,
-                             COMPUSTAT_SHARES_MIN_EXCESS, DISPERSION_MIN_MEAN,
-                             DISPERSION_MIN_NUMEST, FORWARD_YIELD_MAX_ABS, GICS_INDUSTRIES, GICS_SECTORS,
-                             IBES_MAX_AGE_DAYS, MIN_OBS_SHARE, PEER_MIN, PRICE_BASED_FACTORS, PRICE_FLOOR,
-                             RV_MIN_DENOMINATOR_MUSD, RV_MIN_FORWARD_EPS, SANITY_MEDIAN_RANGES,
-                             SHARE_CLASS_GAP_COMPANY, SHARE_CLASS_GAP_YEAR, SIC_TO_GICS_SECTOR, SIC_UNCLASSIFIED,
-                             SNAPSHOT_SIZE_RANGE, STALE_FUNDAMENTALS_DAYS, SURPRISE_MAX_ABS, SURPRISE_MAX_AGE_DAYS,
-                             SURPRISE_PRICE_MAX_DAYS, DataPaths)
+from pipeline.config import (
+    BETA_DAYS,
+    BETA_MONTHS,
+    COMPUSTAT_FLAG_MIN_MONTHS,
+    COMPUSTAT_SHARES_MIN_EXCESS,
+    DISPERSION_MIN_MEAN,
+    DISPERSION_MIN_NUMEST,
+    FORWARD_YIELD_MAX_ABS,
+    GICS_INDUSTRIES,
+    GICS_SECTORS,
+    IBES_MAX_AGE_DAYS,
+    MIN_OBS_SHARE,
+    PEER_MIN,
+    PRICE_BASED_FACTORS,
+    PRICE_FLOOR,
+    RV_MIN_DENOMINATOR_MUSD,
+    RV_MIN_FORWARD_EPS,
+    SANITY_MEDIAN_RANGES,
+    SHARE_CLASS_GAP_COMPANY,
+    SHARE_CLASS_GAP_YEAR,
+    SIC_TO_GICS_SECTOR,
+    SIC_UNCLASSIFIED,
+    SNAPSHOT_SIZE_RANGE,
+    STALE_FUNDAMENTALS_DAYS,
+    SURPRISE_MAX_ABS,
+    SURPRISE_MAX_AGE_DAYS,
+    SURPRISE_PRICE_MAX_DAYS,
+    DataPaths,
+)
 from pipeline.outputs import fresh_stage_dir, table_info, write_parquet, write_summary
 from pipeline.stages import s02_prices
 
@@ -117,9 +138,10 @@ def monthly_beta(monthly: pd.DataFrame, mkt_m: pd.DataFrame) -> pd.DataFrame:
     mo = monthly[["permno", "month_end", "ret_m"]].assign(month=monthly["month_end"].dt.to_period("M"))
     lo = mo.groupby("permno")["month"].min()
     hi = mo.groupby("permno")["month"].max()
-    n = np.array([(h - l).n + 1 for l, h in zip(lo, hi)])
+    n = np.array([(last - first).n + 1 for first, last in zip(lo, hi)])
     grid = pd.DataFrame({"permno": np.repeat(lo.index.to_numpy(), n),
-                         "month": np.concatenate([pd.period_range(l, h, freq="M") for l, h in zip(lo, hi)])})
+                         "month": np.concatenate([pd.period_range(first, last, freq="M")
+                                                  for first, last in zip(lo, hi)])})
     grid = grid.merge(mo[["permno", "month", "ret_m"]], on=["permno", "month"], how="left")
     mm = mkt_m.assign(month=pd.PeriodIndex(mkt_m["month"], freq="M")).set_index("month")
     x = grid["month"].map(mm["mktrf"])
@@ -216,7 +238,8 @@ def company_months(monthly: pd.DataFrame, fq: pd.DataFrame, me: pd.DataFrame) ->
                       right_on="report_date", by="permno", direction="backward")
     x.loc[(x["month_end"] - x["period_end"]).dt.days > STALE_FUNDAMENTALS_DAYS, "cshoq"] = np.nan
     cf = me.set_index(["permno", "month"])["cfacshr_t"]
-    at = lambda d: cf.reindex(pd.MultiIndex.from_arrays([x["permno"], d.dt.to_period("M")])).to_numpy()
+    def at(d):
+        return cf.reindex(pd.MultiIndex.from_arrays([x["permno"], d.dt.to_period("M")])).to_numpy()
     now = at(x["month_end"])
     x["cs"] = pd.Series(x["cshoq"].to_numpy() * at(x["period_end"]) / np.where(now > 0, now, np.nan),
                         index=x.index).where(lambda s: s > 0)
@@ -556,7 +579,8 @@ PANEL_COLS = ("date", "permno", "permco", "gvkey", "ticker", "security_name", "g
               "snapshot_report_dt", "snapshot_eff_dt", "new_entrant", "price_date", "prc", "shrout", "mkt_cap_musd",
               "company_mkt_cap_musd", "company_mkt_cap_crsp_musd", "company_cap_from_compustat", "is_adr",
               "n_share_classes",
-              "company_shares_crsp_m", "company_shares_compustat_m", "cfacpr_t", "cfacpr_last", *PRICE_FACTORS, "beta_252d",
+              "company_shares_crsp_m", "company_shares_compustat_m", "cfacpr_t", "cfacpr_last", *PRICE_FACTORS,
+              "beta_252d",
               "beta_60m", "fund_period_end", "fund_report_date", "fund_is_usd", "fund_stale", *BLOCKS, "ev",
               *STATEMENT_FACTORS, *PRICE_SCALED, *QE_FACTORS, "ibes_statpers", "numest_fy1", *ANALYST,
               "surprise_anndats", "surprise_fpedats", "ret_next_1m", "delisted_next_month",
@@ -628,7 +652,8 @@ def run(paths: DataPaths) -> dict:
               PEERS: table_info(peers, "date", ["n_peers"]), MASTER: table_info(master, None, [])}
     summary = write_summary(out, STAGE, tables, checks, extra)
     print(f"  panel {len(panel):,} rows, {extra['months']} months {panel['date'].min():%Y-%m} to "
-          f"{panel['date'].max():%Y-%m}, {n.min():,}-{n.max():,} stocks | stale fundamentals {b['info']['stale_rows']:,}"
+          f"{panel['date'].max():%Y-%m}, {n.min():,}-{n.max():,} stocks | "
+          f"stale fundamentals {b['info']['stale_rows']:,}"
           f" | late-filed quarters dropped {b['info']['late_filed_quarters_dropped']} | peer rows {len(peers):,} | "
           f"master {len(master):,} | company-months from Compustat shares "
           f"{cinfo['company_cap_from_compustat']['company_months']:,} | capped {b['info']['capped_yields']}")

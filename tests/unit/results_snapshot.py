@@ -21,8 +21,13 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from tests.unit.test_saved_runs import (_assert_clean, _click_main_tab, _open_tab, _synthetic_universe,
-                                        browser_like_widget_states)
+from tests.unit.test_saved_runs import (
+    _assert_clean,
+    _click_main_tab,
+    _open_tab,
+    _synthetic_universe,
+    browser_like_widget_states,
+)
 
 APP_DIR = Path(__file__).resolve().parents[2] / 'app'
 

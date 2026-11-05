@@ -5,15 +5,17 @@ PURPOSE: Object-oriented representation of a managed investment portfolio.
 VERSION: 2.0.0
 """
 
+from typing import Any, Dict, List, Optional
+
 import pandas as pd
-from typing import List, Dict, Optional, Any
+
 
 class Portfolio:
     """
     Manages a collection of equity investments and handles position state.
-    
-    This class serves as the primary container for portfolio constituents during 
-    the rebalancing process. It provides a structured interface for the backtest 
+
+    This class serves as the primary container for portfolio constituents during
+    the rebalancing process. It provides a structured interface for the backtest
     engine to track share counts and ticker allocations across factor cohorts.
     """
 
@@ -32,7 +34,7 @@ class Portfolio:
         Appends a new position to the portfolio constituent list.
         """
         self.investments.append({
-            'ticker': ticker, 
+            'ticker': ticker,
             'number_of_shares': n_shares
         })
 
@@ -55,10 +57,10 @@ class Portfolio:
 
         # Create a temporary series for vectorized valuation
         holdings = pd.DataFrame(self.investments).set_index('ticker')['number_of_shares']
-        
+
         # Determine correct price column (handle potential underscores)
         price_col = 'Ending_Price' if 'Ending_Price' in market_data.columns else 'Ending Price'
-        
+
         if price_col not in market_data.columns:
             return 0.0
 
@@ -72,7 +74,7 @@ class Portfolio:
         """
         if t1_value == 0:
             return 0.0
-        
+
         return ((t2_value - t1_value) / t1_value) * 100
 
     def to_dataframe(self) -> pd.DataFrame:

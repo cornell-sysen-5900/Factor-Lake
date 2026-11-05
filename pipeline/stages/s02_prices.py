@@ -30,8 +30,16 @@ import pyarrow.csv as pacsv
 import pyarrow.parquet as pq
 
 from pipeline.checks import PASS, WARN, Check, check, vs_last_run
-from pipeline.config import (DELISTING_FILL, DELISTING_FILL_DEFAULT, MIN_OBS_SHARE, MOMENTUM_WINDOWS,
-                             PARQUET_COMPRESSION, TRADING_DAYS_PER_YEAR, VOL_WINDOWS, DataPaths)
+from pipeline.config import (
+    DELISTING_FILL,
+    DELISTING_FILL_DEFAULT,
+    MIN_OBS_SHARE,
+    MOMENTUM_WINDOWS,
+    PARQUET_COMPRESSION,
+    TRADING_DAYS_PER_YEAR,
+    VOL_WINDOWS,
+    DataPaths,
+)
 from pipeline.outputs import fresh_stage_dir, table_info, write_parquet, write_summary
 from pipeline.stages.s00_inventory import read_header
 

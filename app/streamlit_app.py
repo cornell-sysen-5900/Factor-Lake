@@ -24,23 +24,27 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import streamlit as st
-import streamlit_utils as utils
-import streamlit_css as css
-import streamlit_config as config
 
 import components.sidebar as sidebar
-from components.strategy_settings import render_strategy_settings
-from components.factor_selection import (clear_factor_selection, render_factor_selection,
-                                         reset_factor_selection)
-from components.results_tab import (OPENED_MESSAGE_KEY, render_all_saved_analyses, render_analysis_history,
-                                    render_earlier_analyses, render_open_saved_analysis,
-                                    render_saved_runs)
+import streamlit_config as config
+import streamlit_css as css
+import streamlit_utils as utils
 from analysis_history import BROWSER_ANALYSES_KEY, earlier_analyses, sync_browser_analyses
-from components.compare_tab import render_compare_tab
-from components.scoreboard_tab import OPEN_RESULTS_KEY, render_scoreboard_tab
 from compare_state import OPEN_COMPARE_KEY
-from components.data_viewer import render_data_viewer_tab, clear_viewer_data
 from components.about import render_about_tab
+from components.compare_tab import render_compare_tab
+from components.data_viewer import clear_viewer_data, render_data_viewer_tab
+from components.factor_selection import clear_factor_selection, render_factor_selection, reset_factor_selection
+from components.results_tab import (
+    OPENED_MESSAGE_KEY,
+    render_all_saved_analyses,
+    render_analysis_history,
+    render_earlier_analyses,
+    render_open_saved_analysis,
+    render_saved_runs,
+)
+from components.scoreboard_tab import OPEN_RESULTS_KEY, render_scoreboard_tab
+from components.strategy_settings import render_strategy_settings
 
 # Global Page Configuration
 st.set_page_config(
@@ -154,15 +158,16 @@ def main():
     # To re-enable: uncomment below and keep password in secrets/env
     # if not utils.check_password(st.secrets):
     #     st.stop()
-        
+
     st.markdown(
         '<div class="main-header-container">' +
         '<div class="main-header">Factor-Lake Portfolio Analysis</div>' +
-        '<a href="https://cornell-sysen-5900.github.io/Factor-Lake/" target="_blank" class="docs-icon-link" title="View Documentation">📚</a>' +
+        '<a href="https://cornell-sysen-5900.github.io/Factor-Lake/" target="_blank" class="docs-icon-link" '
+        'title="View Documentation">📚</a>' +
         '</div>',
         unsafe_allow_html=True
     )
-    
+
     # Render Global Sidebar and capture configuration
     user_settings = sidebar.render_sidebar(config.SECTOR_OPTIONS, utils.describe_data_source(),
                                            utils.get_backtest_lambda_name(),

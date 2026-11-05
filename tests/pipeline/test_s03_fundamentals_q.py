@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pipeline.config import DataPaths, YTD_ITEMS
+from pipeline.config import YTD_ITEMS, DataPaths
 from pipeline.stages import s03_fundamentals_q as s03
 
 NUMERIC = ["atq", "ltq", "actq", "lctq", "cheq", "invtq", "rectq", "apq", "ppentq", "gdwlq", "intanq", "dlcq",
@@ -140,7 +140,8 @@ def test_run_writes_output_and_summary(tmp_path):
 
 
 def test_near_zero_denominators_give_nan():
-    # prior TTM sales 0.8 (< $1M): no sales growth; prior TTM capex 0.4: no capex growth; current sales 0.8: no R&D ratio
+    # prior TTM sales 0.8 (< $1M): no sales growth; prior TTM capex 0.4: no capex growth;
+    # current sales 0.8: no R&D ratio
     raw = quarters(8, saleq=[0.2] * 4 + [5.0] * 4, capxy=[0.1, 0.2, 0.3, 0.4, 2.0, 4.0, 6.0, 8.0], xrdq=1.0)
     out = built(raw)
     assert np.isnan(out.loc[(2021, 4), "f_sales_growth_1yr"]) and np.isnan(out.loc[(2021, 4), "f_capex_growth_1yr"])

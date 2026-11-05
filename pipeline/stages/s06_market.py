@@ -25,8 +25,18 @@ import numpy as np
 import pandas as pd
 
 from pipeline.checks import PASS, WARN, Check, check
-from pipeline.config import (CLOSED_MARKET_DAYS, DAILY_START, ETF_PERMNOS, FF_MONTHLY_TOLERANCE, FRED_SERIES,
-                             INDEX_TICS, IWM_MINUS_INDEX_RANGE, MAX_FILLED_RUN_DAYS, YIELD_RANGES, DataPaths)
+from pipeline.config import (
+    CLOSED_MARKET_DAYS,
+    DAILY_START,
+    ETF_PERMNOS,
+    FF_MONTHLY_TOLERANCE,
+    FRED_SERIES,
+    INDEX_TICS,
+    IWM_MINUS_INDEX_RANGE,
+    MAX_FILLED_RUN_DAYS,
+    YIELD_RANGES,
+    DataPaths,
+)
 from pipeline.outputs import fresh_stage_dir, table_info, write_parquet, write_summary
 
 STAGE = "s06_market"

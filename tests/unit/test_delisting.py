@@ -3,10 +3,11 @@ Test suite for time-adjusted delisting strategy functionality.
 Tests the three delisting modes: zero_return, hold_cash, reinvest.
 Time fractions are derived from Delist_Date; missing dates default to 0.5.
 """
-import pytest
 import datetime
-import pandas as pd
+
 import numpy as np
+import pandas as pd
+import pytest
 
 from src.backtest_engine import _calculate_annual_return
 from src.portfolio import Portfolio
@@ -178,7 +179,8 @@ class TestEdgeCases:
         assert ret == pytest.approx(0.0, abs=1e-9)
 
         # hold_cash: rf * fraction * value / value = rf * fraction
-        ret, _ = _calculate_annual_return([p], df, delisting_strategy='hold_cash', risk_free_rate=0.03, rebalance_year=2010)
+        ret, _ = _calculate_annual_return([p], df, delisting_strategy='hold_cash', risk_free_rate=0.03,
+                                          rebalance_year=2010)
         assert ret == pytest.approx(0.03 * frac, abs=1e-9)
 
         # reinvest: no live positions => 0

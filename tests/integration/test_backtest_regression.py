@@ -8,12 +8,13 @@ the upstream Supabase data was modified.
 
 Values last calibrated: 2026-04-13 (time-adjusted delisting engine).
 """
-from src.supabase_client import SupabaseManager
-from src.backtest_engine import rebalance_portfolio
-import pytest
 import os
+
+import pytest
 import streamlit as st
 
+from src.backtest_engine import rebalance_portfolio
+from src.supabase_client import SupabaseManager
 
 pytestmark = [
     pytest.mark.integration,

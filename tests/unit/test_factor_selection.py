@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from app.streamlit_config import FACTOR_METADATA, FACTOR_GROUPS
+from app.streamlit_config import FACTOR_GROUPS, FACTOR_METADATA
 from tests.unit.test_saved_runs import _synthetic_universe
 
 APP_DIR = Path(__file__).resolve().parents[2] / 'app'

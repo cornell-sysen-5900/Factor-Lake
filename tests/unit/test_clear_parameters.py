@@ -8,7 +8,12 @@ from app.streamlit_config import FACTOR_METADATA, SECTOR_OPTIONS
 from src.backtest_jobs import results_match
 from tests.unit.test_backtest_lambda import lambda_app, manager, s3  # noqa: F401 (fixtures)
 from tests.unit.test_saved_runs import (
-    _add_factor, _assert_clean, _click, _click_main_tab, _open_tab, at,
+    _add_factor,
+    _assert_clean,
+    _click,
+    _click_main_tab,
+    _open_tab,
+    at,
 )  # noqa: F401 (fixture)
 
 

@@ -16,16 +16,34 @@ from typing import Any, Dict
 
 import streamlit as st
 
-from components.results_tab import (_build_wealth_series, _pick_rebalance, _render_advanced_stats_grid,
-                                    _render_cohort_analysis_section, _render_growth_plot,
-                                    _render_header_captions, _render_holdings_caption,
-                                    _render_holdings_dataframe, _render_summary_metrics,
-                                    _render_win_loss_ledger, _render_year_by_year_table)
 from app.streamlit_utils import describe_compute, load_wrds_holdings, run_wrds_ranked
-from app.wrds_tables import (FREQUENCY_LABELS, benchmark_label, calendar_year_results, frequency_caption,
-                             holdings_display_table, period_by_period_columns, period_label,
-                             ranked_display_table, result_notes, short_benchmark, table_number_formats,
-                             win_loss_columns)
+from app.wrds_tables import (
+    FREQUENCY_LABELS,
+    benchmark_label,
+    calendar_year_results,
+    frequency_caption,
+    holdings_display_table,
+    period_by_period_columns,
+    period_label,
+    ranked_display_table,
+    result_notes,
+    short_benchmark,
+    table_number_formats,
+    win_loss_columns,
+)
+from components.results_tab import (
+    _build_wealth_series,
+    _pick_rebalance,
+    _render_advanced_stats_grid,
+    _render_cohort_analysis_section,
+    _render_growth_plot,
+    _render_header_captions,
+    _render_holdings_caption,
+    _render_holdings_dataframe,
+    _render_summary_metrics,
+    _render_win_loss_ledger,
+    _render_year_by_year_table,
+)
 from Visualizations.wrds_plots import plot_wrds_period_returns
 
 WRDS_DELISTING = "CRSP delisting returns included, then the risk-free rate until the next rebalance"

@@ -5,12 +5,15 @@ PURPOSE: Configuration interface for global backtest parameters and ESG filters.
 VERSION: 2.7.0
 """
 
-import streamlit as st
-import streamlit_config as config
-from typing import Callable, Dict, Any, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
+import streamlit as st
+
+import streamlit_config as config
 from src.trading_costs import MAX_TRADING_COST_BPS
-from src.wrds_calendar import FIRST_YEAR as WRDS_FIRST_YEAR, LAST_YEAR as WRDS_LAST_YEAR, describe_schedule
+from src.wrds_calendar import FIRST_YEAR as WRDS_FIRST_YEAR
+from src.wrds_calendar import LAST_YEAR as WRDS_LAST_YEAR
+from src.wrds_calendar import describe_schedule
 from src.wrds_factors import WRDS_SECTORS
 
 # Widget key of the Legacy / WRDS switch
@@ -132,7 +135,7 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
                        else "Backtests run in this app (load the market data first).")
 
         st.divider()
-        
+
         # ESG & Ethical Filtering
         st.subheader("ESG Filters")
         restrict_fossil_fuels = st.checkbox(
@@ -141,9 +144,9 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
             key="restrict_fossil_fuels_input",
             help="Exclude coal, oil, gas and petroleum companies."
         )
-        
+
         st.divider()
-        
+
         # Allocation Methodology
         st.subheader("Portfolio Weighting")
         weighting_method = st.radio(
@@ -154,7 +157,7 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
             help="Equal: same dollars per stock. Market Cap: sized by company value."
         )
         use_market_cap_weight = (weighting_method == "Market Cap Weight")
-        
+
         if use_market_cap_weight:
             st.info("Portfolio will be weighted by market capitalization, aligning with the Russell 2000 methodology.")
 
@@ -199,7 +202,8 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
                 options=["Zero Return", "Hold Cash", "Reinvest"],
                 index=0,
                 key="delisting_strategy_input",
-                help="Zero Return: earns 0%. Hold Cash: earns the risk free rate. Reinvest: spread across remaining stocks."
+                help="Zero Return: earns 0%. Hold Cash: earns the risk free rate. "
+                     "Reinvest: spread across remaining stocks."
             )
             delisting_map = {"Zero Return": "zero_return", "Hold Cash": "hold_cash", "Reinvest": "reinvest"}
             delisting_strategy_key = delisting_map[delisting_strategy]

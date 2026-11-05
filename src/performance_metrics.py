@@ -5,8 +5,10 @@ PURPOSE: Mathematical core with comprehensive index coverage.
 VERSION: 1.3.0
 """
 
+from typing import Any, Dict, List
+
 import numpy as np
-from typing import Dict, List, Any
+
 
 def compute_comprehensive_metrics(p_ret: np.ndarray, b_ret: np.ndarray, g_ret: np.ndarray,
                                  v_ret: np.ndarray, rf: np.ndarray,
@@ -26,7 +28,7 @@ def compute_comprehensive_metrics(p_ret: np.ndarray, b_ret: np.ndarray, g_ret: n
     # Excess Returns
     excess_p, excess_b = p_ret - rf, b_ret - rf
     excess_g, excess_v = g_ret - rf, v_ret - rf
-    
+
     def get_vols(rets):
         return np.std(rets, ddof=1) if len(rets) > 1 else 0
 
@@ -50,7 +52,8 @@ def compute_comprehensive_metrics(p_ret: np.ndarray, b_ret: np.ndarray, g_ret: n
 
     def build_wealth(rets):
         vals = [p_vals[0]]
-        for r in rets: vals.append(vals[-1] * (1 + r))
+        for r in rets:
+            vals.append(vals[-1] * (1 + r))
         return vals
 
     # Year-by-Year Comparisons

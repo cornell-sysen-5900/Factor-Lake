@@ -13,8 +13,16 @@ import pytest
 
 from app.holdings_table import TURNOVER_HELP
 from tests.unit.test_holdings_table import _downloaded_csv, served_files  # noqa: F401 (fixture)
-from tests.unit.test_saved_runs import (_add_factor, _assert_clean, _captions, _click, _click_main_tab, _metric,
-                                        _run_tab_labels, at)  # noqa: F401 (fixture)
+from tests.unit.test_saved_runs import (
+    _add_factor,
+    _assert_clean,
+    _captions,
+    _click,
+    _click_main_tab,
+    _metric,
+    _run_tab_labels,  # noqa: F401 (fixture)
+    at,
+)
 from tests.unit.test_wrds_saved import OLD_IDS, _run_wrds, manager, new_session, s3  # noqa: F401 (fixtures)
 
 COST_KEY = 'trading_cost_bps_input'
@@ -151,8 +159,8 @@ def test_a_legacy_lambda_run_sends_the_cost_and_its_history_and_listing_show_it(
     run = at.session_state['saved_runs'][0]
     assert run['label'] == 'Run 1: ROE using 9/30 Data | 25 bps'
     assert at.session_state['analysis_history'][-1]['label'].endswith('| 25 bps')
-    from src.saved_analyses import list_saved_analyses
     from app.streamlit_utils import get_results_store
+    from src.saved_analyses import list_saved_analyses
     listing = list_saved_analyses(get_results_store())['entries']
     assert listing[0]['analysis_id'] == run['compute']['hash'] and listing[0]['summary'].endswith('| 25 bps')
 

@@ -72,7 +72,8 @@ def test_schema_dictionary_holds_nothing_from_the_data():
     schema = dictionary.render_schema()
     assert not cs.leaked(schema, values)
     assert cs.leaked(schema + "\n| x | 1.235 |", values) == ["1.235"]
-    assert "### Stats" not in schema and "Coverage by year" not in schema and "rows" not in schema.split("## Files")[1].split("\n")[2]
+    assert "### Stats" not in schema and "Coverage by year" not in schema
+    assert "rows" not in schema.split("## Files")[1].split("\n")[2]
 
 
 def test_schema_and_full_dictionaries_list_the_same_columns():

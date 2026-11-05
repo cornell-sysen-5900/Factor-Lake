@@ -9,11 +9,10 @@ import pandas as pd
 import pytest
 
 from src.backtest_engine import rebalance_portfolio
+from src.factor_utils import normalize_series
 from src.performance_metrics import compute_comprehensive_metrics
 from src.wrds_calendar import FIRST_MONTH, LAST_MONTH, PERIODS_PER_YEAR
-from src.wrds_engine import (eligible_universe, factor_zscores, run_periods,
-                             run_wrds_backtest)
-from src.factor_utils import normalize_series
+from src.wrds_engine import eligible_universe, factor_zscores, run_periods, run_wrds_backtest
 from tests.unit.wrds_fixtures import month_ends, synthetic_frames
 
 FACTORS = ['f_roe', 'mom_12_1', 'f_book_to_price']
@@ -283,7 +282,9 @@ def _metrics(k=None):
     rf = rng.uniform(0, 0.01, 12)
     values = list(1000 * np.cumprod(np.r_[1, 1 + p]))
     args = (p, b, g, v, rf, values, 2010, 2022)
-    return compute_comprehensive_metrics(*args) if k is None else compute_comprehensive_metrics(*args, periods_per_year=k)
+    if k is None:
+        return compute_comprehensive_metrics(*args)
+    return compute_comprehensive_metrics(*args, periods_per_year=k)
 
 
 def test_metrics_default_is_legacy_and_k_annualizes_volatility_sharpe_and_ir():

@@ -5,7 +5,7 @@ PURPOSE: Centralized registry mapping UI labels to backend database column names
 VERSION: 2.3.0
 """
 
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
 # Maximum number of backtest runs kept as tabs in Results (oldest dropped first)
 MAX_SAVED_RUNS: int = 5

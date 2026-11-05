@@ -25,8 +25,16 @@ import numpy as np
 import pandas as pd
 
 from pipeline.checks import PASS, WARN, Check, check
-from pipeline.config import (DCF_EXCLUDED_SECTORS, GICS_INDUSTRIES, GICS_SECTORS, REPORT_LAG_DAYS_ANNUAL,
-                             STATUTORY_TAX_RATE, STATUTORY_TAX_RATE_FROM_2018, TAX_RATE_RANGE, DataPaths)
+from pipeline.config import (
+    DCF_EXCLUDED_SECTORS,
+    GICS_INDUSTRIES,
+    GICS_SECTORS,
+    REPORT_LAG_DAYS_ANNUAL,
+    STATUTORY_TAX_RATE,
+    STATUTORY_TAX_RATE_FROM_2018,
+    TAX_RATE_RANGE,
+    DataPaths,
+)
 from pipeline.outputs import fresh_stage_dir, table_info, write_parquet, write_summary
 from pipeline.stages.s03_fundamentals_q import OUTPUT as QUARTERLY_OUTPUT
 from pipeline.stages.s03_fundamentals_q import STAGE as QUARTERLY_STAGE
@@ -37,7 +45,8 @@ OUTPUT = "dcf_inputs_annual.parquet"
 _TEXT = ("gvkey", "tic", "conm", "indfmt", "consol", "popsrc", "datafmt", "curcd", "costat")
 FCFF_PARTS = ("ebit", "tax_rate_fcff", "da", "capex", "d_nwc")
 BLOCKS = ("revenue", "ebitda", "ebit", "da", "capex", "oancf", "pretax_income", "taxes", "tax_rate",
-          "tax_rate_fcff", "statutory_tax_rate", "interest_expense", "net_income", "nwc", "d_nwc", "total_debt", "cash", "net_debt", "preferred",
+          "tax_rate_fcff", "statutory_tax_rate", "interest_expense", "net_income", "nwc", "d_nwc", "total_debt",
+          "cash", "net_debt", "preferred",
           "minority_interest", "diluted_shares", "basic_shares", "book_equity", "dividends", "dividends_total",
           "buybacks", "share_issuance", "fcff", "revenue_growth", "ebitda_growth")
 ID_COLS = ("permno", "gvkey", "tic", "conm", "fyear", "fyr", "period_end", "report_date", "report_date_source",

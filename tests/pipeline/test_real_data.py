@@ -38,6 +38,7 @@ def test_final_files_match_the_manifest():
 
 def test_repo_dictionary_holds_no_value_from_the_data():
     import pandas as pd
+
     from pipeline import column_stats as cs
     stats = pd.read_parquet(DATA / "processed" / "final" / "column_stats.parquet")
     schema = (Path(__file__).resolve().parents[2] / "pipeline" / "DATA_DICTIONARY.md").read_text(encoding="utf-8")

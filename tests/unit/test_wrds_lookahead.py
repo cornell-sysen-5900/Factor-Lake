@@ -52,8 +52,9 @@ def test_changing_data_after_t_changes_nothing_at_t(combination, cap, k):
     results2, holdings2 = _run(frames, combination, cap)
 
     # Text columns are categoricals whose category list covers the whole run, so compare values
-    upto = lambda h: h[h['rebalance_date'] <= t].reset_index(drop=True).astype(
-        {'ticker': object, 'name': object, 'sector': object})
+    def upto(h):
+        return h[h['rebalance_date'] <= t].reset_index(drop=True).astype(
+            {'ticker': object, 'name': object, 'sector': object})
     pd.testing.assert_frame_equal(upto(holdings2), upto(holdings))     # same stocks, ranks, scores, weights, returns
     n = k + 1                                                          # periods ending by t_next
     assert results2['yearly_returns'][:n] == results['yearly_returns'][:n]
@@ -70,7 +71,8 @@ def test_returns_in_the_holding_period_change_returns_but_never_what_is_bought()
     rm.loc[in_period, 'ret_m'] = -rm.loc[in_period, 'ret_m']
     results2, holdings2 = _run(frames)
 
-    at_t = lambda h: h[h['rebalance_date'] == t]
+    def at_t(h):
+        return h[h['rebalance_date'] == t]
     pd.testing.assert_frame_equal(at_t(holdings2)[HOLDING_KEYS], at_t(holdings)[HOLDING_KEYS])
     assert results2['yearly_returns'][2] != results['yearly_returns'][2]
     assert results2['yearly_returns'][:2] == results['yearly_returns'][:2]

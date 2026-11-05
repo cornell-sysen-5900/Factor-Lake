@@ -12,9 +12,11 @@ TODO(supabase): Once credentials are restored, verify:
   - The >10,000 record threshold still holds for the 'Full Precision Test' table.
   - The Supabase project URL is valid (current secrets.toml points to a dead project).
 """
-import pytest
-import pandas as pd
 import os
+
+import pandas as pd
+import pytest
+
 from src.supabase_client import SupabaseManager
 
 # Skip entire module if no credentials

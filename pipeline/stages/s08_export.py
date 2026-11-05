@@ -32,8 +32,16 @@ import pyarrow.parquet as pq
 from pipeline import column_stats as cs
 from pipeline import dictionary
 from pipeline.checks import PASS, Check, check
-from pipeline.config import (DELISTING_FILL, DELISTING_FILL_DEFAULT, GICS_SECTORS, PARQUET_COMPRESSION,
-                             SIC_TO_GICS_SECTOR, SIC_UNCLASSIFIED, UNITS, DataPaths)
+from pipeline.config import (
+    DELISTING_FILL,
+    DELISTING_FILL_DEFAULT,
+    GICS_SECTORS,
+    PARQUET_COMPRESSION,
+    SIC_TO_GICS_SECTOR,
+    SIC_UNCLASSIFIED,
+    UNITS,
+    DataPaths,
+)
 from pipeline.outputs import fresh_stage_dir, utc_now, write_json, write_parquet, write_summary
 
 STAGE = "s08_export"
@@ -176,7 +184,8 @@ def output_info(out: Path, name: str, date_col: str | None) -> dict:
 
 def source_ends(inventory: dict) -> dict:
     rng = {k: v.get("date_range") for k, v in inventory["files"].items()}
-    end = lambda k: rng[k][1] if rng.get(k) else None
+    def end(k):
+        return rng[k][1] if rng.get(k) else None
     return {"prices (CRSP CIZ daily)": end("r2000_price_crsp_ciz.csv"),
             "holdings (IWM)": end("iwm_holdings_raw.csv"),
             "Fama-French": end("ff_daily.csv"),
@@ -191,7 +200,8 @@ def build_manifest(paths: DataPaths, out: Path, version: str, outputs: dict, inv
     commit, dirty = git_commit()
     gaps = pd.read_parquet(paths.stage_dir("s01_membership") / "known_gaps.parquet")
     panel = pd.read_parquet(out / "factor_panel_monthly.parquet",
-                            columns=["date", "permco", "company_cap_from_compustat"]).drop_duplicates(["date", "permco"])
+                            columns=["date", "permco", "company_cap_from_compustat"]
+                            ).drop_duplicates(["date", "permco"])
     return {
         "data_version": version, "created_at": utc_now(),
         "pipeline_git_commit": commit, "pipeline_git_dirty": dirty,
@@ -248,7 +258,10 @@ def s3_folder(version: str) -> str:
 # ---------- UPLOAD.md ----------
 
 def upload_md(version: str, outputs: dict) -> str:
-    """UPLOAD.md: how to run scripts/upload_wrds.py on this folder. Only the Parquet files and the daily manifest go up."""
+    """
+    UPLOAD.md: how to run scripts/upload_wrds.py on this folder. Only the Parquet files and the
+    daily manifest go up.
+    """
     prefix = f"{S3_PREFIX}/{s3_folder(version)}"
     n_files = sum(o["files"] for o in outputs.values())
     total = sum(o["size_mb"] for o in outputs.values())
@@ -258,8 +271,9 @@ The upload script is `scripts/upload_wrds.py` in the Factor-Lake repo. It sends 
 
     s3://{S3_BUCKET}/{prefix}/
 
-a new folder next to the files the live app reads (`{S3_PREFIX}/full_precision_test.parquet`, `{S3_PREFIX}/daily_prices/`,
-...), so nothing the app reads is touched. It refuses any other prefix and never deletes anything.
+a new folder next to the files the live app reads (`{S3_PREFIX}/full_precision_test.parquet`,
+`{S3_PREFIX}/daily_prices/`, ...), so nothing the app reads is touched. It refuses any other prefix and never
+deletes anything.
 
 What goes up: the {n_files} Parquet files (about {total:,.0f} MB) with their relative paths (the tables at the top level
 and `prices_daily/year=YYYY/data.parquet`), then `prices_daily/_manifest.json` last, once every year file is
