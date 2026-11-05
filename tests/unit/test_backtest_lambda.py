@@ -75,6 +75,11 @@ class FakeS3:
         self.modified[Key] = datetime(2026, 10, 1, tzinfo=timezone.utc) + timedelta(seconds=len(self.puts))
         self.puts.append(Key)
 
+    def copy_object(self, Bucket, Key, CopySource, Metadata, MetadataDirective, ContentType=None):
+        """Only the in-place metadata rewrite (scripts/score_saved_analyses.py)."""
+        assert CopySource == {'Bucket': Bucket, 'Key': Key} and MetadataDirective == 'REPLACE'
+        self.put_object(Bucket, Key, self.objects[Key][0], ContentType, Metadata)
+
     def list_objects_v2(self, Bucket, Prefix, ContinuationToken=None):
         if not self.can_list:
             raise ClientError({'Error': {'Code': 'AccessDenied'}}, 'ListObjectsV2')
@@ -429,6 +434,19 @@ def test_check_script_compares_lambda_with_local(monkeypatch, manager, capsys, l
     assert ('All checks passed.' in out) == (exit_code == 0)
     # The first job again at 25 bps: its cost fields, and a final value below the job at 0 bps
     assert 'costs:  25 bps, average turnover' in out and 'final value below 0 bps: yes' in out
+    # Every analysis's scores (for the scoreboard) were saved and equal the local result's; the cohort has none
+    assert out.count('scores: saved') == 4 and 'scores: none, as for every cohort' in out
+    assert 'scores: NO' not in out
+
+
+def test_check_script_fails_when_the_lambda_saves_no_scores(monkeypatch, manager, capsys):
+    import scripts.check_backtest_lambda as check
+    monkeypatch.setattr(backtest_service, 'score_metadata', lambda job, result: {})   # a Lambda from before
+    monkeypatch.setattr(check, 'S3DataManager', lambda: manager)
+    monkeypatch.setattr(check, 'BacktestLambdaClient',
+                        lambda name: BacktestLambdaClient(name, client=FakeLambda(BacktestService(manager))))
+    assert check.main(["--skip-wrds"]) == 1
+    assert capsys.readouterr().out.count('scores: NO scores saved') == 4
 
 
 # ---------------------------------------------------------------------------

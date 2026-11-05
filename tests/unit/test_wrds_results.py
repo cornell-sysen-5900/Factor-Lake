@@ -416,12 +416,14 @@ def test_the_data_viewer_says_it_shows_legacy_data_in_wrds_mode(new_session):
 def test_legacy_results_tab_renders_exactly_as_on_main():
     expected = json.loads((FIXTURES / 'legacy_results_render_main.json').read_text(encoding='utf-8'))
     actual = json.loads(json.dumps(legacy_results_snapshot(), sort_keys=True))
-    # The one change: the main tab bar's new Compare tab, right after Results (and its run tabs).
-    # Everything else, including every other tab, is compared with main's snapshot unchanged.
+    # The changes: the main tab bar's new Compare and Scoreboard tabs, right after Results (and its
+    # run tabs). Everything else, including every other tab, is compared with main's snapshot unchanged.
     for step, render in actual.items():
-        assert render['tabs'].count('Compare') == 1, step
-        assert render['tabs'].index('Compare') == render['tabs'].index('Data Viewer') - 1, step
+        assert render['tabs'].count('Compare') == 1 and render['tabs'].count('Scoreboard') == 1, step
+        assert render['tabs'].index('Compare') == render['tabs'].index('Data Viewer') - 2, step
+        assert render['tabs'].index('Scoreboard') == render['tabs'].index('Data Viewer') - 1, step
         render['tabs'].remove('Compare')
+        render['tabs'].remove('Scoreboard')
     # Text, widgets and table cells must be equal; numbers to the Lambda check's relative 1e-9
     # (main's snapshot was rendered on Windows, CI renders on Linux)
     difference, where = max_difference(comparable(actual), comparable(expected))

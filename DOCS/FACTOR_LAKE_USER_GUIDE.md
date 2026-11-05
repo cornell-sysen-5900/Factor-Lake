@@ -79,6 +79,7 @@ When backtests run in AWS Lambda, every analysis is saved for 90 days under an *
 6. Runs computed in the app (with the Lambda switch off) are not saved, so they have no ID.
 7. An ID that is mistyped, or older than 90 days, shows an error saying no saved analysis has that ID.
 8. To see 2 to 4 saved analyses side by side, use the **Compare** tab ([17. Compare analyses](#17-compare-analyses)).
+9. To see which saved analyses did best, use the **Scoreboard** tab ([18. Backtest scoreboard](#18-backtest-scoreboard)).
 
 ## 8. Read the results in order
 
@@ -243,3 +244,19 @@ Only saved analysis IDs work, so only runs done in AWS Lambda can be compared. A
 - **Sort by** reorders the columns best first by CAGR, total return, Sharpe, max drawdown, volatility, information ratio or cost drag (n/a last, ties in the order entered). **Entered order** puts them back. Sorting never reloads the results.
 
 **The chart** overlays every analysis's portfolio after costs, each in its own color, on one date axis, and draws each benchmark once (one Russell 2000 line, one IWM line), grey and dotted. A benchmark's line comes from the first analysis in the current order that uses it, so sorting can change which period it covers. When the analyses have different initial AUMs, every line (each portfolio and each benchmark) is scaled to start at $1,000 and the title says **Growth of $1,000**; when they match, the lines show dollar values. Each analysis keeps its color when you sort; the legend follows the sort. Legacy's yearly values are placed on September 30, since Legacy rebalances on the 9/30 data.
+
+## 18. Backtest scoreboard
+
+The **Scoreboard** tab, after Compare, ranks every saved analysis (everyone's, Legacy and WRDS) by the metric you choose, so you can see which factor combinations did best and open the winners.
+
+1. Open **Scoreboard**. The table lists the analyses ranked by **Sharpe**, best first, 20 at a time; **Show all** lists the rest.
+2. **Rank by** changes the metric: Sharpe, CAGR, cumulative outperformance, max drawdown, volatility, win rate, total return or final value. The ranked column's header has ▼ (highest first) or ▲ (lowest first, for volatility). Max drawdown is a loss, so the smallest loss ranks first. Analyses that tie (they look the same) share a rank and are listed newest first.
+3. Narrow it down with the filters: **Data source** (Legacy, or WRDS with its frequency), **Factor combination** (Mixing or Integrating), **Uses every factor** (only analyses with all the factors you pick) and **Period within** (only analyses whose whole period lies within those years).
+4. Pick an analysis under **Open an analysis** (listed by rank). Its full ID is shown with a copy button. **Open** opens it in Results as a new tab, as if you had pasted its ID; **Compare** adds it to the Compare tab and opens that.
+
+The metrics are the ones the analysis's Results show (and the Compare tab's): the backtest Lambda saves them with each analysis, so the scoreboard reads them without downloading any result or rerunning anything. It reads them again at most once a minute; **Refresh** reads them now. Outperformance and win rate are against each analysis's own benchmark (Russell 2000 for Legacy, IWM for WRDS).
+
+**Comparing fairly.** Analyses cover different periods and start with different amounts. Rank by Sharpe, CAGR or another rate rather than final value, which only compares at the same initial amount, and use **Period within** for a like-for-like ranking. A WRDS analysis's frequency is in its Source column.
+
+Only saved analyses are ranked, so only runs done in AWS Lambda appear. Cohort comparisons and ranked lists are not analyses and are left out. Analyses saved before sharing existed have no settings to score, so the scoreboard leaves them out and says how many; they are still listed under **All saved analyses** in Results. Saved analyses are deleted after 90 days, and they leave the scoreboard then.
+

@@ -1,21 +1,32 @@
 """
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: src/saved_analyses.py
-PURPOSE: Opens a saved analysis (a backtest the Lambda saved in S3) by its analysis ID.
-VERSION: 1.1.0
+PURPOSE: Opens a saved analysis (a backtest the Lambda saved in S3) by its analysis ID, and
+         lists everyone's saved analyses (with their scores, for the scoreboard).
+VERSION: 1.2.0
 
 The analysis ID is the hash the backtest Lambda saves each result under
 (see src/backtest_service.py), so anyone with the ID can open the same results.
 """
 
 import re
-from typing import Any, Dict, Optional
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
+from .analysis_scores import SCORES_FIELD, decode_scores
 from .backtest_jobs import decode_result, decode_saved
 from .backtest_service import RESULT_RETENTION_DAYS, RESULTS_DIR, result_file
 from .s3_client import S3DataManager
 
 ANALYSIS_ID_PATTERN = re.compile(r'^[0-9a-f]{64}$')
+# Saved results that are not analyses (cohort comparisons, WRDS ranked stock lists)
+NOT_ANALYSES = ('cohort', 'ranked')
+# Listings read the metadata of at most this many saved results (the newest), this many at a time
+MAX_LISTED = 1000
+HEAD_WORKERS = 16
+# Metadata of a result whose metadata was rewritten: when it was first saved (UTC, ISO 8601)
+FIRST_SAVED_FIELD = 'first-saved'
 
 
 class SavedAnalysisError(ValueError):
@@ -59,7 +70,52 @@ def list_saved_analyses(manager: Optional[S3DataManager] = None, limit: int = 30
     Raises:
         SavedAnalysisError: the bucket cannot be listed with these AWS keys.
     """
-    manager = manager or S3DataManager()
+    saved = _saved_results(manager or S3DataManager())
+    entries = [{'analysis_id': r['analysis_id'], 'saved_at': r['saved_at'], 'summary': r['summary']}
+               for r in saved if r['kind'] not in NOT_ANALYSES]
+    return {'entries': entries[:limit], 'total': len(saved)}
+
+
+def list_scored_analyses(manager: Optional[S3DataManager] = None) -> Dict[str, Any]:
+    """
+    Everyone's saved analyses with their scores, for the scoreboard, without downloading them.
+
+    Returns:
+        {'entries': [{'analysis_id', 'saved_at', 'summary', 'scores' (src/analysis_scores.py;
+        None when the analysis was saved before scores were recorded)}], newest first,
+        cohort comparisons and ranked lists left out; 'total': number of saved results found}.
+
+    Raises:
+        SavedAnalysisError: the bucket cannot be listed with these AWS keys.
+    """
+    saved = _saved_results(manager or S3DataManager())
+    return {'entries': [{k: r[k] for k in ('analysis_id', 'saved_at', 'summary', 'scores')}
+                        for r in saved if r['kind'] not in NOT_ANALYSES],
+            'total': len(saved)}
+
+
+def _saved_results(manager: S3DataManager) -> List[Dict[str, Any]]:
+    """
+    Every saved result (up to MAX_LISTED, the newest), newest first: {'analysis_id',
+    'saved_at', 'kind', 'summary', 'scores'} from its S3 metadata, read HEAD_WORKERS at a time.
+    A result deleted between the listing and the metadata read is left out.
+    """
+    found = sorted(_list_result_ids(manager), reverse=True)[:MAX_LISTED]
+    with ThreadPoolExecutor(max_workers=HEAD_WORKERS) as pool:
+        metadata = list(pool.map(lambda item: _metadata(manager, item[1]), found))
+    results = []
+    for (last_modified, analysis_id), meta in zip(found, metadata):
+        if meta is None:
+            continue
+        results.append({'analysis_id': analysis_id, 'saved_at': _saved_at(last_modified, meta),
+                        'last_modified': last_modified, 'kind': meta.get('kind'), 'summary': meta.get('summary'),
+                        'scores': decode_scores(meta.get(SCORES_FIELD))})
+    results.sort(key=lambda r: (r['saved_at'], r['last_modified']), reverse=True)
+    return results
+
+
+def _list_result_ids(manager: S3DataManager) -> List[Tuple[datetime, str]]:
+    """(LastModified, analysis ID) of every saved result in S3. Raises SavedAnalysisError."""
     prefix = manager.object_key(RESULTS_DIR) + '/'
     found = []
     token = None
@@ -80,17 +136,29 @@ def list_saved_analyses(manager: Optional[S3DataManager] = None, limit: int = 30
             raise SavedAnalysisError("This app's AWS key may not list saved analyses (it needs s3:ListBucket on "
                                      f"{manager.s3_uri(RESULTS_DIR)}/). Open one by its ID instead.") from e
         raise SavedAnalysisError(f"Could not list saved analyses in S3: {e}") from e
+    return found
 
-    entries = []
-    for saved_at, analysis_id in sorted(found, reverse=True):
-        if len(entries) >= limit:
-            break
-        metadata = manager.client.head_object(Bucket=manager.bucket,
-                                              Key=manager.object_key(result_file(analysis_id))).get('Metadata') or {}
-        if metadata.get('kind') in ('cohort', 'ranked'):
-            continue
-        entries.append({'analysis_id': analysis_id, 'saved_at': saved_at, 'summary': metadata.get('summary')})
-    return {'entries': entries, 'total': len(found)}
+
+def _metadata(manager: S3DataManager, analysis_id: str) -> Optional[Dict[str, str]]:
+    """A saved result's S3 metadata, or None when it no longer exists."""
+    try:
+        head = manager.client.head_object(Bucket=manager.bucket, Key=manager.object_key(result_file(analysis_id)))
+    except Exception as e:
+        if str(getattr(e, 'response', {}).get('Error', {}).get('Code', '')) in ('NoSuchKey', '404', 'NotFound'):
+            return None
+        raise
+    return head.get('Metadata') or {}
+
+
+def _saved_at(last_modified: datetime, metadata: Dict[str, str]) -> datetime:
+    """
+    When a result was saved: its S3 LastModified, or FIRST_SAVED_FIELD when its metadata was
+    rewritten later (scripts/score_saved_analyses.py), which changes LastModified.
+    """
+    try:
+        return datetime.fromisoformat(metadata[FIRST_SAVED_FIELD].replace('Z', '+00:00'))
+    except (KeyError, ValueError):
+        return last_modified
 
 
 def load_saved_analysis(text: Optional[str], manager: Optional[S3DataManager] = None) -> Dict[str, Any]:

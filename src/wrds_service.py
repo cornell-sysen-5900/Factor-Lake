@@ -14,7 +14,8 @@ src/backtest_service.py sends every job with data_mode 'wrds' here. For each job
    backtest-results/<hash>.holdings.parquet (one row group per rebalance date), then
    the result JSON (backtest-results/<hash>.json), which lists the holdings' dates.
    The result JSON therefore only exists once its holdings do. Its S3 metadata has the
-   job's kind and a short summary, read by the list of saved analyses.
+   job's kind and a short summary, read by the list of saved analyses, and a backtest's
+   scores (src/analysis_scores.py), read by the scoreboard.
 """
 
 import logging
@@ -24,6 +25,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
 
+from .analysis_scores import score_metadata
 from .backtest_jobs import encode_saved, job_hash
 from .backtest_service import RESULTS_DIR, _error_code, _is_missing, result_file, summarize_job
 from .s3_client import S3DataManager
@@ -143,6 +145,8 @@ class WrdsBacktestService:
                 # Read by the list of saved analyses without downloading each result
                 'kind': job['kind'],
                 'summary': summarize_wrds_job(job),
+                # Read by the scoreboard, to rank analyses without downloading them
+                **score_metadata(job, result),
             }
             body = encode_saved(job, result)   # with its job, so the hash alone can reopen it
             self._put(filename, body, 'application/json', info)
