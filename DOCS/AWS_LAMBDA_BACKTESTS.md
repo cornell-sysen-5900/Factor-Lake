@@ -114,6 +114,7 @@ The hash a result is saved under doubles as its **analysis ID**. Each saved file
 - **This session's analyses** lists only the runs of the current browser session. Nothing is listed from S3, so nobody sees other people's analyses unless they're given an ID.
 - **Earlier analyses on this browser** (`app/analysis_history.py`) lists IDs from earlier sessions on the same browser. The app has no logins, so they are kept in the browser's `localStorage` (key `factor-lake-analyses`, newest 200). A small inline JavaScript component (`st.components.v2`) adds each session's IDs and reports the stored list to the app once per page load. Reporting more often would rerun the app and clear messages like "Analysis complete".
 - **All saved analyses** lists everyone's newest 20 from S3 (`list_saved_analyses`). It reads only the files' metadata (the Lambda saves a short `summary` and the `kind`, so cohort comparisons and WRDS ranked lists are left out), and only while expanded. Only `<ID>.json` results are listed, never the WRDS holdings files next to them. A WRDS analysis's summary starts with its data source and frequency, e.g. "WRDS, Quarterly | ROE (higher), ROA (higher) | Mixing | 2008-2026 | $1,000", and the session and browser lists show the same line under a WRDS run's label. The app's key needs `s3:ListBucket` on `backtest-results/`; without it the list explains that. Results saved before summaries existed show "Details not recorded".
+- The **Scoreboard** tab ranks everyone's saved analyses by the scores saved in their metadata (section 11).
 - Errors: text that isn't a 64-character ID, an ID with no saved analysis (mistyped, or deleted by the 90-day rule), a result saved before sharing existed, or a cohort comparison's ID.
 
 Demo (about 2 minutes, after the steps in section 5):
@@ -228,3 +229,33 @@ Deployed to `sysen5900-factor-lake-backtest-dev` with `--leave-lifecycle-rules` 
 - "0 bps vs `main`" ran `main`'s code (faeca5c) locally on the same S3 data and compared every number with the dev function's result (relative 1e-9, as the check script).
 - The before-cost values of the 25 bps runs equal the 0 bps runs' final values ($9,460.16 and $4,857.67).
 - `scripts/check_backtest_lambda.py --function-name sysen5900-factor-lake-backtest-dev`: all checks passed, including the Legacy (102.9% average turnover, 0.28% drag) and WRDS (75.8%, 0.82%) runs at 25 bps.
+
+## 11. Scoreboard scores
+
+The Scoreboard tab (user guide, section 18) ranks every saved analysis without downloading any. When the Lambda saves an analysis (`kind` `backtest`, Legacy or WRDS), it adds its **scores** to the result's S3 metadata, next to `kind` and `summary` (`src/analysis_scores.py`). For example (numbers rounded):
+
+```json
+{"v":1,"mode":"legacy","frequency":"Annual","combination":"mixing","start_year":2002,"end_year":2024,
+ "initial_aum":1000.0,"trading_cost_bps":0.0,"factors":["ROE using 9/30 Data","ROA %"],
+ "metrics":{"final_value":9460.16,"total_return":8.46,"cagr":0.1075,"outperformance":0.52,"sharpe":0.61,
+            "max_drawdown":-0.42,"volatility":0.21,"win_rate":0.57}}
+```
+
+- **Metrics** use the Results tab's formulas (the same as `app/compare.py`; `tests/unit/test_scoreboard.py` checks they are equal): CAGR counts years as periods / periods per year, outperformance is cumulative against the analysis's own benchmark, and Sharpe, max drawdown, raw volatility and win rate are the result's own. A missing, NaN or infinite value is saved as `null` (n/a).
+- **Size.** S3 allows 2 KB of metadata in all. The scores are compact ASCII JSON of at most 1,200 characters; when long factor labels would pass that, `factors` is saved as `null` (the summary still names them).
+- **Listing.** `list_scored_analyses` (`src/saved_analyses.py`) lists `backtest-results/` and reads each result's metadata with `head_object`, 16 at a time (about 1 second for 160 results; one at a time took 11 s). "All saved analyses" uses the same listing. Each listing reads the newest 1,000 results at most.
+- **Code versions.** `src/analysis_scores.py` and `src/backtest_service.py` are not in `ENGINE_SOURCES`, so the Legacy code version and Legacy analysis IDs do not change. `src/wrds_service.py` is in `WRDS_ENGINE_SOURCES`, so this change gives WRDS a new code version: a WRDS job run again after the deploy is computed once more and gets a new ID, with the same results. IDs saved earlier still open.
+- **Cache hits** return the saved result as it is, so an analysis computed before the scores existed gets none by being run again.
+- **Checked after each deploy.** `scripts/check_backtest_lambda.py` reads the metadata of every analysis it computes and checks that the scores were saved and equal the scores of its local run (relative 1e-9), and that cohort comparisons have none.
+
+### Score analyses saved before the scoreboard
+
+`scripts/score_saved_analyses.py` adds scores to the analyses that have none. It reads each one, computes its scores from the saved result (nothing is rerun) and rewrites only its metadata, with an S3 copy onto itself: the result, the analysis and its ID do not change. Results saved before summaries also get their `kind` and `summary`, so a cohort comparison saved then leaves the saved-analysis lists. Analyses saved before sharing have no job, so they cannot be scored and are left as they are.
+
+```bash
+uv run python scripts/score_saved_analyses.py            # dry run: lists what it would change
+uv run python scripts/score_saved_analyses.py --apply    # rewrite their metadata
+```
+
+A metadata rewrite changes an object's `LastModified`, which the 90-day rule counts from. So the rewritten result is kept 90 days from the rewrite, and its first save time is kept in its metadata (`first-saved`), which the listings show and sort by. The key needs `s3:GetObject` and `s3:PutObject` on `backtest-results/`. Running it twice changes nothing: scored analyses are skipped.
+

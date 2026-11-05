@@ -9,7 +9,9 @@ For each job (see src/backtest_jobs.py) the service:
    files) and the backtest code version.
 2. Returns the saved result for that hash when one exists, without rerunning.
 3. Otherwise reads the market data from S3, runs the backtest and saves the result
-   under backtest-results/<hash>.json (an S3 lifecycle rule deletes it after 90 days).
+   under backtest-results/<hash>.json (an S3 lifecycle rule deletes it after 90 days),
+   with its kind, a short summary and an analysis's scores (src/analysis_scores.py) as
+   S3 metadata, read by the list of saved analyses and the scoreboard.
 4. Returns the result in the response, or a temporary S3 link when it is too big
    for a Lambda response (6 MB).
 """
@@ -21,6 +23,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
 
+from .analysis_scores import score_metadata
 from .backtest_jobs import code_version, decode_saved, describe_job, encode_saved, job_hash, run_job, validate_job
 from .data_standardization import validate_universe
 from .s3_client import DELISTING_FILE, UNIVERSE_FILE, S3DataManager
@@ -126,6 +129,8 @@ class BacktestService:
                 # Read by the list of saved analyses without downloading each result
                 'kind': job['kind'],
                 'summary': summarize_job(job),
+                # Read by the scoreboard, to rank analyses without downloading them
+                **score_metadata(job, result),
             }
             body = encode_saved(job, result)   # with its job, so the hash alone can reopen it
             self.manager.client.put_object(

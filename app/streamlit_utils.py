@@ -42,7 +42,8 @@ def initialize_environment() -> None:
                     line = line.strip()
                     if line and not line.startswith('#') and '=' in line:
                         key, value = line.split('=', 1)
-                        os.environ.setdefault(key, value.strip("'\""))
+                        # "KEY = value" too: spaces around = are not part of the name or value
+                        os.environ.setdefault(key.strip(), value.strip().strip("'\""))
 
 # PASSWORD AUTHENTICATION (currently disabled for open access)
 # To re-enable password protection:
@@ -548,6 +549,12 @@ def get_results_store():
     """The S3 location saved analyses are read from (the market data's bucket and prefix)."""
     from src.s3_client import S3DataManager
     return S3DataManager()
+
+@st.cache_data(ttl=60, show_spinner=False)
+def list_scored_analyses() -> Dict[str, Any]:
+    """Everyone's saved analyses with their scores (src/saved_analyses.list_scored_analyses), reused for a minute."""
+    from src.saved_analyses import list_scored_analyses as list_scored
+    return list_scored(get_results_store())
 
 @st.cache_data(ttl=60, show_spinner=False)
 def list_all_saved_analyses(limit: int) -> Dict[str, Any]:

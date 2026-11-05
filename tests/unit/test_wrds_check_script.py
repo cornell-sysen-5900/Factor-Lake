@@ -93,7 +93,7 @@ def test_wrds_check(monkeypatch, manager, synthetic_job, capsys, lambda_class, f
     monkeypatch.setattr(check, 'S3DataManager', lambda: manager)
     assert check.check_wrds(BacktestLambdaClient('factor-lake-backtest', client=fake), unique=True)[0] == failures
     out = capsys.readouterr().out
-    assert 'rows read with ranged GETs' in out and 'cached=True' in out
+    assert 'rows read with ranged GETs' in out and 'cached=True' in out and 'scores: saved' in out
     if failed_line:
         assert failed_line in out
     else:

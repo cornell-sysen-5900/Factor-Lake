@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/streamlit_app.py
 PURPOSE: Main application entry point orchestrating UI components and analysis logic.
-VERSION: 3.7.0
+VERSION: 3.8.0
 """
 
 import os
@@ -36,6 +36,7 @@ from components.results_tab import (OPENED_MESSAGE_KEY, render_all_saved_analyse
                                     render_saved_runs)
 from analysis_history import BROWSER_ANALYSES_KEY, earlier_analyses, sync_browser_analyses
 from components.compare_tab import render_compare_tab
+from components.scoreboard_tab import OPEN_RESULTS_KEY, render_scoreboard_tab
 from compare_state import OPEN_COMPARE_KEY
 from components.data_viewer import render_data_viewer_tab, clear_viewer_data
 from components.about import render_about_tab
@@ -52,7 +53,7 @@ utils.initialize_environment()
 utils.initialize_session_state()
 css.inject_styles()
 
-MAIN_TABS = ["Analysis", "Results", "Compare", "Data Viewer", "About"]
+MAIN_TABS = ["Analysis", "Results", "Compare", "Scoreboard", "Data Viewer", "About"]
 # The open main tab (a plain session value, updated on every run)
 MAIN_TABS_KEY = "main_tabs"
 # Widget key of the main tab bar, plus a version that changes each time the app opens a
@@ -176,10 +177,13 @@ def main():
     # Add to comparison in a run tab opens the Compare tab the same way
     if st.session_state.pop(OPEN_COMPARE_KEY, False):
         _open_main_tab("Compare")
+    # Open on the Scoreboard opens the analysis in Results
+    if st.session_state.pop(OPEN_RESULTS_KEY, False):
+        _open_main_tab("Results")
 
     # Define primary application layout. Only the open tab is rendered.
     main_tabs = st.tabs(MAIN_TABS, key=_main_tabs_widget_key(), on_change=_on_main_tab_change)
-    tab_analysis, tab_results, tab_compare, tab_viewer, tab_about = main_tabs
+    tab_analysis, tab_results, tab_compare, tab_scoreboard, tab_viewer, tab_about = main_tabs
     st.session_state[MAIN_TABS_KEY] = next(label for tab, label in zip(main_tabs, MAIN_TABS) if tab.open)
 
     if tab_analysis.open:
@@ -226,6 +230,11 @@ def main():
             # Saved analyses side by side (reads saved results only; loads no market data)
             history = st.session_state.get('analysis_history', [])
             render_compare_tab(history, earlier_analyses(st.session_state.get(BROWSER_ANALYSES_KEY), history))
+
+    if tab_scoreboard.open:
+        with tab_scoreboard:
+            # Everyone's saved analyses ranked (reads their scores from S3 metadata only)
+            render_scoreboard_tab()
 
     if tab_viewer.open:
         with tab_viewer:

@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: scripts/check_backtest_lambda.py
 PURPOSE: Checks the deployed backtest Lambda against the app's local backtest, and its result cache.
-VERSION: 2.1.0
+VERSION: 2.2.0
 
 Usage (from the project root, after scripts/deploy_backtest_lambda.py):
     uv run python scripts/check_backtest_lambda.py
@@ -30,6 +30,9 @@ Then one quarterly WRDS backtest end to end, at 0 and at 25 bps trading cost
    the app reads them (two ranged GETs) and must match the local holdings of that date;
 4. it runs in Lambda again and must come from the cache, unchanged.
 
+Every computed analysis must have its scores saved with it (S3 metadata, read by the
+scoreboard), equal to the local result's; cohort comparisons must have none.
+
 Runs with a trading cost must also come back with their cost fields (turnover and cost
 drag, which are printed) and with a lower final value than the same job at 0 bps.
 """
@@ -47,7 +50,9 @@ from typing import Any, List, Optional, Tuple
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.analysis_scores import SCORES_FIELD, analysis_scores, decode_scores, encode_scores  # noqa: E402
 from src.backtest_jobs import build_job, describe_job, encode_result, run_job  # noqa: E402
+from src.backtest_service import result_file  # noqa: E402
 from src.lambda_client import DEFAULT_FUNCTION_NAME, BacktestLambdaClient  # noqa: E402
 from src.s3_client import S3DataManager  # noqa: E402
 from src.wrds_data import WRDS_DIR_ENV, wrds_dir  # noqa: E402
@@ -115,6 +120,30 @@ def check_costs(job: dict, result: dict, free_final_value: Optional[float]) -> i
     return 0 if lower else 1
 
 
+def check_scores(manager: S3DataManager, job: dict, info: dict, local: dict) -> int:
+    """
+    The scores the Lambda saved with a computed analysis (S3 metadata, read by the scoreboard)
+    must equal the scores of the local result; a cohort comparison must have none. A cached
+    result was saved by an earlier run, so it is not checked. Returns 1 when the check fails.
+    """
+    if info['cached']:
+        print("  scores: not checked (a cached result, saved by an earlier run)")
+        return 0
+    head = manager.client.head_object(Bucket=manager.bucket, Key=manager.object_key(result_file(info['hash'])))
+    saved = decode_scores((head.get('Metadata') or {}).get(SCORES_FIELD))
+    if job['kind'] != 'backtest':
+        print(f"  scores: {'none, as for every ' + job['kind'] if saved is None else 'NO: a ' + job['kind'] + ' has scores'}")
+        return 0 if saved is None else 1
+    if saved is None:
+        print("  scores: NO scores saved with the analysis (the scoreboard cannot rank it)")
+        return 1
+    diff, where = max_difference(json.loads(encode_scores(analysis_scores(job, local))), saved)
+    ok = diff <= TOLERANCE
+    print(f"  scores: saved, Sharpe {saved['metrics']['sharpe']:.4f}, CAGR {saved['metrics']['cagr']:.2%}; "
+          f"match {'yes' if ok else 'NO'} (largest relative difference {diff:.1e}{'' if ok else ' at ' + where})")
+    return 0 if ok else 1
+
+
 def plain_rows(frame) -> dict:
     """Holdings rows as plain values by column (dates as text, categories as their values)."""
     frame = frame.reset_index(drop=True)
@@ -173,7 +202,9 @@ def check_wrds(client: BacktestLambdaClient, unique: bool, job: Optional[dict] =
     print(f"  repeat: {second['round_trip_seconds']:6.2f} s  cached={second['cached']}  "
           f"identical={'yes' if same else 'NO'}")
     costs = check_costs(job, remote, free_final_value)
-    return (not folder_ok) + (not match) + (not held_ok) + (not cached) + (not same) + costs, remote['final_value']
+    scores = check_scores(manager, job, first, local)
+    return ((not folder_ok) + (not match) + (not held_ok) + (not cached) + (not same) + costs + scores,
+            remote['final_value'])
 
 
 def comparable(result: dict) -> dict:
@@ -222,7 +253,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     function_name = args.function_name or os.environ.get('FACTOR_LAKE_BACKTEST_LAMBDA') or DEFAULT_FUNCTION_NAME
     print(f"Checking Lambda {function_name}. Loading the market data from S3 for the local runs...")
-    universe = S3DataManager().fetch_all_data()
+    manager = S3DataManager()
+    universe = manager.fetch_all_data()
     client = BacktestLambdaClient(function_name)
     failures = 0
     jobs = sample_jobs(unique=not args.reuse_cache)
@@ -249,6 +281,7 @@ def main(argv: Optional[List[str]] = None) -> int:
               f"identical={'yes' if same else 'NO'}")
         failures += (not match) + (not cached) + (not same)
         failures += check_costs(job, remote, free_final_value)
+        failures += check_scores(manager, job, first, local)
         if job is jobs[0]:
             free_final_value = remote['final_value']
 
