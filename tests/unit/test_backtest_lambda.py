@@ -24,14 +24,12 @@ from streamlit.testing.v1 import AppTest
 
 import src.backtest_service as backtest_service
 from src.backtest_engine import rebalance_portfolio, run_cohort_comparison
-from src.backtest_jobs import (build_job, code_version, decode_result, encode_result, job_hash,
-                               results_match, run_job)
+from src.backtest_jobs import build_job, code_version, decode_result, encode_result, job_hash, results_match, run_job
 from src.backtest_service import BacktestService, result_file
 from src.lambda_client import BacktestLambdaClient, BacktestLambdaError
 from src.s3_client import DELISTING_FILE, UNIVERSE_FILE, S3DataManager
 from src.universe_selection import select_universe
-from tests.unit.test_saved_runs import (_assert_clean, _click, _click_main_tab, _open_tab,
-                                        browser_like_widget_states)
+from tests.unit.test_saved_runs import _assert_clean, _click, _click_main_tab, _open_tab, browser_like_widget_states
 
 APP_DIR = Path(__file__).resolve().parents[2] / 'app'
 BUCKET, PREFIX = 'test-bucket', 'factor-lake-data'
@@ -474,6 +472,7 @@ def test_role_instructions_for_an_admin_include_both_policies(capsys):
 
 def test_deploy_without_iam_access_explains_the_admin_step(monkeypatch, caplog):
     import boto3
+
     import scripts.deploy_backtest_lambda as deploy
 
     class DeniedIam:
@@ -512,6 +511,7 @@ def test_package_over_the_lambda_limit_is_refused(tmp_path, monkeypatch):
 
 def test_lambda_package_has_the_engine_but_not_supabase():
     import zipfile
+
     from scripts.deploy_backtest_lambda import build_package
     names = zipfile.ZipFile(io.BytesIO(build_package())).namelist()
     assert 'aws_lambda/backtest_handler.py' in names and 'src/backtest_engine.py' in names

@@ -5,10 +5,11 @@ PURPOSE: Silent, high-performance data ingestion with schema-aligned standardiza
 VERSION: 2.5.0
 """
 
-import os
 import logging
+import os
+
 import pandas as pd
-from supabase import create_client, Client
+from supabase import Client, create_client
 
 from .data_standardization import (
     attach_delisting_info,
@@ -25,9 +26,9 @@ logger = logging.getLogger(__name__)
 class SupabaseManager:
     """
     Orchestrates bulk data ingestion and preprocessing for the investment universe.
-    
-    This manager interfaces with Supabase to retrieve longitudinal market data, 
-    applying necessary transformations to ensure the dataset conforms to the 
+
+    This manager interfaces with Supabase to retrieve longitudinal market data,
+    applying necessary transformations to ensure the dataset conforms to the
     analytical requirements of the backtesting engine.
     """
 
@@ -38,14 +39,14 @@ class SupabaseManager:
 
         if not url or not key:
             raise RuntimeError("Cloud configuration failure: SUPABASE_URL or SUPABASE_KEY not found.")
-        
+
         self.client: Client = create_client(url, key)
 
     def fetch_all_data(self, table_name: str = 'Full Precision Test') -> pd.DataFrame:
         """
         Retrieves the complete dataset from the specified table via iterative pagination.
-        
-        This method utilizes range-based queries to circumvent database response 
+
+        This method utilizes range-based queries to circumvent database response
         limits, ensuring comprehensive data coverage for multi-year simulations.
         """
         page_size = 1000
@@ -59,18 +60,18 @@ class SupabaseManager:
 
                 if not batch:
                     break
-                
+
                 all_rows.extend(batch)
                 if len(batch) < page_size:
                     break
-                
+
                 offset += page_size
         except Exception as e:
             logger.error(f"Network Ingestion Failure: {str(e)}")
             return pd.DataFrame()
 
         df = pd.DataFrame(all_rows)
-        
+
         if df.empty:
             logger.warning("Ingestion process completed but returned an empty dataset.")
             return df
@@ -109,7 +110,8 @@ class SupabaseManager:
 
         try:
             while True:
-                response = self.client.table('last_price_mapping').select('*').range(offset, offset + page_size - 1).execute()
+                response = (self.client.table('last_price_mapping').select('*')
+                            .range(offset, offset + page_size - 1).execute())
                 batch = response.data if hasattr(response, 'data') else []
                 if not batch:
                     break

@@ -15,8 +15,17 @@ from typing import Any, List
 import streamlit as st
 
 from app.compare_state import FULL_MESSAGE, OPEN_COMPARE_KEY, add_to_comparison, ids_in_comparison
-from app.scoreboard import (DEFAULT_RANK, METRICS, TOP_ROWS, distinct_entries, filter_entries, filter_options,
-                            rank_entries, row_label, scoreboard_table)
+from app.scoreboard import (
+    DEFAULT_RANK,
+    METRICS,
+    TOP_ROWS,
+    distinct_entries,
+    filter_entries,
+    filter_options,
+    rank_entries,
+    row_label,
+    scoreboard_table,
+)
 from app.streamlit_utils import list_scored_analyses, open_saved_analysis
 from components.results_tab import OPENED_MESSAGE_KEY
 from src.saved_analyses import SavedAnalysisError
@@ -106,7 +115,8 @@ def render_scoreboard_tab() -> None:
     if options['years'] and options['years'][0] < options['years'][1]:
         low, high = options['years']
         # The saved range, kept within the years listed now (newer analyses can widen them, expiry narrows them)
-        start, end = st.session_state.get(YEARS_KEY) or st.session_state.get(SAVED_KEY, {}).get(YEARS_KEY) or (low, high)
+        start, end = (st.session_state.get(YEARS_KEY) or st.session_state.get(SAVED_KEY, {}).get(YEARS_KEY)
+                      or (low, high))
         start, end = min(max(start, low), high), max(min(end, high), low)
         st.session_state[YEARS_KEY] = (start, end) if start <= end else (low, high)
         chosen = years_col.slider("Period within", low, high, key=YEARS_KEY,

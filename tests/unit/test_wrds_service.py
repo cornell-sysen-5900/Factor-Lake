@@ -18,8 +18,8 @@ from src.wrds_engine import run_wrds_backtest
 from src.wrds_holdings import holdings_file, holdings_parquet, read_holdings_date
 from src.wrds_jobs import build_wrds_job, engine_arguments
 from src.wrds_service import WrdsBacktestRunner
-from tests.unit.test_backtest_lambda import (DELISTING_FILE, UNIVERSE_FILE, _delisting, _job as legacy_job,
-                                             _parquet, _raw_universe)
+from tests.unit.test_backtest_lambda import DELISTING_FILE, UNIVERSE_FILE, _delisting, _parquet, _raw_universe
+from tests.unit.test_backtest_lambda import _job as legacy_job
 from tests.unit.wrds_fixtures import WRDS_SETTINGS, RangeS3, put_wrds_files, synthetic_frames, wrds_file_bytes
 
 BUCKET, PREFIX = 'test-bucket', 'factor-lake-data'
@@ -211,6 +211,7 @@ def test_holdings_parquet_has_one_row_group_per_date():
                                     first_month='2009-11', last_month='2013-02')
     body, layout = holdings_parquet(holdings)
     import io
+
     import pyarrow.parquet as pq
     meta = pq.ParquetFile(io.BytesIO(body)).metadata
     assert meta.num_row_groups == len(layout['dates']) == holdings['rebalance_date'].nunique()

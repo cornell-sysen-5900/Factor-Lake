@@ -18,10 +18,31 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 import streamlit as st
 
-from app.compare import (GROWTH_BASE, MAX_COMPARED, MIN_COMPARED, SORT_OPTIONS, benchmark_lines, chart_series,
-                         column_titles, compact_analysis, comparison_table, short_id, sort_order)
-from app.compare_state import (FULL_MESSAGE, IDS_KEY, MESSAGE_KEY, add_slot, add_to_comparison, box_text,
-                               id_key, ids_in_comparison, remove_slot, slots)
+from app.compare import (
+    GROWTH_BASE,
+    MAX_COMPARED,
+    MIN_COMPARED,
+    SORT_OPTIONS,
+    benchmark_lines,
+    chart_series,
+    column_titles,
+    compact_analysis,
+    comparison_table,
+    short_id,
+    sort_order,
+)
+from app.compare_state import (
+    FULL_MESSAGE,
+    IDS_KEY,
+    MESSAGE_KEY,
+    add_slot,
+    add_to_comparison,
+    box_text,
+    id_key,
+    ids_in_comparison,
+    remove_slot,
+    slots,
+)
 from app.streamlit_utils import load_compared_analysis
 from components.results_tab import render_all_saved_analyses, render_analysis_history, render_earlier_analyses
 from src.saved_analyses import SavedAnalysisError, normalize_analysis_id

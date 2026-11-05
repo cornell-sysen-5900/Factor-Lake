@@ -15,11 +15,28 @@ import pandas as pd
 import pytest
 
 from app.compare import cagr, compact_analysis, outperformance, total_return
-from app.scoreboard import (DEFAULT_RANK, METRICS, NOT_SCORED, TOP_ROWS, distinct_entries, filter_entries, filter_options,
-                            rank_entries, row_label, scoreboard_table)
+from app.scoreboard import (
+    DEFAULT_RANK,
+    METRICS,
+    NOT_SCORED,
+    TOP_ROWS,
+    distinct_entries,
+    filter_entries,
+    filter_options,
+    rank_entries,
+    row_label,
+    scoreboard_table,
+)
 from scripts.score_saved_analyses import score_saved_analyses
-from src.analysis_scores import (MAX_SCORES_LENGTH, SCORES_FIELD, analysis_scores, decode_scores, encode_scores,
-                                 score_metadata, score_result)
+from src.analysis_scores import (
+    MAX_SCORES_LENGTH,
+    SCORES_FIELD,
+    analysis_scores,
+    decode_scores,
+    encode_scores,
+    score_metadata,
+    score_result,
+)
 from src.backtest_jobs import decode_result, decode_saved, encode_saved
 from src.backtest_service import BacktestService, result_file, summarize_job
 from src.saved_analyses import FIRST_SAVED_FIELD, SavedAnalysisError, list_saved_analyses, list_scored_analyses

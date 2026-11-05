@@ -19,5 +19,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
+      - name: Lint (PEP 8, ruff)
+        run: uv run ruff check --output-format github .
+
       - name: Run unit tests
+        if: success() || failure()   # still run the tests when only the lint step failed
         run: uv run pytest

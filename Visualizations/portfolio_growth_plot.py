@@ -6,8 +6,9 @@ PURPOSE: Standalone plotting utility for comparative wealth-index visualizations
 VERSION: 3.0.0
 """
 
-import plotly.graph_objects as go
 from typing import Dict, List, Optional
+
+import plotly.graph_objects as go
 
 HOVER_TEMPLATE = '%{fullData.name}: $%{y:,.0f}<extra></extra>'
 # Legacy's benchmark names; WRDS runs pass their ETFs' names instead

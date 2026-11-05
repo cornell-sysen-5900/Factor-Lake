@@ -13,8 +13,8 @@ import pytest
 from app.compare import column_titles, compact_analysis, comparison_table
 from src.saved_analyses import load_saved_analysis
 from tests.unit.test_saved_runs import _add_factor, _assert_clean, _click, _click_main_tab
-from Visualizations.compare_growth_plot import COMPARE_COLORS
 from tests.unit.test_wrds_saved import OLD_IDS, _run_wrds, manager, new_session, s3  # noqa: F401 (fixtures)
+from Visualizations.compare_growth_plot import COMPARE_COLORS
 
 COST_KEY = 'trading_cost_bps_input'
 
@@ -41,7 +41,10 @@ def _run_wrds_at(at, frequency, bps, *factors):
 
 @pytest.fixture
 def saved(new_session):
-    """A session that saved a Legacy annual run (0 bps), a WRDS quarterly run (25 bps) and a WRDS monthly run (0 bps)."""
+    """
+    A session that saved a Legacy annual run (0 bps), a WRDS quarterly run (25 bps) and a
+    WRDS monthly run (0 bps).
+    """
     at = new_session()
     ids = {'legacy': _run_legacy(at)}
     ids['quarterly'] = _run_wrds_at(at, 'Quarterly', 25, 'w_roe')
@@ -482,8 +485,14 @@ def test_add_to_comparison_in_results_with_every_box_full_shows_a_message(saved)
 
 def test_runs_computed_in_the_app_have_no_add_to_comparison(monkeypatch):
     from streamlit.testing.v1 import AppTest
-    from tests.unit.test_saved_runs import APP_DIR, _add_roe_and_load, _run_analysis, _synthetic_universe
-    from tests.unit.test_saved_runs import browser_like_widget_states
+
+    from tests.unit.test_saved_runs import (
+        APP_DIR,
+        _add_roe_and_load,
+        _run_analysis,
+        _synthetic_universe,
+        browser_like_widget_states,
+    )
     monkeypatch.setenv('FACTOR_LAKE_BACKTEST_LAMBDA', '')
     monkeypatch.syspath_prepend(str(APP_DIR))
     browser_like_widget_states(monkeypatch)

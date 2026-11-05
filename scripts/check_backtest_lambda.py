@@ -132,7 +132,8 @@ def check_scores(manager: S3DataManager, job: dict, info: dict, local: dict) -> 
     head = manager.client.head_object(Bucket=manager.bucket, Key=manager.object_key(result_file(info['hash'])))
     saved = decode_scores((head.get('Metadata') or {}).get(SCORES_FIELD))
     if job['kind'] != 'backtest':
-        print(f"  scores: {'none, as for every ' + job['kind'] if saved is None else 'NO: a ' + job['kind'] + ' has scores'}")
+        verdict = 'none, as for every ' + job['kind'] if saved is None else 'NO: a ' + job['kind'] + ' has scores'
+        print(f"  scores: {verdict}")
         return 0 if saved is None else 1
     if saved is None:
         print("  scores: NO scores saved with the analysis (the scoreboard cannot rank it)")
@@ -242,7 +243,8 @@ def max_difference(a: Any, b: Any, path: str = '') -> Tuple[float, str]:
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Compare the backtest Lambda with local backtests.")
-    parser.add_argument('--function-name', help="Default: FACTOR_LAKE_BACKTEST_LAMBDA (.env), else factor-lake-backtest")
+    parser.add_argument('--function-name',
+                        help="Default: FACTOR_LAKE_BACKTEST_LAMBDA (.env), else factor-lake-backtest")
     parser.add_argument('--reuse-cache', action='store_true',
                         help="Use the same inputs every time (the first Lambda call may then be a cache hit)")
     parser.add_argument('--skip-wrds', action='store_true', help="Leave out the WRDS backtest check")

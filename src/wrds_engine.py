@@ -32,8 +32,7 @@ import numpy as np
 import pandas as pd
 
 from .performance_metrics import compute_comprehensive_metrics
-from .trading_costs import (cost_fraction, cost_results, drifted_weights, net_return, turnover,
-                            validate_trading_cost_bps)
+from .trading_costs import cost_fraction, cost_results, drifted_weights, net_return, turnover, validate_trading_cost_bps
 from .wrds_calendar import FIRST_MONTH, LAST_MONTH, PERIODS_PER_YEAR, period_boundaries
 from .wrds_data import WrdsData
 from .wrds_factors import WRDS_FACTOR_COLUMNS, WRDS_SECTORS

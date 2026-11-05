@@ -2,31 +2,32 @@
 Test suite for portfolio.py module
 Tests portfolio creation, management, and calculations
 """
-import pytest
 import pandas as pd
+import pytest
+
 from src.portfolio import Portfolio
 
 
 class TestPortfolioCreation:
     """Test portfolio initialization and creation"""
-    
+
     def test_create_empty_portfolio(self):
         """Test creating an empty portfolio"""
         portfolio = Portfolio(name="Test Portfolio")
-        
+
         assert portfolio.name == "Test Portfolio"
         assert portfolio.investments == []
         assert len(portfolio.investments) == 0
-    
+
     def test_create_portfolio_with_investments(self):
         """Test creating portfolio with initial investments"""
         investments = [
             {'ticker': 'AAPL', 'number_of_shares': 10},
             {'ticker': 'MSFT', 'number_of_shares': 5}
         ]
-        
+
         portfolio = Portfolio(name="Test Portfolio", investments=investments)
-        
+
         assert portfolio.name == "Test Portfolio"
         assert len(portfolio.investments) == 2
         assert portfolio.investments[0]['ticker'] == 'AAPL'
@@ -35,67 +36,67 @@ class TestPortfolioCreation:
 
 class TestPortfolioManagement:
     """Test adding and removing investments"""
-    
+
     @pytest.fixture
     def portfolio(self):
         """Create a portfolio for testing"""
         return Portfolio(name="Test Portfolio")
-    
+
     def test_add_single_investment(self, portfolio):
         """Test adding a single investment"""
         portfolio.add_investment('AAPL', 10)
-        
+
         assert len(portfolio.investments) == 1
         assert portfolio.investments[0]['ticker'] == 'AAPL'
         assert portfolio.investments[0]['number_of_shares'] == 10
-    
+
     def test_add_multiple_investments(self, portfolio):
         """Test adding multiple investments"""
         portfolio.add_investment('AAPL', 10)
         portfolio.add_investment('MSFT', 5)
         portfolio.add_investment('GOOGL', 2)
-        
+
         assert len(portfolio.investments) == 3
-        
+
         tickers = [inv['ticker'] for inv in portfolio.investments]
         assert 'AAPL' in tickers
         assert 'MSFT' in tickers
         assert 'GOOGL' in tickers
-    
+
     def test_add_fractional_shares(self, portfolio):
         """Test adding fractional shares"""
         portfolio.add_investment('AAPL', 10.5)
-        
+
         assert portfolio.investments[0]['number_of_shares'] == 10.5
-    
+
     def test_remove_investment(self, portfolio):
         """Test removing an investment"""
         portfolio.add_investment('AAPL', 10)
         portfolio.add_investment('MSFT', 5)
-        
+
         portfolio.remove_investment('AAPL')
-        
+
         assert len(portfolio.investments) == 1
         assert portfolio.investments[0]['ticker'] == 'MSFT'
-    
+
     def test_remove_nonexistent_investment(self, portfolio):
         """Test removing an investment that doesn't exist"""
         portfolio.add_investment('AAPL', 10)
-        
+
         portfolio.remove_investment('INVALID')
-        
+
         # Should not raise error, portfolio unchanged
         assert len(portfolio.investments) == 1
         assert portfolio.investments[0]['ticker'] == 'AAPL'
-    
+
     def test_remove_all_investments(self, portfolio):
         """Test removing all investments"""
         portfolio.add_investment('AAPL', 10)
         portfolio.add_investment('MSFT', 5)
-        
+
         portfolio.remove_investment('AAPL')
         portfolio.remove_investment('MSFT')
-        
+
         assert len(portfolio.investments) == 0
 
 
@@ -157,50 +158,50 @@ class TestPortfolioValuation:
 
 class TestPortfolioReturns:
     """Test return calculations"""
-    
+
     @pytest.fixture
     def portfolio(self):
         """Create a portfolio for testing"""
         return Portfolio(name="Test Portfolio")
-    
+
     def test_calculate_return_positive(self, portfolio):
         """Test calculating positive return"""
         t1_value = 1000.0
         t2_value = 1200.0
-        
+
         return_pct = portfolio.calculate_return(t1_value, t2_value)
-        
+
         assert return_pct == 20.0  # 20% gain
-    
+
     def test_calculate_return_negative(self, portfolio):
         """Test calculating negative return"""
         t1_value = 1000.0
         t2_value = 800.0
-        
+
         return_pct = portfolio.calculate_return(t1_value, t2_value)
-        
+
         assert return_pct == -20.0  # 20% loss
-    
+
     def test_calculate_return_zero_change(self, portfolio):
         """Test calculating zero return"""
         t1_value = 1000.0
         t2_value = 1000.0
-        
+
         return_pct = portfolio.calculate_return(t1_value, t2_value)
-        
+
         assert return_pct == 0.0
-    
+
     def test_calculate_return_zero_t1(self, portfolio):
         """Test that zero t1 value returns 0.0"""
         assert portfolio.calculate_return(0, 1000.0) == 0.0
-    
+
     def test_calculate_return_large_gain(self, portfolio):
         """Test calculating large return"""
         t1_value = 1000.0
         t2_value = 5000.0
-        
+
         return_pct = portfolio.calculate_return(t1_value, t2_value)
-        
+
         assert return_pct == 400.0  # 400% gain
 
 

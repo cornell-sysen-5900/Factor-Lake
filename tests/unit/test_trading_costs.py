@@ -9,8 +9,7 @@ import pandas as pd
 import pytest
 
 from src.backtest_engine import rebalance_portfolio, run_cohort_comparison
-from src.trading_costs import (cost_results, drifted_weights, net_return, turnover,
-                               validate_trading_cost_bps)
+from src.trading_costs import cost_results, drifted_weights, net_return, turnover, validate_trading_cost_bps
 from src.wrds_engine import run_periods, run_wrds_backtest
 from tests.unit.test_mixing_regression import delisting_universe, synthetic_universe
 from tests.unit.test_wrds_pinned import FIRST, LAST, pinned_frames

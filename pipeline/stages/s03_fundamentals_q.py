@@ -23,11 +23,25 @@ import numpy as np
 import pandas as pd
 
 from pipeline.checks import PASS, WARN, Check, check, vs_last_run
-from pipeline.config import (COVERAGE_TOLERANCE, GICS_INDUSTRIES, GICS_SECTORS, LAST_RUN_COVERAGE_2015,
-                             PRICE_BASED_FACTORS, PRICE_FLOOR, REPORT_LAG_DAYS_Q, REPORT_LAG_DAYS_Q4,
-                             MIN_SUE_STD, MIN_TTM_CAPEX_MUSD, MIN_TTM_SALES_MUSD, SUE_HISTORY_QUARTERS,
-                             SUE_MAX_ABS,
-                             SUE_MIN_HISTORY, TAX_RATE_RANGE, YTD_ITEMS, DataPaths)
+from pipeline.config import (
+    COVERAGE_TOLERANCE,
+    GICS_INDUSTRIES,
+    GICS_SECTORS,
+    LAST_RUN_COVERAGE_2015,
+    MIN_SUE_STD,
+    MIN_TTM_CAPEX_MUSD,
+    MIN_TTM_SALES_MUSD,
+    PRICE_BASED_FACTORS,
+    PRICE_FLOOR,
+    REPORT_LAG_DAYS_Q,
+    REPORT_LAG_DAYS_Q4,
+    SUE_HISTORY_QUARTERS,
+    SUE_MAX_ABS,
+    SUE_MIN_HISTORY,
+    TAX_RATE_RANGE,
+    YTD_ITEMS,
+    DataPaths,
+)
 from pipeline.outputs import fresh_stage_dir, table_info, write_parquet, write_summary
 
 STAGE = "s03_fundamentals_q"
@@ -187,7 +201,8 @@ def add_factors(fq: pd.DataFrame, qs: Quarters) -> tuple[pd.DataFrame, dict]:
     f.loc[no_price, list(PRICE_BASED_FACTORS)] = np.nan
     fq.loc[~fq["is_usd"], "mkt_cap_qe_musd"] = np.nan
     counts = {"impossible_to_nan": {k: int(v.sum()) for k, v in bad.items()},
-              "non_usd_rows": int((~fq["is_usd"]).sum()), "non_usd_permnos": int(fq.loc[~fq["is_usd"], "permno"].nunique()),
+              "non_usd_rows": int((~fq["is_usd"]).sum()),
+              "non_usd_permnos": int(fq.loc[~fq["is_usd"], "permno"].nunique()),
               "price_below_floor_rows": int((fq["prccq"] < PRICE_FLOOR).sum()),
               "sue_above_max_abs": int(sue_capped.sum())}
     return pd.concat([fq, f], axis=1), counts

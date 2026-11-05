@@ -6,8 +6,9 @@ PURPOSE: Institutional-grade cohort spread analysis visualization,
 VERSION: 3.0.0
 """
 
+from typing import Any, Dict, List, Optional, Union
+
 import plotly.graph_objects as go
-from typing import List, Optional, Dict, Any, Union
 
 from Visualizations.portfolio_growth_plot import date_axis, line_mode
 
@@ -82,7 +83,8 @@ def plot_top_bottom_percent(
 
     # 2. Bottom Cohort (Lower Visual Weight)
     if show_bottom and precomputed_bot is not None:
-        bot_vals = precomputed_bot.get('portfolio_values', [initial_investment]) if isinstance(precomputed_bot, dict) else precomputed_bot
+        bot_vals = (precomputed_bot.get('portfolio_values', [initial_investment])
+                    if isinstance(precomputed_bot, dict) else precomputed_bot)
         if len(bot_vals) >= len(years):
             fig.add_trace(go.Scatter(
                 x=years, y=bot_vals[:len(years)], name=f'Bottom {percent}%',
@@ -94,7 +96,8 @@ def plot_top_bottom_percent(
 
     # 3. Top Cohort (High Contrast)
     if precomputed_top is not None:
-        top_vals = precomputed_top.get('portfolio_values', [initial_investment]) if isinstance(precomputed_top, dict) else precomputed_top
+        top_vals = (precomputed_top.get('portfolio_values', [initial_investment])
+                    if isinstance(precomputed_top, dict) else precomputed_top)
         if len(top_vals) >= len(years):
             fig.add_trace(go.Scatter(
                 x=years, y=top_vals[:len(years)], name=f'Top {percent}%',

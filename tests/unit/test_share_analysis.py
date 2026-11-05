@@ -19,8 +19,18 @@ from streamlit.testing.v1 import AppTest
 from src.backtest_jobs import decode_saved, encode_result, results_match
 from src.backtest_service import BacktestService, result_file
 from src.saved_analyses import SavedAnalysisError, load_saved_analysis, normalize_analysis_id
-from tests.unit.test_backtest_lambda import (APP_DIR, BUCKET, PREFIX, FakeLambda, _add, _client_init_with,
-                                             _job, _run, manager, s3)  # noqa: F401 (fixtures)
+from tests.unit.test_backtest_lambda import (
+    APP_DIR,
+    BUCKET,
+    PREFIX,
+    FakeLambda,
+    _add,
+    _client_init_with,
+    _job,  # noqa: F401 (fixtures)
+    _run,
+    manager,
+    s3,
+)
 from tests.unit.test_saved_runs import _assert_clean, _click_main_tab, _open_tab, browser_like_widget_states
 
 MISSING_ID = 'f' * 64
@@ -66,7 +76,8 @@ def test_text_that_is_not_an_id_is_explained(text, message):
 @pytest.mark.parametrize('code', ['NoSuchKey', 'AccessDenied'])   # AccessDenied: keys without s3:ListBucket
 def test_missing_or_expired_id_is_explained(manager, s3, code):
     s3.can_list = code == 'NoSuchKey'
-    with pytest.raises(SavedAnalysisError, match=r'No saved analysis has the ID ffffffff…ffff\. .*deleted after 90 days'):
+    with pytest.raises(SavedAnalysisError,
+                       match=r'No saved analysis has the ID ffffffff…ffff\. .*deleted after 90 days'):
         load_saved_analysis(MISSING_ID, manager)
 
 

@@ -59,8 +59,8 @@ def test_link_windows_scores_and_open_ended_latest_link():
 def test_two_tickers_for_one_permno_keep_the_better_link():
     lk = s05.clean_links(links([("AAA", 1, "2010-01-01", "2030-12-31", 2), ("AAB", 1, "2010-01-01", "2030-12-31", 1)]),
                          ours={1})
-    out, dropped = s05.link(estimates([("AAA", "2021-01-14", "EPS", 1, 1.0, 9), ("AAB", "2021-01-14", "EPS", 1, 2.0, 3)]),
-                            lk)
+    out, dropped = s05.link(estimates([("AAA", "2021-01-14", "EPS", 1, 1.0, 9),
+                                       ("AAB", "2021-01-14", "EPS", 1, 2.0, 3)]), lk)
     assert dropped == 1 and out["ticker"].tolist() == ["AAB"]
 
 

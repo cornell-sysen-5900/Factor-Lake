@@ -12,8 +12,18 @@ from streamlit.testing.v1 import AppTest
 
 from src.backtest_service import BacktestService, result_file, summarize_job
 from src.saved_analyses import SavedAnalysisError, list_saved_analyses
-from tests.unit.test_backtest_lambda import (APP_DIR, BUCKET, PREFIX, FakeLambda, _add, _client_init_with,
-                                             _job, _run, manager, s3)  # noqa: F401 (fixtures)
+from tests.unit.test_backtest_lambda import (
+    APP_DIR,
+    BUCKET,
+    PREFIX,
+    FakeLambda,
+    _add,
+    _client_init_with,
+    _job,  # noqa: F401 (fixtures)
+    _run,
+    manager,
+    s3,
+)
 from tests.unit.test_saved_runs import _click_main_tab, browser_like_widget_states
 
 ID_A, ID_B, ID_C = 'a' * 64, 'b' * 64, 'c' * 64

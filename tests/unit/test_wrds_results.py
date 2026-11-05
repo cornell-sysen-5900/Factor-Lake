@@ -15,11 +15,20 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from app.wrds_tables import (benchmark_label, calendar_year_results, factor_header, frequency_caption,
-                             holdings_display_table, period_by_period_columns, ranked_display_table, result_notes,
-                             table_number_formats, win_loss_columns)
-from src.wrds_engine import rank_stocks, run_wrds_backtest
+from app.wrds_tables import (
+    benchmark_label,
+    calendar_year_results,
+    factor_header,
+    frequency_caption,
+    holdings_display_table,
+    period_by_period_columns,
+    ranked_display_table,
+    result_notes,
+    table_number_formats,
+    win_loss_columns,
+)
 from scripts.check_backtest_lambda import TOLERANCE, max_difference
+from src.wrds_engine import rank_stocks, run_wrds_backtest
 from tests.unit.results_snapshot import comparable, legacy_results_snapshot, main_area
 from tests.unit.test_backtest_lambda import DELISTING_FILE, UNIVERSE_FILE, _delisting, _parquet, _raw_universe
 from tests.unit.test_saved_runs import _assert_clean, _click_main_tab, _open_tab

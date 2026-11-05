@@ -39,7 +39,8 @@ def test_report_date_from_matching_q4_rdq_else_90_days():
     quarterly = q4(fyears=(2020, 2021), ends=[pd.Timestamp("2020-12-31"), pd.Timestamp("2021-06-30")])
     out, info = s04.build(years(), quarterly)
     out = out.set_index("fyear")
-    assert out.loc[2020, "report_date"] == pd.Timestamp("2021-02-09") and out.loc[2020, "report_date_source"] == "q4_rdq"
+    assert out.loc[2020, "report_date"] == pd.Timestamp("2021-02-09")
+    assert out.loc[2020, "report_date_source"] == "q4_rdq"
     # 2021: the Q4 of fiscal 2021 ends in June (fiscal-year change), so its rdq is not used
     assert out.loc[2021, "report_date"] == pd.Timestamp("2022-03-31") and out.loc[2021, "report_date_source"] == "proxy"
     assert out.loc[2022, "report_date_source"] == "proxy"                  # no Q4 row at all
@@ -60,7 +61,8 @@ def test_fcff_formula_and_missing_parts():
 def test_changes_only_vs_exactly_the_previous_fiscal_year():
     out = built(years((2020, 2022, 2023), sale=[100.0, 150.0, 180.0], oibdp=[10.0, 12.0, 15.0]))
     assert np.isnan(out.loc[2022, "revenue_growth"]) and np.isnan(out.loc[2022, "d_nwc"])   # 2021 is missing
-    assert out.loc[2023, "revenue_growth"] == pytest.approx(0.2) and out.loc[2023, "ebitda_growth"] == pytest.approx(0.25)
+    assert out.loc[2023, "revenue_growth"] == pytest.approx(0.2)
+    assert out.loc[2023, "ebitda_growth"] == pytest.approx(0.25)
 
 
 @pytest.mark.parametrize("xint, xintd, value, source", [(5.0, 4.0, 5.0, "xint"), (np.nan, 4.0, 4.0, "xintd"),

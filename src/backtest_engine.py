@@ -5,20 +5,28 @@ PURPOSE: Backtesting engine with integrated on-the-fly filtering.
 VERSION: 2.5.0
 """
 
+import math
+from typing import Any, Dict, List, Optional, Tuple  # Added Tuple and Optional
+
 import numpy as np
 import pandas as pd
-import math
-from typing import Dict, List, Any, Tuple, Optional  # Added Tuple and Optional
 
-from .factor_utils import normalize_series
-from .benchmarks import get_benchmark_list
-from .portfolio import Portfolio
 from src.factor_registry import get_factor_column
-from .portfolio_filters import filter_universe
-from .performance_metrics import compute_comprehensive_metrics
-from .trading_costs import (cost_fraction, cost_results, drifted_weights, job_trading_cost, net_return,
-                            turnover, validate_trading_cost_bps)
 
+from .benchmarks import get_benchmark_list
+from .factor_utils import normalize_series
+from .performance_metrics import compute_comprehensive_metrics
+from .portfolio import Portfolio
+from .portfolio_filters import filter_universe
+from .trading_costs import (
+    cost_fraction,
+    cost_results,
+    drifted_weights,
+    job_trading_cost,
+    net_return,
+    turnover,
+    validate_trading_cost_bps,
+)
 
 # How rebalance_portfolio combines several factors (see its docstring)
 FACTOR_COMBINATIONS = ('mixing', 'integrating')
@@ -372,7 +380,8 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
         df_year = _dedupe_year_slice_by_ticker(
             working_data[working_data['Year'] == year].set_index('Ticker')
         )
-        if df_year.empty: continue
+        if df_year.empty:
+            continue
 
         if factor_combination == 'integrating':
             yearly_components = [
@@ -381,7 +390,8 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
         else:
             factor_aum = aum / len(factors)
             yearly_components = [
-                calculate_holdings(df_year, f, factor_aum, (factor_directions.get(f) == 'top'), top_pct, use_market_cap_weight)
+                calculate_holdings(df_year, f, factor_aum, (factor_directions.get(f) == 'top'), top_pct,
+                                   use_market_cap_weight)
                 for f in factors
             ]
 
@@ -569,13 +579,13 @@ def _value_positions(portfolios: List[Portfolio], df_year: pd.DataFrame,
     return total_profit / total_val, delisted_count, positions
 
 
-def run_cohort_comparison(data: pd.DataFrame, 
-                          selected_factors: List[str], 
+def run_cohort_comparison(data: pd.DataFrame,
+                          selected_factors: List[str],
                           factor_directions: Dict[str, str],
                           cohort_pct: float,
                           user_settings: Dict[str, Any]) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
     """
-    Orchestrates a comparative backtest between the chosen factor tilts 
+    Orchestrates a comparative backtest between the chosen factor tilts
     and their exact opposites, combining factors the way the run did
     (user_settings['factor_combination'], Mixing when absent). Both pay the run's
     trading cost (user_settings['trading_cost_bps'], 0 when absent) the same way.

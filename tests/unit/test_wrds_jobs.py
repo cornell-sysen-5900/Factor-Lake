@@ -7,8 +7,7 @@ import json
 import pytest
 
 from src.backtest_jobs import ENGINE_SOURCES, JOB_FIELDS, build_job, code_version, job_hash
-from src.wrds_jobs import (WRDS_ENGINE_SOURCES, WRDS_JOB_FIELDS, build_wrds_job, validate_wrds_job,
-                           wrds_code_version)
+from src.wrds_jobs import WRDS_ENGINE_SOURCES, WRDS_JOB_FIELDS, build_wrds_job, validate_wrds_job, wrds_code_version
 from tests.unit.wrds_fixtures import WRDS_SETTINGS
 
 FACTORS = ['f_roe', 'mom_12_1']
