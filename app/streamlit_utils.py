@@ -347,6 +347,8 @@ def run_backtest_logic(user_settings: Dict[str, Any],
         'compute': compute,
         'cohort': None,
     }
+    from components.strategy_settings import annotate_new_run
+    annotate_new_run(run)
     st.session_state.next_run_id = run_id + 1
     st.session_state.saved_runs = add_saved_run(
         st.session_state.saved_runs, run, MAX_SAVED_RUNS
@@ -440,6 +442,8 @@ def run_wrds_backtest_logic(user_settings: Dict[str, Any], factor_names: List[st
         'compute': compute,
         'cohort': None,
     }
+    from components.strategy_settings import annotate_new_run
+    annotate_new_run(run)
     st.session_state.next_run_id = run_id + 1
     st.session_state.saved_runs = add_saved_run(st.session_state.saved_runs, run, MAX_SAVED_RUNS)
     add_to_history(run)

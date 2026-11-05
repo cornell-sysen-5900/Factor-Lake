@@ -338,7 +338,8 @@ def test_a_wrds_run_looks_like_legacys_results(new_session, legacy):
     assert _is_subsequence(legacy['button'], shown['button'])
     # The snapshot's runs were computed in the app (no ID); this WRDS run has an ID, so it also has
     # the Add to comparison button beside its Analysis ID (the one new button in Results)
-    assert set(shown['button']) - set(legacy['button']) == {'Rank every stock on this date', 'Add to comparison'}
+    assert set(shown['button']) - set(legacy['button']) == {
+        'Rank every stock on this date', 'Add to comparison', 'Save name and note'}
     def uncounted(labels):          # "This session's analyses (2)": main's snapshot had two runs
         return [re.sub(r' \(\d+\)$', '', label) for label in labels]
     assert _is_subsequence(uncounted(legacy['expander']), uncounted(shown['expander']))
@@ -373,7 +374,8 @@ def test_holdings_ranked_stocks_and_csvs_of_another_date(new_session):
     caption = (f"**Method:** Mixing | **Holdings:** {len(holdings)} | **Portfolio return ({newest} to "
                f"{results['period_end_dates'][-1]}):** {results['yearly_returns'][-1]:.2f}%")
     assert caption in [c.value for c in at.caption]
-    assert [d.proto.label for d in at.main.get('download_button')] == ['Download CSV']
+    assert [d.proto.label for d in at.main.get('download_button')
+            if d.proto.label not in ('Export settings (JSON)', 'Export this run’s settings (JSON)')] == ['Download CSV']
 
     # Another date: only that date's row group is read
     other = results['rebalance_dates'][3]
@@ -388,7 +390,8 @@ def test_holdings_ranked_stocks_and_csvs_of_another_date(new_session):
     ranked = at.main.dataframe[1].value
     assert list(ranked.columns[:6]) == ['Rank', 'Ticker', 'Name', 'Sector', 'Held', 'Score']
     assert {'ROE %', 'ROE Z-Score', 'Rank by ROE', 'Market Cap ($M)', 'PERMNO'} <= set(ranked.columns)
-    assert len(at.main.get('download_button')) == 2
+    assert len([d for d in at.main.get('download_button')
+                if d.proto.label not in ('Export settings (JSON)', 'Export this run’s settings (JSON)')]) == 2
 
 
 def test_a_reopened_wrds_id_shows_every_view_in_a_new_session(new_session):
@@ -433,6 +436,11 @@ def test_legacy_results_tab_renders_exactly_as_on_main():
         assert render['tabs'].index('Scoreboard') == render['tabs'].index('Data Viewer') - 1, step
         render['tabs'].remove('Compare')
         render['tabs'].remove('Scoreboard')
+    from tests.unit.results_snapshot import without_strategy_controls
+    for render in actual.values():
+        assert 'Save name and note' in render['button']
+        assert 'Name, note and settings file' in render['expander']
+    actual = {step: without_strategy_controls(render) for step, render in actual.items()}
     # Text, widgets and table cells must be equal; numbers to the Lambda check's relative 1e-9
     # (main's snapshot was rendered on Windows, CI renders on Linux)
     difference, where = max_difference(comparable(actual), comparable(expected))

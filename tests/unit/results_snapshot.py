@@ -84,6 +84,25 @@ def main_area(at) -> dict:
     }
 
 
+
+def without_strategy_controls(render: dict) -> dict:
+    """Exclude only the intentional additions, keeping original result snapshots frozen.
+
+    Strategy import/export and annotations have their own AppTest coverage. Every
+    existing metric, table, chart and control must still match the main snapshot.
+    """
+    added = {
+        'button': {'Apply imported settings', 'Save name and note'},
+        'expander': {'Save or import strategy settings', 'Name, note and settings file'},
+        'caption': {
+            'Save inputs as JSON to reuse or share a strategy. Files contain no market data, '
+            'results, or credentials. Matching results also require the same data and calculation logic.',
+            'Names and notes are kept for this session and included in exported settings files.',
+        },
+    }
+    return {kind: [value for value in values if value not in added[kind]] if kind in added else values
+            for kind, values in render.items()}
+
 def legacy_results_snapshot() -> dict:
     """Runs two Legacy analyses locally and a cohort comparison; returns the Results tab after each step."""
     with pytest.MonkeyPatch.context() as mp:

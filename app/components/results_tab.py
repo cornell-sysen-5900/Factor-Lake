@@ -30,6 +30,7 @@ from app.streamlit_utils import (
     open_saved_analysis,
     run_cohort,
 )
+from components.strategy_settings import render_run_settings
 from src.saved_analyses import SavedAnalysisError
 from src.trading_costs import has_trading_costs, job_trading_cost
 from Visualizations.portfolio_growth_plot import plot_portfolio_growth
@@ -97,6 +98,7 @@ def render_saved_runs(saved_runs: List[Dict[str, Any]]) -> None:
                 on_click=_remove_run,
                 args=(run['id'],),
             )
+            render_run_settings(run)
             # A run that fails to render must not break the other tabs or its Remove button
             try:
                 render_results_tab(run)

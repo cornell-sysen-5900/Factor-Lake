@@ -44,6 +44,7 @@ from components.results_tab import (
     render_saved_runs,
 )
 from components.scoreboard_tab import OPEN_RESULTS_KEY, render_scoreboard_tab
+from components.strategy_settings import render_strategy_settings
 
 # Global Page Configuration
 st.set_page_config(
@@ -206,6 +207,8 @@ def main():
 
             # Configuration phase: Capture factors and directions
             selected_factor_names, factor_directions = render_factor_selection(data_mode)
+            render_strategy_settings(user_settings, selected_factor_names, factor_directions,
+                                     bool(utils.get_backtest_lambda_name()))
 
             if data_mode == 'wrds':
                 _render_wrds_run(user_settings, selected_factor_names, factor_directions)

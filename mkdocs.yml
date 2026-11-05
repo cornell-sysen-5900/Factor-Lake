@@ -55,6 +55,7 @@ nav:
   - Home: index.md
   - Guides:
     - Factor Lake User Guide: FACTOR_LAKE_USER_GUIDE.md
+    - Strategy Settings and Run Names: STRATEGY_SETTINGS.md
     - Developer Onboarding: DEV_ONBOARDING.md
     - Streamlit Admin Guide: STREAMLIT_ADMIN_GUIDE.md
     - Documentation Contributor: DOCS_CONTRIBUTOR_GUIDE.md
