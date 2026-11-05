@@ -5,24 +5,35 @@ PURPOSE: Visualization of results with strict adherence to original metrics and 
 VERSION: 3.8.0
 """
 
-import streamlit as st
-import pandas as pd
-import numpy as np
-from typing import Callable, Dict, Any, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
-from Visualizations.portfolio_growth_plot import plot_portfolio_growth
-from Visualizations.top_bottom_portfolio_plot import plot_top_bottom_percent
-from app.streamlit_config import MAX_SAVED_RUNS
-from app.streamlit_utils import (describe_compute, get_backtest_lambda_name, list_all_saved_analyses,
-                                 open_saved_analysis, run_cohort)
-from src.saved_analyses import SavedAnalysisError
-from src.trading_costs import has_trading_costs, job_trading_cost
-from app.saved_runs import remove_saved_run
+import numpy as np
+import pandas as pd
+import streamlit as st
+
 from app.compare_state import FULL_MESSAGE, OPEN_COMPARE_KEY, add_to_comparison, ids_in_comparison
 from app.holdings_table import (
-    FACTOR_COMBINATION_LABELS, build_holdings_display_table, default_holdings_year,
-    TURNOVER_HELP, holdings_number_formats, holdings_period_return, holdings_table_to_csv
+    FACTOR_COMBINATION_LABELS,
+    TURNOVER_HELP,
+    build_holdings_display_table,
+    default_holdings_year,
+    holdings_number_formats,
+    holdings_period_return,
+    holdings_table_to_csv,
 )
+from app.saved_runs import remove_saved_run
+from app.streamlit_config import MAX_SAVED_RUNS
+from app.streamlit_utils import (
+    describe_compute,
+    get_backtest_lambda_name,
+    list_all_saved_analyses,
+    open_saved_analysis,
+    run_cohort,
+)
+from src.saved_analyses import SavedAnalysisError
+from src.trading_costs import has_trading_costs, job_trading_cost
+from Visualizations.portfolio_growth_plot import plot_portfolio_growth
+from Visualizations.top_bottom_portfolio_plot import plot_top_bottom_percent
 
 DIRECTION_LABELS = {'top': 'Higher is better', 'bottom': 'Lower is better'}
 # Column headers of the Year-by-Year and Win/Loss tables; WRDS runs pass their own
@@ -117,7 +128,7 @@ def render_results_tab(run: Dict[str, Any]) -> None:
 
     # 1. Header Information
     _render_header_captions(run)
-    
+
     # 2. Performance Summary
     st.subheader("Performance Summary")
     _render_summary_metrics(results, settings)
@@ -241,8 +252,8 @@ def _render_year_by_year_table(res: Dict[str, Any], periods: Optional[List[Any]]
                                columns: List[str] = YEAR_BY_YEAR_COLUMNS) -> None:
     """
     Generates the primary performance table with standardized financial headers.
-    
-    The table includes longitudinal portfolio values and relative returns against 
+
+    The table includes longitudinal portfolio values and relative returns against
     core market benchmarks (Russell 2000, Growth, and Value). WRDS runs pass their
     periods' labels and their own column headers.
     """
@@ -255,7 +266,7 @@ def _render_year_by_year_table(res: Dict[str, Any], periods: Optional[List[Any]]
 
     # Align data lengths for consistent reporting
     min_len = len(p_rets)
-    
+
     df = pd.DataFrame(dict(zip(columns, [
         [int(y) for y in years[:min_len]] if periods is None else periods,
         [f"${v:,.2f}" for v in port_vals[1:min_len+1]],
@@ -416,7 +427,8 @@ def _render_header_captions(run: Dict[str, Any], data_source: Optional[str] = No
         'mixing': "Mixing (one sleeve per factor)",
         'integrating': "Integrating (top stocks by composite score)",
     }
-    st.caption(f"**Factor Combination:** {combination_descriptions.get(combination, combination_descriptions['mixing'])}")
+    st.caption("**Factor Combination:** "
+               f"{combination_descriptions.get(combination, combination_descriptions['mixing'])}")
     st.caption(f"**Weighting:** {weighting_str}")
     st.caption(f"**Delisting Strategy:** {delisting_str}")
     if job_trading_cost(settings) > 0:
@@ -611,14 +623,14 @@ def _render_summary_metrics(res: Dict[str, Any], settings: Dict[str, Any],
     col1, col2, col3, col4 = st.columns(4)
     initial_aum = settings.get('initial_aum', 1000000.0)
     final_value = res.get('final_value', initial_aum)
-    
+
     n_years = len(res.get('yearly_returns', [])) / res.get('periods_per_year', 1)
     cagr = (((final_value / initial_aum) ** (1 / n_years)) - 1) if n_years > 0 else 0
-    
+
     bench_rets = res.get('benchmark_returns', [])
     benchmark_final = initial_aum * np.prod([1 + (r / 100.0) for r in bench_rets])
     cum_outperformance = ((final_value / benchmark_final) - 1)
-    
+
     col1.metric("Final Portfolio Value", f"${final_value:,.2f}")
     col2.metric("Total Return", f"{((final_value/initial_aum)-1):.2%}")
     col3.metric("CAGR", f"{cagr:.2%}")
@@ -665,7 +677,8 @@ def _render_cohort_analysis_section(run: Dict[str, Any], n_years: Optional[float
             st.session_state[saved_pct_key] = cohort_pct
 
         if st.button("Generate Comparison", type="primary", key=f"cohort_btn_{run_id}"):
-            spinner = "Running the comparison in AWS Lambda..." if run.get('data') is None else "Running the comparison..."
+            spinner = ("Running the comparison in AWS Lambda..." if run.get('data') is None
+                       else "Running the comparison...")
             try:
                 with st.spinner(spinner):
                     res_top, res_bot, compute = run_cohort(run, cohort_pct)
@@ -731,7 +744,7 @@ def _render_growth_plot(res: Dict[str, Any], settings: Dict[str, Any], factor_la
     initial = settings.get('initial_aum', 1000000.0)
     if has_trading_costs(res):
         chart['before_costs_vals'] = res.get('portfolio_values_before_costs')
-    
+
     fig = plot_portfolio_growth(
         years=res.get('years', []),
         port_vals=res.get('portfolio_values', []),

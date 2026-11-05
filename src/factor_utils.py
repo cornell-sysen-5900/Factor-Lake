@@ -5,9 +5,11 @@ PURPOSE: Numerical transformation and normalization utilities for quantitative s
 VERSION: 2.1.0
 """
 
+from typing import Optional
+
 import numpy as np
 import pandas as pd
-from typing import Optional
+
 
 def normalize_series(
     s: pd.Series,
@@ -19,11 +21,11 @@ def normalize_series(
     """
     Transforms a raw factor distribution into a standardized, comparable signal.
 
-    This utility processes a cross-section of financial data by mitigating the 
-    influence of outliers and adjusting the directional polarity of the signal. 
+    This utility processes a cross-section of financial data by mitigating the
+    influence of outliers and adjusting the directional polarity of the signal.
     Standardization is achieved via Z-score normalization:
 
-    $$Z = \frac{x - \mu}{\sigma}$$
+    $$Z = \frac{x - \\mu}{\\sigma}$$
 
     Args:
         s: The raw numerical factor values.
@@ -37,7 +39,7 @@ def normalize_series(
     """
     # Numerical validation and initial cleanup
     s = pd.to_numeric(s, errors='coerce').replace([np.inf, -np.inf], np.nan).copy()
-    
+
     if s.dropna().empty:
         return s
 
@@ -59,7 +61,7 @@ def normalize_series(
     if zscore:
         mu = s.mean()
         sigma = s.std(ddof=1)
-        
+
         # Guard against zero-variance to prevent division by zero errors
         if sigma > 1e-12:
             s = (s - mu) / sigma

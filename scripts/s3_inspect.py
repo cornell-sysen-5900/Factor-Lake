@@ -33,9 +33,9 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 try:
-    import tomllib                                   # Python 3.11+
+    import tomllib  # Python 3.11+
 except ImportError:
-    import tomli as tomllib                          # Python 3.10: installed with the repo's dev group
+    import tomli as tomllib  # Python 3.10: installed with the repo's dev group
 
 BUCKET = "sysen-5900-factor-lake"
 TEXT = {".csv", ".json", ".md", ".txt", ".toml", ".yaml", ".yml", ".log"}

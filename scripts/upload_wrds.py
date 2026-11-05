@@ -28,9 +28,9 @@ import tempfile
 from pathlib import Path
 
 try:
-    import tomllib                                   # Python 3.11+
+    import tomllib  # Python 3.11+
 except ImportError:
-    import tomli as tomllib                          # Python 3.10: installed with the repo's dev group
+    import tomli as tomllib  # Python 3.10: installed with the repo's dev group
 
 APP_PREFIX = "factor-lake-data"
 APP = (f"{APP_PREFIX}/full_precision_test.parquet", f"{APP_PREFIX}/last_price_mapping.parquet",
@@ -186,7 +186,8 @@ def upload(s3, bucket: str, local: dict[str, Path], remote: dict, really: bool, 
 def main(argv: list[str] | None = None, s3=None) -> int:
     parser = argparse.ArgumentParser(description="Upload processed/final/ to S3 (dry run unless --upload).")
     parser.add_argument("final_dir", type=Path, help="the processed/final folder")
-    parser.add_argument("--prefix", help="target prefix (default: from final/manifest.json, factor-lake-data/wrds_YYYY_MM)")
+    parser.add_argument("--prefix",
+                        help="target prefix (default: from final/manifest.json, factor-lake-data/wrds_YYYY_MM)")
     parser.add_argument("--secrets", type=Path, default=Path(__file__).resolve().parents[1] / ".streamlit" /
                         "secrets.toml", help="Streamlit secrets with the AWS keys (default: the repo's)")
     parser.add_argument("--upload", action="store_true", help="really upload (default: dry run)")

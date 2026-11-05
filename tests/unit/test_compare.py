@@ -5,10 +5,25 @@ series, and the table the tab shows (app/components/compare_tab.comparison_table
 """
 import pytest
 
-from app.compare import (GROWTH_BASE, MAX_COMPARED, NA, ROWS, ROWS_BY_NAME, SORT_OPTIONS, benchmark_lines,
-                         best_positions, cagr, chart_series, column_titles, compact_analysis, comparison_rows, growth_series,
-                         outperformance, sort_order)
-from app.compare import comparison_table
+from app.compare import (
+    GROWTH_BASE,
+    MAX_COMPARED,
+    NA,
+    ROWS,
+    ROWS_BY_NAME,
+    SORT_OPTIONS,
+    benchmark_lines,
+    best_positions,
+    cagr,
+    chart_series,
+    column_titles,
+    compact_analysis,
+    comparison_rows,
+    comparison_table,
+    growth_series,
+    outperformance,
+    sort_order,
+)
 from Visualizations.compare_growth_plot import BENCHMARK_STYLES, COMPARE_COLORS, plot_compare_growth
 
 

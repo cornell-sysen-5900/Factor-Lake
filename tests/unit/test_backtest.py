@@ -11,19 +11,18 @@ Rewritten to match the 2026 architecture:
   - get_benchmark_list replaces get_benchmark_return.
   - Information ratio lives in compute_comprehensive_metrics, not a standalone fn.
 """
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
 import streamlit as st
 
 from src.backtest_engine import (
-    calculate_holdings,
     _calculate_annual_return,
+    calculate_holdings,
     rebalance_portfolio,
 )
 from src.benchmarks import get_benchmark_list
 from src.portfolio import Portfolio
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

@@ -653,7 +653,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--chunk-size", type=int, default=CHUNK_SIZE, help="Rows per upload batch")
     parser.add_argument("--date-column", default=DATE_COLUMN, help="Date column used when ordering preview rows")
     parser.add_argument("--create-sql", default=CREATE_SQL, help="Inline SQL used to create the target table")
-    parser.add_argument("--create-sql-file", default=CREATE_SQL_FILE, help="SQL file path used to create the target table")
+    parser.add_argument("--create-sql-file", default=CREATE_SQL_FILE,
+                        help="SQL file path used to create the target table")
 
     parser.add_argument("--supabase-url", default="", help="Temporary Supabase project URL")
     parser.add_argument(

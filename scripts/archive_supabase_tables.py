@@ -5,12 +5,12 @@ MODULE: scripts/archive_supabase_tables.py
 PURPOSE: Archiving Supabase tables to Parquet format and pushing to GitHub.
 """
 
-import os
-import sys
-import logging
-import urllib.request
 import json
+import logging
+import os
 import subprocess
+import sys
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 from typing import List
@@ -22,7 +22,7 @@ except ImportError:
     pass
 
 import pandas as pd
-from supabase import create_client, Client
+from supabase import Client, create_client
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -31,16 +31,16 @@ class SupabaseArchiver:
     def __init__(self):
         self.url = os.environ.get('SUPABASE_URL')
         self.key = os.environ.get('SUPABASE_KEY')
-        
+
         if not self.url or not self.key:
             raise RuntimeError("Missing SUPABASE_URL or SUPABASE_KEY environment variables.")
-        
+
         self.client: Client = create_client(self.url, self.key)
-        
+
         # Default to data/archive relative to the project root if not specified
         default_archive_path = Path(__file__).resolve().parent.parent / "data" / "archive"
         self.archive_dir = Path(os.environ.get('ARCHIVE_REPO_PATH', default_archive_path))
-        
+
         self.archive_dir.mkdir(parents=True, exist_ok=True)
 
     def fetch_table_names(self) -> List[str]:
@@ -59,7 +59,7 @@ class SupabaseArchiver:
             "apikey": self.key,
             "Authorization": f"Bearer {self.key}"
         })
-        
+
         try:
             with urllib.request.urlopen(req) as response:
                 spec = json.loads(response.read())
@@ -100,27 +100,27 @@ class SupabaseArchiver:
 
                 if not batch:
                     break
-                
+
                 all_rows.extend(batch)
                 if len(batch) < page_size:
                     break
-                
+
                 offset += page_size
         except Exception as e:
             logger.error(f"Failed to fetch data for {table_name}: {e}")
             raise
 
         df = pd.DataFrame(all_rows)
-        
+
         # Ensure all columns are strings if they are objects, to prevent parquet type issues
         for col in df.select_dtypes(include=['object']).columns:
             df[col] = df[col].astype(str)
 
         output_path = self.archive_dir / f"{table_name}.parquet"
-        
+
         if df.empty:
             logger.warning(f"Table {table_name} is empty. Creating an empty Parquet file.")
-        
+
         df.to_parquet(output_path, engine="pyarrow", index=False)
         logger.info(f"Saved {len(df)} rows to {output_path}")
         return output_path
@@ -146,26 +146,27 @@ class SupabaseArchiver:
         notes = "Automated backup of Supabase tables."
 
         logger.info(f"Creating release {tag_name}...")
-        
+
         # We need the repo context. If we're inside a git repo, gh will figure it out.
         # Alternatively, the user can set ARCHIVE_GITHUB_REPO="owner/repo" in the environment.
         repo = os.environ.get('ARCHIVE_GITHUB_REPO')
-        
+
         cmd = ['gh', 'release', 'create', tag_name, '--title', title, '--notes', notes]
         if repo:
             cmd.extend(['--repo', repo])
-            
+
         # Add all parquet files as assets
         parquet_files = list(self.archive_dir.glob('*.parquet'))
         if not parquet_files:
             logger.warning("No parquet files found to release.")
             return
-            
+
         for p in parquet_files:
             cmd.append(str(p.name))
-            
+
         try:
-            # gh release create requires the tag to exist locally or on remote, or it will create it on the default branch.
+            # gh release create requires the tag to exist locally or on remote,
+            # or it will create it on the default branch.
             res = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
             if res.returncode != 0:
                 logger.error(f"Failed to create GitHub release: {res.stderr}")

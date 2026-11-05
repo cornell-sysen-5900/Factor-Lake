@@ -161,7 +161,8 @@ def cost_drag(a: Dict[str, Any]) -> float:
 
 def _factors(a: Dict[str, Any]) -> str:
     job = a['job']
-    return ', '.join(f"{job['factor_labels'].get(f, f)} ({'higher' if job['factor_directions'][f] == 'top' else 'lower'})"
+    return ', '.join(f"{job['factor_labels'].get(f, f)} "
+                     f"({'higher' if job['factor_directions'][f] == 'top' else 'lower'})"
                      for f in job['factors'])
 
 

@@ -6,10 +6,11 @@ VERSION: 3.1.0
 """
 
 import math
+from typing import Any, Dict, List, Tuple
 
 import streamlit as st
+
 import streamlit_config as config
-from typing import Any, Dict, List, Tuple
 
 HIGHER = "Higher is better"
 LOWER = "Lower is better"

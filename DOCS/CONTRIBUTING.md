@@ -36,7 +36,14 @@ The active branch will have an asterisk.
 
 ### Step 6: Edit the files you need
 
-Use VS Code or your preferred editor to make the change.
+Use VS Code or your preferred editor to make the change. Before committing, check the code style (PEP 8) and run the tests; CI runs both on every pull request:
+
+```bash
+uv run ruff check --fix .
+uv run pytest
+```
+
+`ruff check --fix` fixes whitespace and import order itself and lists anything left to fix by hand, such as lines over 120 characters. See "Code Style" in the README.
 
 ### Step 7: Stage the files
 

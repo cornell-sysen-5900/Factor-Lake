@@ -4,8 +4,16 @@ examples of DOCS/WRDS_MODE_DESIGN.md, section 3.2.
 """
 import pytest
 
-from src.wrds_calendar import (FIRST_MONTH, FIRST_YEAR, LAST_MONTH, LAST_YEAR, PERIODS_PER_YEAR,
-                               REBALANCE_MONTHS, describe_schedule, period_boundaries)
+from src.wrds_calendar import (
+    FIRST_MONTH,
+    FIRST_YEAR,
+    LAST_MONTH,
+    LAST_YEAR,
+    PERIODS_PER_YEAR,
+    REBALANCE_MONTHS,
+    describe_schedule,
+    period_boundaries,
+)
 
 
 def _span(frequency, start, end):

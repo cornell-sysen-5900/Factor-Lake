@@ -14,6 +14,13 @@ import pandas as pd
 import pytest
 import streamlit as st
 
+from app.holdings_table import (
+    build_holdings_display_table,
+    default_holdings_year,
+    holdings_number_formats,
+    holdings_period_return,
+    holdings_table_to_csv,
+)
 from src.backtest_engine import (
     _calculate_annual_return,
     _dedupe_year_slice_by_ticker,
@@ -25,13 +32,6 @@ from src.backtest_engine import (
 )
 from src.benchmarks import get_benchmark_list
 from src.factor_utils import normalize_series
-from app.holdings_table import (
-    build_holdings_display_table,
-    default_holdings_year,
-    holdings_number_formats,
-    holdings_period_return,
-    holdings_table_to_csv,
-)
 from tests.unit.test_mixing_regression import delisting_universe
 from tests.unit.test_saved_runs import RUN, _add_factor, _assert_clean, _captions, _click, _open_tab, _run_analysis, at  # noqa: F401
 
@@ -135,7 +135,8 @@ def test_one_factor_mixing_equals_integrating(universe, strategy, use_mcap):
     mixing, integrating = _run(universe, 'mixing', **kwargs), _run(universe, 'integrating', **kwargs)
     assert mixing['portfolio_values'] == integrating['portfolio_values']
     assert mixing['yearly_returns'] == integrating['yearly_returns']
-    strip = lambda rows: [{k: v for k, v in r.items() if k != 'Picked By'} for r in rows]
+    def strip(rows):
+        return [{k: v for k, v in r.items() if k != 'Picked By'} for r in rows]
     for year in mixing['holdings_by_year']:
         assert strip(mixing['holdings_by_year'][year]) == strip(integrating['holdings_by_year'][year])
 
@@ -277,7 +278,8 @@ def test_delisted_row_return_includes_what_its_capital_earned_after_delisting():
         dead = next(r for r in res['holdings_by_year'][2010] if r['Ticker'] == 'DEAD')
         assert dead['Delisted']
         assert dead['Period Return %'] == pytest.approx(100 * (0.5 + post_rate * frac * 1.5))
-        assert sum(r['Contribution %'] for r in res['holdings_by_year'][2010]) == pytest.approx(res['yearly_returns'][0])
+        contributions = sum(r['Contribution %'] for r in res['holdings_by_year'][2010])
+        assert contributions == pytest.approx(res['yearly_returns'][0])
 
 
 def test_holdings_years_follow_the_rebalance_years_kept(universe):
@@ -463,7 +465,8 @@ def test_single_factor_run_is_the_same_for_both_methods(at):
     _assert_clean(at)
     run_2, run_1 = at.session_state['saved_runs']
     assert run_1['results']['portfolio_values'] == run_2['results']['portfolio_values']
-    strip = lambda rows: [{k: v for k, v in r.items() if k != 'Picked By'} for r in rows]
+    def strip(rows):
+        return [{k: v for k, v in r.items() if k != 'Picked By'} for r in rows]
     for year, rows in run_1['results']['holdings_by_year'].items():
         assert strip(rows) == strip(run_2['results']['holdings_by_year'][year])
 
@@ -486,7 +489,8 @@ def test_screen_rounds_but_downloaded_csv_is_unrounded(at, served_files):
                for col, cfg in json.loads(table.proto.columns).items() if 'type_config' in cfg}
     assert formats == holdings_number_formats(['ROE using 9/30 Data', 'ROA %'])
 
-    exported = pd.read_csv(io.BytesIO(_downloaded_csv(at, served_files, 'ranked_csv_1').content), float_precision='round_trip')
+    exported = pd.read_csv(io.BytesIO(_downloaded_csv(at, served_files, 'ranked_csv_1').content),
+                           float_precision='round_trip')
     data = at.session_state['saved_runs'][0]['data']
     raw = data[data['Year'] == 2023].set_index('Ticker')
     assert exported['ROA %'].tolist() == raw.loc[exported['Ticker'], 'ROA'].tolist()

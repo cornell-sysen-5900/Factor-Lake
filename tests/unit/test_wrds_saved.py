@@ -16,8 +16,16 @@ from src.backtest_jobs import decode_result, decode_saved, results_match
 from src.backtest_service import BacktestService, result_file
 from src.s3_client import S3DataManager
 from src.saved_analyses import SavedAnalysisError, load_saved_analysis
-from tests.unit.test_backtest_lambda import (APP_DIR, DELISTING_FILE, UNIVERSE_FILE, FakeLambda,
-                                             _client_init_with, _delisting, _parquet, _raw_universe)
+from tests.unit.test_backtest_lambda import (
+    APP_DIR,
+    DELISTING_FILE,
+    UNIVERSE_FILE,
+    FakeLambda,
+    _client_init_with,
+    _delisting,
+    _parquet,
+    _raw_universe,
+)
 from tests.unit.test_saved_runs import _assert_clean, _click_main_tab, _open_tab, browser_like_widget_states
 from tests.unit.wrds_fixtures import RangeS3, put_wrds_files, synthetic_frames
 

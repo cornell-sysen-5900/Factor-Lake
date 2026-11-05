@@ -75,8 +75,9 @@ def score_saved_analyses(manager: S3DataManager, apply: bool = False, log=print)
             counts['labeled'] += 1
         log(f"{'Updating' if apply else 'Would update'} {analysis_id[:12]} ({job['kind']}): {updated['summary']}")
         if apply:
-            manager.client.copy_object(Bucket=manager.bucket, Key=key, CopySource={'Bucket': manager.bucket, 'Key': key},
-                                       Metadata=updated, MetadataDirective='REPLACE', ContentType='application/json')
+            manager.client.copy_object(Bucket=manager.bucket, Key=key,
+                                       CopySource={'Bucket': manager.bucket, 'Key': key}, Metadata=updated,
+                                       MetadataDirective='REPLACE', ContentType='application/json')
     return counts
 
 

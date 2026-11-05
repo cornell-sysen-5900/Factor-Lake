@@ -61,7 +61,8 @@ class BacktestLambdaClient:
         if response.get('FunctionError'):
             raise BacktestLambdaError(f"The backtest Lambda failed: {payload.get('errorMessage', payload)}")
         if payload.get('status') != 'ok':
-            raise BacktestLambdaError(f"The backtest Lambda could not run this backtest: {payload.get('error', payload)}")
+            raise BacktestLambdaError("The backtest Lambda could not run this backtest: "
+                                      f"{payload.get('error', payload)}")
 
         if 'result' in payload:
             result, delivery = payload['result'], 'inline'

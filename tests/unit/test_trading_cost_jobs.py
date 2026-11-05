@@ -14,8 +14,7 @@ from src.backtest_service import result_file, summarize_job
 from src.saved_analyses import list_saved_analyses, load_saved_analysis
 from src.wrds_jobs import WRDS_JOB_FIELDS, build_wrds_job, describe_wrds_job, engine_arguments, validate_wrds_job
 from src.wrds_service import summarize_wrds_job
-from tests.unit.test_wrds_service import (BUCKET, PREFIX, manager, s3, service,  # noqa: F401 (fixtures)
-                                          frames, wrds_job)
+from tests.unit.test_wrds_service import BUCKET, PREFIX, frames, manager, s3, service, wrds_job  # noqa: F401 (fixtures)
 from tests.unit.wrds_fixtures import WRDS_SETTINGS
 
 LEGACY_SETTINGS = dict(start_year=2004, end_year=2020, initial_aum=1000.0)
@@ -162,6 +161,7 @@ def test_wrds_cohort_pays_the_cost_on_both_sides(service):
 def test_old_ids_open_at_0_bps(manager, s3):
     """A result saved by main has no trading cost fields; its job opens as a 0 bps job."""
     from pathlib import Path
+
     from src.trading_costs import has_trading_costs, job_trading_cost
     body = (Path(__file__).resolve().parents[1] / 'fixtures' / 'saved_main_backtest.json').read_bytes()
     old_id = '1' * 64

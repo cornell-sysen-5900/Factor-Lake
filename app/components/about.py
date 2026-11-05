@@ -7,12 +7,13 @@ VERSION: 2.1.0
 
 import streamlit as st
 
+
 def render_about_tab() -> None:
     """
     Renders the informational 'About' section of the application.
-    
-    This component provides the investment thesis for each factor, explains the 
-    underlying return methodology (including survivorship bias handling), 
+
+    This component provides the investment thesis for each factor, explains the
+    underlying return methodology (including survivorship bias handling),
     and outlines the operational workflow for the backtesting engine.
     """
     st.header("About Factor-Lake Portfolio Analysis")
@@ -61,10 +62,10 @@ def render_about_tab() -> None:
     [Factor Lake User Guide (Docs Site)](https://cornell-sysen-5900.github.io/Factor-Lake/FACTOR_LAKE_USER_GUIDE/).
     If your docs deployment is unavailable, use the
     [repository version](https://github.com/cornell-sysen-5900/Factor-Lake/blob/main/DOCS/FACTOR_LAKE_USER_GUIDE.md).
-    
+
 
     ---
-    **Version:** 2.1.0  
-    **Last Updated:** April 2026  
+    **Version:** 2.1.0\\
+    **Last Updated:** April 2026\\
     **Project Repository:** [Factor-Lake GitHub](https://github.com/cuddihyd-cornell/Factor-Lake/)
     """)

@@ -5,7 +5,7 @@ PURPOSE: Reference data for annual index returns and risk-free rates.
 VERSION: 2.1.0
 """
 
-from typing import List, Dict
+from typing import Dict, List
 
 # Annual Returns for benchmarks are represented as percentages (e.g., 8.50).
 # Risk-Free Rates are represented as decimals (e.g., 0.015).
@@ -33,7 +33,7 @@ benchmarks = {
         2017: 20.55, 2018: 9.32, 2019: -8.24, 2020: -14.87, 2021: 63.93,
         2022: -17.69, 2023: 7.84, 2024: 25.89
     },
-    
+
     # FRED 4-Week Treasury Bill Secondary Market Rate (Annualized Decimal)
     "RISK_FREE_RATES": {
         2002: 0.0156, 2003: 0.0102, 2004: 0.0182, 2005: 0.0349, 2006: 0.0473,
@@ -62,12 +62,12 @@ def get_benchmark_list(index: int, start_year: int, end_year: int) -> List[float
         3: "Russell 2000 Value",
         4: "RISK_FREE_RATES"
     }
-    
+
     name = benchmark_mapping.get(index)
     if not name:
         raise ValueError(f"Benchmark index {index} is not recognized. Expected 1-4.")
 
     data_source = benchmarks[name]
-    
+
     # Range selection: Uses 0.0 as a fallback for missing historical data
     return [data_source.get(year, 0.0) for year in range(start_year, end_year)]

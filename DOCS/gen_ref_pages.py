@@ -16,8 +16,9 @@ No docstrings are required.  mkdocstrings renders signatures and type
 annotations for every symbol regardless of whether a docstring exists.
 """
 
-import mkdocs_gen_files
 from pathlib import Path
+
+import mkdocs_gen_files
 
 # Absolute path to the project root (one level above this DOCS/ directory).
 ROOT = Path(__file__).resolve().parent.parent

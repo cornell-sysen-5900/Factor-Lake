@@ -30,10 +30,19 @@ import numpy as np
 import pandas as pd
 
 from pipeline.checks import PASS, WARN, Check, check, vs_last_run
-from pipeline.config import (KNOWN_MISSING_MONTHS, MEMBERSHIP_BRIDGE_SNAPSHOTS, NEIGHBOUR_MISSING_MAX,
-                             NON_MEMBER_CAP_MULTIPLE, NON_MEMBER_CAP_QUANTILE_B, NON_MEMBER_MAX_SNAPSHOTS,
-                             NON_MEMBER_MAX_WEIGHT_A, NON_STOCK_PATTERN,
-                             SNAPSHOT_SIZE_RANGE, SNAPSHOT_WEIGHT_RANGE, DataPaths)
+from pipeline.config import (
+    KNOWN_MISSING_MONTHS,
+    MEMBERSHIP_BRIDGE_SNAPSHOTS,
+    NEIGHBOUR_MISSING_MAX,
+    NON_MEMBER_CAP_MULTIPLE,
+    NON_MEMBER_CAP_QUANTILE_B,
+    NON_MEMBER_MAX_SNAPSHOTS,
+    NON_MEMBER_MAX_WEIGHT_A,
+    NON_STOCK_PATTERN,
+    SNAPSHOT_SIZE_RANGE,
+    SNAPSHOT_WEIGHT_RANGE,
+    DataPaths,
+)
 from pipeline.outputs import fresh_stage_dir, table_info, write_parquet, write_summary
 from pipeline.stages import s02_prices
 
@@ -202,7 +211,8 @@ def run(paths: DataPaths) -> dict:
                                                 "mkt_cap_musd", "max_other_mkt_cap_musd", "p95_mkt_cap_musd",
                                                 "weight", "n_snapshots_total", "exclusion_rule"]].rename(
         columns={"exclusion_rule": "rule"}).reset_index(drop=True)
-    money = lambda v: None if pd.isna(v) else round(float(v), 1)
+    def money(v):
+        return None if pd.isna(v) else round(float(v), 1)
 
     listed = set(snap["permno"].tolist())
     raw_path = paths.query_inputs / "permno_list.txt"

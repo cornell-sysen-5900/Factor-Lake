@@ -13,8 +13,16 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 
-from src.wrds_data import (DEFAULT_WRDS_DIR, MARKET_COLUMNS, MARKET_FILE, PANEL_COLUMNS, PANEL_FILE,
-                           RETURNS_COLUMNS, RETURNS_FILE, WrdsData)
+from src.wrds_data import (
+    DEFAULT_WRDS_DIR,
+    MARKET_COLUMNS,
+    MARKET_FILE,
+    PANEL_COLUMNS,
+    PANEL_FILE,
+    RETURNS_COLUMNS,
+    RETURNS_FILE,
+    WrdsData,
+)
 from src.wrds_factors import WRDS_FACTOR_COLUMNS, WRDS_SECTORS
 from tests.unit.test_backtest_lambda import FakeS3
 
