@@ -2,6 +2,7 @@
 import json
 import math
 from copy import deepcopy
+
 from app import streamlit_config as config
 from src.trading_costs import MAX_TRADING_COST_BPS
 from src.wrds_calendar import FIRST_YEAR, LAST_YEAR
@@ -97,7 +98,8 @@ def build(settings, factors, directions, name='', note='', mode=None):
     mode = mode or settings.get('data_mode', 'legacy')
     # Refuse to silently discard engine settings that the current controls cannot restore.
     if settings.get('top_pct', 10.0) != 10.0 or settings.get('benchmark_index', 1) != 1:
-        raise ValueError('This run uses a custom portfolio percentage or benchmark not supported by the current controls.')
+        raise ValueError('This run uses a custom portfolio percentage or benchmark '
+                         'not supported by the current controls.')
     fields = COMMON | ({'frequency'} if mode == 'wrds' else {'delisting_strategy'})
     s = {k: deepcopy(settings[k]) for k in fields if k in settings}
     s.setdefault('trading_cost_bps', 0)
@@ -131,9 +133,12 @@ def widget_values(document):
     if s['sector_filter_enabled']:
         values['wrds_sectors_input' if mode == 'wrds' else 'selected_sectors_input'] = s['selected_sectors']
     if mode == 'wrds':
-        values['wrds_frequency_input'] = next(k for k, v in config.WRDS_FREQUENCY_OPTIONS.items() if v == s['frequency'])
+        values['wrds_frequency_input'] = next(k for k, v in config.WRDS_FREQUENCY_OPTIONS.items()
+                                              if v == s['frequency'])
     else:
-        values['delisting_strategy_input'] = {'zero_return': 'Zero Return', 'hold_cash': 'Hold Cash', 'reinvest': 'Reinvest'}[s['delisting_strategy']]
+        values['delisting_strategy_input'] = {
+            'zero_return': 'Zero Return', 'hold_cash': 'Hold Cash', 'reinvest': 'Reinvest',
+        }[s['delisting_strategy']]
     by_column = {m['column']: (label, m) for label, m in catalog(mode).items()}
     selected = {}
     for f in d['factors']:

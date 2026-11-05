@@ -1,12 +1,14 @@
 """Inputs-only JSON contract: both modes, validation, and real Streamlit workflows."""
+import json
 from copy import deepcopy
 from io import BytesIO
-import json
+
 import pytest
+
 from app import strategy_config as cfg
 from app.streamlit_config import WRDS_FACTOR_METADATA
+from tests.unit.test_saved_runs import _add_factor, _assert_clean, _click, _click_main_tab, at  # noqa: F401
 from tests.unit.test_wrds_mode_switch import LEGACY_DEFAULT_SETTINGS
-from tests.unit.test_saved_runs import at, _add_factor, _click, _click_main_tab, _assert_clean  # noqa: F401
 
 
 def document(mode='legacy'):
@@ -22,7 +24,8 @@ def document(mode='legacy'):
 def test_json_round_trip_and_explicit_export_allowlist(mode):
     doc = document(mode)
     assert cfg.loads(cfg.dumps(doc).encode()) == doc
-    settings = dict(doc['settings'], data_mode=mode, SUPABASE_KEY='secret', data=[123], results={'x': 1}, use_lambda=True)
+    settings = dict(doc['settings'], data_mode=mode, SUPABASE_KEY='secret', data=[123], results={'x': 1},
+                    use_lambda=True)
     exported = cfg.dumps(cfg.build(settings, [doc['factors'][0]['column']], {}, mode=mode))
     for excluded in ('SUPABASE_KEY', 'secret', 'results', 'use_lambda'):
         assert excluded not in exported
@@ -167,7 +170,7 @@ def test_wrds_import_switches_mode_and_restores_frequency(at, monkeypatch):
     assert at.radio(key='data_mode_input').value == 'Legacy'
 
 # Use an in-process Lambda and synthetic S3 to verify WRDS without live credentials.
-from tests.unit.test_wrds_saved import new_session, manager, s3  # noqa: E402,F401
+from tests.unit.test_wrds_saved import manager, new_session, s3  # noqa: E402,F401
 
 
 def test_wrds_round_trip_keeps_cache_identity_and_results(new_session, monkeypatch):

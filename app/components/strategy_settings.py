@@ -1,9 +1,11 @@
 """Strategy import/export controls and session-only run annotations."""
 import re
+
 import streamlit as st
+
 from app import strategy_config as configs
-from components.factor_selection import reset_factor_selection
 from components.data_viewer import clear_viewer_data
+from components.factor_selection import reset_factor_selection
 
 
 def apply_import(raw, lambda_available):
