@@ -29,6 +29,7 @@ import streamlit_css as css
 import streamlit_config as config
 
 import components.sidebar as sidebar
+from components.strategy_settings import render_strategy_settings
 from components.factor_selection import (clear_factor_selection, render_factor_selection,
                                          reset_factor_selection)
 from components.results_tab import (OPENED_MESSAGE_KEY, render_all_saved_analyses, render_analysis_history,
@@ -201,6 +202,8 @@ def main():
 
             # Configuration phase: Capture factors and directions
             selected_factor_names, factor_directions = render_factor_selection(data_mode)
+            render_strategy_settings(user_settings, selected_factor_names, factor_directions,
+                                     bool(utils.get_backtest_lambda_name()))
 
             if data_mode == 'wrds':
                 _render_wrds_run(user_settings, selected_factor_names, factor_directions)

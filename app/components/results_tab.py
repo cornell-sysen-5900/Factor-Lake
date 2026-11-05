@@ -18,6 +18,7 @@ from app.streamlit_utils import (describe_compute, get_backtest_lambda_name, lis
 from src.saved_analyses import SavedAnalysisError
 from src.trading_costs import has_trading_costs, job_trading_cost
 from app.saved_runs import remove_saved_run
+from components.strategy_settings import render_run_settings
 from app.compare_state import FULL_MESSAGE, OPEN_COMPARE_KEY, add_to_comparison, ids_in_comparison
 from app.holdings_table import (
     FACTOR_COMBINATION_LABELS, build_holdings_display_table, default_holdings_year,
@@ -86,6 +87,7 @@ def render_saved_runs(saved_runs: List[Dict[str, Any]]) -> None:
                 on_click=_remove_run,
                 args=(run['id'],),
             )
+            render_run_settings(run)
             # A run that fails to render must not break the other tabs or its Remove button
             try:
                 render_results_tab(run)
