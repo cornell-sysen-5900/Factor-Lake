@@ -95,6 +95,21 @@ Factor-Lake/
 └── README.md
 ```
 
+## Live Calculation Preview
+
+The Analysis tab shows a **Calculation Preview** directly below Factor Selection, before
+Load Market Data. It updates immediately when factors, directions, combination method,
+weighting, delisting strategy, ESG, sectors, years or initial investment change. No market
+data or cloud credentials are needed to preview the strategy. With no factors, a placeholder
+is shown. Expand **Step-by-step calculation** for normalization, selection, allocation,
+delisting and compounding details.
+
+After running, **Calculation Used in This Run** in Results preserves the formula from that
+run. Current sidebar changes do not change historical formulas. Opened saved analyses use
+their stored inputs.
+
+Run the acceptance tests with `uv run pytest tests/unit/test_calculation_preview.py`.
+
 ## Import Conventions
 
 Always import from `src`:

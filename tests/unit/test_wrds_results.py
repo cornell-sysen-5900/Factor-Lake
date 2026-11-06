@@ -435,7 +435,12 @@ def test_the_data_viewer_says_it_shows_legacy_data_in_wrds_mode(new_session):
 # Legacy's Results tab is exactly as on main
 # ---------------------------------------------------------------------------
 
-def test_legacy_results_tab_renders_exactly_as_on_main():
+def test_legacy_results_tab_renders_exactly_as_on_main(monkeypatch):
+    # Calculation visibility is an intentional addition covered by its own AppTests.
+    # Keep comparing every pre-existing result metric, table, chart and control.
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / 'app'))
+    monkeypatch.setattr('components.results_tab.render_calculation_preview', lambda *args, **kwargs: None)
+    monkeypatch.setattr('app.calculation_preview.render_calculation_preview', lambda *args, **kwargs: None)
     expected = json.loads((FIXTURES / 'legacy_results_render_main.json').read_text(encoding='utf-8'))
     actual = json.loads(json.dumps(legacy_results_snapshot(), sort_keys=True))
     # The changes: the main tab bar's new Compare and Scoreboard tabs, right after Results (and its

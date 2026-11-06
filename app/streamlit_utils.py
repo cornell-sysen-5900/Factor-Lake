@@ -337,6 +337,8 @@ def run_backtest_logic(user_settings: Dict[str, Any],
         )
         return None
 
+    from app.calculation_preview import build_calculation_preview
+
     # Save a snapshot so later sidebar/factor changes never alter this run
     run_id = st.session_state.next_run_id
     run = {
@@ -345,6 +347,8 @@ def run_backtest_logic(user_settings: Dict[str, Any],
         'factor_labels': factor_labels,
         'factors': internal_factor_cols,
         'factor_directions': internal_directions,
+        'calculation_preview': build_calculation_preview(
+            {**user_settings, **universe}, factor_labels, factor_dirs),
         'settings': dict(user_settings),
         'universe': universe,
         'data': data,
