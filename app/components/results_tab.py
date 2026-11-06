@@ -16,6 +16,7 @@ from app.streamlit_config import MAX_SAVED_RUNS
 from app.streamlit_utils import describe_compute, get_backtest_lambda_name, open_saved_analysis, run_cohort
 from src.saved_analyses import SavedAnalysisError
 from app.saved_runs import remove_saved_run
+from app.calculation_preview import preview_for_run, render_calculation_preview
 from app.holdings_table import (
     FACTOR_COMBINATION_LABELS, build_holdings_display_table, default_holdings_year,
     holdings_number_formats, holdings_period_return, holdings_table_to_csv
@@ -105,6 +106,7 @@ def render_results_tab(run: Dict[str, Any]) -> None:
 
     # 1. Header Information
     _render_header_captions(run)
+    render_calculation_preview(preview_for_run(run), saved=True)
     
     # 2. Performance Summary
     st.subheader("Performance Summary")

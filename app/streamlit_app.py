@@ -30,6 +30,7 @@ import streamlit_config as config
 
 import components.sidebar as sidebar
 from components.factor_selection import render_factor_selection
+from app.calculation_preview import build_calculation_preview, render_calculation_preview
 from components.results_tab import render_analysis_history, render_open_saved_analysis, render_saved_runs
 from components.data_viewer import render_data_viewer_tab, clear_viewer_data
 from components.about import render_about_tab
@@ -95,9 +96,18 @@ def main():
         unsafe_allow_html=True
     )
     
+    demo_mode = os.environ.get("FACTOR_LAKE_DEMO", "") == "1"
+    if demo_mode:
+        from app.demo_data import build_demo_universe
+        if st.session_state.raw_data is None:
+            st.session_state.raw_data = build_demo_universe()
+        st.warning("DEMO MODE — Synthetic stock data, not real market performance. "
+                   "Benchmarks use the application's existing historical series. Backtests run locally.")
+
     # Render Global Sidebar and capture configuration
-    user_settings = sidebar.render_sidebar(config.SECTOR_OPTIONS, utils.describe_data_source(),
-                                           utils.get_backtest_lambda_name())
+    user_settings = sidebar.render_sidebar(
+        config.SECTOR_OPTIONS, "Synthetic demo data" if demo_mode else utils.describe_data_source(),
+        "" if demo_mode else utils.get_backtest_lambda_name())
     use_lambda = utils.lambda_backtests_enabled(user_settings)
 
     # A finished run opens the Results tab. The active tab can only be set
@@ -114,6 +124,9 @@ def main():
         with tab_analysis:
             # Configuration phase: Capture factors and directions
             selected_factor_names, factor_directions = render_factor_selection()
+
+            render_calculation_preview(build_calculation_preview(
+                user_settings, selected_factor_names, factor_directions))
 
             # Step 1: Data Acquisition (with Lambda backtests, only the Data Viewer needs it)
             if use_lambda:
