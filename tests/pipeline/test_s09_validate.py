@@ -68,7 +68,8 @@ def test_rerun_comparison_finds_changed_data_and_ignores_created_at(tmp_path):
     assert all(v["same"] for v in same.values())
     write_final(tmp_path / "c", 3.5)
     diff = s09.compare_finals(tmp_path / "a", tmp_path / "c")
-    assert not diff["factor_panel_monthly.parquet"]["same"] and diff["manifest.json"]["same"]          # only created_at differs
+    # only created_at differs
+    assert not diff["factor_panel_monthly.parquet"]["same"] and diff["manifest.json"]["same"]
 
 
 def test_rerun_hash_ignores_row_order(tmp_path):
@@ -128,5 +129,5 @@ def test_independent_recompute_script_on_tiny_raw_files(tmp_path):
     n_feb = sum(1 for d in days if d.month == 2 and d.year == 2020)
     assert r.ret_m == pytest.approx(1.001 ** n_feb - 1)
     code = (ROOT / "scripts" / "wrds_independent_recompute.py").read_text(encoding="utf-8")
-    imports = [l for l in code.splitlines() if l.startswith(("import ", "from "))]
-    assert imports and not any("pipeline" in l for l in imports)
+    imports = [line for line in code.splitlines() if line.startswith(("import ", "from "))]
+    assert imports and not any("pipeline" in line for line in imports)

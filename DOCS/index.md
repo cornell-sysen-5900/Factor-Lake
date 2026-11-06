@@ -11,6 +11,7 @@ Factor-Lake lets you compose multi-factor stock selection models, run historical
 | Section | Description |
 |---|---|
 | [Factor Lake User Guide](FACTOR_LAKE_USER_GUIDE.md) | Student-focused walkthrough for NBA5220/Equity Research workflows |
+| [Strategy Settings and Run Names](STRATEGY_SETTINGS.md) | Export and import strategy JSON files, name saved runs, and add notes |
 | [Developer Onboarding](DEV_ONBOARDING.md) | Getting access, workspace setup, and understanding workflow for new team members |
 | [Documentation Contributor](DOCS_CONTRIBUTOR_GUIDE.md) | How to add and edit guides, update navigation, and publish docs to the site |
 | [Streamlit Admin Guide](STREAMLIT_ADMIN_GUIDE.md) | Team runbook for production deploys, secret rotation, and app operations |

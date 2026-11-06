@@ -51,10 +51,13 @@ Then open http://localhost:8501
 - Sector filtering (configurable sector universe)
 - Market data loaded from AWS S3 (Parquet), shared by all sessions, with Supabase as a fallback
 - Annual rebalancing backtest (configurable period, currently 2002-2024 in UI)
+- WRDS mode: point-in-time WRDS data with semi-annual, quarterly or monthly rebalancing, run in AWS Lambda (user guide section 15; design in `DOCS/WRDS_MODE_DESIGN.md`)
 - Benchmark comparison vs Russell 2000, Growth, and Value
 - Performance metrics: CAGR, yearly returns, drawdown, Sharpe, Information Ratio, win rate
 - Ranked-stock table and top-vs-bottom cohort analysis
 - Saved runs: each backtest run is kept as its own tab in Results (newest first, last 5; cleared when the page is refreshed), shows the settings that produced it, and can be removed
+- Strategy files and names: export/import Legacy or WRDS settings as JSON, name backtests and add notes, and edit annotations in Results without changing calculations. See [Save, import and name backtests](DOCS/STRATEGY_SETTINGS.md).
+- Clear and rerun: on the Analysis tab, click **Clear Parameters** to remove selected factors and restore the analysis settings to their defaults. Choose new inputs, then **Run Portfolio Analysis**. For local backtests, click **Load Market Data** first to apply the new filters using the cached source data. Saved runs, analysis history, the Lambda execution preference and the data source (Legacy or WRDS) are kept; in WRDS mode the frequency and years return to Quarterly, 2008-2026. No page refresh or app restart is needed.
 - Data Viewer tab: filter the loaded market data by date range, sector and industry, view it, and download it as CSV (no extra data downloads)
 
 ## Project Layout
@@ -117,6 +120,19 @@ from src.portfolio import Portfolio
 from src.factor_registry import get_factor_column
 ```
 
+## Code Style
+
+The Python code follows [PEP 8](https://peps.python.org/pep-0008/), checked by [ruff](https://docs.astral.sh/ruff/) on every pull request (the CI **Lint** step fails on any error):
+
+```bash
+uv run ruff check .          # list problems
+uv run ruff check --fix .    # fix whitespace, import order and other safe fixes
+```
+
+The rules are in `pyproject.toml` (`[tool.ruff]`): PEP 8's errors and warnings (`E`, `W`), its naming rules (`N`) and import order (`I`), with lines up to **120 characters**, the width the code was already written at. Three exceptions are allowed, each explained there: the fake AWS clients in `tests/` take boto3's argument names (`Bucket=`, `Key=`), `app/streamlit_app.py` sets up the environment before its imports, and the `Visualizations` package keeps its capitalized name.
+
+Changing a backtest engine file (`ENGINE_SOURCES` in `src/backtest_jobs.py`, `WRDS_ENGINE_SOURCES` in `src/wrds_jobs.py`), even only its formatting, changes the backtest code version: after the deploy, each backtest run again is computed once more and gets a new analysis ID. Old IDs still open.
+
 ## Documentation
 
 - `DOCS/index.md` - Documentation home
@@ -141,7 +157,7 @@ uv run streamlit run app/streamlit_app.py
 
 1. Create a feature branch from `main`.
 2. Add/modify tests in `tests/unit/` and/or `tests/integration/`.
-3. Run unit tests: `uv run pytest`
+3. Run unit tests: `uv run pytest`, and the PEP 8 check: `uv run ruff check .` (see [Code Style](#code-style))
 4. Run integration tests (requires Supabase and/or AWS creds):
    ```bash
    SUPABASE_URL="..." SUPABASE_KEY="..." uv run pytest tests/integration -v

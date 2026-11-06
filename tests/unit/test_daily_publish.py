@@ -71,7 +71,9 @@ class FakeS3Client:
         body = self.objects[(Bucket, Key)]
         if self.shrink_reads and Key.endswith('data.parquet'):   # simulate a damaged object
             table = pq.read_table(io.BytesIO(body)).slice(0, 0)
-            buf = io.BytesIO(); pq.write_table(table, buf); body = buf.getvalue()
+            buf = io.BytesIO()
+            pq.write_table(table, buf)
+            body = buf.getvalue()
         return {'Body': io.BytesIO(body)}
 
     def put_object(self, Bucket, Key, Body, **kwargs):
@@ -243,7 +245,8 @@ def test_publish_uploads_years_then_manifest_and_reads_back(built):
         'factor-lake-data/daily_last_prices.parquet',
         'factor-lake-data/daily_prices/_manifest.json',          # last, so readers see a complete set
     ]
-    assert client.content_types['factor-lake-data/daily_prices/year=2008/data.parquet'] == 'application/vnd.apache.parquet'
+    content_type = client.content_types['factor-lake-data/daily_prices/year=2008/data.parquet']
+    assert content_type == 'application/vnd.apache.parquet'
     assert client.content_types['factor-lake-data/daily_prices/_manifest.json'] == 'application/json'
     assert json.loads(client.objects[('bucket', 'factor-lake-data/' + DAILY_MANIFEST_FILE)]) == manifest
 

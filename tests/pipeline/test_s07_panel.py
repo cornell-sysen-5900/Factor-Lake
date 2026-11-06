@@ -15,7 +15,8 @@ def test_universe_uses_the_latest_snapshot_whose_every_line_is_effective():
     snaps = pd.DataFrame({
         "report_dt": pd.to_datetime(["2019-12-31", "2019-12-31", "2020-01-31", "2020-01-31"]),
         "eff_dt": pd.to_datetime(["2020-01-20", "2020-01-25", "2020-02-20", "2020-03-05"]),   # Jan report: Mar 5
-        "permno": [1, 2, 1, 3], "weight": 0.5, "ticker": "T", "security_name": "N", "in_universe": [True, True, True, False]})
+        "permno": [1, 2, 1, 3], "weight": 0.5, "ticker": "T", "security_name": "N",
+        "in_universe": [True, True, True, False]})
     cal = pd.DataFrame({"month_end": T})
     dates = s07.rebalance_dates(cal, snaps)
     assert dates.tolist() == list(T)                                   # first snapshot effective by 2020-01-31
@@ -29,7 +30,8 @@ def test_universe_uses_the_latest_snapshot_whose_every_line_is_effective():
 def quarter(permno, end, report, **vals):
     end = pd.Timestamp(end)
     row = {"permno": permno, "gvkey": "001", "period_end": end, "report_date": pd.Timestamp(report),
-           "fyearq": end.year, "fqtr": (end.month - 1) // 3 + 1, "is_usd": True, "gsector": 45, "ggroup": 4510, "gind": 451030, "gsubind": 45103010,
+           "fyearq": end.year, "fqtr": (end.month - 1) // 3 + 1, "is_usd": True, "gsector": 45, "ggroup": 4510,
+           "gind": 451030, "gsubind": 45103010,
            **{c: 1.0 for c in (*s07.BLOCKS, *s07.STATEMENT_FACTORS, *PRICE_BASED_FACTORS)}}
     row.update(vals)
     return row
@@ -76,7 +78,8 @@ def test_rolling_beta_on_a_known_series():
 
 def panel_rows(**cols):
     base = {"date": T[0], "permno": 1, "gsector": 45, "gind": 451030, "prc": 20.0, "company_mkt_cap_musd": 1000.0,
-            "company_cap_from_compustat": False, "fund_is_usd": True, "ev_claims": 200.0, "book_equity": 500.0, "ib_ttm": 50.0, "revenue_ttm": 800.0,
+            "company_cap_from_compustat": False, "fund_is_usd": True, "ev_claims": 200.0, "book_equity": 500.0,
+            "ib_ttm": 50.0, "revenue_ttm": 800.0,
             "dv_ttm": 10.0, "fcf_ttm": 40.0, "ebitda_ttm": 120.0, "ebit_ttm": 90.0, "eps1_crsp": 1.0, "eps2_crsp": 1.25,
             "ebt1_meanest": 130.0, "sal1_meanest": 850.0, "ltg_meanest": 0.10,
             **{c: np.nan for c in s07.QE_FACTORS}}

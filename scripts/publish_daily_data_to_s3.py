@@ -105,7 +105,8 @@ def clean_chunk(chunk: pd.DataFrame, counts: Dict[str, int], start: Optional[dat
     df = df.loc[:, ~df.columns.duplicated(keep='first')]
     missing = [c for c in ('date', 'prc') if c not in df.columns]
     if missing or not ({'permno', 'ticker'} & set(df.columns)):
-        raise ValueError(f"The CSV needs date, prc and permno or ticker columns; missing {missing or ['permno/ticker']}. "
+        raise ValueError("The CSV needs date, prc and permno or ticker columns; "
+                         f"missing {missing or ['permno/ticker']}. "
                          f"Found: {list(chunk.columns)}")
 
     df = df.mask(df.isin(SENTINELS))   # placeholders -> missing (all columns are text here)
@@ -311,8 +312,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         manifest = build_daily_dataset(args.csv, output_dir, args.chunk_rows, args.start_date)
         c = manifest['cleaning']
         logger.info(f"Cleaned {c['rows_read']:,} rows into {manifest['rows_written']:,} "
-                    f"({manifest['securities']:,} securities, {manifest['date_range'][0]} to {manifest['date_range'][1]}). "
-                    f"Dropped: {c['dropped_missing_date']:,} no date, {c['dropped_before_start']:,} before the start date, "
+                    f"({manifest['securities']:,} securities, "
+                    f"{manifest['date_range'][0]} to {manifest['date_range'][1]}). "
+                    f"Dropped: {c['dropped_missing_date']:,} no date, "
+                    f"{c['dropped_before_start']:,} before the start date, "
                     f"{c['dropped_missing_price']:,} no price, "
                     f"{c['dropped_missing_id']:,} no identifier, {c['dropped_duplicates']:,} duplicates.")
         if c['ticker_date_conflicts']:

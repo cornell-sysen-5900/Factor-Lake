@@ -1,8 +1,9 @@
 """Verify the opt-in calculation visibility demo works without cloud data."""
 import pandas as pd
+
 from app.demo_data import build_demo_universe
 from app.streamlit_config import FACTOR_METADATA
-from tests.unit.test_saved_runs import _add_factor, _click, _assert_clean
+from tests.unit.test_saved_runs import _add_factor, _assert_clean, _click
 
 
 def test_demo_data_is_repeatable_and_covers_all_factors():
@@ -16,7 +17,9 @@ def test_demo_data_is_repeatable_and_covers_all_factors():
 
 def test_calculation_demo_runs_locally_without_clear_rerun(monkeypatch):
     from pathlib import Path
+
     from streamlit.testing.v1 import AppTest
+
     from tests.unit.test_saved_runs import browser_like_widget_states
     app_dir = Path(__file__).resolve().parents[2] / 'app'
     monkeypatch.syspath_prepend(str(app_dir))

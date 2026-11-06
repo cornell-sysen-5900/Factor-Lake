@@ -9,7 +9,9 @@ For each job (see src/backtest_jobs.py) the service:
    files) and the backtest code version.
 2. Returns the saved result for that hash when one exists, without rerunning.
 3. Otherwise reads the market data from S3, runs the backtest and saves the result
-   under backtest-results/<hash>.json (an S3 lifecycle rule deletes it after 90 days).
+   under backtest-results/<hash>.json (an S3 lifecycle rule deletes it after 90 days),
+   with its kind, a short summary and an analysis's scores (src/analysis_scores.py) as
+   S3 metadata, read by the list of saved analyses and the scoreboard.
 4. Returns the result in the response, or a temporary S3 link when it is too big
    for a Lambda response (6 MB).
 """
@@ -21,9 +23,11 @@ from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
 
+from .analysis_scores import score_metadata
 from .backtest_jobs import code_version, decode_saved, describe_job, encode_saved, job_hash, run_job, validate_job
 from .data_standardization import validate_universe
 from .s3_client import DELISTING_FILE, UNIVERSE_FILE, S3DataManager
+from .trading_costs import describe_trading_cost, job_trading_cost
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +45,22 @@ def result_file(key: str) -> str:
     return f'{RESULTS_DIR}/{key}.json'
 
 
+def summarize_job(job: Dict[str, Any]) -> str:
+    """
+    A short description of a job for listings, e.g. "ROE using 9/30 Data (higher), ROA % (higher)
+    | Mixing | 2002-2024 | $1,000", ending "| 25 bps" with a trading cost. Stored as S3
+    metadata, so it is kept ASCII and short.
+    """
+    factors = ', '.join(
+        f"{job['factor_labels'].get(f, f)} ({'higher' if job['factor_directions'][f] == 'top' else 'lower'})"
+        for f in job['factors'])
+    text = (f"{factors} | {job['factor_combination'].capitalize()} | "
+            f"{job['start_year']}-{job['end_year']} | ${job['initial_aum']:,.0f}")
+    if job_trading_cost(job) > 0:
+        text += f" | {describe_trading_cost(job_trading_cost(job))}"
+    return text.encode('ascii', 'replace').decode()[:500]
+
+
 class BacktestService:
     """
     Runs and caches backtests. One instance lives for the life of a Lambda container,
@@ -53,6 +73,15 @@ class BacktestService:
         self.inline_limit = inline_limit
         self.code_version = code_version()
         self._universe: Optional[Tuple[str, pd.DataFrame]] = None   # (data version, data)
+        self._wrds = None   # WrdsBacktestService, created on the first WRDS job
+
+    @property
+    def wrds(self):
+        """The WRDS backtest service (src/wrds_service.py), sharing this service's S3 and cache."""
+        if self._wrds is None:
+            from .wrds_service import WrdsBacktestService
+            self._wrds = WrdsBacktestService(self)
+        return self._wrds
 
     def handle_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -77,7 +106,11 @@ class BacktestService:
         The response has the hash, whether it was cached, when and how fast it was
         computed, its size, and either 'result' (the result itself) or 'result_url'
         (a temporary S3 link to it, for results over the inline limit).
+
+        WRDS jobs (data_mode 'wrds') go to the WRDS service; every other job is Legacy.
         """
+        if isinstance(job, dict) and job.get('data_mode') == 'wrds':
+            return self.wrds.run(job)
         validate_job(job)
         data_version = self.data_version()
         key = job_hash(job, data_version, self.code_version)
@@ -93,6 +126,11 @@ class BacktestService:
             info = {
                 'computed_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
                 'compute_seconds': f"{time.perf_counter() - started:.3f}",
+                # Read by the list of saved analyses without downloading each result
+                'kind': job['kind'],
+                'summary': summarize_job(job),
+                # Read by the scoreboard, to rank analyses without downloading them
+                **score_metadata(job, result),
             }
             body = encode_saved(job, result)   # with its job, so the hash alone can reopen it
             self.manager.client.put_object(
@@ -100,13 +138,17 @@ class BacktestService:
                 ContentType='application/json', Metadata=info,
             )
             logger.info(f"Computed {key[:12]} in {info['compute_seconds']} s for {describe_job(job)}")
+        return self._respond(key, filename, body, info, cached is not None, data_version, self.code_version)
 
+    def _respond(self, key: str, filename: str, body: bytes, info: Dict[str, str], cached: bool,
+                 data_version: str, code: str) -> Dict[str, Any]:
+        """The Lambda response for a saved result: inline, or a temporary S3 link when too big."""
         response = {
             'status': 'ok',
             'hash': key,
-            'cached': cached is not None,
+            'cached': cached,
             'data_version': data_version,
-            'code_version': self.code_version,
+            'code_version': code,
             'computed_at': info.get('computed_at'),
             'compute_seconds': float(info['compute_seconds']) if info.get('compute_seconds') else None,
             'size_bytes': len(body),

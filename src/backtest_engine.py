@@ -5,18 +5,28 @@ PURPOSE: Backtesting engine with integrated on-the-fly filtering.
 VERSION: 2.5.0
 """
 
+import math
+from typing import Any, Dict, List, Optional, Tuple  # Added Tuple and Optional
+
 import numpy as np
 import pandas as pd
-import math
-from typing import Dict, List, Any, Tuple, Optional  # Added Tuple and Optional
 
-from .factor_utils import normalize_series
-from .benchmarks import get_benchmark_list
-from .portfolio import Portfolio
 from src.factor_registry import get_factor_column
-from .portfolio_filters import filter_universe
-from .performance_metrics import compute_comprehensive_metrics
 
+from .benchmarks import get_benchmark_list
+from .factor_utils import normalize_series
+from .performance_metrics import compute_comprehensive_metrics
+from .portfolio import Portfolio
+from .portfolio_filters import filter_universe
+from .trading_costs import (
+    cost_fraction,
+    cost_results,
+    drifted_weights,
+    job_trading_cost,
+    net_return,
+    turnover,
+    validate_trading_cost_bps,
+)
 
 # How rebalance_portfolio combines several factors (see its docstring)
 FACTOR_COMBINATIONS = ('mixing', 'integrating')
@@ -202,7 +212,8 @@ def calculate_integrated_holdings(
 
 def _build_holdings_rows(portfolios: List[Portfolio], positions: List[Dict[str, Any]],
                          df_year: pd.DataFrame, factors: List[str], factor_combination: str,
-                         factor_labels: Dict[str, str]) -> List[Dict[str, Any]]:
+                         factor_labels: Dict[str, str],
+                         traded: Optional[pd.Series] = None) -> List[Dict[str, Any]]:
     """
     One row per stock the backtest held this year, built from the positions it valued.
 
@@ -211,6 +222,9 @@ def _build_holdings_rows(portfolios: List[Portfolio], positions: List[Dict[str, 
     several Mixing sleeves is one row: its shares and value are summed, Rank and
     Score come from the sleeve where it ranked best, and Picked By lists every
     sleeve that bought it.
+
+    traded (ticker -> |target - drifted weight|, see src/trading_costs.py), when given,
+    adds a 'Traded %' column after 'Weight %'. Runs without trading costs leave it out.
     """
     if not positions:
         return []
@@ -260,6 +274,8 @@ def _build_holdings_rows(portfolios: List[Portfolio], positions: List[Dict[str, 
             row[factor_labels.get(f, f)] = float(pd.to_numeric(df_year.loc[ticker, factor_cols[f]], errors='coerce'))
         weight = held['value'] / total_value
         row['Weight %'] = weight * 100.0
+        if traded is not None:
+            row['Traded %'] = float(traded.get(ticker, 0.0)) * 100.0
         row['Shares'] = held['shares']
         row['Buy Price'] = held['price']
         row['Dollar Value'] = held['value']
@@ -269,6 +285,32 @@ def _build_holdings_rows(portfolios: List[Portfolio], positions: List[Dict[str, 
         rows.append(row)
     return rows
 
+
+def _position_weights(positions: List[Dict[str, Any]]) -> Tuple[pd.Series, pd.Series]:
+    """
+    (target weights, drifted weights) by ticker for one year's valued positions (see
+    _value_positions), netted over Mixing sleeves.
+
+    Target weights are each stock's share of the money invested at the rebalance. Drifted
+    weights are those weights grown by the stock's effective return over the year, as a
+    share of the year-end value; delisted stocks' money is cash at the year end (weight 0).
+    Both are empty when nothing was held.
+    """
+    empty = pd.Series(dtype=float)
+    if not positions:
+        return empty, empty
+    frame = pd.DataFrame({'ticker': [p['ticker'] for p in positions],
+                          'value': [p['value'] for p in positions],
+                          'growth': [1.0 + p['return'] for p in positions],
+                          'delisted': [bool(p['delisted']) for p in positions]})
+    total = float(frame['value'].sum())
+    if not total > 0:
+        return empty, empty
+    by_ticker = frame.groupby('ticker', sort=False)
+    target = by_ticker['value'].sum() / total
+    return target, drifted_weights(target, by_ticker['growth'].first(), by_ticker['delisted'].any())
+
+
 def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_directions: Dict[str, str],
                         start_year: int, end_year: int, initial_aum: float,
                         benchmark_index: int = 1, top_pct: float = 10.0,
@@ -277,7 +319,8 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
                         factor_combination: str = 'mixing',
                         factor_labels: Optional[Dict[str, str]] = None,
                         exclude_fossil: bool = False,
-                        selected_sectors: Optional[List[str]] = None) -> Dict[str, Any]:
+                        selected_sectors: Optional[List[str]] = None,
+                        trading_cost_bps: float = 0.0) -> Dict[str, Any]:
     """Executes simulation using a filtered working copy of the master data.
 
     Takes no Streamlit state, so the same code runs in the app and in AWS Lambda.
@@ -294,15 +337,21 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
         exclude_fossil, selected_sectors: extra on-the-fly filters. The app and the
             Lambda filter the data first (src/universe_selection.py), so they leave
             these at their defaults.
+        trading_cost_bps: cost of every buy and sell, in basis points of its value
+            (0 to 500; see src/trading_costs.py). Each year's turnover is charged at
+            its rebalance, and every metric is computed on the returns after costs.
 
     Returns:
         The metrics from compute_comprehensive_metrics, plus 'holdings_by_year':
         {rebalance year: holdings rows (see _build_holdings_rows)} for every
-        year whose return is in the results.
+        year whose return is in the results. With trading_cost_bps above 0 it also
+        has the fields of src/trading_costs.cost_results, and the holdings rows a
+        'Traded %' column; at 0 bps the results are exactly those without costs.
     """
     if factor_combination not in FACTOR_COMBINATIONS:
         raise ValueError(f"factor_combination must be one of {FACTOR_COMBINATIONS}, not '{factor_combination}'.")
     factor_labels = factor_labels or {}
+    trading_cost_bps = validate_trading_cost_bps(trading_cost_bps)
 
     # ON-THE-FLY FILTERING: Apply constraints to a copy
     working_data = filter_universe(data, exclude_fossil, selected_sectors or [])
@@ -314,6 +363,10 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
     # Rebalance year of each entry in portfolio_returns, and what was held that year
     return_years = []
     holdings_by_year = {}
+    # Trading costs: the weights held at the end of the last year (empty = all cash,
+    # before the first purchase), and each year's return before costs and turnover
+    drifted = pd.Series(dtype=float)
+    gross_returns, turnovers = [], []
 
     # Pre-fetch risk-free rates for hold_cash strategy
     rf_by_year = {}
@@ -327,7 +380,8 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
         df_year = _dedupe_year_slice_by_ticker(
             working_data[working_data['Year'] == year].set_index('Ticker')
         )
-        if df_year.empty: continue
+        if df_year.empty:
+            continue
 
         if factor_combination == 'integrating':
             yearly_components = [
@@ -336,7 +390,8 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
         else:
             factor_aum = aum / len(factors)
             yearly_components = [
-                calculate_holdings(df_year, f, factor_aum, (factor_directions.get(f) == 'top'), top_pct, use_market_cap_weight)
+                calculate_holdings(df_year, f, factor_aum, (factor_directions.get(f) == 'top'), top_pct,
+                                   use_market_cap_weight)
                 for f in factors
             ]
 
@@ -346,11 +401,24 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
             risk_free_rate=rf_by_year.get(year, 0.0),
             rebalance_year=year
         )
+        # Trading costs: buy and sell from last year's drifted weights to this year's,
+        # paid out of the value at the rebalance (so the positions are that much smaller)
+        target, end_weights = _position_weights(positions)
+        year_turnover, traded = turnover(target, drifted)
+        cost = cost_fraction(trading_cost_bps, year_turnover)
+        for pos in positions:
+            pos['shares'] *= 1.0 - cost
+            pos['value'] *= 1.0 - cost
+        drifted = end_weights
         holdings_by_year[year] = _build_holdings_rows(
-            yearly_components, positions, df_year, factors, factor_combination, factor_labels
+            yearly_components, positions, df_year, factors, factor_combination, factor_labels,
+            traded=traded if trading_cost_bps > 0 else None
         )
         return_years.append(year)
         total_delisted += delisted_count
+        gross_returns.append(year_ret)
+        turnovers.append(year_turnover)
+        year_ret = net_return(year_ret, cost)
         portfolio_returns.append(year_ret)
         aum *= (1 + year_ret)
         portfolio_values.append(aum)
@@ -372,6 +440,9 @@ def rebalance_portfolio(data: pd.DataFrame, factors: List[str], factor_direction
     results['total_delisted_positions'] = total_delisted
     results['factor_combination'] = factor_combination
     results['holdings_by_year'] = {yr: holdings_by_year[yr] for yr in return_years[:min_len]}
+    if trading_cost_bps > 0:
+        results.update(cost_results(trading_cost_bps, gross_returns[:min_len], turnovers[:min_len],
+                                    results['portfolio_values']))
     return results
 
 def _calculate_annual_return(portfolios: List[Portfolio], df_year: pd.DataFrame,
@@ -508,15 +579,16 @@ def _value_positions(portfolios: List[Portfolio], df_year: pd.DataFrame,
     return total_profit / total_val, delisted_count, positions
 
 
-def run_cohort_comparison(data: pd.DataFrame, 
-                          selected_factors: List[str], 
+def run_cohort_comparison(data: pd.DataFrame,
+                          selected_factors: List[str],
                           factor_directions: Dict[str, str],
                           cohort_pct: float,
                           user_settings: Dict[str, Any]) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
     """
-    Orchestrates a comparative backtest between the chosen factor tilts 
+    Orchestrates a comparative backtest between the chosen factor tilts
     and their exact opposites, combining factors the way the run did
-    (user_settings['factor_combination'], Mixing when absent).
+    (user_settings['factor_combination'], Mixing when absent). Both pay the run's
+    trading cost (user_settings['trading_cost_bps'], 0 when absent) the same way.
     """
     # 1. Run Top Cohort (User's Strategy)
     res_top = rebalance_portfolio(
@@ -530,7 +602,8 @@ def run_cohort_comparison(data: pd.DataFrame,
         top_pct=cohort_pct,
         use_market_cap_weight=user_settings['use_market_cap_weight'],
         delisting_strategy=user_settings.get('delisting_strategy', 'zero_return'),
-        factor_combination=user_settings.get('factor_combination', 'mixing')
+        factor_combination=user_settings.get('factor_combination', 'mixing'),
+        trading_cost_bps=job_trading_cost(user_settings)
     )
 
     # 2. Run Bottom Cohort (Inverse Strategy)
@@ -546,7 +619,8 @@ def run_cohort_comparison(data: pd.DataFrame,
         top_pct=cohort_pct,
         use_market_cap_weight=user_settings['use_market_cap_weight'],
         delisting_strategy=user_settings.get('delisting_strategy', 'zero_return'),
-        factor_combination=user_settings.get('factor_combination', 'mixing')
+        factor_combination=user_settings.get('factor_combination', 'mixing'),
+        trading_cost_bps=job_trading_cost(user_settings)
     )
 
     top_list = res_top['portfolio_values'] if isinstance(res_top, dict) else res_top

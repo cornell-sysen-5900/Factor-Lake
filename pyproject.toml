@@ -27,6 +27,7 @@ dependencies = [
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
+    "ruff>=0.8.4",
 ]
 docs = [
     "mkdocs>=1.5.0",
@@ -46,6 +47,27 @@ pipeline = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["src*", "app*", "Visualizations*"]
+
+[tool.ruff]
+# PEP 8, with lines up to 120 characters (the code's existing width; see README "Code style")
+line-length = 120
+target-version = "py310"
+# app/ modules import each other by bare name (e.g. `import streamlit_utils`)
+src = [".", "app"]
+# tests/fixtures/bad_code.py is deliberately bad code, a sample for the security scanners
+extend-exclude = ["site", "factor_lake.egg-info", "tests/fixtures/bad_code.py"]
+
+[tool.ruff.lint]
+# pycodestyle errors and warnings (PEP 8), pep8-naming, and import order
+select = ["E", "W", "N", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# Fake AWS clients in tests take boto3's own argument names (Bucket=, Key=, ...)
+"tests/**" = ["N803"]
+# Sets the Arrow memory pool and sys.path before anything imports pandas or the app's modules
+"app/streamlit_app.py" = ["E402"]
+# The package is named Visualizations; renaming it would change every import of it
+"Visualizations/__init__.py" = ["N999"]
 
 [tool.pytest.ini_options]
 python_files = ["test_*.py"]

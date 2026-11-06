@@ -1,10 +1,16 @@
 """Acceptance tests for live strategy formulas and historical run snapshots."""
 import copy
+
 import pytest
+
 from app.calculation_preview import build_calculation_preview, preview_for_run
 from app.streamlit_config import FACTOR_METADATA
 from tests.unit.test_saved_runs import (
-    at, _add_factor, _click, _click_main_tab, _assert_clean,
+    _add_factor,
+    _assert_clean,
+    _click,
+    _click_main_tab,
+    at,
 )
 
 
@@ -101,3 +107,11 @@ def test_older_and_opened_runs_use_stored_inputs(mode):
     run["settings"]["initial_aum"] = 9000
     assert preview_for_run(run) == snapshot
     assert "$1,000.00" in snapshot["formula"]
+
+
+def test_preview_includes_new_trading_cost_setting():
+    settings = {"start_year": 2010, "end_year": 2020, "initial_aum": 1000, "trading_cost_bps": 25}
+    preview = build_calculation_preview(settings, ["ROA %"], {"ROA %": "top"})
+    assert "Trading cost = 25 bps" in preview["formula"]
+    assert "R_net(t)" in preview["formula"]
+    assert preview["steps"][-1][0] == "Apply trading costs"

@@ -24,14 +24,12 @@ from streamlit.testing.v1 import AppTest
 
 import src.backtest_service as backtest_service
 from src.backtest_engine import rebalance_portfolio, run_cohort_comparison
-from src.backtest_jobs import (build_job, code_version, decode_result, encode_result, job_hash,
-                               results_match, run_job)
+from src.backtest_jobs import build_job, code_version, decode_result, encode_result, job_hash, results_match, run_job
 from src.backtest_service import BacktestService, result_file
 from src.lambda_client import BacktestLambdaClient, BacktestLambdaError
 from src.s3_client import DELISTING_FILE, UNIVERSE_FILE, S3DataManager
 from src.universe_selection import select_universe
-from tests.unit.test_saved_runs import (_assert_clean, _click, _click_main_tab, _open_tab,
-                                        browser_like_widget_states)
+from tests.unit.test_saved_runs import _assert_clean, _click, _click_main_tab, _open_tab, browser_like_widget_states
 
 APP_DIR = Path(__file__).resolve().parents[2] / 'app'
 BUCKET, PREFIX = 'test-bucket', 'factor-lake-data'
@@ -49,10 +47,12 @@ class FakeS3:
     a role without s3:ListBucket: missing objects give AccessDenied instead of NoSuchKey.
     """
 
-    def __init__(self, can_list=True):
+    def __init__(self, can_list=True, page_size=1000):
         self.objects = {}   # key -> (body, metadata)
+        self.modified = {}  # key -> LastModified (each put is one second after the previous)
         self.puts = []
         self.can_list = can_list
+        self.page_size = page_size
 
     def get_object(self, Bucket, Key):
         if Key not in self.objects:
@@ -63,12 +63,31 @@ class FakeS3:
     def head_object(self, Bucket, Key):
         if Key not in self.objects:
             raise ClientError({'Error': {'Code': '404'}}, 'HeadObject')
-        body = self.objects[Key][0]
-        return {'ETag': f'"{hashlib.sha256(body).hexdigest()[:32]}"', 'ContentLength': len(body)}
+        body, metadata = self.objects[Key]
+        return {'ETag': f'"{hashlib.sha256(body).hexdigest()[:32]}"', 'ContentLength': len(body),
+                'Metadata': dict(metadata), 'LastModified': self.modified[Key]}
 
     def put_object(self, Bucket, Key, Body, ContentType=None, Metadata=None):
+        from datetime import datetime, timedelta, timezone
         self.objects[Key] = (bytes(Body), dict(Metadata or {}))
+        self.modified[Key] = datetime(2026, 10, 1, tzinfo=timezone.utc) + timedelta(seconds=len(self.puts))
         self.puts.append(Key)
+
+    def copy_object(self, Bucket, Key, CopySource, Metadata, MetadataDirective, ContentType=None):
+        """Only the in-place metadata rewrite (scripts/score_saved_analyses.py)."""
+        assert CopySource == {'Bucket': Bucket, 'Key': Key} and MetadataDirective == 'REPLACE'
+        self.put_object(Bucket, Key, self.objects[Key][0], ContentType, Metadata)
+
+    def list_objects_v2(self, Bucket, Prefix, ContinuationToken=None):
+        if not self.can_list:
+            raise ClientError({'Error': {'Code': 'AccessDenied'}}, 'ListObjectsV2')
+        keys = sorted(k for k in self.objects if k.startswith(Prefix))
+        start = int(ContinuationToken or 0)
+        page = keys[start:start + self.page_size]
+        more = start + self.page_size < len(keys)
+        return {'Contents': [{'Key': k, 'LastModified': self.modified[k], 'Size': len(self.objects[k][0])}
+                             for k in page],
+                'IsTruncated': more, **({'NextContinuationToken': str(start + self.page_size)} if more else {})}
 
     def generate_presigned_url(self, operation, Params, ExpiresIn):
         return f"https://fake-s3.example/{Params['Key']}?expires={ExpiresIn}"
@@ -372,6 +391,8 @@ def test_check_script_uses_new_inputs_each_run():
     first, second = sample_jobs(unique=True), sample_jobs(unique=True)
     assert all(a['initial_aum'] != b['initial_aum'] for a, b in zip(first, second))
     assert sample_jobs(unique=False) == sample_jobs(unique=False)
+    jobs = sample_jobs(unique=True)
+    assert jobs[-1] == dict(jobs[0], trading_cost_bps=25.0)            # the first job at 25 bps
 
 
 class ReorderedLambda(FakeLambda):
@@ -405,10 +426,25 @@ def test_check_script_compares_lambda_with_local(monkeypatch, manager, capsys, l
     fake = lambda_class(BacktestService(manager))
     monkeypatch.setattr(check, 'S3DataManager', lambda: manager)
     monkeypatch.setattr(check, 'BacktestLambdaClient', lambda name: BacktestLambdaClient(name, client=fake))
-    assert check.main([]) == exit_code
+    assert check.main(["--skip-wrds"]) == exit_code              # the WRDS check: test_wrds_check_script.py
     out = capsys.readouterr().out
-    assert out.count('cached=True') == 4                        # every repeat came from the cache
+    assert out.count('cached=True') == 5                        # every repeat came from the cache
     assert ('All checks passed.' in out) == (exit_code == 0)
+    # The first job again at 25 bps: its cost fields, and a final value below the job at 0 bps
+    assert 'costs:  25 bps, average turnover' in out and 'final value below 0 bps: yes' in out
+    # Every analysis's scores (for the scoreboard) were saved and equal the local result's; the cohort has none
+    assert out.count('scores: saved') == 4 and 'scores: none, as for every cohort' in out
+    assert 'scores: NO' not in out
+
+
+def test_check_script_fails_when_the_lambda_saves_no_scores(monkeypatch, manager, capsys):
+    import scripts.check_backtest_lambda as check
+    monkeypatch.setattr(backtest_service, 'score_metadata', lambda job, result: {})   # a Lambda from before
+    monkeypatch.setattr(check, 'S3DataManager', lambda: manager)
+    monkeypatch.setattr(check, 'BacktestLambdaClient',
+                        lambda name: BacktestLambdaClient(name, client=FakeLambda(BacktestService(manager))))
+    assert check.main(["--skip-wrds"]) == 1
+    assert capsys.readouterr().out.count('scores: NO scores saved') == 4
 
 
 # ---------------------------------------------------------------------------
@@ -436,6 +472,7 @@ def test_role_instructions_for_an_admin_include_both_policies(capsys):
 
 def test_deploy_without_iam_access_explains_the_admin_step(monkeypatch, caplog):
     import boto3
+
     import scripts.deploy_backtest_lambda as deploy
 
     class DeniedIam:
@@ -474,6 +511,7 @@ def test_package_over_the_lambda_limit_is_refused(tmp_path, monkeypatch):
 
 def test_lambda_package_has_the_engine_but_not_supabase():
     import zipfile
+
     from scripts.deploy_backtest_lambda import build_package
     names = zipfile.ZipFile(io.BytesIO(build_package())).namelist()
     assert 'aws_lambda/backtest_handler.py' in names and 'src/backtest_engine.py' in names

@@ -1,6 +1,7 @@
 """Deterministic synthetic stocks for opt-in demonstrations; never a production fallback."""
 import numpy as np
 import pandas as pd
+
 from app.streamlit_config import FACTOR_METADATA, SECTOR_OPTIONS
 
 

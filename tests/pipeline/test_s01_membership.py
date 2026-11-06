@@ -135,7 +135,8 @@ def test_run_writes_outputs_and_is_rerunnable(tmp_path):
                   f"1,{d.date()},{e},0.40,100,BETA INC,BBB22222,{'' if i == 2 else 102},BBB"]
     lines.append(f"1,{D[0].date()},{(D[0] + pd.Timedelta(days=20)).date()},0.00,5,HUGE CORP,HHH33333,103,HUG")
     (raw / "iwm_holdings_raw.csv").write_text("\n".join(lines) + "\n")
-    ciz = [f"{p},{d.date()},N,{prc},{sh}" for d in D for p, prc, sh in ((101, 10, 1000), (102, 5, 1000), (103, 50, 100000))]
+    ciz = [f"{p},{d.date()},N,{prc},{sh}"
+           for d in D for p, prc, sh in ((101, 10, 1000), (102, 5, 1000), (103, 50, 100000))]
     (raw / "r2000_price_crsp_ciz.csv").write_text(CIZ_HEADER + "\n".join(ciz) + "\n")
     (raw / "query_inputs" / "permno_list.txt").write_text("101\n102\n103\n")
     paths = DataPaths.from_data_dir(tmp_path)

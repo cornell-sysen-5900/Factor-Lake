@@ -1,7 +1,8 @@
-import sys
+import hashlib
 import json
 import os
-import hashlib
+import sys
+
 
 def generate_fingerprint(file_path, line_number, test_id):
     data = f"{file_path}:{line_number}:{test_id}"

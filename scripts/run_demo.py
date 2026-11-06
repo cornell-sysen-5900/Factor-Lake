@@ -1,8 +1,8 @@
 """Start the synthetic-data demo: uv run python scripts/run_demo.py (port 8502)."""
 import os
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 if __name__ == '__main__':
     root = Path(__file__).resolve().parents[1]

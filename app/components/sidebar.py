@@ -2,14 +2,97 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/components/sidebar.py
 PURPOSE: Configuration interface for global backtest parameters and ESG filters.
-VERSION: 2.6.0
+VERSION: 2.7.0
 """
 
+from typing import Any, Callable, Dict, List, Optional
+
 import streamlit as st
-from typing import Dict, Any, List
+
+import streamlit_config as config
+from src.trading_costs import MAX_TRADING_COST_BPS
+from src.wrds_calendar import FIRST_YEAR as WRDS_FIRST_YEAR
+from src.wrds_calendar import LAST_YEAR as WRDS_LAST_YEAR
+from src.wrds_calendar import describe_schedule
+from src.wrds_factors import WRDS_SECTORS
+
+# Widget key of the Legacy / WRDS switch
+DATA_MODE_KEY = "data_mode_input"
+WRDS_NEEDS_LAMBDA = "WRDS mode runs in AWS Lambda, which is not configured for this app."
+# Widget key of the trading cost input (shared by both data sources)
+TRADING_COST_KEY = "trading_cost_bps_input"
+TRADING_COST_HELP = ("Charged on every buy and sell. Russell 2000 stocks often cost roughly 20-60 bps "
+                     "per side, more for the smallest names.")
+
+
+def _render_data_mode(backtest_lambda: str, on_change: Optional[Callable[[], None]]) -> bool:
+    """
+    The Legacy / WRDS switch. WRDS runs only in AWS Lambda, so without a configured
+    Lambda the switch stays on Legacy and is disabled. Returns True for WRDS.
+    """
+    if not backtest_lambda and st.session_state.get(DATA_MODE_KEY) == 'WRDS':
+        st.session_state[DATA_MODE_KEY] = 'Legacy'
+    choice = st.radio(
+        "Data source",
+        options=config.DATA_MODE_OPTIONS,
+        key=DATA_MODE_KEY,
+        horizontal=True,
+        label_visibility="collapsed",
+        disabled=not backtest_lambda,
+        on_change=on_change,
+        help="Legacy: annual rebalancing on the 9/30 data, as before. WRDS: point-in-time WRDS data "
+             "with semi-annual, quarterly or monthly rebalancing, run in AWS Lambda. "
+             "Switching clears the selected factors."
+    )
+    if not backtest_lambda:
+        st.caption(WRDS_NEEDS_LAMBDA)
+    return choice == 'WRDS'
+
+
+# Only analysis inputs are reset; the Lambda execution preference and the data source are kept.
+PARAMETER_DEFAULTS = {
+    'restrict_fossil_fuels_input': False,
+    'weighting_method_input': 'Equal Weight',
+    'factor_combination_input': 'Mixing',
+    'delisting_strategy_input': 'Zero Return',
+    'sector_filter_enabled_input': False,
+    'start_year_input': 2002,
+    'end_year_input': 2024,
+    'initial_aum_input': 1000.0,
+    TRADING_COST_KEY: 0,
+}
+# WRDS mode's inputs: the shared ones, with its frequency and years in place of Legacy's
+# delisting strategy and years
+WRDS_PARAMETER_DEFAULTS = {
+    **{k: v for k, v in PARAMETER_DEFAULTS.items()
+       if k not in ('delisting_strategy_input', 'start_year_input', 'end_year_input')},
+    'wrds_frequency_input': config.WRDS_DEFAULT_FREQUENCY,
+    'wrds_start_year_input': WRDS_FIRST_YEAR,
+    'wrds_end_year_input': WRDS_LAST_YEAR,
+}
+
+
+def clear_sidebar_parameters() -> None:
+    """Button callback helper: explicitly send default values to the visible inputs."""
+    wrds = st.session_state.get(DATA_MODE_KEY) == 'WRDS'
+    shown, hidden = ((WRDS_PARAMETER_DEFAULTS, PARAMETER_DEFAULTS) if wrds
+                     else (PARAMETER_DEFAULTS, WRDS_PARAMETER_DEFAULTS))
+    # The other data source's own inputs are not on screen: forget them, so they
+    # show their defaults when the data source is switched.
+    for key in hidden.keys() - shown.keys():
+        st.session_state.pop(key, None)
+    # Assigning values tells the browser to update its controls. Merely deleting
+    # their keys can leave the previous values visible on the frontend.
+    st.session_state.update(shown)
+    # The sector multiselects disappear when filtering is disabled. When enabled
+    # again they use render_sidebar's existing default (all available sectors).
+    st.session_state.pop('selected_sectors_input', None)
+    st.session_state.pop('wrds_sectors_input', None)
+
 
 def render_sidebar(sector_options: List[str], data_source_label: str,
-                   backtest_lambda: str = '') -> Dict[str, Any]:
+                   backtest_lambda: str = '',
+                   on_data_mode_change: Optional[Callable[[], None]] = None) -> Dict[str, Any]:
     """
     Constructs the application sidebar to capture user configuration settings.
 
@@ -17,10 +100,14 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
     capitalization, sector exposures, and weighting methodologies.
 
     backtest_lambda is the configured backtest Lambda's name ('' for none); when
-    set, a switch chooses whether backtests run there or in the app.
+    set, a switch chooses whether backtests run there or in the app, and the WRDS
+    data source can be chosen. on_data_mode_change runs when the data source changes.
 
     Returns:
-        Dict[str, Any]: Standardized dictionary of user-defined parameters.
+        Dict[str, Any]: Standardized dictionary of user-defined parameters. Legacy
+            settings are exactly as before WRDS mode (no data_mode key); WRDS settings
+            have data_mode 'wrds' and frequency, and no delisting strategy. Both have
+            trading_cost_bps only when it is above 0, so settings at 0 bps are as before.
     """
     with st.sidebar:
         st.header("Configuration")
@@ -28,10 +115,14 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
         # Data Source Information
         st.subheader("Data Source")
         st.caption(f"Primary Source: {data_source_label}")
+        wrds = _render_data_mode(backtest_lambda, on_data_mode_change)
 
         # Where backtests run
         use_lambda = False
-        if backtest_lambda:
+        if wrds:
+            use_lambda = True
+            st.caption(f"WRDS backtests run in AWS Lambda: `{backtest_lambda}`")
+        elif backtest_lambda:
             use_lambda = st.toggle(
                 "Run backtests in AWS Lambda",
                 value=True,
@@ -44,27 +135,29 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
                        else "Backtests run in this app (load the market data first).")
 
         st.divider()
-        
+
         # ESG & Ethical Filtering
         st.subheader("ESG Filters")
         restrict_fossil_fuels = st.checkbox(
             "Restrict Fossil Fuel Companies",
             value=False,
+            key="restrict_fossil_fuels_input",
             help="Exclude coal, oil, gas and petroleum companies."
         )
-        
+
         st.divider()
-        
+
         # Allocation Methodology
         st.subheader("Portfolio Weighting")
         weighting_method = st.radio(
             "Select weighting method:",
             options=["Equal Weight", "Market Cap Weight"],
             index=0,
+            key="weighting_method_input",
             help="Equal: same dollars per stock. Market Cap: sized by company value."
         )
         use_market_cap_weight = (weighting_method == "Market Cap Weight")
-        
+
         if use_market_cap_weight:
             st.info("Portfolio will be weighted by market capitalization, aligning with the Russell 2000 methodology.")
 
@@ -88,16 +181,46 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
 
         st.divider()
 
-        # Delisting Strategy
-        st.subheader("Delisting Strategy")
-        delisting_strategy = st.radio(
-            "How to treat delisted positions:",
-            options=["Zero Return", "Hold Cash", "Reinvest"],
-            index=0,
-            help="Zero Return: earns 0%. Hold Cash: earns the risk free rate. Reinvest: spread across remaining stocks."
+        if wrds:
+            # Rebalancing (WRDS returns include delisting returns, so there is no delisting option)
+            st.subheader("Rebalancing")
+            frequency_label = st.radio(
+                "Rebalancing frequency",
+                options=list(config.WRDS_FREQUENCY_OPTIONS),
+                index=list(config.WRDS_FREQUENCY_OPTIONS).index(config.WRDS_DEFAULT_FREQUENCY),
+                key="wrds_frequency_input",
+                help="How often the portfolio is rebuilt, at month ends: Semi-annual (Jun, Dec), "
+                     "Quarterly (Mar, Jun, Sep, Dec) or Monthly. Returns include CRSP delisting "
+                     "returns, so there is no delisting option."
+            )
+            frequency = config.WRDS_FREQUENCY_OPTIONS[frequency_label]
+        else:
+            # Delisting Strategy
+            st.subheader("Delisting Strategy")
+            delisting_strategy = st.radio(
+                "How to treat delisted positions:",
+                options=["Zero Return", "Hold Cash", "Reinvest"],
+                index=0,
+                key="delisting_strategy_input",
+                help="Zero Return: earns 0%. Hold Cash: earns the risk free rate. "
+                     "Reinvest: spread across remaining stocks."
+            )
+            delisting_map = {"Zero Return": "zero_return", "Hold Cash": "hold_cash", "Reinvest": "reinvest"}
+            delisting_strategy_key = delisting_map[delisting_strategy]
+
+        st.divider()
+
+        # Trading costs, charged on every buy and sell at each rebalance
+        st.subheader("Trading Costs")
+        trading_cost_bps = st.number_input(
+            "Trading cost (bps per trade)",
+            min_value=0,
+            max_value=int(MAX_TRADING_COST_BPS),
+            value=0,
+            step=5,
+            key=TRADING_COST_KEY,
+            help=TRADING_COST_HELP
         )
-        delisting_map = {"Zero Return": "zero_return", "Hold Cash": "hold_cash", "Reinvest": "reinvest"}
-        delisting_strategy_key = delisting_map[delisting_strategy]
 
         st.divider()
 
@@ -106,52 +229,41 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
         sector_filter_enabled = st.checkbox(
             "Enable Sector Filter",
             value=False,
+            key="sector_filter_enabled_input",
             help="Limit the portfolio to chosen sectors."
         )
         selected_sectors = []
         if sector_filter_enabled:
-            selected_sectors = st.multiselect(
-                "Include following sectors:",
-                options=sector_options,
-                default=sector_options,
-                help="Only stocks in these sectors can be held."
-            )
-            
+            if wrds:
+                selected_sectors = st.multiselect(
+                    "Include following sectors:",
+                    options=list(WRDS_SECTORS),
+                    default=list(WRDS_SECTORS),
+                    key="wrds_sectors_input",
+                    help="Only stocks in these GICS sectors can be held. Sectors use today's GICS "
+                         "codes, not historical ones, and stocks without a sector are left out "
+                         "while this filter is on."
+                )
+            else:
+                selected_sectors = st.multiselect(
+                    "Include following sectors:",
+                    options=sector_options,
+                    default=sector_options,
+                    key="selected_sectors_input",
+                    help="Only stocks in these sectors can be held."
+                )
+
         st.divider()
-        
+
         # Analysis Temporal Range
         st.subheader("Analysis Period")
-        col1, col2 = st.columns(2)
-        with col1:
-            start_year = st.number_input(
-                "Start Year",
-                min_value=2002,
-                max_value=2023,
-                value=2002,
-                step=1,
-                format="%d",
-                help="First year of the backtest. Earliest is 2008.",
-                key="start_year_input"
-            )
-        with col2:
-            end_year = st.number_input(
-                "End Year",
-                min_value=2002,
-                max_value=2024,
-                value=2024,
-                step=1,
-                format="%d",
-                help="Last year of the backtest. Latest is 2024.",
-                key="end_year_input"
-            )
+        if wrds:
+            start_year, end_year = _render_wrds_period(frequency)
+        else:
+            start_year, end_year = _render_legacy_period()
 
-        # Logic to ensure chronological consistency
-        if start_year > end_year:
-            st.warning('Start Year exceeded End Year. Synchronizing dates...')
-            end_year = start_year
-            
         st.divider()
-        
+
         # Capitalization
         st.subheader("Initial Investment")
         initial_aum = st.number_input(
@@ -161,9 +273,26 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
             value=1000.0,
             step=100.0,
             format="%.0f",
+            key="initial_aum_input",
             help="Starting portfolio value."
         )
 
+    costs = {"trading_cost_bps": float(trading_cost_bps)} if trading_cost_bps > 0 else {}
+    if wrds:
+        return {
+            "data_mode": "wrds",
+            "frequency": frequency,
+            "restrict_fossil_fuels": restrict_fossil_fuels,
+            "use_market_cap_weight": use_market_cap_weight,
+            "factor_combination": factor_combination,
+            "selected_sectors": selected_sectors if sector_filter_enabled else None,
+            "sector_filter_enabled": sector_filter_enabled,
+            "start_year": start_year,
+            "end_year": end_year,
+            "initial_aum": initial_aum,
+            "use_lambda": use_lambda,
+            **costs
+        }
     return {
         "restrict_fossil_fuels": restrict_fossil_fuels,
         "use_market_cap_weight": use_market_cap_weight,
@@ -174,5 +303,75 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
         "end_year": end_year,
         "initial_aum": initial_aum,
         "delisting_strategy": delisting_strategy_key,
-        "use_lambda": use_lambda
+        "use_lambda": use_lambda,
+        **costs
     }
+
+
+def _render_wrds_period(frequency: str):
+    """WRDS start and end years, limited to the data, with the rebalances they give."""
+    col1, col2 = st.columns(2)
+    with col1:
+        start_year = st.number_input(
+            "Start Year",
+            min_value=WRDS_FIRST_YEAR,
+            max_value=WRDS_LAST_YEAR,
+            value=WRDS_FIRST_YEAR,
+            step=1,
+            format="%d",
+            help="First calendar year of the backtest. The WRDS data starts in April 2008.",
+            key="wrds_start_year_input"
+        )
+    with col2:
+        end_year = st.number_input(
+            "End Year",
+            min_value=WRDS_FIRST_YEAR,
+            max_value=WRDS_LAST_YEAR,
+            value=WRDS_LAST_YEAR,
+            step=1,
+            format="%d",
+            help="Last calendar year of the backtest. The WRDS data ends in September 2026.",
+            key="wrds_end_year_input"
+        )
+
+    if start_year > end_year:
+        st.warning('Start Year exceeded End Year. Synchronizing dates...')
+        end_year = start_year
+    try:
+        st.caption(describe_schedule(frequency, start_year, end_year).capitalize() + ".")
+    except ValueError as e:
+        st.warning(str(e))
+    return start_year, end_year
+
+
+def _render_legacy_period():
+    """Legacy start and end years, exactly as before WRDS mode."""
+    col1, col2 = st.columns(2)
+    with col1:
+        start_year = st.number_input(
+            "Start Year",
+            min_value=2002,
+            max_value=2023,
+            value=2002,
+            step=1,
+            format="%d",
+            help="First year of the backtest. Earliest is 2008.",
+            key="start_year_input"
+        )
+    with col2:
+        end_year = st.number_input(
+            "End Year",
+            min_value=2002,
+            max_value=2024,
+            value=2024,
+            step=1,
+            format="%d",
+            help="Last year of the backtest. Latest is 2024.",
+            key="end_year_input"
+        )
+
+    # Logic to ensure chronological consistency
+    if start_year > end_year:
+        st.warning('Start Year exceeded End Year. Synchronizing dates...')
+        end_year = start_year
+    return start_year, end_year

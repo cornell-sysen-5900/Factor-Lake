@@ -269,7 +269,8 @@ def check_recompute(paths: DataPaths, out: Path, final: Path) -> tuple[list[Chec
     for raw_col, (_, col) in RECOMPUTE.items():
         a, b = m[col].astype(float), m[raw_col if raw_col != col else f"{col}_raw"].astype(float)
         same = (a.isna() & b.isna()) | ((a - b).abs() <= REL_TOL * np.maximum(a.abs(), b.abs()) + 1e-12)
-        res["metrics"][col] = {"compared": len(m), "match": int(same.sum()), "both_missing": int((a.isna() & b.isna()).sum())}
+        res["metrics"][col] = {"compared": len(m), "match": int(same.sum()),
+                               "both_missing": int((a.isna() & b.isna()).sum())}
         for i in m.index[~same]:
             r = m.loc[i]
             reason = ("different fundamentals quarter" if r["fund_period_end"] != r["fund_period_end_raw"]
@@ -469,7 +470,8 @@ def render(r: dict, checks: list[Check], manifest: dict) -> str:
         md += ["", "Years more than 2 pp from IWM, and the stocks that most separate market-cap weights from IWM's "
                "weights that year (contribution in pp):", ""]
         for y, e in t["years_off_by_more_than_2pp"].items():
-            top = ", ".join(f"{x['ticker']} {x['contribution_pp']:+.2f}" for x in e["top_contributors_cap_vs_iwm_weight"])
+            top = ", ".join(f"{x['ticker']} {x['contribution_pp']:+.2f}"
+                            for x in e["top_contributors_cap_vs_iwm_weight"])
             cause = ("most of it is market-cap vs IWM weighting"
                      if abs(e["iwm_weighted_difference_pp"]) < abs(e["difference_pp"]) / 2
                      else "the weighting is not the main cause")
@@ -545,7 +547,8 @@ def render(r: dict, checks: list[Check], manifest: dict) -> str:
     up = r["upload"]
     md += [verdict_line(checks, "app memory"), "", "## 7. Upload dry run", "",
            f"`scripts/upload_wrds.py` run with `--offline`, without credentials and with network connections "
-           f"blocked: exit code {up['exit_code']}, {up['keys']} S3 keys for {up['files_in_final']} files (the Parquet files and the daily manifest, last), all under "
+           f"blocked: exit code {up['exit_code']}, {up['keys']} S3 keys for {up['files_in_final']} files "
+           f"(the Parquet files and the daily manifest, last), all under "
            f"`{up['prefix']}`" + (f" except {up['outside_prefix']}" if up["outside_prefix"] else "") + ".", "",
            verdict_line(checks, "upload"), ""]
     return "\n".join(md)

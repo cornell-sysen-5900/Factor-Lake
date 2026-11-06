@@ -13,8 +13,9 @@ from __future__ import annotations
 from pipeline.config import GICS_SECTORS, SIC_TO_GICS_SECTOR
 
 # units
-DEC, MUSD, PS, DATE, TEXT, FLAG, CODE, N, X, MSH = ("decimal", "$ millions", "$ per share", "date", "text", "true/false",
-                                                     "code", "count", "ratio (times)", "millions of shares")
+DEC, MUSD, PS, DATE, TEXT, FLAG, CODE, N, X, MSH = ("decimal", "$ millions", "$ per share", "date", "text",
+                                                     "true/false", "code", "count", "ratio (times)",
+                                                     "millions of shares")
 
 # sources
 CIZ = "CRSP daily stock file (CIZ)"
@@ -595,7 +596,8 @@ def render(manifest: dict, stats=None, coverage=None) -> str:
         md.append("")
         if stats is not None and name != "column_stats.parquet":
             md += [*column_stats.stats_table(stats, name), "",
-                   "Rounded to 4 significant figures; p1 and p99 for factors and multiples. Text columns: unique values "
+                   "Rounded to 4 significant figures; p1 and p99 for factors and multiples. "
+                   "Text columns: unique values "
                    "and the 3 most common with their share of rows (5 in column_stats.parquet).", ""]
         if coverage is not None and name == "factor_panel_monthly.parquet":
             md += [*column_stats.coverage_table(coverage), ""]

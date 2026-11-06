@@ -61,17 +61,30 @@ def build_calculation_preview(settings: Dict[str, Any], factors: List[str],
           f"Create one sleeve per factor, each buying its highest {pct:g}% of valid z-scores. Divide capital "
           "equally among sleeves. Stocks selected by multiple factors occur in multiple sleeves.") +
          " Select max(1, floor(eligible count × percentage / 100)) when eligible stocks exist. "
-         "A positive, valid formation price is required to buy a selected stock; skipped allocations are not redistributed."),
-        ("Allocate capital", weighting_step + " A denotes the capital of the portfolio or sleeve; H is its selected stock set. "
+         "A positive, valid formation price is required to buy a selected stock; "
+         "skipped allocations are not redistributed."),
+        ("Allocate capital", weighting_step + " A denotes the capital of the portfolio or sleeve; "
+         "H is its selected stock set. "
          "The return calculation normalizes by the value of positions actually purchased."),
-        ("Handle delisted positions", f"{label}: keep the price return earned before delisting, then apply q = {post_rate} "
+        ("Handle delisted positions", f"{label}: keep the price return earned before delisting, "
+         f"then apply q = {post_rate} "
          "to capital at delisting for the remaining days / 365. If the delisting price is unavailable, r_pre is 0; "
          "if its date is unavailable, the remaining-year fraction is 0.5. Live positions use Next-Years_Return / 100. "
          "Here r_i* is the effective decimal return of a live or delisted position."),
-        ("Compound portfolio value", f"Start with ${float(settings['initial_aum']):,.2f}. Combine all purchased positions' "
+        ("Compound portfolio value", f"Start with ${float(settings['initial_aum']):,.2f}. "
+         "Combine all purchased positions' "
          f"value-weighted returns, then compound annually from {start} to {end}. Years without data are skipped; "
          "a year with no purchased positions has a zero return. K is the number of selected factors."),
     ]
+    cost_bps = float(settings.get("trading_cost_bps") or 0)
+    if cost_bps > 0:
+        lines += [f"Trading cost = {cost_bps:g} bps per buy or sell",
+                  "Turnover(t) = sum(abs(target_weight_i - drifted_weight_i))",
+                  f"c(t) = {cost_bps:g} / 10000 * Turnover(t)",
+                  "R_net(t) = R(t) - c(t) * (1 + R(t)); V(t+1) = V(t) * (1 + R_net(t))"]
+        steps.append(("Apply trading costs", "Charge buys and sells at each rebalance based on turnover, "
+                      "starting from cash on the first rebalance. Compound net returns after costs; "
+                      "there is no final liquidation charge."))
     return {"formula": "\n".join(lines), "steps": steps}
 
 
@@ -93,7 +106,8 @@ def render_calculation_preview(preview: Dict[str, Any], *, saved: bool = False) 
     with st.container(border=True):
         st.subheader("Calculation Used in This Run" if saved else "Calculation Preview")
         st.caption("Saved run inputs; changing current selections does not change this formula." if saved else
-                   "Updates with your selections. Data is not required; numerical scores are computed when you run the analysis.")
+                   "Updates with your selections. Data is not required; "
+                   "numerical scores are computed when you run the analysis.")
         st.code(preview["formula"], language="text", wrap_lines=True)
         with st.expander("Step-by-step calculation", expanded=False):
             for number, (title, description) in enumerate(preview["steps"], 1):
