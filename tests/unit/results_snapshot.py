@@ -76,8 +76,9 @@ KINDS = {
     'tabs': (lambda b: b.tabs, lambda t: t.label),
     'plotly': (lambda b: b.get('plotly_chart'), lambda c: json.loads(c.proto.spec)),
 }
-# The Results tab's Saved analyses panel is the container that holds both of these boxes
-PANEL_MARKERS = ('Open a saved analysis', 'Import settings from file')
+# The Results tab's Saved analyses panel: the container whose handle names this checkbox
+# (TOGGLE_ID in app/components/saved_panel.py; main's code has no panel)
+PANEL_TOGGLE_ID = 'saved-analyses-panel-open'
 
 
 def _panel_column(at):
@@ -87,10 +88,9 @@ def _panel_column(at):
             if hasattr(child, 'children'):
                 yield child
                 yield from blocks(child)
-    holding = [b for b in blocks(at.main)
-               if all(any(e.label == m for e in b.expander) for m in PANEL_MARKERS)]
-    # The innermost one: the panel itself, not the tabs around it
-    return holding[-1] if holding else None
+    return next((b for b in blocks(at.main)
+                 if any(getattr(c, 'type', None) == 'html' and PANEL_TOGGLE_ID in str(c.proto)
+                        for c in b.children.values())), None)
 
 
 def main_area(at) -> dict:
@@ -131,14 +131,15 @@ def moved_to_panel(render: dict, panel: dict, strict: bool = True) -> dict:
 def without_strategy_controls(render: dict) -> dict:
     """Exclude only the intentional additions, keeping original result snapshots frozen.
 
-    Strategy import and each run's Rename and Use these settings have their own AppTest
-    coverage. Every existing metric, table, chart and control must still match the main snapshot.
+    Import settings from file (on the Analysis tab, which the snapshot's steps also hold) and
+    each run's Rename and Use these settings have their own AppTest coverage. Every existing
+    metric, table, chart and control must still match the main snapshot.
     """
     added = {
         'button': {'Apply', 'Use these settings'},
         'expander': {'Import settings from file'},
         'caption': {
-            'Load a settings file (JSON, from a run\'s Export settings) into the Analysis tab. '
+            "Load a settings file (JSON, from a run's Export settings) into these inputs. "
             'It replaces the current inputs and runs nothing.',
             'Names and notes are kept for this session and included in exported settings files.',
         },

@@ -2,8 +2,8 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/components/saved_panel.py
 PURPOSE: The Results tab's Saved analyses panel: opening saved analyses (by ID or from the
-         lists) and importing a settings file, beside the runs so they stay in view.
-VERSION: 1.2.0
+         lists), beside the runs so they stay in view.
+VERSION: 1.3.0
 
 With runs, the panel floats over the right edge of the page with only its "Saved analyses"
 tab (the handle) showing. With a mouse it slides in while the pointer is over it (or
@@ -23,7 +23,6 @@ from components.results_tab import (
     render_earlier_analyses,
     render_open_saved_analysis,
 )
-from components.strategy_settings import render_import_settings
 
 # The panel's container key: Streamlit gives the container the class st-key-<key>
 PANEL_KEY = "saved_analyses_panel"
@@ -106,12 +105,11 @@ HANDLE_HTML = (f'<input type="checkbox" id="{TOGGLE_ID}">'
 
 
 def render_saved_panel(history: List[Dict[str, Any]], earlier: List[Dict[str, Any]], has_runs: bool) -> None:
-    """The panel's contents: open by ID, the analysis lists, and Import settings from file."""
+    """The panel's contents: open by ID and the analysis lists."""
     render_open_saved_analysis(has_runs=has_runs)
     render_analysis_history(history)
     render_earlier_analyses(earlier)
     render_all_saved_analyses()
-    render_import_settings()
 
 
 def render_hover_panel(history: List[Dict[str, Any]], earlier: List[Dict[str, Any]]) -> None:

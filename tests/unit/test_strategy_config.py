@@ -114,11 +114,11 @@ class _UploadedFile(BytesIO):
 
 def upload(at, monkeypatch, raw):
     # AppTest cannot upload a file. Supply its bytes at that boundary only; exercise the
-    # Saved analyses panel's import, its rerun, the widgets and the backtest below.
+    # Analysis tab's import box, its rerun, the widgets and the backtest below.
     import streamlit as st
     file = _UploadedFile(raw)
     monkeypatch.setattr(st, 'file_uploader', lambda *a, **k: file)
-    _click_main_tab(at, 'Results')
+    _click_main_tab(at, 'Analysis')
 
 
 def _next_run_name_shown(at, name):
@@ -147,9 +147,11 @@ def test_import_export_run_rename_and_clear(at, monkeypatch):
     assert at.number_input(key='initial_aum_input').value == 2500.0
     assert at.multiselect(key='selected_sectors_input').value == ['Technology']
     assert at.button_group(key='factor_dir_roa_pct').value == 'Lower is better'
-    # The import opened the Analysis tab, saying so, with the name the next run will get
+    # The import stays on the Analysis tab and says so in its box, with the name the next run will get
     assert at.session_state[MAIN_TABS_KEY] == 'Analysis'
-    assert any(m.value.startswith('Settings imported.') for m in at.success)
+    import_box = next(e for e in at.expander if e.label == 'Import settings from file')
+    assert any(m.value.startswith('Settings imported.') for m in import_box.success)
+    assert at.session_state['strategy_upload_version'] == 1         # the box is emptied
     assert _next_run_name_shown(at, '策略 A')
     _click(at, 'Load Market Data')
     _click(at, 'Run Portfolio Analysis')
@@ -310,9 +312,10 @@ def test_saved_analyses_panel_floats_over_the_runs(at):
     _click(at, 'Load Market Data')
     _click(at, 'Run Portfolio Analysis')
     render = main_area(at)
-    # The panel holds the boxes, and shows on hover with CSS only (no toggle widget, no rerun)
-    assert render['panel']['expander'][0] == 'Open a saved analysis'
-    assert 'Import settings from file' in render['panel']['expander']
+    # The panel holds the saved-analysis boxes, and shows on hover with CSS only (no toggle
+    # widget, no rerun). Import settings from file is on the Analysis tab, not here.
+    assert render['panel']['expander'] == ['Open a saved analysis', "This session's analyses (1)",
+                                           'All saved analyses']
     assert 'Open a saved analysis' not in render['expander']
     assert not at.toggle
     assert f'.st-key-{PANEL_KEY}:hover' in PANEL_CSS and 'position: fixed' in PANEL_CSS

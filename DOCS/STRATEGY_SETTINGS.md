@@ -12,13 +12,12 @@ Each run in **Results** has a row of actions beside **Remove this run**:
 - **Use these settings** loads the run's inputs into the Analysis tab and opens it, so you can
   change them and run again. It runs nothing.
 
-To restore a configuration from a file, open the **Saved analyses** panel in **Results**
-(point at the **Saved analyses** tab on the right edge of the page; the panel slides over the
-results and hides again when you move away. On a touch screen, tap the tab to open the panel
-and tap it again to close it) and choose the file under
-**Import settings from file**. The settings are applied as soon as the file is chosen and the
-Analysis tab opens to show them. Import does not execute a backtest or fetch market data;
-local backtests require **Load Market Data**. If the file has a name, the next run gets it
+To restore a configuration from a file, open **Import settings from file** on the **Analysis**
+tab (below the factors, above the run buttons) and choose the file. The settings are applied
+as soon as the file is chosen: the factors and sidebar show them, and the box says
+**Settings imported** (or why the file could not be imported) and empties, ready for another
+file. Import does not execute a backtest or fetch market data; local backtests require
+**Load Market Data**. If the file has a name, the next run gets it
 (shown above the run buttons); **Clear Parameters** forgets it. **Clear Parameters**
 preserves saved runs and their names, notes and results.
 
@@ -61,10 +60,10 @@ analysis IDs or cache keys. Historical/shared analysis records retain their orig
 4. Return to Analysis and click Clear Parameters. The saved run remains available.
 5. In Results, click **Use these settings**: the Analysis tab opens with the run's factor,
    direction, dates and investment.
-6. Clear Parameters again, then import the downloaded file in the **Saved analyses** panel.
+6. Clear Parameters again, then import the downloaded file under **Import settings from file**.
    The same inputs return, and the next run will be named **Value hypothesis**.
 7. Load market data and rerun. With the same underlying data, the metrics match the first run.
-8. Import an invalid JSON file. The error appears in the panel and current inputs remain intact.
+8. Import an invalid JSON file. The error appears in the import box and current inputs remain intact.
 
 ## Developer checks
 
@@ -76,5 +75,5 @@ uv run streamlit run app/streamlit_app.py
 ```
 
 The tests use synthetic data and fake AWS services. AppTest supplies file bytes at its
-unsupported uploader boundary and exercises the panel's import and rerun, Use these settings,
+unsupported uploader boundary and exercises the Analysis tab's import and rerun, Use these settings,
 widget updates, backtest execution, round trips and annotation edits.

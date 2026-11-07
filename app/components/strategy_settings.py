@@ -1,8 +1,8 @@
 """
 Strategy settings files and run names.
 
-- Import settings from file: in the Results tab's Saved analyses panel. It fills the
-  Analysis tab's inputs (sidebar and factors) and opens that tab; it never runs a backtest.
+- Import settings from file: on the Analysis tab, below the factors. It fills the inputs
+  (sidebar and factors) and says so in its box; it never runs a backtest.
 - Each run's actions, beside Remove this run: Rename (a session-only name and note),
   Export settings (JSON) and Use these settings (loads the run's inputs into the Analysis tab).
 
@@ -25,10 +25,13 @@ from components.factor_selection import reset_factor_selection
 PENDING_SETTINGS_KEY = 'strategy_pending_settings'
 # The file_id of the last uploaded file queued, so a file is imported once, not on every rerun
 IMPORTED_FILE_KEY = 'strategy_imported_file'
-# The message shown at the top of the Analysis tab after settings were loaded into it
+# The message shown at the top of the Analysis tab after a run's settings were loaded into it
 ANALYSIS_MESSAGE_KEY = 'strategy_import_message'
-# Why the uploaded file could not be imported, shown under the import box
+# The outcome of importing a file, shown in the import box: imported, or why it could not be
+IMPORT_SUCCESS_KEY = 'strategy_import_success'
 IMPORT_ERROR_KEY = 'strategy_import_error'
+# Bumped after each import, so the file uploader is new (empty) and the next file can be the same
+IMPORT_VERSION_KEY = 'strategy_upload_version'
 # An imported file's name and note, given to the next run (then cleared)
 NEXT_NAME_KEY = 'strategy_name'
 NEXT_NOTE_KEY = 'strategy_note'
@@ -58,7 +61,8 @@ def _apply_document(document, lambda_available):
 def apply_pending_settings(lambda_available) -> bool:
     """
     Applies queued settings (an imported file or a run's Use these settings). Call before the
-    sidebar is drawn. True when they were loaded, so the caller opens the Analysis tab.
+    sidebar is drawn. True when a run's settings were loaded, so the caller opens the Analysis
+    tab (an import is made there, so it stays).
     """
     pending = st.session_state.pop(PENDING_SETTINGS_KEY, None)
     if pending is None:
@@ -82,8 +86,8 @@ def apply_pending_settings(lambda_available) -> bool:
         message = f'Run {run_id}\'s settings are loaded. Change what you like, then run the analysis.'
     if document['data_mode'] == 'legacy':
         message += ' For local backtests, click Load Market Data first.'
-    st.session_state[ANALYSIS_MESSAGE_KEY] = message
-    return True
+    st.session_state[IMPORT_SUCCESS_KEY if source == 'file' else ANALYSIS_MESSAGE_KEY] = message
+    return source == 'run'
 
 
 def clear_next_run_name():
@@ -93,7 +97,7 @@ def clear_next_run_name():
 
 
 def render_analysis_notice():
-    """At the top of the Analysis tab: the message after settings were loaded into it."""
+    """At the top of the Analysis tab: the message after a run's settings were loaded into it."""
     message = st.session_state.pop(ANALYSIS_MESSAGE_KEY, None)
     if message:
         st.success(message)
@@ -108,17 +112,24 @@ def render_next_run_name():
 
 
 def render_import_settings():
-    """The Import settings from file box, in the Saved analyses panel."""
+    """The Import settings from file box, on the Analysis tab below the factors."""
+    success = st.session_state.pop(IMPORT_SUCCESS_KEY, None)
     error = st.session_state.pop(IMPORT_ERROR_KEY, None)
-    with st.expander('Import settings from file', expanded=bool(error)):
-        st.caption('Load a settings file (JSON, from a run\'s Export settings) into the Analysis tab. '
+    with st.expander('Import settings from file', expanded=bool(success or error)):
+        st.caption('Load a settings file (JSON, from a run\'s Export settings) into these inputs. '
                    'It replaces the current inputs and runs nothing.')
-        uploaded = st.file_uploader('Settings file', type=['json'], key='strategy_upload',
+        version = st.session_state.get(IMPORT_VERSION_KEY, 0)
+        uploaded = st.file_uploader('Settings file', type=['json'], key=f'strategy_upload_{version}',
                                     help='A settings file exported from this app. Maximum 64 KB.')
         if uploaded is not None and uploaded.file_id != st.session_state.get(IMPORTED_FILE_KEY):
+            # Applied at the top of the next rerun, before the inputs are drawn; the new
+            # uploader key empties the box, so the same file can be imported again later
             st.session_state[IMPORTED_FILE_KEY] = uploaded.file_id
             st.session_state[PENDING_SETTINGS_KEY] = ('file', uploaded.getvalue(), None)
+            st.session_state[IMPORT_VERSION_KEY] = version + 1
             st.rerun()
+        if success:
+            st.success(success)
         if error:
             st.error(error)
 

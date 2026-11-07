@@ -42,6 +42,7 @@ from components.strategy_settings import (
     apply_pending_settings,
     clear_next_run_name,
     render_analysis_notice,
+    render_import_settings,
     render_next_run_name,
 )
 
@@ -169,7 +170,7 @@ def main():
     )
 
     # An imported settings file or a run's Use these settings fills the inputs, so it is applied
-    # before the sidebar and factors are drawn, then the Analysis tab opens to show them
+    # before the sidebar and factors are drawn; for Use these settings the Analysis tab then opens
     load_settings = apply_pending_settings(bool(utils.get_backtest_lambda_name()))
 
     # Render Global Sidebar and capture configuration
@@ -214,6 +215,8 @@ def main():
 
             # Configuration phase: Capture factors and directions
             selected_factor_names, factor_directions = render_factor_selection(data_mode)
+            # Import settings from file fills the inputs above (and the sidebar), then the run buttons
+            render_import_settings()
             render_next_run_name()
 
             if data_mode == 'wrds':
@@ -228,8 +231,8 @@ def main():
                 st.success(st.session_state.pop(RUN_COMPLETE_KEY))
             if OPENED_MESSAGE_KEY in st.session_state:
                 st.success(st.session_state.pop(OPENED_MESSAGE_KEY))
-            # The Saved analyses panel: open a saved analysis (it becomes the newest run tab), the
-            # analysis lists and Import settings. Over the right edge, shown on hover; alone without runs.
+            # The Saved analyses panel: open a saved analysis (it becomes the newest run tab) and the
+            # analysis lists. Over the right edge, shown on hover; alone without runs.
             history = st.session_state.get('analysis_history', [])
             earlier = earlier_analyses(st.session_state.get(BROWSER_ANALYSES_KEY), history)
             saved_runs = st.session_state.get('saved_runs')
