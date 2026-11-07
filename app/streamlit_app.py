@@ -35,16 +35,16 @@ from components.about import render_about_tab
 from components.compare_tab import render_compare_tab
 from components.data_viewer import clear_viewer_data, render_data_viewer_tab
 from components.factor_selection import clear_factor_selection, render_factor_selection, reset_factor_selection
-from components.results_tab import (
-    OPENED_MESSAGE_KEY,
-    render_all_saved_analyses,
-    render_analysis_history,
-    render_earlier_analyses,
-    render_open_saved_analysis,
-    render_saved_runs,
-)
+from components.results_tab import OPENED_MESSAGE_KEY, render_saved_runs
+from components.saved_panel import render_hover_panel, render_saved_panel
 from components.scoreboard_tab import OPEN_RESULTS_KEY, render_scoreboard_tab
-from components.strategy_settings import render_strategy_settings
+from components.strategy_settings import (
+    apply_pending_settings,
+    clear_next_run_name,
+    render_analysis_notice,
+    render_import_settings,
+    render_next_run_name,
+)
 
 # Global Page Configuration
 st.set_page_config(
@@ -84,6 +84,7 @@ def _clear_parameters() -> None:
     st.session_state.rdata = None
     st.session_state.loaded_filters = None
     clear_viewer_data()
+    clear_next_run_name()
     st.session_state[PARAMETERS_CLEARED_KEY] = True
 
 def _main_tabs_widget_key() -> str:
@@ -168,6 +169,10 @@ def main():
         unsafe_allow_html=True
     )
 
+    # An imported settings file or a run's Use these settings fills the inputs, so it is applied
+    # before the sidebar and factors are drawn; for Use these settings the Analysis tab then opens
+    load_settings = apply_pending_settings(bool(utils.get_backtest_lambda_name()))
+
     # Render Global Sidebar and capture configuration
     user_settings = sidebar.render_sidebar(config.SECTOR_OPTIONS, utils.describe_data_source(),
                                            utils.get_backtest_lambda_name(),
@@ -186,6 +191,8 @@ def main():
     # Open on the Scoreboard opens the analysis in Results
     if st.session_state.pop(OPEN_RESULTS_KEY, False):
         _open_main_tab("Results")
+    if load_settings:
+        _open_main_tab("Analysis")
 
     # Define primary application layout. Only the open tab is rendered.
     main_tabs = st.tabs(MAIN_TABS, key=_main_tabs_widget_key(), on_change=_on_main_tab_change)
@@ -199,6 +206,7 @@ def main():
                 help="Remove selected factors and restore analysis settings to their defaults. "
                      "Saved results and cached source data are kept.",
             )
+            render_analysis_notice()
             if st.session_state.pop(PARAMETERS_CLEARED_KEY, False):
                 # WRDS runs always go to Lambda, without Load Market Data
                 next_step = ("Choose new inputs, then run the analysis." if use_lambda or data_mode == 'wrds' else
@@ -207,8 +215,9 @@ def main():
 
             # Configuration phase: Capture factors and directions
             selected_factor_names, factor_directions = render_factor_selection(data_mode)
-            render_strategy_settings(user_settings, selected_factor_names, factor_directions,
-                                     bool(utils.get_backtest_lambda_name()))
+            # Import settings from file fills the inputs above (and the sidebar), then the run buttons
+            render_import_settings()
+            render_next_run_name()
 
             if data_mode == 'wrds':
                 _render_wrds_run(user_settings, selected_factor_names, factor_directions)
@@ -222,16 +231,23 @@ def main():
                 st.success(st.session_state.pop(RUN_COMPLETE_KEY))
             if OPENED_MESSAGE_KEY in st.session_state:
                 st.success(st.session_state.pop(OPENED_MESSAGE_KEY))
-            # Open a saved analysis by its ID (it becomes the newest run tab), and this session's history
-            render_open_saved_analysis(has_runs=bool(st.session_state.get('saved_runs')))
+            # The Saved analyses panel: open a saved analysis (it becomes the newest run tab) and the
+            # analysis lists. Over the right edge, shown on hover; alone without runs.
             history = st.session_state.get('analysis_history', [])
-            render_analysis_history(history)
-            render_earlier_analyses(earlier_analyses(st.session_state.get(BROWSER_ANALYSES_KEY), history))
-            render_all_saved_analyses()
-            if st.session_state.get('saved_runs'):
-                render_saved_runs(st.session_state.saved_runs)
+            earlier = earlier_analyses(st.session_state.get(BROWSER_ANALYSES_KEY), history)
+            saved_runs = st.session_state.get('saved_runs')
+            if not saved_runs:
+                render_saved_panel(history, earlier, has_runs=False)
+                # Opening an analysis there adds the first run: show it in this same rerun
+                if st.session_state.get('saved_runs'):
+                    render_saved_runs(st.session_state.saved_runs)
+                else:
+                    st.info("Performance metrics will appear here after a successful analysis run.")
             else:
-                st.info("Performance metrics will appear here after a successful analysis run.")
+                # The panel first (it floats, so this does not move it): opening an analysis there
+                # adds a run tab, which the runs then show in this same rerun
+                render_hover_panel(history, earlier)
+                render_saved_runs(st.session_state.saved_runs)
 
     if tab_compare.open:
         with tab_compare:

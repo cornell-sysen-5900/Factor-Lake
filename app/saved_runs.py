@@ -24,6 +24,20 @@ def build_run_label(run_id: int, factor_labels: List[str], trading_cost_bps: flo
     return label + trading_cost_suffix(trading_cost_bps)
 
 
+def named_run_label(run_id: int, name: str, default_label: str) -> str:
+    """
+    A named run's tab label: the name, then the default label's details in brackets, e.g.
+    "Run 3: Value test (WRDS, Quarterly, 25 bps)" for "Run 3: WRDS, Quarterly | 25 bps",
+    or "Run 1: Value test (ROE +1, opened)" for "Run 1: ROE +1 (opened)".
+    """
+    prefix = f"Run {run_id}"
+    details = default_label[len(prefix):] if default_label.startswith(prefix) else default_label
+    details = details.removeprefix(': ').replace(' | ', ', ').removeprefix(', ')
+    if details.endswith(' (opened)'):
+        details = details[:-len(' (opened)')] + ', opened'
+    return f"{prefix}: {name} ({details})" if details else f"{prefix}: {name}"
+
+
 def trading_cost_suffix(trading_cost_bps: float) -> str:
     """A run label's trading cost, e.g. ' | 25 bps', or an empty string at 0 bps."""
     return f" | {trading_cost_bps:g} bps" if trading_cost_bps and trading_cost_bps > 0 else ''

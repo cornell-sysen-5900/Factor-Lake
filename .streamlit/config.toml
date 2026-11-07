@@ -1,0 +1,6 @@
+# Shared Streamlit settings (secrets go in .streamlit/secrets.toml, which is not tracked)
+
+[theme]
+# Always the light theme: the app's styles (app/streamlit_css.py) and the Saved analyses
+# panel (app/components/saved_panel.py) use light colors, so a dark OS must not switch it.
+base = "light"

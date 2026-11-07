@@ -1,17 +1,25 @@
 # Save, import and name backtests
 
-On **Analysis**, open **Save or import strategy settings** after selecting factors.
-Enter an optional backtest name (up to 100 characters) and note (up to 1,000 characters).
-These are copied into each successful run; blank names keep the existing automatic labels.
+Each run in **Results** has a row of actions beside **Remove this run**:
 
-- **Export settings (JSON)** downloads the current inputs, name and note.
-- To restore a configuration, choose a file with **Import strategy JSON**, then click
-  **Apply imported settings**. Review the restored inputs before running. Import does
-  not execute a backtest or fetch market data. Local backtests require **Load Market Data**.
-- In **Results**, open **Name, note and settings file** to edit that run's annotations
-  or export the exact settings used for that run, independently of the current sidebar.
-  Names and notes are session-only; downloaded files preserve them for later use.
-- **Clear Parameters** preserves saved runs and their names, notes and results.
+- **Rename** names the run (up to 100 characters) and adds a note (up to 1,000 characters).
+  The tab label shows the name, then the automatic label's details in brackets, e.g.
+  **Run 3: Value test (WRDS, Quarterly, 25 bps)**; leave the name empty to restore the
+  automatic label. The note is shown under the actions. Names and notes are session-only;
+  exported settings files keep them.
+- **Export settings (JSON)** downloads the exact inputs used for that run, with its name and
+  note, independently of the current sidebar.
+- **Use these settings** loads the run's inputs into the Analysis tab and opens it, so you can
+  change them and run again. It runs nothing.
+
+To restore a configuration from a file, open **Import settings from file** on the **Analysis**
+tab (below the factors, above the run buttons) and choose the file. The settings are applied
+as soon as the file is chosen: the factors and sidebar show them, and the box says
+**Settings imported** (or why the file could not be imported) and empties, ready for another
+file. Import does not execute a backtest or fetch market data; local backtests require
+**Load Market Data**. If the file has a name, the next run gets it
+(shown above the run buttons); **Clear Parameters** forgets it. **Clear Parameters**
+preserves saved runs and their names, notes and results.
 
 Both Legacy and WRDS are supported, including factors and directions, years, investment,
 weighting, factor combination, ESG and sector filters, trading costs, and the applicable
@@ -34,25 +42,28 @@ before any inputs change. Files larger than 64 KB, duplicate JSON keys, extra fi
 unknown schema versions, nonfinite values and malformed JSON are rejected with an error.
 
 This version supports the portfolio percentage and benchmark exposed by the current app
-(default 10% and benchmark index 1). Export explicitly rejects previously saved Legacy
-runs with other values instead of silently dropping them. Trading costs must be whole
-basis points, matching the current input control.
+(default 10% and benchmark index 1). Export and Use these settings are unavailable (with the
+reason on hover) for previously saved Legacy runs with other values, instead of silently
+dropping them. Trading costs must be whole basis points, matching the current input control.
 
-Names retain the unique run number in tab labels, so duplicate names are safe. Annotation
+Names retain the unique run number in tab labels, so duplicate names are safe. Renaming
+keeps the run's tab open and renames it in **This session's analyses** too. Annotation
 edits affect session presentation only; they do not alter engine inputs, results, shared
 analysis IDs or cache keys. Historical/shared analysis records retain their original labels.
 
 ## Demo (local Legacy mode)
 
 1. Select **ROA %**, choose **Lower is better**, and set 2010-2020 and $2,500.
-2. Enter **Value hypothesis** and a short note; export the settings JSON.
-3. Load market data, run the analysis, and show the named Results tab.
-4. Rename the run and change its note; show that its metrics stay the same.
-5. Return to Analysis and click Clear Parameters. The saved run remains available.
-6. Import the downloaded file and click Apply imported settings. Show that the original
-   factor, direction, dates, investment, name and note return.
+2. Load market data and run the analysis.
+3. **Rename** the run to **Value hypothesis** with a short note; show that its metrics stay the
+   same. Click **Export settings (JSON)**.
+4. Return to Analysis and click Clear Parameters. The saved run remains available.
+5. In Results, click **Use these settings**: the Analysis tab opens with the run's factor,
+   direction, dates and investment.
+6. Clear Parameters again, then import the downloaded file under **Import settings from file**.
+   The same inputs return, and the next run will be named **Value hypothesis**.
 7. Load market data and rerun. With the same underlying data, the metrics match the first run.
-8. Upload an invalid JSON file and apply it. The error appears and current inputs remain intact.
+8. Import an invalid JSON file. The error appears in the import box and current inputs remain intact.
 
 ## Developer checks
 
@@ -63,6 +74,6 @@ uv run pytest
 uv run streamlit run app/streamlit_app.py
 ```
 
-The new tests use synthetic data and fake AWS services. AppTest supplies file bytes at
-its unsupported uploader boundary and exercises the real Apply callback, widget updates,
-backtest execution, round trips and annotation edits.
+The tests use synthetic data and fake AWS services. AppTest supplies file bytes at its
+unsupported uploader boundary and exercises the Analysis tab's import and rerun, Use these settings,
+widget updates, backtest execution, round trips and annotation edits.

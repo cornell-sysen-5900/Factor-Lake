@@ -56,8 +56,8 @@ PARAMETER_DEFAULTS = {
     'factor_combination_input': 'Mixing',
     'delisting_strategy_input': 'Zero Return',
     'sector_filter_enabled_input': False,
-    'start_year_input': 2002,
-    'end_year_input': 2024,
+    'start_year_input': config.LEGACY_FIRST_YEAR,
+    'end_year_input': config.LEGACY_LAST_YEAR,
     'initial_aum_input': 1000.0,
     TRADING_COST_KEY: 0,
 }
@@ -350,9 +350,9 @@ def _render_legacy_period():
     with col1:
         start_year = st.number_input(
             "Start Year",
-            min_value=2002,
-            max_value=2023,
-            value=2002,
+            min_value=config.LEGACY_FIRST_YEAR,
+            max_value=config.LEGACY_LAST_START_YEAR,
+            value=config.LEGACY_FIRST_YEAR,
             step=1,
             format="%d",
             help="First year of the backtest. Earliest is 2008.",
@@ -361,12 +361,12 @@ def _render_legacy_period():
     with col2:
         end_year = st.number_input(
             "End Year",
-            min_value=2002,
-            max_value=2024,
-            value=2024,
+            min_value=config.LEGACY_FIRST_YEAR,
+            max_value=config.LEGACY_LAST_YEAR,
+            value=config.LEGACY_LAST_YEAR,
             step=1,
             format="%d",
-            help="Last year of the backtest. Latest is 2024.",
+            help=f"Last year of the backtest. Latest is {config.LEGACY_LAST_YEAR}.",
             key="end_year_input"
         )
 

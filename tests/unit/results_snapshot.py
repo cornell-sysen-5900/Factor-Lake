@@ -55,53 +55,98 @@ def comparable(snapshot: dict) -> dict:
     return snapshot
 
 
-def _text(elements):
-    return [e.value for e in elements]
+# How main_area reads each kind of element, and the value it keeps of each
+KINDS = {
+    'markdown': (lambda b: b.markdown, lambda e: e.value),
+    'caption': (lambda b: b.caption, lambda e: e.value),
+    'header': (lambda b: b.header, lambda e: e.value),
+    'subheader': (lambda b: b.subheader, lambda e: e.value),
+    'info': (lambda b: b.info, lambda e: e.value),
+    'success': (lambda b: b.success, lambda e: e.value),
+    'warning': (lambda b: b.warning, lambda e: e.value),
+    'error': (lambda b: b.error, lambda e: e.value),
+    'code': (lambda b: b.code, lambda e: e.value),
+    'metric': (lambda b: b.metric, lambda m: [m.label, m.value, m.delta]),
+    'dataframe': (lambda b: b.dataframe, lambda d: d.value.to_csv(index=False)),
+    'table': (lambda b: b.table, lambda t: t.value.to_csv(index=False)),
+    'selectbox': (lambda b: b.selectbox, lambda s: [s.label, [str(o) for o in s.options], str(s.value)]),
+    'slider': (lambda b: b.slider, lambda s: [s.label, s.value]),
+    'button': (lambda b: b.button, lambda b: b.label),
+    'expander': (lambda b: b.expander, lambda e: e.label),
+    'tabs': (lambda b: b.tabs, lambda t: t.label),
+    'plotly': (lambda b: b.get('plotly_chart'), lambda c: json.loads(c.proto.spec)),
+}
+# The Results tab's Saved analyses panel: the container whose handle names this checkbox
+# (TOGGLE_ID in app/components/saved_panel.py; main's code has no panel)
+PANEL_TOGGLE_ID = 'saved-analyses-panel-open'
+
+
+def _panel_column(at):
+    """The Saved analyses panel's container, or None (no runs, or main's code)."""
+    def blocks(node):
+        for child in getattr(node, 'children', {}).values():
+            if hasattr(child, 'children'):
+                yield child
+                yield from blocks(child)
+    return next((b for b in blocks(at.main)
+                 if any(getattr(c, 'type', None) == 'html' and PANEL_TOGGLE_ID in str(c.proto)
+                        for c in b.children.values())), None)
 
 
 def main_area(at) -> dict:
-    """The main area's content, by element type, in document order (the sidebar is left out)."""
-    main = at.main
-    return {
-        'markdown': _text(main.markdown),
-        'caption': _text(main.caption),
-        'header': _text(main.header),
-        'subheader': _text(main.subheader),
-        'info': _text(main.info),
-        'success': _text(main.success),
-        'warning': _text(main.warning),
-        'error': _text(main.error),
-        'code': _text(main.code),
-        'metric': [[m.label, m.value, m.delta] for m in main.metric],
-        'dataframe': [d.value.to_csv(index=False) for d in main.dataframe],
-        'table': [t.value.to_csv(index=False) for t in main.table],
-        'selectbox': [[s.label, [str(o) for o in s.options], str(s.value)] for s in main.selectbox],
-        'slider': [[s.label, s.value] for s in main.slider],
-        'button': [b.label for b in main.button],
-        'expander': [e.label for e in main.expander],
-        'tabs': [t.label for t in main.tabs],
-        'plotly': [json.loads(c.proto.spec) for c in main.get('plotly_chart')],
-    }
+    """
+    The main area's content, by element type, in document order (the sidebar is left out).
+    The Saved analyses panel over the runs is left out too, and given as 'panel', in the
+    same form ({} without the panel).
+    """
+    panel = _panel_column(at)
+    in_panel = {id(e) for kind, (elements, _) in KINDS.items() for e in elements(panel)} if panel else set()
+    render = {kind: [value(e) for e in elements(at.main) if id(e) not in in_panel]
+              for kind, (elements, value) in KINDS.items()}
+    render['panel'] = {kind: [value(e) for e in elements(panel)]
+                       for kind, (elements, value) in KINDS.items()} if panel else {}
+    return render
 
+
+def moved_to_panel(render: dict, panel: dict, strict: bool = True) -> dict:
+    """
+    main's rendering without what the Saved analyses panel now shows: main drew those boxes
+    above the runs. strict: every item of the panel must be one main showed (it moved, it is
+    not new); otherwise items main did not show are ignored (another kind of run's panel).
+    """
+    def same(value):        # clock times and counts ("This session's analyses (2)") aside
+        text = re.sub(r'at \d\d:\d\d:\d\d', 'at <time>', json.dumps(value))
+        return re.sub(r' \(\d+\)"$', '"', text)
+    render = {kind: list(values) for kind, values in render.items()}
+    for kind, values in panel.items():
+        for value in values:
+            match = next((v for v in render[kind] if same(v) == same(value)), None)
+            if match is not None:
+                render[kind].remove(match)
+            else:
+                assert not strict, f"The panel shows a {kind} main did not: {value!r}"
+    return render
 
 
 def without_strategy_controls(render: dict) -> dict:
     """Exclude only the intentional additions, keeping original result snapshots frozen.
 
-    Strategy import/export and annotations have their own AppTest coverage. Every
-    existing metric, table, chart and control must still match the main snapshot.
+    Import settings from file (on the Analysis tab, which the snapshot's steps also hold) and
+    each run's Rename and Use these settings have their own AppTest coverage. Every existing
+    metric, table, chart and control must still match the main snapshot.
     """
     added = {
-        'button': {'Apply imported settings', 'Save name and note'},
-        'expander': {'Save or import strategy settings', 'Name, note and settings file'},
+        'button': {'Apply', 'Use these settings'},
+        'expander': {'Import settings from file'},
         'caption': {
-            'Save inputs as JSON to reuse or share a strategy. Files contain no market data, '
-            'results, or credentials. Matching results also require the same data and calculation logic.',
+            "Load a settings file (JSON, from a run's Export settings) into these inputs. "
+            'It replaces the current inputs and runs nothing.',
             'Names and notes are kept for this session and included in exported settings files.',
         },
     }
     return {kind: [value for value in values if value not in added[kind]] if kind in added else values
             for kind, values in render.items()}
+
 
 def legacy_results_snapshot() -> dict:
     """Runs two Legacy analyses locally and a cohort comparison; returns the Results tab after each step."""
