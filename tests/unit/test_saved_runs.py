@@ -13,7 +13,7 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 import src.backtest_engine as backtest_engine
-from app.saved_runs import add_saved_run, build_run_label, remove_saved_run
+from app.saved_runs import add_saved_run, build_run_label, named_run_label, remove_saved_run
 
 APP_DIR = Path(__file__).resolve().parents[2] / 'app'
 RUN = 'Run Portfolio Analysis'
@@ -28,6 +28,19 @@ class TestBuildRunLabel:
 
     def test_no_factors(self):
         assert build_run_label(7, []) == 'Run 7'
+
+
+class TestNamedRunLabel:
+    @pytest.mark.parametrize('default, named', [
+        ('Run 3: WRDS, Quarterly | 25 bps', 'Run 3: Value test (WRDS, Quarterly, 25 bps)'),
+        ('Run 3: WRDS, Quarterly', 'Run 3: Value test (WRDS, Quarterly)'),
+        ('Run 3: ROA % +2', 'Run 3: Value test (ROA % +2)'),
+        ('Run 3: ROA % +2 | 25 bps (opened)', 'Run 3: Value test (ROA % +2, 25 bps, opened)'),
+        ('Run 3', 'Run 3: Value test'),
+        ('Run 3 | 25 bps', 'Run 3: Value test (25 bps)'),
+    ])
+    def test_keeps_the_default_labels_details(self, default, named):
+        assert named_run_label(3, 'Value test', default) == named
 
 
 class TestAddSavedRun:

@@ -7,9 +7,10 @@ scripts/extract_functions.py
 .env.local
 app/.env
 
-# Streamlit local config & secrets
-.streamlit/
-*.streamlit/
+# Streamlit local secrets (the shared config.toml is tracked)
+.streamlit/*
+*.streamlit/*
+!.streamlit/config.toml
 .streamlit/secrets.toml
 
 # Coverage reports

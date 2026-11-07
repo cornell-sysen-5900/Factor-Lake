@@ -10,6 +10,12 @@ from typing import Any, Dict, List
 # Maximum number of backtest runs kept as tabs in Results (oldest dropped first)
 MAX_SAVED_RUNS: int = 5
 
+# Legacy data's years: the earliest start and end year, the latest start year (a backtest
+# needs a year after it) and the latest end year. The sidebar and settings files use these.
+LEGACY_FIRST_YEAR: int = 2002
+LEGACY_LAST_START_YEAR: int = 2023
+LEGACY_LAST_YEAR: int = 2024
+
 # Standardized sector classifications for universe filtering
 SECTOR_OPTIONS: List[str] = [
     'Consumer',

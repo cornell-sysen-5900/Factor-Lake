@@ -16,6 +16,7 @@ from typing import Any, Callable, Dict
 import streamlit as st
 
 from app import strategy_config as configs
+from app.saved_runs import named_run_label
 from components.data_viewer import clear_viewer_data
 from components.factor_selection import reset_factor_selection
 
@@ -128,7 +129,7 @@ def annotate_new_run(run):
     run['name'] = st.session_state.pop(NEXT_NAME_KEY, '').strip()
     run['note'] = st.session_state.pop(NEXT_NOTE_KEY, '')
     if run['name']:
-        run['label'] = f"Run {run['id']}: {run['name']}"
+        run['label'] = named_run_label(run['id'], run['name'], run['default_label'])
 
 
 def _run_error_key(run_id):
@@ -149,7 +150,8 @@ def _save_annotation(run_id, keep_open: Callable[[str], None]):
             old_label = run['label']
             run['name'] = st.session_state[f'run_name_{run_id}'].strip()
             run['note'] = st.session_state[f'run_note_{run_id}']
-            run['label'] = f"Run {run_id}: {run['name']}" if run['name'] else run['default_label']
+            run['label'] = (named_run_label(run_id, run['name'], run['default_label']) if run['name']
+                            else run['default_label'])
             # This session's analyses lists the run by its label too
             for entry in st.session_state.get('analysis_history', []):
                 if entry['label'] == old_label:

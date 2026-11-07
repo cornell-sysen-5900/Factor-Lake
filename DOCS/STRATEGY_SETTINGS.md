@@ -3,7 +3,8 @@
 Each run in **Results** has a row of actions beside **Remove this run**:
 
 - **Rename** names the run (up to 100 characters) and adds a note (up to 1,000 characters).
-  The name replaces the automatic label after the run number; leave it empty to restore the
+  The tab label shows the name, then the automatic label's details in brackets, e.g.
+  **Run 3: Value test (WRDS, Quarterly, 25 bps)**; leave the name empty to restore the
   automatic label. The note is shown under the actions. Names and notes are session-only;
   exported settings files keep them.
 - **Export settings (JSON)** downloads the exact inputs used for that run, with its name and
@@ -13,7 +14,8 @@ Each run in **Results** has a row of actions beside **Remove this run**:
 
 To restore a configuration from a file, open the **Saved analyses** panel in **Results**
 (point at the **Saved analyses** tab on the right edge of the page; the panel slides over the
-results and hides again when you move away) and choose the file under
+results and hides again when you move away. On a touch screen, tap the tab to open the panel
+and tap it again to close it) and choose the file under
 **Import settings from file**. The settings are applied as soon as the file is chosen and the
 Analysis tab opens to show them. Import does not execute a backtest or fetch market data;
 local backtests require **Load Market Data**. If the file has a name, the next run gets it

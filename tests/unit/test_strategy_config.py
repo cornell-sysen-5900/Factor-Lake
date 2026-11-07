@@ -55,6 +55,19 @@ def test_invalid_document(field, value):
         cfg.loads(json.dumps(doc))
 
 
+def test_legacy_year_limits_come_from_config():
+    from app.streamlit_config import LEGACY_FIRST_YEAR, LEGACY_LAST_START_YEAR, LEGACY_LAST_YEAR
+    ok = document()
+    ok['settings'].update(start_year=LEGACY_LAST_START_YEAR, end_year=LEGACY_LAST_YEAR)
+    cfg.loads(json.dumps(ok))
+    for start, end in [(LEGACY_FIRST_YEAR - 1, LEGACY_LAST_YEAR), (LEGACY_LAST_START_YEAR + 1, LEGACY_LAST_YEAR),
+                       (LEGACY_FIRST_YEAR, LEGACY_LAST_YEAR + 1)]:
+        bad = document()
+        bad['settings'].update(start_year=start, end_year=end)
+        with pytest.raises(ValueError):
+            cfg.loads(json.dumps(bad))
+
+
 @pytest.mark.parametrize('field,value', [
     ('start_year', 2001), ('start_year', True), ('end_year', 2001), ('end_year', 2025),
     ('initial_aum', float('nan')), ('initial_aum', float('inf')), ('initial_aum', 0),
@@ -144,13 +157,13 @@ def test_import_export_run_rename_and_clear(at, monkeypatch):
     run = at.session_state['saved_runs'][0]
     results = deepcopy(run['results'])
     settings = deepcopy(run['settings'])
-    assert run['label'] == 'Run 1: 策略 A'
+    assert run['label'] == 'Run 1: 策略 A (ROA %, 25 bps)'          # the name, then the default details
     assert cfg.build(run['settings'], run['factors'], run['factor_directions'], run['name'], run['note']) == doc
     at.text_input(key='run_name_1').set_value('Revised name')
     at.text_area(key='run_note_1').set_value('New note')
     _click(at, 'Apply')
     _assert_clean(at)
-    assert run['label'] == 'Run 1: Revised name'
+    assert run['label'] == 'Run 1: Revised name (ROA %, 25 bps)'
     assert run['settings'] == settings
     assert results_match(run['results'], results)
     _click_main_tab(at, 'Analysis')
@@ -238,7 +251,7 @@ def test_imported_name_names_only_the_next_run_and_clear_forgets_it(at, monkeypa
     _click(at, 'Run Portfolio Analysis')
     _assert_clean(at)
     first = at.session_state['saved_runs'][0]
-    assert first['label'] == 'Run 1: 策略 A' and first['note'] == doc['note']
+    assert first['label'] == 'Run 1: 策略 A (ROA %, 25 bps)' and first['note'] == doc['note']
     _click_main_tab(at, 'Analysis')
     assert not _next_run_name_shown(at, '策略 A')             # given to that run only
     _click(at, 'Run Portfolio Analysis')
@@ -258,7 +271,7 @@ def test_rename_keeps_the_run_open_and_renames_it_in_the_history(at):
     at.text_area(key=f"run_note_{older['id']}").set_value('Lower ROA test')
     _click(at, 'Apply')
     _assert_clean(at)
-    assert older['label'] == f"Run {older['id']}: Value hypothesis"
+    assert older['label'] == f"Run {older['id']}: Value hypothesis (ROA %)"
     assert at.session_state['saved_run_tabs'] == older['label']          # still the open run
     assert older['label'] in [e['label'] for e in at.session_state['analysis_history']]
     assert any(t.value == 'Lower ROA test' for t in at.text)

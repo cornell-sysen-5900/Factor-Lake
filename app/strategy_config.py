@@ -41,9 +41,9 @@ def validate(document):
     require(isinstance(s, dict) and set(s) == fields, 'Settings contain missing or unsupported fields.')
     for key in ('restrict_fossil_fuels', 'use_market_cap_weight', 'sector_filter_enabled'):
         require(type(s[key]) is bool, f'{key} must be true or false.')
-    lo, hi = (FIRST_YEAR, LAST_YEAR) if mode == 'wrds' else (2002, 2024)
+    lo, hi = (FIRST_YEAR, LAST_YEAR) if mode == 'wrds' else (config.LEGACY_FIRST_YEAR, config.LEGACY_LAST_YEAR)
     for key in ('start_year', 'end_year'):
-        limit = 2023 if mode == 'legacy' and key == 'start_year' else hi
+        limit = config.LEGACY_LAST_START_YEAR if mode == 'legacy' and key == 'start_year' else hi
         require(type(s[key]) is int and lo <= s[key] <= limit, f'{key} must be between {lo} and {limit}.')
     require(s['start_year'] <= s['end_year'], 'Start year must not exceed end year.')
     aum = s['initial_aum']
