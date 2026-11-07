@@ -7,8 +7,18 @@ import pytest
 
 from app import strategy_config as cfg
 from app.streamlit_config import WRDS_FACTOR_METADATA
-from tests.unit.test_saved_runs import _add_factor, _assert_clean, _click, _click_main_tab, at  # noqa: F401
+from tests.unit.test_saved_runs import (  # noqa: F401
+    _add_factor,
+    _assert_clean,
+    _click,
+    _click_main_tab,
+    _open_tab,
+    at,
+)
 from tests.unit.test_wrds_mode_switch import LEGACY_DEFAULT_SETTINGS
+
+# The open main tab (MAIN_TABS_KEY in app/streamlit_app.py)
+MAIN_TABS_KEY = 'main_tabs'
 
 
 def document(mode='legacy'):
@@ -79,14 +89,27 @@ def test_unknown_fields_duplicate_factors_and_sectors():
             cfg.loads(json.dumps(doc))
 
 
+class _UploadedFile(BytesIO):
+    """What st.file_uploader returns: the bytes, and an ID that is new for every upload."""
+    uploads = 0
+
+    def __init__(self, raw):
+        super().__init__(raw if isinstance(raw, bytes) else raw.encode())
+        _UploadedFile.uploads += 1
+        self.file_id = f'test-upload-{_UploadedFile.uploads}'
+
+
 def upload(at, monkeypatch, raw):
-    # AppTest cannot upload a file. Supply its bytes at that boundary only; exercise
-    # the actual Apply button callback, widgets, reruns and backtest below.
+    # AppTest cannot upload a file. Supply its bytes at that boundary only; exercise the
+    # Saved analyses panel's import, its rerun, the widgets and the backtest below.
     import streamlit as st
-    file = BytesIO(raw if isinstance(raw, bytes) else raw.encode())
+    file = _UploadedFile(raw)
     monkeypatch.setattr(st, 'file_uploader', lambda *a, **k: file)
-    at.run()
-    at.button(key='strategy_apply').click().run()
+    _click_main_tab(at, 'Results')
+
+
+def _next_run_name_shown(at, name):
+    return any(f'The next run will be named "{name}"' in c.value for c in at.caption)
 
 
 def test_import_export_run_rename_and_clear(at, monkeypatch):
@@ -111,7 +134,10 @@ def test_import_export_run_rename_and_clear(at, monkeypatch):
     assert at.number_input(key='initial_aum_input').value == 2500.0
     assert at.multiselect(key='selected_sectors_input').value == ['Technology']
     assert at.button_group(key='factor_dir_roa_pct').value == 'Lower is better'
-    assert at.text_input(key='strategy_name_input').value == '策略 A'
+    # The import opened the Analysis tab, saying so, with the name the next run will get
+    assert at.session_state[MAIN_TABS_KEY] == 'Analysis'
+    assert any(m.value.startswith('Settings imported.') for m in at.success)
+    assert _next_run_name_shown(at, '策略 A')
     _click(at, 'Load Market Data')
     _click(at, 'Run Portfolio Analysis')
     _assert_clean(at)
@@ -122,7 +148,7 @@ def test_import_export_run_rename_and_clear(at, monkeypatch):
     assert cfg.build(run['settings'], run['factors'], run['factor_directions'], run['name'], run['note']) == doc
     at.text_input(key='run_name_1').set_value('Revised name')
     at.text_area(key='run_note_1').set_value('New note')
-    _click(at, 'Save name and note')
+    _click(at, 'Apply')
     _assert_clean(at)
     assert run['label'] == 'Run 1: Revised name'
     assert run['settings'] == settings
@@ -198,19 +224,82 @@ def test_wrds_round_trip_keeps_cache_identity_and_results(new_session, monkeypat
     assert results_match(second['results'], first['results'])
 
 
-def test_draft_name_persists_across_tabs_and_blank_restores_default(at):
-    at.text_input(key='strategy_name_input').set_value('Value hypothesis').run()
-    at.text_area(key='strategy_note_input').set_value('Lower ROA test').run()
+def test_imported_name_names_only_the_next_run_and_clear_forgets_it(at, monkeypatch):
+    doc = document()
+    doc['factors'] = [{'column': 'ROA', 'direction': 'top'}]
+    upload(at, monkeypatch, cfg.dumps(doc))
     _click_main_tab(at, 'About')
     _click_main_tab(at, 'Analysis')
-    assert at.text_input(key='strategy_name_input').value == 'Value hypothesis'
+    assert _next_run_name_shown(at, '策略 A')                 # kept while other tabs are open
+    _click(at, 'Clear Parameters')
+    assert not _next_run_name_shown(at, '策略 A')
+    upload(at, monkeypatch, cfg.dumps(doc))
+    _click(at, 'Load Market Data')
+    _click(at, 'Run Portfolio Analysis')
+    _assert_clean(at)
+    first = at.session_state['saved_runs'][0]
+    assert first['label'] == 'Run 1: 策略 A' and first['note'] == doc['note']
+    _click_main_tab(at, 'Analysis')
+    assert not _next_run_name_shown(at, '策略 A')             # given to that run only
+    _click(at, 'Run Portfolio Analysis')
+    second = at.session_state['saved_runs'][0]
+    assert second['label'] == second['default_label'] and second['name'] == '' and second['note'] == ''
+
+
+def test_rename_keeps_the_run_open_and_renames_it_in_the_history(at):
     _add_factor(at, 'ROA %')
     _click(at, 'Load Market Data')
     _click(at, 'Run Portfolio Analysis')
-    run = at.session_state['saved_runs'][0]
-    assert run['name'] == 'Value hypothesis'
-    at.text_input(key='run_name_1').set_value('')
-    _click(at, 'Save name and note')
+    _click_main_tab(at, 'Analysis')
+    _click(at, 'Run Portfolio Analysis')
+    older = at.session_state['saved_runs'][1]
+    _open_tab(at, older['label'])
+    at.text_input(key=f"run_name_{older['id']}").set_value('Value hypothesis')
+    at.text_area(key=f"run_note_{older['id']}").set_value('Lower ROA test')
+    _click(at, 'Apply')
     _assert_clean(at)
-    assert run['label'] == run['default_label']
-    assert run['note'] == 'Lower ROA test'
+    assert older['label'] == f"Run {older['id']}: Value hypothesis"
+    assert at.session_state['saved_run_tabs'] == older['label']          # still the open run
+    assert older['label'] in [e['label'] for e in at.session_state['analysis_history']]
+    assert any(t.value == 'Lower ROA test' for t in at.text)
+    at.text_input(key=f"run_name_{older['id']}").set_value('')
+    _click(at, 'Apply')
+    _assert_clean(at)
+    assert older['label'] == older['default_label']
+    assert older['note'] == 'Lower ROA test'
+
+
+def test_use_these_settings_loads_the_run_into_the_analysis_tab(at):
+    _add_factor(at, 'ROA %')
+    at.button_group(key='factor_dir_roa_pct').set_value('Lower is better').run()
+    next(r for r in at.sidebar.radio if r.key == 'weighting_method_input').set_value('Market Cap Weight').run()
+    _click(at, 'Load Market Data')
+    _click(at, 'Run Portfolio Analysis')
+    run = at.session_state['saved_runs'][0]
+    _click_main_tab(at, 'Analysis')
+    _click(at, 'Clear Parameters')
+    assert at.session_state['factor_builder_selected'] == {}
+    _click_main_tab(at, 'Results')
+    at.button(key=f"run_use_settings_{run['id']}").click().run()
+    _assert_clean(at)
+    assert at.session_state[MAIN_TABS_KEY] == 'Analysis'
+    assert any(m.value.startswith(f"Run {run['id']}'s settings are loaded.") for m in at.success)
+    assert at.session_state['factor_builder_selected'] == {'ROA %': 'bottom'}
+    assert at.radio(key='weighting_method_input').value == 'Market Cap Weight'
+    assert not at.session_state['data_loaded']                # load data for the new inputs
+    assert at.session_state['saved_runs'] == [run]            # nothing was run
+
+
+def test_saved_analyses_panel_floats_over_the_runs(at):
+    from components.saved_panel import PANEL_CSS, PANEL_KEY
+    from tests.unit.results_snapshot import main_area
+    _add_factor(at, 'ROA %')
+    _click(at, 'Load Market Data')
+    _click(at, 'Run Portfolio Analysis')
+    render = main_area(at)
+    # The panel holds the boxes, and shows on hover with CSS only (no toggle widget, no rerun)
+    assert render['panel']['expander'][0] == 'Open a saved analysis'
+    assert 'Import settings from file' in render['panel']['expander']
+    assert 'Open a saved analysis' not in render['expander']
+    assert not at.toggle
+    assert f'.st-key-{PANEL_KEY}:hover' in PANEL_CSS and 'position: fixed' in PANEL_CSS

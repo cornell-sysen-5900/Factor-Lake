@@ -124,9 +124,7 @@ def widget_values(document):
               'factor_combination_input': s['factor_combination'].title(),
               'sector_filter_enabled_input': s['sector_filter_enabled'],
               'initial_aum_input': float(s['initial_aum']),
-              'trading_cost_bps_input': int(s['trading_cost_bps']),
-              'strategy_name': d['name'], 'strategy_note': d['note'],
-              'strategy_name_input': d['name'], 'strategy_note_input': d['note']}
+              'trading_cost_bps_input': int(s['trading_cost_bps'])}
     prefix = 'wrds_' if mode == 'wrds' else ''
     values[prefix + 'start_year_input'] = s['start_year']
     values[prefix + 'end_year_input'] = s['end_year']
