@@ -119,6 +119,64 @@ m/d/Y dates (`skip_lines`, `date_format` in its RawFile). Paths in the inventory
 (e.g. `raw_v2/...`). s08 copies the checksums into the manifest, and re-hashes the raw files to check they did not
 change.
 
+## s00b_client
+
+**Inputs:** `<client folder>/FR2000 Annual Quant Data(Data).csv` (the client's Russell 2000 lists as of each 9/30,
+from FactSet; licensed: the file and everything derived from it stay out of the repo). **Output:**
+`processed/s00b_client/client_lists.parquet`: row, date, year, name, ticker_region, ticker, cusip9, cusip8, method,
+weight.
+
+**Rules:**
+1. The header is the third line (two title lines above it); rows blank in every column are dropped. Text is read
+   as text (`keep_default_na=False`). `row` = the pandas row index + 5, the key of the client map.
+2. ticker = Ticker-Region without "-US". CUSIP "#Calc" (FactSet has none) -> method `ticker`; otherwise method
+   `cusip`, cusip8 = the first 8 characters, upper case.
+3. weight = "Russell 2000 Port. Weight" (percent of the index on that 9/30). The FactSet factor columns are not
+   read.
+
+**Checks:** unique row key (FAIL); every list dated 9/30 (FAIL); one list per year, none missing (FAIL); rows per
+list 1,800-2,150, weights summing to 99-101%, every row with a weight, CUSIPs 9 characters or #Calc, no CUSIP
+twice in one list (WARN; a repeated CUSIP is a FactSet error that s00c rule 3 resolves).
+
+**Tests:** title lines, blank row, row key, -US suffix, #Calc, CUSIP case; a list not dated 9/30 FAILs.
+
+## s00c_client_map
+
+**Inputs:** `processed/s00b_client/client_lists.parquet`, `raw/crsp_names_history.csv` (every CRSP name row with
+its validity dates), `raw/r2000_price_crsp_ciz.csv` (streamed; only each year's last September trading day).
+**Outputs** (`processed/s00c_client_map/`): `client_permno_map.parquet` (one row per client row: status,
+candidates, CRSP names, suggested_permno, fallback_rejected, final_permno, final_method), `known_gaps.parquet` and
+`known_gaps.md` (client securities without a permno, with the reason).
+
+**Rules** (decision 34; reviewed by hand on 2026-11-07, and the stage reproduces that review row for row):
+1. **CUSIP rows:** cusip8 equals a CRSP CUSIP whose names row is valid on the 9/30.
+2. **Rows without a CUSIP:** the ticker valid on the 9/30, and the client name matches a CRSP name of that permno.
+   FactSet back-fills today's names, so every name the permno ever had counts. Names match when, after dropping
+   punctuation and legal words (`config.NAME_STOPWORDS`), one's words contain the other's; or the first word is
+   the same (and not generic, `config.NAME_GENERIC_WORDS`, unless the second is the same too); or one joined name
+   contains the other (5+ letters); or the first words start alike (4+ letters, not generic).
+3. **A CUSIP of another company:** a CUSIP match whose company never had the client's name, while the client ticker
+   + name point to a different permno trading on the 9/30, takes that permno (`cusip_corrected_by_ticker`).
+4. **Fallback** for rows still without a permno: the ticker without FactSet's `.XXn` suffix on any date, names
+   matching, the permno trading on the 9/30, exactly one candidate, and a CRSP price (a real trading row, DlyPrc not
+   0) on the last September trading day (`ticker_any_date`, or `cusip_row_ticker_any_date` for CUSIP rows). Without
+   the price the fallback is rejected. (The hand review could check the price only from 2007, when the first price
+   file began; with prices from 1997 every year is checked, and every earlier row passes.)
+5. **A ticker with two permnos:** the one whose CRSP share class on the 9/30 is the class in the client name
+   ("... Class B" -> `ticker_shareclass_B`).
+6. **The same permno twice in one list:** keep the row whose client name matches CRSP; when both or neither do,
+   the CUSIP row. The other row is `dropped_duplicate`.
+7. Everything else has no permno (`unmatched`) and is listed in known_gaps with the reason.
+
+**Checks:** one map row per client row (FAIL); no permno twice in one list (FAIL); every row has a permno or is a
+known gap or a dropped duplicate (FAIL); every fallback has its September price (FAIL); match rate per list at
+least 99% (WARN); every mapped permno is in the permno upload list (WARN: rerun the permno-based queries).
+
+**Tests:** the name rule; each matching rule on invented companies (CUSIP, ticker + name, the fallback with and
+without a price, the share class, a CUSIP of another company, unmatched); duplicates keep the name match, else the
+CUSIP row; the September price uses the last trading day and skips delisting rows and zero prices; an end-to-end
+run.
+
 ## s01_membership
 
 **Inputs:** `raw/iwm_holdings_raw.csv`, `raw/r2000_price_crsp_ciz.csv` (permno, date, flag, price, shares only,

@@ -28,6 +28,8 @@ def test_stage_names(name):
 def test_all_runs_every_stage_in_order():
     assert run.resolve_stages("all") == list(STAGES)
     assert STAGES[0] == "s00_inventory" and STAGES[-1] == "s09_validate"
+    assert STAGES[1:3] == ("s00b_client", "s00c_client_map")
+    assert run.resolve_stages("s00c") == run.resolve_stages("client_map") == ["s00c_client_map"]
 
 
 def test_unknown_stage_exits():
