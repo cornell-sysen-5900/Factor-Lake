@@ -39,7 +39,7 @@ about 10 minutes; s09_validate reruns every stage into a temporary folder to che
 | s00_inventory | size, sha256, rows, columns, date range and expected columns of every raw file | done |
 | s00b_client | the client's 9/30 Russell 2000 lists as a clean table | done |
 | s00c_client_map | a CRSP permno for every client list row (CUSIP, then ticker + name), known gaps | done |
-| s01_membership | IWM snapshots, membership periods, permno fill from CUSIP, known gaps, non-member exclusions | done |
+| s01_membership | index snapshots from the client lists (before 2008-02), IWM and the client fill (2008-02 to 2010-05), membership periods, permno fill from CUSIP, known gaps and their fixes, non-member exclusions | done |
 | s02_prices | daily cleaning, momentum, volatility, monthly returns incl. delisting rows | done |
 | s03_fundamentals_q | quarterly factors, TTM, split adjustment, RV/DCF building blocks | done |
 | s04_fundamentals_a | annual statements for DCF (dcf_inputs_annual) | done |

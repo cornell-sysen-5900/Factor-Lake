@@ -25,6 +25,7 @@ CA = "Compustat annual (CCM)"
 IBES = "IBES summary statistics"
 LINK = "CRSP-IBES link"
 DERIVED = "derived"
+CLIENT = "client Russell 2000 lists (9/30, FactSet)"
 
 ID = {
     "permno": ("CRSP security id (one share class)", CODE, CIZ),
@@ -201,18 +202,26 @@ FILES["factor_panel_monthly.parquet"] = {
 
 FILES["universe_periods.parquet"] = {
     "stage": "s01_membership", "row": "stock, membership period", "key": ["permno", "index_effective"],
-    "about": "Periods each stock was in the IWM snapshots (consecutive snapshots, one missing snapshot bridged).",
+    "about": "Periods each stock was in the index snapshots (consecutive snapshots of one source, one missing "
+             "snapshot bridged). Sources: the client's 9/30 lists before 2008-02, IWM holdings from 2008-02, and the "
+             "list members the old IWM fund id hides, 2008-02 to 2010-05.",
     "columns": {
         "permno": ID["permno"],
-        "index_effective": ("report date of the period's first snapshot", DATE, IWM),
-        "index_through": ("report date of the period's last snapshot", DATE, IWM),
-        "first_known": ("first date the period was public (earliest eff_dt)", DATE, IWM),
-        "n_snapshots": ("snapshots in the period", N, IWM),
+        "index_effective": ("report date of the period's first snapshot (a client-list snapshot: the month's "
+                            "last trading day)", DATE, f"{IWM}; {CLIENT}"),
+        "index_through": ("report date of the period's last snapshot", DATE, f"{IWM}; {CLIENT}"),
+        "first_known": ("first date the period was public (earliest eff_dt)", DATE, f"{IWM}; {CLIENT}"),
+        "n_snapshots": ("snapshots in the period", N, f"{IWM}; {CLIENT}"),
         "n_excluded": ("snapshots of the period excluded as non-members (decision 11)", N, DERIVED),
         "excluded_non_member": ("every snapshot of the period is excluded: a merger stock that was never really a "
                                 "member, not in the panel", FLAG, DERIVED),
-        "ticker": ("IWM ticker in the period's last snapshot", TEXT, IWM),
-        "security_name": ("IWM security name in the period's last snapshot", TEXT, IWM),
+        "membership_source": ("where the period's membership comes from: client_list (the client's 9/30 lists, "
+                              "before 2008-02), iwm (IWM holdings), client_fill (a list member missing from the "
+                              "IWM snapshot, 2008-02 to 2010-05); a period has one source", TEXT, DERIVED),
+        "ticker": ("ticker in the period's last snapshot (IWM's, or CRSP's for client-list rows)", TEXT,
+                   f"{IWM}; {CIZ}"),
+        "security_name": ("security name in the period's last snapshot (IWM's, or CRSP's for client-list rows)",
+                          TEXT, f"{IWM}; {CIZ}"),
     },
 }
 

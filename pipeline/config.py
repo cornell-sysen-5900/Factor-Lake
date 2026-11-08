@@ -16,6 +16,7 @@ Every folder and upload list can be moved with run.py options (--raw-dir, --proc
 
 from __future__ import annotations
 
+import datetime as _dt
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -262,21 +263,22 @@ MEMBERSHIP_SOURCES = ("client_list", "iwm", "client_fill")
 CLIENT_LIST_FIRST_MONTH = "2002-07"     # the 9/30/2002 list counts from the 2002-07 month end
 IWM_FIRST_MONTH = "2008-02"
 CLIENT_FILL_LAST_MONTH = "2010-05"
-LIST_SWITCH_MONTH = 7                   # the 9/30/Y list counts from the July Y through the June Y+1 month end
 
 
-def client_list_year(year: int, month: int) -> int:
-    """The client list (its 9/30 year) in force at a month end: the June-reconstitution switch."""
-    return year if month >= LIST_SWITCH_MONTH else year - 1
-
-
-def reconstitution_date(year: int):
+def reconstitution_date(year: int) -> _dt.date:
     """Russell's annual reconstitution: the last Friday of June, or the Friday before when that is the 29th or
     30th. A stock first trading after it (an IPO added after June) counts only from its list's 9/30."""
-    import datetime as _dt
     day = _dt.date(year, 6, 30)
     day -= _dt.timedelta(days=(day.weekday() - 4) % 7)
     return day - _dt.timedelta(days=7) if day.day >= 29 else day
+
+
+def client_list_year(month_end) -> int:
+    """The client list (its 9/30 year) in force at a month end (the month's last CRSP trading day): each list
+    counts from the first month end after that year's reconstitution, so June in most years and July when the
+    reconstitution is on June's last trading day (e.g. 2002)."""
+    day = month_end.date() if isinstance(month_end, _dt.datetime) else month_end
+    return day.year if day > reconstitution_date(day.year) else day.year - 1
 
 
 # Client list mapping to permnos (s00c_client_map, decision 34)
