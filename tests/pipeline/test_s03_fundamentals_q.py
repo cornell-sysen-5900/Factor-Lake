@@ -132,6 +132,11 @@ def test_run_writes_output_and_summary(tmp_path):
     out = pd.read_parquet(tmp_path / "processed" / "s03_fundamentals_q" / s03.OUTPUT)
     assert len(out) == 8 and out["gind_name"].iloc[0] == "Software" and out["gsector_name"].iloc[0] == (
         "Information Technology")
+    r = out.iloc[0]
+    assert (r.ggroup_name, r.gsubind_name, r.gics_source) == ("Software & Services", "Application Software",
+                                                              "current_header")
+    assert {c["name"]: c["status"] for c in summary["checks"]}["every GICS gsubind code has a name"] == "PASS"
+
     stats = summary["tables"][s03.OUTPUT]["stats"]
     assert set(s03.FACTORS) | {"revenue_ttm", "fcf_ttm", "tax_rate_ttm"} <= set(stats)
     status = {c["name"]: c["status"] for c in summary["checks"]}
@@ -162,3 +167,15 @@ def test_sue_above_50_is_nan_and_counted():
     out, info = s03.build(quarters(16, epspxq=eps))
     assert info["sue_above_max_abs"] >= 1
     assert out["f_sue"].dropna().abs().max() <= 50
+
+
+def test_gics_names_all_levels_and_discontinued_codes():
+    df = pd.DataFrame({"gsector": pd.array([40, 60, None], dtype="Int64"),
+                       "ggroup": pd.array([4040, 6010, None], dtype="Int64"),
+                       "gind": pd.array([404020, 601010, None], dtype="Int64"),
+                       "gsubind": pd.array([40402060, 60101070, None], dtype="Int64")})
+    out = s03.add_gics_names(df)
+    assert out["ggroup_name"].tolist()[:2] == ["Real Estate (discontinued 2016)",
+                                               "Equity Real Estate Investment Trusts (REITs)"]
+    assert out["gsubind_name"].tolist()[:2] == ["Retail REITs (discontinued 2016)", "Retail REITs (2016-2023 code)"]
+    assert out["gics_source"].tolist() == ["current_header", "current_header", None]

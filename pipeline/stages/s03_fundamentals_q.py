@@ -25,8 +25,11 @@ import pandas as pd
 from pipeline.checks import PASS, WARN, Check, check, vs_last_run
 from pipeline.config import (
     COVERAGE_TOLERANCE,
+    GICS_GROUPS,
     GICS_INDUSTRIES,
     GICS_SECTORS,
+    GICS_SOURCE,
+    GICS_SUB_INDUSTRIES,
     LAST_RUN_COVERAGE_2015,
     MIN_SUE_STD,
     MIN_TTM_CAPEX_MUSD,
@@ -63,8 +66,8 @@ BLOCKS = ("book_equity", "total_debt", "cash", "net_debt", "preferred", "minorit
           "d_nwc_4q", *TTM_ITEMS, "fcf_ttm", "tax_rate_ttm", "epsfxq_ttm_adj", "dvpsxq_ttm_adj", "diluted_shares",
           "csho_adj", "cshfd_adj", "mkt_cap_qe_musd")
 ID_COLS = ("permno", "gvkey", "tic", "conm", "period_end", "report_date", "report_date_source", "rdq", "fyearq",
-           "fqtr", "curcdq", "is_usd", "ajexq", "gsector", "gsector_name", "ggroup", "gind", "gind_name", "gsubind",
-           "naics", "price_qe", "cshoq")
+           "fqtr", "curcdq", "is_usd", "ajexq", "gsector", "gsector_name", "ggroup", "ggroup_name", "gind", "gind_name",
+           "gsubind", "gsubind_name", "gics_source", "naics", "price_qe", "cshoq")
 REPORTED = ("atq", "ltq", "actq", "lctq", "cheq", "invtq", "rectq", "apq", "ppentq", "gdwlq", "intanq", "dlcq",
             "dlttq", "pstkq", "mibtq", "seqq", "ceqq", "txditcq", "saleq", "revtq", "cogsq", "xsgaq", "xrdq",
             "oibdpq", "dpq", "oiadpq", "xintq", "piq", "txtq", "niq", "ibq", "epsfxq", "epspxq", "dvpsxq",
@@ -211,9 +214,30 @@ def add_factors(fq: pd.DataFrame, qs: Quarters) -> tuple[pd.DataFrame, dict]:
 def add_gics(fq: pd.DataFrame) -> pd.DataFrame:
     for c in ("gsector", "ggroup", "gind", "gsubind", "naics"):
         fq[c] = pd.to_numeric(fq[c], errors="coerce").astype("Int64")
-    fq["gsector_name"] = fq["gsector"].map(GICS_SECTORS).astype(object)
-    fq["gind_name"] = fq["gind"].map(GICS_INDUSTRIES).astype(object)
-    return fq
+    return add_gics_names(fq)
+
+
+GICS_LEVELS = {"gsector": GICS_SECTORS, "ggroup": GICS_GROUPS, "gind": GICS_INDUSTRIES, "gsubind": GICS_SUB_INDUSTRIES}
+
+
+def add_gics_names(df: pd.DataFrame) -> pd.DataFrame:
+    """<level>_name for the four GICS levels (config tables) and gics_source (decision 39). s04 and s07 use it too."""
+    for code, names in GICS_LEVELS.items():
+        df[f"{code}_name"] = df[code].map(names).astype(object)
+    df["gics_source"] = np.where(df["gsector"].notna(), GICS_SOURCE, None).astype(object)
+    return df
+
+
+def gics_name_checks(df: pd.DataFrame) -> list[Check]:
+    """Every GICS code of each level has a name (WARN); gics_source is set exactly where there is a sector (FAIL)."""
+    checks = []
+    for code in GICS_LEVELS:
+        unnamed = sorted(int(g) for g in df.loc[df[code].notna() & df[f"{code}_name"].isna(), code].unique())
+        checks.append(check(f"every GICS {code} code has a name", not unnamed,
+                            f"no name for {unnamed[:10]} ({int(df[code].isin(unnamed).sum())} rows)", level=WARN))
+    checks.append(check("gics_source set exactly where GICS is", bool(
+        (df["gics_source"].notna() == df["gsector"].notna()).all())))
+    return checks
 
 
 def build(fq_raw: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
@@ -277,9 +301,7 @@ def run_checks(fq: pd.DataFrame, info: dict, seed: int = 7) -> list[Check]:
                         "; ".join(f"{k}: {v}" for k, v in off.items())
                         or ("all 17 within" if known else "no last-run coverage: pipeline_last_run.json not loaded"),
                         level=WARN))
-    unnamed = sorted(int(g) for g in fq.loc[fq["gind"].notna() & fq["gind_name"].isna(), "gind"].unique())
-    checks.append(check("every GICS industry code has a name", not unnamed,
-                        f"no name for {unnamed} ({int(fq['gind'].isin(unnamed).sum())} rows)", level=WARN))
+    checks += gics_name_checks(fq)
     return checks
 
 
