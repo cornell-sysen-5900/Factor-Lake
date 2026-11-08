@@ -52,7 +52,7 @@ Decided in the stage 1 review:
 | Job | `build_job` (`src/backtest_jobs.py`) | `build_wrds_job` (`src/wrds_jobs.py`) | the job's `data_mode` key: absent means Legacy |
 | Lambda | `BacktestService.run` | `WrdsBacktestService.run` | one dispatch on `job.get('data_mode')` in `BacktestService.handle_event` |
 | Engine | `src/backtest_engine.py` | `src/wrds_engine.py` (vectorized) | separate modules |
-| Data | `full_precision_test.parquet`, `last_price_mapping.parquet` | `wrds_2026_10/factor_panel_monthly.parquet`, `returns_monthly.parquet`, `market_monthly.parquet` | the service that runs the job |
+| Data | `full_precision_test.parquet`, `last_price_mapping.parquet` | `wrds_2026_11/factor_panel_monthly.parquet`, `returns_monthly.parquet`, `market_monthly.parquet` (until 2026-11: `wrds_2026_10/`) | the service that runs the job |
 | Benchmarks, metrics | `src/benchmarks.py`, `src/performance_metrics.py` | `src/wrds_metrics.py` (IWM, IWN, IWO, Fama-French rf) | separate modules |
 | Results tab | `render_results_tab` | `render_wrds_results_tab` (new `app/components/wrds_results.py`, reusing Legacy's render helpers read-only) | `run['data_mode']` |
 | Saved IDs | `backtest-results/<hash>.json` | the same file layout, plus `<hash>.holdings.parquet` | the saved job's `data_mode` |
@@ -64,7 +64,7 @@ The invariant is that **Legacy results do not change**. Legacy's code version an
 
 1. **Engine.** The Legacy engine (`backtest_engine.py`, `benchmarks.py`, `performance_metrics.py`, `universe_selection.py`, ...) is not edited. WRDS code lives in new `src/wrds_*.py` modules that may import Legacy files but do not change them. Files that only route jobs, such as `backtest_jobs.py`, may get a WRDS branch.
 2. **Job.** Legacy jobs are still built by `build_job`, which reads only the keys it knows. The sidebar's Legacy settings are exactly as on `main` (no `data_mode` key), and a Legacy job never has a `data_mode` key.
-3. **Data.** Legacy reads the same two files. The WRDS data sits in its own folder (`factor-lake-data/wrds_2026_10/`), so publishing it changes nothing Legacy reads.
+3. **Data.** Legacy reads the same two files. The WRDS data sits in its own folder (`factor-lake-data/wrds_2026_11/`, before it `wrds_2026_10/`), so publishing it changes nothing Legacy reads.
 4. **Local Legacy runs.** `run_backtest_logic`'s Legacy body, `load_and_process_data` and `select_universe` are not edited. The WRDS branch is decided before the Legacy code runs.
 5. **Pinned results.** `tests/unit/test_legacy_pinned.py` runs fixed Legacy jobs (Mixing and Integrating, all three delisting strategies, equal and cap weight, a sector filter, a cohort comparison) through `build_job` and `run_job`. It compares the whole result, holdings included, with `tests/fixtures/legacy_pinned_results.json`, which was captured from `main` (c063100) before any WRDS code existed.
 6. **Tests.** Every existing test passes without being edited. New behaviour gets new test files. If an existing app test has to change because the sidebar gained a widget, that is a sign the Legacy path changed, and the change is reviewed as such.
@@ -265,7 +265,7 @@ There is no `delisting_strategy` (returns include delisting returns) and no `ben
 The key is computed by the unchanged `job_hash(job, data_version, code_version)`, so it is the same kind of 64-character SHA-256 as Legacy's:
 
 - `job`: the WRDS job. Its `data_mode` key means it can never equal a Legacy job.
-- `data_version`: the WRDS folder name plus the S3 ETags of the three files the engine reads, for example `wrds_2026_10|factor_panel_monthly.parquet:<etag>|returns_monthly.parquet:<etag>|market_monthly.parquet:<etag>`. A new WRDS pull goes into a new folder, so it gives new keys.
+- `data_version`: the WRDS folder name plus the S3 ETags of the three files the engine reads, for example `wrds_2026_11|factor_panel_monthly.parquet:<etag>|returns_monthly.parquet:<etag>|market_monthly.parquet:<etag>`. A new WRDS pull goes into a new folder, so it gives new keys.
 - `code_version`: a hash of `WRDS_ENGINE_SOURCES` (the `src/wrds_*.py` modules plus the shared files they import, such as `factor_utils.py`), computed the same way as `code_version()`.
 
 ### 5.3 Where results are stored
@@ -306,7 +306,7 @@ When the user picks a date, the app reads the file's footer and that date's row 
 
 ### 6.1 Files and columns
 
-| File (under `factor-lake-data/wrds_2026_10/`) | Columns read | Use |
+| File (under `factor-lake-data/wrds_2026_11/`) | Columns read | Use |
 |---|---|---|
 | `factor_panel_monthly.parquet` | `date`, `permno`, `ticker`, `security_name`, `sector_name`, `gsubind`, `siccd`, `prc`, `mkt_cap_musd`, `ret_next_1m`, and the 39 allowlisted factor columns (49 of 103) | universe, factors, weights, one-month returns |
 | `returns_monthly.parquet` | `month_end`, `permno`, `ret_m`, `delisted_in_month` | returns for later months of a period, delisting months |
@@ -315,7 +315,7 @@ When the user picks a date, the app reads the file's footer and that date's row 
 - The panel is one zstd row group, so dates cannot be skipped inside the file. The Lambda downloads each file with one GET and decodes only the listed columns. Text columns become pandas categoricals.
 - The Lambda builds a month by permno matrix of `ret_m` once per container.
 - It keeps the frames for the life of the container, next to the Legacy universe, and reloads them only when the WRDS data version changes, as `_load_universe` does for Legacy.
-- The folder name is `WRDS_DATA_DIR = 'wrds_2026_10'` in `src/wrds_data.py`, overridable with `FACTOR_LAKE_WRDS_DIR`, which the deploy script sets on the function.
+- The folder name is `DEFAULT_WRDS_DIR = 'wrds_2026_11'` in `src/wrds_data.py` (data version 2, panel from 2002-07; `FIRST_MONTH = '2002-07'` in `src/wrds_calendar.py`), overridable with `FACTOR_LAKE_WRDS_DIR`, which the deploy script sets on the function. The previous folder, `wrds_2026_10` (panel from 2008-04), stays in S3 for rollback.
 - `prices_daily/` is not needed: every rebalance is at a month end, so monthly returns are enough.
 
 ### 6.2 Measured on the real files

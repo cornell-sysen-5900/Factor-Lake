@@ -8,8 +8,8 @@ PURPOSE: Read-only look at what is in the Factor-Lake S3 bucket: a tree with siz
 Usage (from the repo root; the AWS keys come from .streamlit/secrets.toml, which is local only and never on GitHub):
     uv run python scripts/s3_inspect.py                                   # factor-lake-data/, with heads
     uv run python scripts/s3_inspect.py --no-head                         # listing only
-    uv run python scripts/s3_inspect.py --prefix factor-lake-data/wrds_2026_10/ --rows 5
-    uv run python scripts/s3_inspect.py --prefix factor-lake-data/wrds_2026_10/ --all-partitions --max-files 5
+    uv run python scripts/s3_inspect.py --prefix factor-lake-data/wrds_2026_11/ --rows 5
+    uv run python scripts/s3_inspect.py --prefix factor-lake-data/wrds_2026_11/ --all-partitions --max-files 5
 
 Heads:
     Parquet   the footer read with ranged GETs: rows, row groups, columns and types, and the first --rows rows of the
