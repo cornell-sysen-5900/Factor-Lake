@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/components/sidebar.py
 PURPOSE: Configuration interface for global backtest parameters and ESG filters.
-VERSION: 2.7.0
+VERSION: 2.8.0
 """
 
 import calendar
@@ -17,7 +17,7 @@ from src.wrds_calendar import FIRST_YEAR as WRDS_FIRST_YEAR
 from src.wrds_calendar import LAST_MONTH as WRDS_LAST_MONTH
 from src.wrds_calendar import LAST_YEAR as WRDS_LAST_YEAR
 from src.wrds_calendar import describe_schedule
-from src.wrds_factors import WRDS_SECTORS
+from src.wrds_gics import GICS_LEVELS, codes_under, level_names, make_gics_filter, names_to_codes
 
 # Widget key of the Legacy / WRDS switch
 DATA_MODE_KEY = "data_mode_input"
@@ -26,6 +26,20 @@ WRDS_NEEDS_LAMBDA = "WRDS mode runs in AWS Lambda, which is not configured for t
 TRADING_COST_KEY = "trading_cost_bps_input"
 TRADING_COST_HELP = ("Charged on every buy and sell. Russell 2000 stocks often cost roughly 20-60 bps "
                      "per side, more for the smallest names.")
+# WRDS GICS filter: the level picker's key and options (label -> level), and each level's
+# multiselect key and plural name (the sector list keeps its original key)
+GICS_LEVEL_KEY = "wrds_gics_level_input"
+GICS_LEVEL_OPTIONS = {label: level for level, (label, _, _) in GICS_LEVELS.items()}
+GICS_WIDGETS = {
+    'sector': ("wrds_sectors_input", "sectors"),
+    'industry_group': ("wrds_industry_groups_input", "industry groups"),
+    'industry': ("wrds_industries_input", "industries"),
+    'sub_industry': ("wrds_sub_industries_input", "sub-industries"),
+}
+GICS_LEVEL_HELP = ("Filter by GICS sector, industry group, industry or sub-industry. GICS is each company's "
+                   "current classification applied to its whole history (gics_source = current_header), "
+                   "not the historical one. Sector also places stocks without GICS by their SIC code; "
+                   "the finer levels leave those stocks out.")
 
 
 def _render_data_mode(backtest_lambda: str, on_change: Optional[Callable[[], None]]) -> bool:
@@ -90,7 +104,14 @@ def clear_sidebar_parameters() -> None:
     # The sector multiselects disappear when filtering is disabled. When enabled
     # again they use render_sidebar's existing default (all available sectors).
     st.session_state.pop('selected_sectors_input', None)
-    st.session_state.pop('wrds_sectors_input', None)
+    clear_gics_inputs()
+
+
+def clear_gics_inputs() -> None:
+    """Forgets the WRDS GICS filter's level and lists, so they show their defaults."""
+    st.session_state.pop(GICS_LEVEL_KEY, None)
+    for key, _ in GICS_WIDGETS.values():
+        st.session_state.pop(key, None)
 
 
 def render_sidebar(sector_options: List[str], data_source_label: str,
@@ -236,17 +257,10 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
             help="Limit the portfolio to chosen sectors."
         )
         selected_sectors = []
+        gics_filter = None
         if sector_filter_enabled:
             if wrds:
-                selected_sectors = st.multiselect(
-                    "Include following sectors:",
-                    options=list(WRDS_SECTORS),
-                    default=list(WRDS_SECTORS),
-                    key="wrds_sectors_input",
-                    help="Only stocks in these GICS sectors can be held. Sectors use today's GICS "
-                         "codes, not historical ones, and stocks without a sector are left out "
-                         "while this filter is on."
-                )
+                gics_filter = _render_wrds_gics_filter()
             else:
                 selected_sectors = st.multiselect(
                     "Include following sectors:",
@@ -288,7 +302,8 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
             "restrict_fossil_fuels": restrict_fossil_fuels,
             "use_market_cap_weight": use_market_cap_weight,
             "factor_combination": factor_combination,
-            "selected_sectors": selected_sectors if sector_filter_enabled else None,
+            "selected_sectors": [] if sector_filter_enabled else None,
+            "gics_filter": gics_filter,
             "sector_filter_enabled": sector_filter_enabled,
             "start_year": start_year,
             "end_year": end_year,
@@ -309,6 +324,51 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
         "use_lambda": use_lambda,
         **costs
     }
+
+
+def _render_wrds_gics_filter() -> Optional[Dict[str, Any]]:
+    """
+    The WRDS GICS filter: a level, then one list per level down to it. Each list offers
+    only what is inside the choices above it (all of it while nothing is chosen there).
+    Returns the filter of the choices at the picked level, or None when there are none.
+    """
+    chosen = GICS_LEVEL_OPTIONS[st.radio(
+        "Filter level",
+        options=list(GICS_LEVEL_OPTIONS),
+        index=0,
+        key=GICS_LEVEL_KEY,
+        help=GICS_LEVEL_HELP
+    )]
+    levels = list(GICS_LEVELS)[:list(GICS_LEVELS).index(chosen) + 1]
+    parent, allowed, picked = None, [], []
+    for level in levels:
+        names = level_names(level)
+        codes = sorted(names) if parent is None else codes_under(level, allowed, parent)
+        options = sorted(names[c] for c in codes)
+        key, plural = GICS_WIDGETS[level]
+        # Drop choices a narrower choice above took away (a list's value must be among its options)
+        if key in st.session_state and any(v not in options for v in st.session_state[key]):
+            st.session_state[key] = [v for v in st.session_state[key] if v in options]
+        last = level == chosen
+        if level == 'sector':
+            help_text = ("Only stocks in these GICS sectors can be held; stocks without a sector are left "
+                         "out while this filter is on." if last else "Narrows the lists below to these sectors.")
+        else:
+            help_text = (f"Only stocks in these GICS {plural} can be held; stocks without GICS are left out."
+                         if last else f"Narrows the lists below to these {plural}.")
+        choice = st.multiselect(
+            f"Include following {plural}:",
+            options=options,
+            default=options if level == 'sector' else [],
+            key=key,
+            placeholder=f"Choose {plural}" if last else f"All {plural}",
+            help=help_text
+        )
+        picked = names_to_codes(level, choice)
+        parent, allowed = level, picked or codes
+    if not picked:
+        st.caption(f"No {GICS_WIDGETS[chosen][1]} chosen: the filter is off.")
+    return make_gics_filter(chosen, picked)
 
 
 def _month_name(month: str) -> str:
