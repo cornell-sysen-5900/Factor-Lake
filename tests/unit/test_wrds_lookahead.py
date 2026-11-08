@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from src.wrds_data import PANEL_COLUMNS
-from src.wrds_engine import run_wrds_backtest
+from src.wrds_engine import HOLDINGS_GICS_COLUMNS, run_wrds_backtest
 from src.wrds_factors import WRDS_FACTOR_COLUMNS
 from tests.unit.wrds_fixtures import synthetic_frames
 
@@ -53,8 +53,8 @@ def test_changing_data_after_t_changes_nothing_at_t(combination, cap, k):
 
     # Text columns are categoricals whose category list covers the whole run, so compare values
     def upto(h):
-        return h[h['rebalance_date'] <= t].reset_index(drop=True).astype(
-            {'ticker': object, 'name': object, 'sector': object})
+        text = ['ticker', 'name', 'sector'] + list(HOLDINGS_GICS_COLUMNS.values())
+        return h[h['rebalance_date'] <= t].reset_index(drop=True).astype(dict.fromkeys(text, object))
     pd.testing.assert_frame_equal(upto(holdings2), upto(holdings))     # same stocks, ranks, scores, weights, returns
     n = k + 1                                                          # periods ending by t_next
     assert results2['yearly_returns'][:n] == results['yearly_returns'][:n]

@@ -142,6 +142,8 @@ The sector filter offers the 11 GICS sectors, using the panel's `sector_name` co
 
 **Limitation (decision 6):** the panel's GICS code is today's classification, not the historical one (data dictionary), so the sector filter is the one input that is not strictly point in time. A stock that moved sectors is filtered by its current sector for its whole history. The sector list's tooltip says so (risk R3).
 
+**Granular GICS filter.** The filter can also work at the industry group, industry or sub-industry level (`gics_filter` in the job, `src/wrds_gics.py`). Those levels match the panel's `gsubind` on its first 4, 6 or 8 digits, so stocks without GICS are left out (there is no SIC fallback below the sector). The sector level keeps the `sector_name` rule above, so an older job's `selected_sectors` is the same as a sector-level `gics_filter`.
+
 ### 2.3 Fossil fuel filter
 
 Legacy excludes five FactSet industries. WRDS mode excludes the matching GICS sub-industries (`gsubind`): 10101010 Oil & Gas Drilling, 10101020 Oil & Gas Equipment & Services, 10102010 Integrated Oil & Gas, 10102020 Oil & Gas Exploration & Production, 10102030 Oil & Gas Refining & Marketing, 10102050 Coal & Consumable Fuels. Where GICS is missing, it excludes SIC 1221, 1222, 1231 (coal), 1311 (crude oil and gas), 1381, 1382, 1389 (oil and gas field services) and 2911 (refining). This keeps Legacy's mapping (decision 3): 10102040 Oil & Gas Storage & Transportation is not in Legacy's list, so it is kept.
@@ -254,7 +256,8 @@ A WRDS job is plain JSON like a Legacy job, built by `build_wrds_job` and checke
 | `use_market_cap_weight` | bool | |
 | `factor_combination` | `mixing`, `integrating` | |
 | `restrict_fossil_fuels` | bool | section 2.3 |
-| `selected_sectors` | sorted GICS sector names | |
+| `selected_sectors` | sorted GICS sector names | older jobs' sector filter; `[]` when `gics_filter` is set |
+| `gics_filter` | `{'level': 'sector', 'industry_group', 'industry' or 'sub_industry', 'codes': sorted GICS codes}` | only when set, so jobs without it keep their shape (section 2.2) |
 | `cohort_pct` | number for `cohort`, else null | |
 | `rebalance_date` | `YYYY-MM` for `ranked`, else null | must be one of the run's rebalance months |
 

@@ -35,9 +35,13 @@ RETURNS_FILE = 'returns_monthly.parquet'
 MARKET_FILE = 'market_monthly.parquet'
 WRDS_FILES = (PANEL_FILE, RETURNS_FILE, MARKET_FILE)
 
-# Panel columns besides the factors: keys, display, filters, price and weight
+# Panel columns besides the factors: keys, display, filters, price and weight, and the
+# four GICS names (shown in the holdings)
 PANEL_KEY_COLUMNS = ('date', 'permno', 'ticker', 'security_name', 'sector_name', 'gsubind', 'siccd',
-                     'prc', 'mkt_cap_musd')
+                     'prc', 'mkt_cap_musd', 'gsector_name', 'ggroup_name', 'gind_name', 'gsubind_name')
+# Text columns kept as categories (few distinct values, a fraction of the memory)
+PANEL_CATEGORY_COLUMNS = ('ticker', 'security_name', 'sector_name', 'gsector_name', 'ggroup_name', 'gind_name',
+                          'gsubind_name')
 PANEL_COLUMNS = tuple(dict.fromkeys(PANEL_KEY_COLUMNS + WRDS_FACTOR_COLUMNS))
 RETURNS_COLUMNS = ('month_end', 'permno', 'ret_m', 'delisted_in_month')
 MARKET_COLUMNS = ('month_end', 'iwm_total_ret', 'iwn_total_ret', 'iwo_total_ret', 'rf', 'tbill_3m')
@@ -68,7 +72,7 @@ class WrdsData:
     def build(cls, panel: pd.DataFrame, returns_monthly: pd.DataFrame, market: pd.DataFrame) -> 'WrdsData':
         """Builds the return matrices from returns_monthly (one row per month end and permno)."""
         panel = panel.copy()
-        for col in ('ticker', 'security_name', 'sector_name'):
+        for col in PANEL_CATEGORY_COLUMNS:
             panel[col] = panel[col].astype('category')
         # Every month end of either file; a holding period over a month without market data is refused
         months = pd.DatetimeIndex(returns_monthly['month_end'].unique()).union(
