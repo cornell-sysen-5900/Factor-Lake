@@ -18,8 +18,8 @@ Every factor and multiple is a raw value; the app z-scores or ranks at each reba
 
 | S3 key under wrds_YYYY_MM/ | one row per | contents | built in | used by |
 |---|---|---|---|---|
-| factor_panel_monthly.parquet | index member, month end t (point in time) | ids, GICS sector and industry, index weight, price, listed and company market cap, momentum, volatility, betas, the fundamentals used and their 12 statement factors, 8 price-scaled factors and 5 quarter-end versions, 9 analyst factors, ret_next_1m | s07 | factor selection, backtests, sector filter, Data Viewer |
-| universe_periods.parquet | stock, membership period | permno, index_effective, index_through, first_known, n_snapshots, n_excluded, excluded_non_member, ticker, security_name | s01 | universe selection |
+| factor_panel_monthly.parquet | index member, month end t (point in time) | ids, GICS at four levels with names and gics_source, membership_source, index weight, price, listed and company market cap, momentum, volatility, betas, the fundamentals used and their 12 statement factors, 8 price-scaled factors and 5 quarter-end versions, 9 analyst factors, ret_next_1m | s07 | factor selection, backtests, sector filter, Data Viewer |
+| universe_periods.parquet | stock, membership period | permno, index_effective, index_through, first_known, n_snapshots, n_excluded, excluded_non_member, membership_source, ticker, security_name | s01 | universe selection |
 | returns_monthly.parquet | stock, month (every permno ever in the universe, also after it leaves) | month-end price, shares, market cap, ret_m with delisting returns, delisting flags, trading days, is_adr | s02 | backtest holding returns |
 | prices_daily/year=YYYY/data.parquet (one per year) | stock, trading day | permno, ticker, date, prc, prc_adj, cfacpr, shrout, mkt_cap_musd, ret, vol, is_delisting_row | s02 | daily loader, sub-annual rebalancing |
 | prices_daily/_manifest.json | - | years, rows, bytes and columns of the daily files (uploaded last) | s08 | readers of the daily files |
@@ -578,7 +578,7 @@ estimates_consensus.parquet (EPS, CPS, SAL, EBT; FPI 0-2) and link.parquet; s06 
 
 | file | one row per | columns |
 |---|---|---|
-| factor_panel_monthly.parquet | universe stock, month end t | identity (permno, permco, gvkey, ticker, security_name, gsector, gsector_name, ggroup, gind, gind_name, gsubind, sector_name, gics_from_sic, siccd), index_weight, snapshot_report_dt, snapshot_eff_dt, new_entrant, price_date, prc, shrout, mkt_cap_musd, company_mkt_cap_musd, company_mkt_cap_crsp_musd, company_cap_from_compustat, is_adr, n_share_classes, company_shares_crsp_m, company_shares_compustat_m, cfacpr_t, cfacpr_last (s08 drops these two), mom_1m, mom_6m, mom_12m, mom_12_1, vol_gk_* and vol_close_*, beta_252d, beta_60m, fund_period_end, fund_report_date, fund_is_usd, fund_stale, the building blocks used (book_equity, ib_ttm, revenue_ttm, dv_ttm, fcf_ttm, ev_claims, ebitda_ttm, ebit_ttm, cshoq), ev, the 12 statement factors, the 8 price-scaled factors, the 5 quarter-end versions (`_qe`), ibes_statpers, numest_fy1, the 9 analyst factors, surprise_anndats, surprise_fpedats, ret_next_1m, delisted_next_month, and the statpers of each IBES series used |
+| factor_panel_monthly.parquet | universe stock, month end t | identity (permno, permco, gvkey, ticker, security_name, gsector, gsector_name, ggroup, ggroup_name, gind, gind_name, gsubind, gsubind_name, gics_source, sector_name, gics_from_sic, siccd), index_weight, membership_source, snapshot_report_dt, snapshot_eff_dt, new_entrant, price_date, prc, shrout, mkt_cap_musd, company_mkt_cap_musd, company_mkt_cap_crsp_musd, company_cap_from_compustat, is_adr, n_share_classes, company_shares_crsp_m, company_shares_compustat_m, cfacpr_t, cfacpr_last (s08 drops these two), mom_1m, mom_6m, mom_12m, mom_12_1, vol_gk_* and vol_close_*, beta_252d, beta_60m, fund_period_end, fund_report_date, fund_is_usd, fund_stale, the building blocks used (book_equity, ib_ttm, revenue_ttm, dv_ttm, fcf_ttm, ev_claims, ebitda_ttm, ebit_ttm, cshoq), ev, the 12 statement factors, the 8 price-scaled factors, the 5 quarter-end versions (`_qe`), ibes_statpers, numest_fy1, the 9 analyst factors, surprise_anndats, surprise_fpedats, ret_next_1m, delisted_next_month, and the statpers of each IBES series used |
 | rv_multiples_monthly.parquet | same rows | date, permno, gsector, gind, prc, company_mkt_cap_musd, company_cap_from_compustat, ev, the 15 multiples, and `<multiple>_pct_gind`, `<multiple>_pct_gsector` |
 | rv_peer_stats_monthly.parquet | gind, month end | date, gind, gind_name, n_peers, and per multiple `_n`, `_p25`, `_p50`, `_p75` |
 | security_master.parquet | permno in permno_list.txt | permco, gvkey, ibes_ticker (all linked tickers, `;`-separated), ticker, security_name, GICS codes and names, siccd, first and last price date, first and last universe date, excluded_non_member |
@@ -588,7 +588,9 @@ The monthly returns table is s02's monthly.parquet; s08 exports it as returns_mo
 
 **Rules:**
 1. **Calendar:** every month end t (last CRSP trading day) from the first month with an effective snapshot to the
-   last month with prices.
+   last month with prices. With data version 2 the first snapshot is the 2002-07 client list, so the panel starts
+   at the 2002-07 month end (decision 35); the earlier prices only feed the momentum, volatility and beta windows.
+   membership_source and index_weight come from the snapshot in use (client rows carry the list's 9/30 weight).
 2. **Universe at t:** the latest s01 snapshot whose every line has eff_dt <= t, lines with in_universe = True
    (decision 11). In the known missing months the previous snapshot is used. new_entrant = not in the universe at
    the previous t.
@@ -703,7 +705,7 @@ two data dictionaries:
 | estimates_consensus.parquet | s05 |
 | fundamentals_quarterly.parquet | s03 |
 | column_stats.parquet | computed by s08 from the other final tables (prices_daily's years combined): numeric dtype, rows, non-null %, min, p1, p25, median, mean, p75, p99, max; dates non-null %, min, max, unique; text non-null %, unique, top 5 with their share of rows; booleans non-null %, share True |
-| manifest.json | data_version (build date), created_at, pipeline git commit (and whether the tree was dirty), sha256 of every raw file (from s00), per output file path, rows, MB, date range, permnos, column types; units, sectors (GICS and the SIC fallback), delisting fill rule, month-end convention, which market cap to use for what, point-in-time note, known gaps (unmatched IWM holdings, unlisted share classes, where each source ends), factor coverage by year |
+| manifest.json | data_version (build date), created_at, pipeline git commit (and whether the tree was dirty), sha256 of every raw file (from s00), per output file path, rows, MB, date range, permnos, column types; units, membership (the three sources, list timing, snapshot rows by source, IWM gap fixes, client rows without a permno as counts only), sectors (GICS at four levels, gics_source, and the SIC fallback), delisting fill rule, month-end convention, which market cap to use for what, point-in-time note, known gaps (unmatched IWM holdings, unlisted share classes, where each source starts and ends), factor coverage by year |
 | UPLOAD.md | how to run `scripts/upload_wrds.py` on this folder (dry run, upload, check) |
 | processed/DATA_DICTIONARY.md (next to final/, not uploaded) | rendered from `pipeline/dictionary.py`: per file what it is, its key and rows, every column with type, meaning, unit, source and stage, a Stats table from column_stats.parquet (4 significant figures), and for factor_panel_monthly the non-null % of every factor by year |
 | pipeline/DATA_DICTIONARY.md (in the repo) | the same files and columns with meaning, unit, source and stage only: nothing from the data |
@@ -731,7 +733,9 @@ files keep the publish layout and sort; UPLOAD.md points at the repo script and 
 
 ## s09_validate
 
-**Inputs:** `processed/final/` and `raw/` only, plus the old notebook panel (`config.OLD_PANEL_PATHS`) for check 3.
+**Inputs:** `processed/final/` and `raw/`, the old notebook panel (`config.OLD_PANEL_PATHS`) for check 3, and for
+checks 9 and 10 the client file (its FactSet values are the app's Legacy data) with
+`processed/s00c_client_map/client_permno_map.parquet` (its permnos).
 **Outputs:** `processed/s09_validation/` (summary.json, VALIDATION.md for teammates, the recompute sample and its
 raw-side values). Never writes into final/.
 
@@ -749,10 +753,23 @@ and a hash of the data sorted by its key (JSON and Markdown as text, created_at 
 of factor_panel_monthly in pandas, full and with 9 columns, vs the ~1 GB Streamlit free tier (WARN above half); (7)
 `scripts/upload_wrds.py --offline` with no credentials and network blocked: one key per Parquet file plus the daily
 manifest last, nothing else, under factor-lake-data/wrds_YYYY_MM/.
+Data version 2 adds: (1) and (2) also by membership era of the formation month (client lists to 2008-01, IWM +
+client fill 2008-02 to 2010-05, IWM after), each era's correlation with IWM >= 0.99; IWM's monthly return drops
+the ETF file's exact duplicate rows first; (8) membership by source: panel rows and stocks per month by
+membership_source, each source only in its own months, 1,800-2,150 stocks every month; (9) client lists vs IWM:
+each 9/30 list against the IWM universe periods covering that 9/30, at least 99% of the list in IWM or (2008-2010)
+the client fill; (10) WRDS vs Legacy, 2002-2007: each Legacy stock-year matched by permno to the panel's September
+month end (at least 98% found), and per FactSet column (price, market cap, 12/6/1-month momentum, 1-year
+volatility, Book/Price, ROA, next-FY E/P, asset growth, accruals, next-year return from returns_monthly October to
+September) the rank correlation, median difference and share within a tolerance, overall and by year; rank
+correlation at least 0.99 for price, 0.95 for market cap, 0.90 for 12-month momentum and next-year return; (11)
+GICS: share of rows with each of the four levels by year, every code named, gics_source = current_header wherever
+there is GICS.
 
 **Tests:** cap-weighted next-month returns, tracking statistics, long-short sorts both ways, the June portfolio,
 the rerun comparison (changed data found, row order and created_at ignored), the offline dry run, the recompute
-script on tiny raw files.
+script on tiny raw files; the membership eras and tracking by era; the next-year return window and the Legacy
+comparison; a source outside its months found.
 
 ## Problems in the old notebook
 
@@ -807,7 +824,7 @@ client lists, the names history and the v2 columns.
 | 3 | s09_validate; causal share flag, IBES scale and margin rules, column stats | done |
 | upload | the 2026-10 pull to `s3://sysen-5900-factor-lake/factor-lake-data/wrds_2026_10/` (34 keys), checked by size, ETag and content | done |
 | v2 A | data version 2: folder options, every raw column, start dates, s00 on raw_v2, s00b_client, s00c_client_map, s01 with three membership sources | done |
-| v2 B | s02-s07 on the v2 data, s08 export as wrds_2026_11 (local only), s09 extended to 2002 | to do |
+| v2 B | s02-s07 on the v2 data, s08 export as wrds_2026_11 (local only, not uploaded), s09 extended to 2002 | done |
 
 Every stage was compared with the notebook's cells rerun unchanged on the same raw files; each difference comes
 from a decision above. The results of each phase and of the validation are in the stages' summary.json files and

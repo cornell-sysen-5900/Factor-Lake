@@ -3,8 +3,9 @@ PROJECT: Factor-Lake Portfolio Analysis
 MODULE: pipeline/stages/s09_validate.py
 PURPOSE: Stage s09_validate: final validation of processed/final/ against independent sources, for teammates.
 
-In:  processed/final/ (never written), raw/ (benchmarks, Fama-French, the raw CSVs for the recompute);
-     the old notebook panel for the old-vs-new backtest (config.OLD_PANEL_PATHS, first one found)
+In:  processed/final/ (never written), raw/ (benchmarks, Fama-French, the raw CSVs for the recompute), the client
+     file (Legacy values) and processed/s00c_client_map/ (its permnos); the old notebook panel for the old-vs-new
+     backtest (config.OLD_PANEL_PATHS, first one found)
 Out: processed/s09_validation/summary.json, VALIDATION.md, recompute_sample.csv, recompute_raw.csv
 
 Checks (all WARN, pipeline/PLAN.md s09_validate):
@@ -16,6 +17,12 @@ Checks (all WARN, pipeline/PLAN.md s09_validate):
     5. reproducibility: every stage rerun into a temporary folder, final files compared by rows and data hash
     6. app memory of factor_panel_monthly, full and with 9 columns
     7. upload dry run offline (scripts/upload_wrds.py --offline): every S3 key without credentials or network
+    8. membership by source: panel months and stocks by membership_source, each source in its own months
+    9. client lists vs IWM: each 9/30 list against the IWM universe on that 9/30 (2008 on; with the fill 2008-2010)
+   10. WRDS vs Legacy: the client's 9/30 FactSet values (the app's Legacy data) against the panel's September month
+       end, 2002-2007 (price, market cap, momentum, volatility, value, ROA, forward E/P, growth, next-year return)
+   11. GICS: coverage of the four levels and their names by year, gics_source
+Tracking and the factor checks are also split by membership era (client lists, IWM + fill, IWM).
 """
 
 from __future__ import annotations
@@ -35,7 +42,18 @@ import pandas as pd
 
 from pipeline import dictionary
 from pipeline.checks import PASS, WARN, Check, check
-from pipeline.config import ETF_PERMNOS, INDEX_TICS, OLD_PANEL_PATHS, DataPaths
+from pipeline.config import (
+    CLIENT_FILE,
+    CLIENT_FILL_LAST_MONTH,
+    ETF_PERMNOS,
+    GICS_SOURCE,
+    INDEX_TICS,
+    IWM_FIRST_MONTH,
+    MEMBERSHIP_SOURCES,
+    OLD_PANEL_PATHS,
+    SNAPSHOT_SIZE_RANGE,
+    DataPaths,
+)
 from pipeline.outputs import fresh_stage_dir, write_summary
 from pipeline.stages import STAGES
 
@@ -58,6 +76,27 @@ RECOMPUTE = {  # script column -> (final file, column)
     "mom_12_1": ("factor_panel_monthly.parquet", "mom_12_1"),
     "e_p": ("factor_panel_monthly.parquet", "f_earnings_to_price"),
     "ev_ebitda": ("rv_multiples_monthly.parquet", "ev_ebitda"), "ret_m": ("returns_monthly.parquet", "ret_m")}
+ERAS = (("client lists", None, pd.Period(IWM_FIRST_MONTH, "M") - 1),
+        ("IWM + client fill", pd.Period(IWM_FIRST_MONTH, "M"), pd.Period(CLIENT_FILL_LAST_MONTH, "M")),
+        ("IWM", pd.Period(CLIENT_FILL_LAST_MONTH, "M") + 1, None))
+LEGACY_YEARS = (2002, 2007)
+# Legacy (client file) column -> (panel or derived column, multiplier to the Legacy unit, tolerance, kind)
+LEGACY_COMPARE = {
+    "Ending Price": ("prc", 1.0, 0.01, "relative"),
+    "Market Capitalization": ("company_mkt_cap_musd", 1.0, 0.10, "relative"),
+    "12-Mo Momentum %": ("mom_12m", 100.0, 5.0, "absolute"),
+    "6-Mo Momentum %": ("mom_6m", 100.0, 5.0, "absolute"),
+    "1-Mo Momentum %": ("mom_1m", 100.0, 2.0, "absolute"),
+    "1-Yr Price Vol %": ("vol_close_12m", 100.0, 5.0, "absolute"),
+    "Book/Price": ("f_book_to_price", 1.0, 0.05, "absolute"),
+    "ROA %": ("f_roa", 100.0, 2.0, "absolute"),
+    "Next FY Earns/P": ("f_forward_ep", 1.0, 0.01, "absolute"),
+    "1-Yr Asset Growth %": ("f_asset_growth_1yr", 100.0, 5.0, "absolute"),
+    "Accruals/Assets": ("f_accruals_to_assets", 1.0, 0.02, "absolute"),
+    "Next-Year's Return %": ("next_year_ret", 100.0, 5.0, "absolute"),
+}
+LEGACY_MIN_SPEARMAN = {"Ending Price": 0.99, "Market Capitalization": 0.95, "12-Mo Momentum %": 0.90,
+                       "Next-Year's Return %": 0.90}
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "wrds_independent_recompute.py"
 UPLOAD_SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "upload_wrds.py"
 
@@ -65,7 +104,7 @@ UPLOAD_SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "upload_wrds.p
 # ---------- Benchmarks from raw ----------
 
 def iwm_monthly(raw: Path) -> pd.Series:
-    etf = pd.read_csv(raw / "benchmark_etfs.csv")
+    etf = pd.read_csv(raw / "benchmark_etfs.csv").drop_duplicates()       # exact duplicate rows (decision 38)
     etf.columns = etf.columns.str.lower()
     iwm = etf[etf["permno"] == next(p for p, n in ETF_PERMNOS.items() if n == "iwm")]
     month = pd.to_datetime(iwm["dlycaldt"]).dt.to_period("M")
@@ -117,6 +156,28 @@ def tracking(port: pd.Series, bench: pd.Series) -> dict:
                                  "difference_pp": round(float((yp[y] - yb[y]) * 100), 2)} for y in yp.index}}
 
 
+def era_of(month: pd.Period) -> str:
+    """The membership era of a formation month."""
+    for name, lo, hi in ERAS:
+        if (lo is None or month >= lo) and (hi is None or month <= hi):
+            return name
+    return ERAS[-1][0]
+
+
+def tracking_by_era(port: pd.Series, bench: pd.Series) -> dict:
+    """tracking() per membership era of the formation month (the month before the holding month)."""
+    both = pd.concat([port.rename("p"), bench.rename("b")], axis=1).dropna()
+    era = pd.Series([era_of(h - 1) for h in both.index], index=both.index)
+    out = {}
+    for name, *_ in ERAS:
+        part = both[era == name]
+        if len(part) > 2:
+            t = tracking(part["p"], part["b"])
+            out[name] = {k: t[k] for k in ("months", "first", "last", "correlation", "tracking_error_annual",
+                                           "mean_annual_difference")}
+    return out
+
+
 def contributors(m: pd.DataFrame, year: int, n: int = 3) -> list[dict]:
     """Stocks that most separate the market-cap-weighted from the IWM-weighted portfolio in a year:
     sum over months of (cap weight - IWM weight) x return."""
@@ -134,7 +195,7 @@ def check_tracking(panel, rets, raw) -> tuple[list[Check], dict]:
     cap, iwmw = weighted(m, "mkt_cap_musd"), weighted(m, "index_weight")
     iwm, r2k = iwm_monthly(raw), r2000_monthly(raw)
     res = {"vs_iwm": tracking(cap, iwm), "vs_r2000_price_index": tracking(cap, r2k),
-           "iwm_weighted_vs_iwm": tracking(iwmw, iwm)}
+           "iwm_weighted_vs_iwm": tracking(iwmw, iwm), "vs_iwm_by_era": tracking_by_era(cap, iwm)}
     diff = (cap - iwm).dropna()
     snap = panel.groupby("date").agg(weight=("index_weight", "sum"), report=("snapshot_report_dt", "first"))
     snap["age"] = (snap.index - snap["report"]).dt.days
@@ -157,6 +218,11 @@ def check_tracking(panel, rets, raw) -> tuple[list[Check], dict]:
               check("index tracking: annualized tracking error vs IWM <= 2%", t["tracking_error_annual"] <= 0.02,
                     f"{t['tracking_error_annual']:.2%}; mean difference {t['mean_annual_difference']:+.2%} a year; "
                     f"{len(off)} years off by more than 2 pp", level=WARN)]
+    for name, e in res["vs_iwm_by_era"].items():
+        checks.append(check(f"index tracking: {name} era, correlation with IWM >= 0.99", e["correlation"] >= 0.99,
+                            f"{e['correlation']:.4f}, tracking error {e['tracking_error_annual']:.2%}, mean "
+                            f"difference {e['mean_annual_difference']:+.2%} a year ({e['first']} to {e['last']})",
+                            level=WARN))
     return checks, res
 
 
@@ -178,9 +244,12 @@ def check_factors(panel, rets, raw) -> tuple[list[Check], dict]:
         both = pd.concat([ls.rename("ls"), ff[fac]], axis=1).dropna()
         corr = float(both["ls"].corr(both[fac]))
         mean, sd = float(both["ls"].mean()), float(both["ls"].std())
+        era = pd.Series([era_of(h - 1) for h in both.index], index=both.index)
         res[name] = {"column": col, "fama_french": fac, "months": len(both), "correlation": round(corr, 3),
                      "mean_monthly": round(mean, 5), "t_stat": round(mean / (sd / np.sqrt(len(both))), 2),
-                     "fama_french_mean_monthly": round(float(both[fac].mean()), 5)}
+                     "fama_french_mean_monthly": round(float(both[fac].mean()), 5),
+                     "correlation_by_era": {e: round(float(g["ls"].corr(g[fac])), 3)
+                                            for e, g in both.groupby(era) if len(g) > 2}}
         if lo is not None:
             checks.append(check(f"factor sanity: {name} long-short vs {fac.upper()} correlation >= {lo}",
                                 corr >= lo, f"{corr:.3f}; long-short mean {mean:+.2%} a month, t = "
@@ -288,6 +357,171 @@ def check_recompute(paths: DataPaths, out: Path, final: Path) -> tuple[list[Chec
     return [check(f"independent recompute: {N_SAMPLE} random rows match within {REL_TOL:g} relative", not mismatches,
                   f"{ok} of {n} values match; {len(mismatches)} differ ({unexplained} unexplained)",
                   level=WARN)], res
+
+
+# ---------- Membership by source ----------
+
+def check_membership(final: Path) -> tuple[list[Check], dict]:
+    """Panel months and stocks by membership_source; each source only in its own months."""
+    p = pd.read_parquet(final / "factor_panel_monthly.parquet", columns=["date", "permno", "membership_source",
+                                                                         "mkt_cap_musd"])
+    month = p["date"].dt.to_period("M")
+    era = month.map(era_of)
+    per = p.groupby(["date", "membership_source"]).agg(n=("permno", "size"), cap=("mkt_cap_musd", "sum")).unstack(
+        fill_value=0)
+    n, cap = per["n"].reindex(columns=list(MEMBERSHIP_SOURCES), fill_value=0), per["cap"].reindex(
+        columns=list(MEMBERSHIP_SOURCES), fill_value=0)
+    total = n.sum(axis=1)
+    by_year = {}
+    for y, g in n.groupby(n.index.year):
+        c = cap.loc[g.index]
+        by_year[int(y)] = {"months": len(g), **{f"{s}_rows": int(g[s].sum()) for s in MEMBERSHIP_SOURCES},
+                           "stocks_min": int(total.loc[g.index].min()), "stocks_max": int(total.loc[g.index].max()),
+                           "fill_cap_pct": round(float(100 * c["client_fill"].sum() / c.sum(axis=1).sum()), 2)}
+    allowed = {"client lists": {"client_list"}, "IWM + client fill": {"iwm", "client_fill"}, "IWM": {"iwm"}}
+    wrong = int(sum((~p.loc[era == e, "membership_source"].isin(s)).sum() for e, s in allowed.items()))
+    lo, hi = SNAPSHOT_SIZE_RANGE
+    outside = total[(total < lo) | (total > hi)]
+    res = {"first_month": str(month.min()), "last_month": str(month.max()), "months": int(month.nunique()),
+           "rows_by_source": {k: int(v) for k, v in p["membership_source"].value_counts().items()},
+           "by_year": by_year}
+    checks = [check("membership by source: each source only in its own months", wrong == 0,
+                    f"{wrong} rows outside; client_list before {IWM_FIRST_MONTH}, client_fill to "
+                    f"{CLIENT_FILL_LAST_MONTH}, IWM after", level=WARN),
+              check(f"membership by source: {lo:,}-{hi:,} stocks every month", outside.empty,
+                    f"{int(total.min()):,} to {int(total.max()):,} over {len(total)} months"
+                    + (f"; outside: {len(outside)} months" if len(outside) else ""), level=WARN)]
+    return checks, res
+
+
+# ---------- Client lists vs IWM ----------
+
+def client_map(paths: DataPaths) -> pd.DataFrame | None:
+    f = paths.stage_dir("s00c_client_map") / "client_permno_map.parquet"
+    return pd.read_parquet(f, columns=["row", "year", "final_permno"]) if f.exists() else None
+
+
+def check_client_overlap(paths: DataPaths, final: Path) -> tuple[list[Check], dict]:
+    """Each 9/30 list against the IWM universe periods covering that 9/30 (with the client fill, 2008-2010)."""
+    cm = client_map(paths)
+    if cm is None:
+        return [check("client lists vs IWM: client map found", False, "no s00c output", level=WARN)], {}
+    per = pd.read_parquet(final / "universe_periods.parquet")
+    per = per[~per["excluded_non_member"]]
+    res = {}
+    for y in sorted(cm["year"].unique()):
+        d = pd.Timestamp(f"{y}-09-30")
+        cover = per[(per["index_effective"] <= d) & (per["index_through"] >= d)]
+        iwm = set(cover.loc[cover["membership_source"] == "iwm", "permno"])
+        if not iwm:
+            continue
+        fill = set(cover.loc[cover["membership_source"] == "client_fill", "permno"])
+        cl = set(cm.loc[(cm["year"] == y) & cm["final_permno"].notna(), "final_permno"].astype(int))
+        res[int(y)] = {"client": len(cl), "iwm": len(iwm), "both": len(cl & iwm),
+                       "client_in_iwm_pct": round(100 * len(cl & iwm) / len(cl), 2),
+                       "iwm_in_client_pct": round(100 * len(cl & iwm) / len(iwm), 2),
+                       "client_in_iwm_or_fill_pct": round(100 * len(cl & (iwm | fill)) / len(cl), 2)}
+    low = {y: v["client_in_iwm_or_fill_pct"] for y, v in res.items() if v["client_in_iwm_or_fill_pct"] < 99}
+    rng = [v["client_in_iwm_pct"] for v in res.values()]
+    return [check("client lists vs IWM: at least 99% of each 9/30 list in IWM (or the client fill)", not low,
+                  f"{len(res)} lists; client in IWM {min(rng):.1f}% to {max(rng):.1f}%"
+                  + (f"; below 99%: {low}" if low else ""), level=WARN)], res
+
+
+# ---------- WRDS vs Legacy ----------
+
+def read_legacy(path: Path) -> pd.DataFrame:
+    """The client file's Legacy values (FactSet, licensed) with the client map's row key; numbers as floats."""
+    raw = pd.read_csv(path, header=2, dtype=str, encoding="utf-8", keep_default_na=False, na_values=[""])
+    raw = raw.dropna(how="all")
+    out = pd.DataFrame({"row": (raw.index + 5).astype("int64")})
+    cols = {c.strip(): c for c in raw.columns}
+    for name in LEGACY_COMPARE:
+        if name in cols:
+            out[name] = pd.to_numeric(raw[cols[name]].str.replace(",", "", regex=False).str.strip(),
+                                      errors="coerce").to_numpy()
+    return out
+
+
+def next_year_returns(rets: pd.DataFrame, years: list[int]) -> pd.DataFrame:
+    """Each permno's compounded returns_monthly return October Y to September Y+1 (to its delisting)."""
+    r = rets.assign(m=rets["month_end"].dt.to_period("M"))
+    parts = []
+    for y in years:
+        w = r[(r["m"] >= pd.Period(f"{y}-10", "M")) & (r["m"] <= pd.Period(f"{y + 1}-09", "M"))]
+        g = (1 + w["ret_m"]).groupby(w["permno"]).prod(min_count=1) - 1
+        parts.append(pd.DataFrame({"year": y, "permno": g.index, "next_year_ret": g.to_numpy()}))
+    return pd.concat(parts, ignore_index=True)
+
+
+def compare_legacy(m: pd.DataFrame) -> dict:
+    """Per Legacy column: pairs, Spearman rank correlation, median difference, share within the tolerance."""
+    out = {}
+    for name, (col, mult, tol, kind) in LEGACY_COMPARE.items():
+        if name not in m or col not in m:
+            continue
+        x = m[[name, col]].dropna()
+        a, b = x[name], x[col] * mult
+        if len(x) < 10:
+            continue
+        diff = (b / a - 1) if kind == "relative" else (b - a)
+        ok = diff.abs() <= tol if kind == "absolute" else (diff.abs() <= tol) & (a > 0)
+        out[name] = {"wrds_column": col, "pairs": len(x), "spearman": round(float(a.corr(b, method="spearman")), 4),
+                     "median_difference": round(float(diff.median()), 4), "within_tolerance_pct": round(
+                         float(100 * ok.mean()), 1), "tolerance": f"{tol:g}{' relative' if kind == 'relative' else ''}"}
+    return out
+
+
+def check_legacy(paths: DataPaths, final: Path) -> tuple[list[Check], dict]:
+    cm, path = client_map(paths), paths.client / CLIENT_FILE
+    if cm is None or not path.exists():
+        return [check("WRDS vs Legacy: client file and map found", False, "missing", level=WARN)], {}
+    lo, hi = LEGACY_YEARS
+    leg = read_legacy(path).merge(cm, on="row")
+    leg = leg[leg["year"].between(lo, hi) & leg["final_permno"].notna()].assign(
+        permno=lambda d: d["final_permno"].astype("int32"))
+    cols = sorted({c for c, *_ in LEGACY_COMPARE.values()} - {"next_year_ret"})
+    panel = pd.read_parquet(final / "factor_panel_monthly.parquet", columns=["date", "permno", *cols])
+    panel = panel[(panel["date"].dt.month == 9) & panel["date"].dt.year.between(lo, hi)].assign(
+        year=lambda d: d["date"].dt.year)
+    rets = pd.read_parquet(final / "returns_monthly.parquet", columns=["month_end", "permno", "ret_m"])
+    m = leg.merge(panel, on=["year", "permno"], how="left", indicator=True)
+    m = m.merge(next_year_returns(rets, list(range(lo, hi + 1))), on=["year", "permno"], how="left")
+    in_panel = m["_merge"].eq("both")
+    res = {"years": f"{lo}-{hi}", "legacy_rows_with_permno": len(m), "in_panel_pct": round(100 * in_panel.mean(), 2),
+           "overall": compare_legacy(m[in_panel]),
+           "by_year": {int(y): {"rows": len(g), "in_panel_pct": round(100 * g["_merge"].eq("both").mean(), 2),
+                                **{k: v["spearman"] for k, v in compare_legacy(g[g["_merge"].eq("both")]).items()}}
+                       for y, g in m.groupby("year")}}
+    checks = [check("WRDS vs Legacy: at least 98% of the Legacy stocks in the panel at the September month end",
+                    res["in_panel_pct"] >= 98, f"{res['in_panel_pct']:.2f}% of {len(m):,} stock-years", level=WARN)]
+    for name, lo_rho in LEGACY_MIN_SPEARMAN.items():
+        v = res["overall"].get(name)
+        if v:
+            checks.append(check(f"WRDS vs Legacy: {name} rank correlation >= {lo_rho}", v["spearman"] >= lo_rho,
+                                f"{v['spearman']:.4f}; {v['within_tolerance_pct']:.1f}% within {v['tolerance']} "
+                                f"({v['pairs']:,} pairs)", level=WARN))
+    return checks, res
+
+
+# ---------- GICS ----------
+
+def check_gics(final: Path) -> tuple[list[Check], dict]:
+    levels = ("gsector", "ggroup", "gind", "gsubind")
+    p = pd.read_parquet(final / "factor_panel_monthly.parquet",
+                        columns=["date", *levels, *(f"{c}_name" for c in levels), "gics_source", "gics_from_sic"])
+    year = p["date"].dt.year
+    by_year = {int(y): {"rows": len(g), **{f"{c}_pct": round(float(100 * g[c].notna().mean()), 2) for c in levels},
+                        "gics_from_sic_pct": round(float(100 * g["gics_from_sic"].mean()), 2)}
+               for y, g in p.groupby(year)}
+    unnamed = {c: int((p[c].notna() & p[f"{c}_name"].isna()).sum()) for c in levels}
+    bad_source = int((p["gsector"].notna() & p["gics_source"].ne(GICS_SOURCE)).sum())
+    res = {"by_year": by_year, "unnamed_rows": unnamed, "distinct_codes": {c: int(p[c].nunique()) for c in levels}}
+    return [check("GICS: every code of the four levels has a name", not any(unnamed.values()),
+                  ", ".join(f"{k} {v}" for k, v in unnamed.items()), level=WARN),
+            check(f"GICS: gics_source = {GICS_SOURCE} wherever there is GICS", bad_source == 0,
+                  f"{bad_source} rows differ; sector coverage {min(v['gsector_pct'] for v in by_year.values()):.1f}% "
+                  f"to {max(v['gsector_pct'] for v in by_year.values()):.1f}% a year", level=WARN)], res
 
 
 # ---------- Reproducibility ----------
@@ -426,7 +660,9 @@ def _pct(v, signed=False):
 
 SECTIONS = (("1. Index tracking", "index tracking"), ("2. Factor sanity", "factor sanity"),
             ("3. Old vs new backtest", "old vs new"), ("4. Independent recompute", "independent"),
-            ("5. Reproducibility", "reproducibility"), ("6. App memory", "app memory"), ("7. Upload dry run", "upload"))
+            ("5. Reproducibility", "reproducibility"), ("6. App memory", "app memory"), ("7. Upload dry run", "upload"),
+            ("8. Membership by source", "membership by source"), ("9. Client lists vs IWM", "client lists vs IWM"),
+            ("10. WRDS vs Legacy", "WRDS vs Legacy"), ("11. GICS", "GICS"))
 
 
 def summary_rows(checks: list[Check]) -> list[str]:
@@ -482,6 +718,13 @@ def render(r: dict, checks: list[Check], manifest: dict) -> str:
                       f"reconstitution, and {e['other_months_pp']:+.2f} pp in the other months. The panel covers "
                       f"{e['iwm_weight_covered_pct']:.1f}% of IWM's weight on average. Largest weighting effects: "
                       f"{top}.")
+    if t.get("vs_iwm_by_era"):
+        md += ["", "By membership era (the formation month's source):", "",
+               "| era | months | correlation | tracking error a year | mean difference a year |",
+               "|---|---|---|---|---|"]
+        md += [f"| {k} ({e['first']} to {e['last']}) | {e['months']} | {e['correlation']:.4f} | "
+               f"{_pct(e['tracking_error_annual'])} | {_pct(e['mean_annual_difference'], True)} |"
+               for k, e in t["vs_iwm_by_era"].items()]
     md += ["", verdict_line(checks, "index tracking"), ""]
     md += ["## 2. Factor sanity against Fama-French", "",
            "Each month t: within the panel, value-weighted (mkt_cap_musd) top 30% minus bottom 30% by the factor, "
@@ -492,6 +735,11 @@ def render(r: dict, checks: list[Check], manifest: dict) -> str:
     for name, f in r["factors"].items():
         md.append(f"| {name} | {f['fama_french'].upper()} | {f['correlation']:.3f} | {_pct(f['mean_monthly'], True)} "
                   f"| {f['t_stat']:.2f} | {_pct(f['fama_french_mean_monthly'], True)} |")
+    eras = [name for name, *_ in ERAS]
+    md += ["", "Correlation by membership era: ", "", "| factor | " + " | ".join(eras) + " |",
+           "|---|" + "---|" * len(eras)]
+    md += [f"| {name} | " + " | ".join(f"{f['correlation_by_era'].get(e, float('nan')):.3f}" for e in eras) + " |"
+           for name, f in r["factors"].items()]
     md += ["", "RMW sorts on operating profitability over book equity; gross profit over assets is a different "
            "measure, so ROE is shown next to it for reference.", "", verdict_line(checks, "factor sanity"), ""]
     bt = r.get("backtest", {})
@@ -551,7 +799,58 @@ def render(r: dict, checks: list[Check], manifest: dict) -> str:
            f"(the Parquet files and the daily manifest, last), all under "
            f"`{up['prefix']}`" + (f" except {up['outside_prefix']}" if up["outside_prefix"] else "") + ".", "",
            verdict_line(checks, "upload"), ""]
+    md += render_v2_sections(r, checks)
     return "\n".join(md)
+
+
+def render_v2_sections(r: dict, checks: list[Check]) -> list[str]:
+    """Sections 8-11 (data version 2): membership by source, client lists vs IWM, WRDS vs Legacy, GICS."""
+    ms = r.get("membership", {})
+    md = ["## 8. Membership by source", ""]
+    if ms:
+        md += [f"Panel months {ms['first_month']} to {ms['last_month']} ({ms['months']}). Rows by source: "
+               + ", ".join(f"{k} {v:,}" for k, v in ms["rows_by_source"].items()) + ".", "",
+               "| year | months | client_list | iwm | client_fill | stocks a month | fill share of cap |",
+               "|---|---|---|---|---|---|---|"]
+        md += [f"| {y} | {v['months']} | {v['client_list_rows']:,} | {v['iwm_rows']:,} | {v['client_fill_rows']:,} | "
+               f"{v['stocks_min']:,}-{v['stocks_max']:,} | {v['fill_cap_pct']:.2f}% |"
+               for y, v in ms["by_year"].items()]
+    md += ["", verdict_line(checks, "membership by source"), "", "## 9. Client lists vs IWM", ""]
+    co = r.get("client_overlap", {})
+    if co:
+        md += ["Each 9/30 client list against the IWM universe periods covering that 9/30 (2008-2010 also with the "
+               "client fill).", "", "| year | client | IWM | both | client in IWM | IWM in client | client in IWM or "
+               "fill |", "|---|---|---|---|---|---|---|"]
+        md += [f"| {y} | {v['client']:,} | {v['iwm']:,} | {v['both']:,} | {v['client_in_iwm_pct']:.2f}% | "
+               f"{v['iwm_in_client_pct']:.2f}% | {v['client_in_iwm_or_fill_pct']:.2f}% |" for y, v in co.items()]
+    md += ["", verdict_line(checks, "client lists vs IWM"), "", "## 10. WRDS vs Legacy", ""]
+    lg = r.get("legacy", {})
+    if lg:
+        md += [f"The app's Legacy data (the client's FactSet values on each 9/30, {lg['years']}) against this panel at "
+               f"the September month end, matched by permno: {lg['legacy_rows_with_permno']:,} stock-years, "
+               f"{lg['in_panel_pct']:.2f}% in the panel. Definitions differ (FactSet's dates and formulas), so the "
+               "rank correlation is the main measure.", "",
+               "| Legacy | WRDS | pairs | rank correlation | median difference | within tolerance |",
+               "|---|---|---|---|---|---|"]
+        md += [f"| {k} | {v['wrds_column']} | {v['pairs']:,} | {v['spearman']:.4f} | {v['median_difference']:+.4f} | "
+               f"{v['within_tolerance_pct']:.1f}% ({v['tolerance']}) |" for k, v in lg["overall"].items()]
+        names = list(lg["overall"])
+        md += ["", "Rank correlation by year:", "", "| year | rows | in panel | " + " | ".join(names) + " |",
+               "|---|---|---|" + "---|" * len(names)]
+        md += [f"| {y} | {v['rows']:,} | {v['in_panel_pct']:.1f}% | "
+               + " | ".join(f"{v.get(n, float('nan')):.3f}" for n in names) + " |" for y, v in lg["by_year"].items()]
+    md += ["", verdict_line(checks, "WRDS vs Legacy"), "", "## 11. GICS", ""]
+    g = r.get("gics", {})
+    if g:
+        md += ["GICS is each company's current (or last) Compustat classification applied to all history "
+               "(gics_source = current_header); there is no historical GICS. Share of panel rows with a code:", "",
+               "| year | sector | industry group | industry | sub-industry | SIC fallback |",
+               "|---|---|---|---|---|---|"]
+        md += [f"| {y} | {v['gsector_pct']:.1f}% | {v['ggroup_pct']:.1f}% | {v['gind_pct']:.1f}% | "
+               f"{v['gsubind_pct']:.1f}% | {v['gics_from_sic_pct']:.1f}% |" for y, v in g["by_year"].items()]
+        md += ["", "Distinct codes: " + ", ".join(f"{k} {v}" for k, v in g["distinct_codes"].items()) + "."]
+    md += ["", verdict_line(checks, "GICS"), ""]
+    return md
 
 
 # ---------- Stage ----------
@@ -572,6 +871,10 @@ def run(paths: DataPaths) -> dict:
                     ("recompute", lambda: check_recompute(paths, out, final)),
                     ("memory", lambda: check_memory(final)),
                     ("upload", lambda: check_upload(final, out, manifest)),
+                    ("membership", lambda: check_membership(final)),
+                    ("client_overlap", lambda: check_client_overlap(paths, final)),
+                    ("legacy", lambda: check_legacy(paths, final)),
+                    ("gics", lambda: check_gics(final)),
                     ("reproducibility", lambda: check_reproducible(paths, out))):
         t0 = time.time()
         c, r[key] = fn()

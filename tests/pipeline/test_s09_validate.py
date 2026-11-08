@@ -131,3 +131,41 @@ def test_independent_recompute_script_on_tiny_raw_files(tmp_path):
     code = (ROOT / "scripts" / "wrds_independent_recompute.py").read_text(encoding="utf-8")
     imports = [line for line in code.splitlines() if line.startswith(("import ", "from "))]
     assert imports and not any("pipeline" in line for line in imports)
+
+
+def test_membership_eras_and_tracking_by_era():
+    assert s09.era_of(pd.Period("2007-12", "M")) == "client lists"
+    assert s09.era_of(pd.Period("2008-02", "M")) == "IWM + client fill"
+    assert s09.era_of(pd.Period("2010-06", "M")) == "IWM"
+    idx = pd.period_range("2007-06", "2010-12", freq="M")
+    bench = pd.Series(np.sin(np.arange(len(idx))) / 50, index=idx)
+    t = s09.tracking_by_era(bench, bench)
+    assert set(t) == {"client lists", "IWM + client fill", "IWM"}
+    assert t["client lists"]["last"] == "2008-02"               # held in 2008-02, formed at the 2008-01 month end
+    assert t["IWM"]["correlation"] == pytest.approx(1.0)
+
+
+def test_legacy_comparison_and_next_year_return():
+    rets = rets_frame([(pd.Timestamp(f"{y}-{m:02d}-28"), 1, 0.01) for y, m in
+                       [(2002, 9)] + [(2002, k) for k in (10, 11, 12)] + [(2003, k) for k in range(1, 10)]])
+    nyr = s09.next_year_returns(rets, [2002])
+    assert nyr["next_year_ret"].item() == pytest.approx(1.01 ** 12 - 1)          # October to September only
+    m = pd.DataFrame({"Ending Price": np.arange(1.0, 21.0), "prc": np.arange(1.0, 21.0) * 1.005,
+                      "12-Mo Momentum %": np.arange(20.0), "mom_12m": np.arange(20.0)[::-1] / 100})
+    out = s09.compare_legacy(m)
+    assert out["Ending Price"]["spearman"] == pytest.approx(1.0)
+    assert out["Ending Price"]["within_tolerance_pct"] == 100.0                   # 0.5% apart, tolerance 1%
+    assert out["12-Mo Momentum %"]["spearman"] == pytest.approx(-1.0)
+
+
+def test_membership_and_client_overlap_checks(tmp_path):
+    final = tmp_path / "final"
+    final.mkdir()
+    rows = [(pd.Timestamp("2007-09-28"), p, "client_list", 1.0) for p in (1, 2)]
+    rows += [(pd.Timestamp("2009-09-30"), p, s, 1.0) for p, s in ((1, "iwm"), (2, "client_fill"))]
+    rows += [(pd.Timestamp("2011-09-30"), 1, "client_fill", 1.0)]                       # fill after 2010-05: wrong
+    pd.DataFrame(rows, columns=["date", "permno", "membership_source", "mkt_cap_musd"]).to_parquet(
+        final / "factor_panel_monthly.parquet")
+    checks, res = s09.check_membership(final)
+    assert checks[0].status == "WARN" and "1 rows outside" in checks[0].detail
+    assert res["by_year"][2009]["fill_cap_pct"] == 50.0
