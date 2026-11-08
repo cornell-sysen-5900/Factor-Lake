@@ -116,8 +116,12 @@ FILES["factor_panel_monthly.parquet"] = {
         "gics_from_sic": ("sector_name comes from the SIC fallback", FLAG, DERIVED),
         "siccd": ("CRSP SIC code at t (last non-zero)", CODE, CIZ),
         "index_weight": ("weight in the IWM fund on the snapshot report date; for client_list and client_fill rows "
-                         "the stock's Russell 2000 weight on the list's 9/30", "percent of the fund (or index)",
-                         f"{IWM}; {CLIENT}", "s01_membership"),
+                         "the stock's Russell 2000 weight on the list's 9/30, held unchanged for the whole year (see "
+                         "index_weight_source). Do not weight portfolios with it before 2008-02: use mkt_cap_musd",
+                         "percent of the fund (or index)", f"{IWM}; {CLIENT}", "s01_membership"),
+        "index_weight_source": ("iwm = IWM's own weight that month; client_list_static_930 = the client list's 9/30 "
+                                "weight held for the year (client_list and client_fill rows), not a monthly weight",
+                                TEXT, DERIVED, "s07_panel"),
         "membership_source": ("where membership at t comes from: client_list (the client's 9/30 lists, before "
                               "2008-02), iwm (IWM holdings), client_fill (a list member the old IWM fund id hides, "
                               "2008-02 to 2010-05)", TEXT, DERIVED, "s01_membership"),

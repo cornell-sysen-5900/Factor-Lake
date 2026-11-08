@@ -29,6 +29,8 @@ def test_universe_uses_the_latest_snapshot_whose_every_line_is_effective():
     src = snaps.assign(membership_source=["client_list", "client_list", "iwm", "iwm"])
     u = s07.build_universe(dates, src).set_index(["date", "permno"])
     assert u.loc[(T[0], 1), "membership_source"] == "client_list" and u.loc[(T[2], 1), "membership_source"] == "iwm"
+    assert u.loc[(T[0], 1), "index_weight_source"] == "client_list_static_930"
+    assert u.loc[(T[2], 1), "index_weight_source"] == "iwm"
 
 
 def quarter(permno, end, report, **vals):

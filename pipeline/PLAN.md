@@ -591,6 +591,9 @@ The monthly returns table is s02's monthly.parquet; s08 exports it as returns_mo
    last month with prices. With data version 2 the first snapshot is the 2002-07 client list, so the panel starts
    at the 2002-07 month end (decision 35); the earlier prices only feed the momentum, volatility and beta windows.
    membership_source and index_weight come from the snapshot in use (client rows carry the list's 9/30 weight).
+   index_weight_source says which: `iwm` (IWM's weight that month) or `client_list_static_930` (the list's 9/30
+   weight held for the whole year, on client_list and client_fill rows). Those static weights must not be used to
+   weight portfolios before 2008-02; backtests weight by market cap (mkt_cap_musd).
 2. **Universe at t:** the latest s01 snapshot whose every line has eff_dt <= t, lines with in_universe = True
    (decision 11). In the known missing months the previous snapshot is used. new_entrant = not in the universe at
    the previous t.
@@ -840,6 +843,7 @@ VALIDATION.md next to the data.
 - GICS is the current classification applied to all history (decisions 4 and 39); no historical GICS is
   available.
 - Before 2008-02 membership comes from the client's 9/30 lists only: no IPO additions between lists, and the list's
-  9/30 weight is used all year.
+  9/30 weight is held all year (index_weight_source = client_list_static_930), so index_weight must not be used for
+  weighting before 2008-02; backtests use market cap.
 - The app still reads the older S3 files; switching it to wrds_YYYY_MM (with `SECTOR_OPTIONS` as GICS names and the
   daily reader on `prices_daily/` and `mkt_cap_musd`) is a separate story.

@@ -102,8 +102,10 @@ def build_universe(dates: pd.Series, snaps: pd.DataFrame) -> pd.DataFrame:
     u["new_entrant"] = u["was_in"].isna() & (u["date"] > dates.min())
     if "membership_source" not in u.columns:
         u["membership_source"] = "iwm"
-    return u[["date", "permno", "snapshot_report_dt", "snapshot_eff_dt", "index_weight", "ticker_snapshot",
-              "security_name", "new_entrant", "membership_source"]]
+    # client rows carry their list's 9/30 weight, held all year: not a weight to build portfolios with
+    u["index_weight_source"] = np.where(u["membership_source"].eq("iwm"), "iwm", INDEX_WEIGHT_STATIC)
+    return u[["date", "permno", "snapshot_report_dt", "snapshot_eff_dt", "index_weight", "index_weight_source",
+              "ticker_snapshot", "security_name", "new_entrant", "membership_source"]]
 
 
 # ---------- Market data, betas ----------
@@ -574,10 +576,11 @@ def run_checks(panel: pd.DataFrame, rv: pd.DataFrame, snaps: pd.DataFrame,
 
 # ---------- Stage ----------
 
+INDEX_WEIGHT_STATIC = "client_list_static_930"     # index_weight_source of client_list and client_fill rows
 GICS_COLS = ("gsector", "gsector_name", "ggroup", "ggroup_name", "gind", "gind_name", "gsubind", "gsubind_name",
              "gics_source")
 PANEL_COLS = ("date", "permno", "permco", "gvkey", "ticker", "security_name", *GICS_COLS, "sector_name",
-              "gics_from_sic", "siccd", "index_weight", "membership_source",
+              "gics_from_sic", "siccd", "index_weight", "index_weight_source", "membership_source",
               "snapshot_report_dt", "snapshot_eff_dt", "new_entrant", "price_date", "prc", "shrout", "mkt_cap_musd",
               "company_mkt_cap_musd", "company_mkt_cap_crsp_musd", "company_cap_from_compustat", "is_adr",
               "n_share_classes",
