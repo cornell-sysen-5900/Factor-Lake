@@ -283,8 +283,9 @@ months (not one years away), a stray line and no fix; reruns give identical file
 ## s02_prices
 
 **Inputs:** `raw/r2000_price_crsp_ciz.csv` (columns permno, permco, dlycaldt, ticker, siccd, dlydelflg,
-securitynm, dlyprc, dlyret, dlyvol, shrout, dlyopen, dlyhigh, dlylow, dlycumfacpr, dlycumfacshr),
-`raw/delistings.csv`.
+securitynm, dlyprc, dlyret, dlyvol, shrout, dlyopen, dlyhigh, dlylow, dlycumfacpr, dlycumfacshr, and primaryexch
+when the file has it), `raw/delistings.csv`. primaryexch (N, Q, A, ...) is kept in the daily files for a future
+Nasdaq volume adjustment (decision 37); s08 does not export it.
 
 **Outputs** (`processed/s02_prices/`):
 
