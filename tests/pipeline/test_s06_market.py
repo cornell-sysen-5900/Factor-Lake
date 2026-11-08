@@ -18,6 +18,7 @@ def write_inputs(tmp_path):
     pd.DataFrame(rows, columns=["tic", "datadate", "gvkeyx", "prccd"]).to_csv(raw / "index_close.csv", index=False)
     crsp_days = days[~days.isin(pd.to_datetime(["2012-10-29", "2012-10-30"]))]
     etf = [(p, d.date(), 0.001) for d in crsp_days for p in (88222, 88399, 88401)]
+    etf.append(etf[0])                                                   # an exact duplicate row: dropped
     pd.DataFrame(etf, columns=["PERMNO", "DlyCalDt", "DlyRet"]).to_csv(raw / "benchmark_etfs.csv", index=False)
     ff = pd.DataFrame({"date": crsp_days, **{c: 0.0005 for c in s06.FF_COLS}})
     ff["rf"] = 0.0001
@@ -61,6 +62,17 @@ def test_market_daily_and_monthly(tmp_path):
     assert nov.r2000_price_ret == pytest.approx(1.001 ** n_lvl - 1)
     assert nov.moodys_baa == pytest.approx(0.046) and nov.rf == pytest.approx(1.0001 ** n_nov - 1)
     status = {c["name"]: c["status"] for c in summary["checks"]}
-    assert status["ust_10y within 0.0%-6%"] == "PASS"
+    assert status["ust_10y within 0.0%-8%"] == "PASS"
+    assert status["ETF rows: exact duplicates dropped, none conflicting"] == "PASS"
+    assert summary["etf_duplicate_rows_dropped"] == 1
+    assert status["ETF returns start by their first month (IWM 2000-05, IWN and IWO 2000-07)"] == "WARN"   # 2012
+
     assert status["published monthly mktrf and rf within 50 bp of compounded daily"] == "PASS"
     assert status["monthly table has every month"] == "PASS"
+
+
+def test_conflicting_etf_rows_are_counted(tmp_path):
+    pd.DataFrame({"PERMNO": [88222, 88222, 88222], "DlyCalDt": ["2012-10-01"] * 3, "DlyRet": [0.01, 0.01, 0.02]}
+                 ).to_csv(tmp_path / "etf.csv", index=False)
+    etf, dups, conflicts = s06.read_etfs(tmp_path / "etf.csv")
+    assert (len(etf), dups, conflicts) == (2, 1, 1)

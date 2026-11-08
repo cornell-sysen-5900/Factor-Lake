@@ -152,6 +152,7 @@ IBES_FPI = {"0": "long-term growth", "1": "FY1", "2": "FY2", "3": "FY3"}     # F
 FRED_SERIES = {"DGS10": "ust_10y", "DGS3MO": "tbill_3m", "DBAA": "moodys_baa", "DAAA": "moodys_aaa"}
 INDEX_TICS = {"I0124": "r2000", "I0120": "r2000_growth", "I0122": "r2000_value"}
 ETF_PERMNOS = {88222: "iwm", 88399: "iwn", 88401: "iwo"}
+ETF_FIRST_BY = {"iwm": "2000-05-31", "iwn": "2000-07-31", "iwo": "2000-07-31"}     # IWM listed 2000-05, IWN/IWO 2000-07
 
 # Every column a stage reads is required (s00 FAILs when one is missing). Other columns in the files are allowed
 # and ignored (decision 37); `optional` ones are kept when present.
@@ -538,7 +539,8 @@ CLOSED_MARKET_DAYS = ("2012-10-29", "2012-10-30")
 
 # s06 checks: sensible yield ranges (decimals), IWM total minus Russell 2000 price return per year (dividends minus
 # fees), and how far a published monthly Fama-French factor may be from its compounded daily values
-YIELD_RANGES = {"ust_10y": (0.0, 0.06), "tbill_3m": (-0.005, 0.07), "moodys_baa": (0.02, 0.10),
+# (ust_10y up to 8%: 1997-2000 had 10-year yields near 7%)
+YIELD_RANGES = {"ust_10y": (0.0, 0.08), "tbill_3m": (-0.005, 0.07), "moodys_baa": (0.02, 0.10),
                 "moodys_aaa": (0.01, 0.09)}
 IWM_MINUS_INDEX_RANGE = (0.005, 0.02)
 FF_MONTHLY_TOLERANCE = 0.005

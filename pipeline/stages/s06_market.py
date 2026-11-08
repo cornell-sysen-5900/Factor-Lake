@@ -27,6 +27,7 @@ import pandas as pd
 from pipeline.checks import PASS, WARN, Check, check
 from pipeline.config import (
     CLOSED_MARKET_DAYS,
+    ETF_FIRST_BY,
     ETF_PERMNOS,
     FF_MONTHLY_TOLERANCE,
     FRED_SERIES,
@@ -63,9 +64,20 @@ def index_levels(path) -> pd.DataFrame:
     return lvl[list(INDEX_TICS.values())]
 
 
-def etf_returns(path) -> pd.DataFrame:
-    etf = _lower(pd.read_csv(path))
+def read_etfs(path) -> tuple[pd.DataFrame, int, int]:
+    """The ETF file without exact duplicate rows (decision 38). Returns the rows, the duplicates dropped, and the
+    (permno, date) keys whose rows still differ (real conflicts)."""
+    etf = _lower(pd.read_csv(path, dtype={"ticker": str}, keep_default_na=False, na_values=[""]))
+    n = len(etf)
+    etf = etf.drop_duplicates().reset_index(drop=True)
+    conflicts = int(etf.duplicated(["permno", "dlycaldt"]).sum())
     etf["dlycaldt"] = pd.to_datetime(etf["dlycaldt"])
+    return etf, n - len(etf), conflicts
+
+
+def etf_returns(path) -> pd.DataFrame:
+    etf = read_etfs(path)[0] if not isinstance(path, pd.DataFrame) else path
+    etf = etf.drop_duplicates(["permno", "dlycaldt"])
     r = etf.pivot(index="dlycaldt", columns="permno", values="dlyret").rename(
         columns={p: f"{n}_total_ret" for p, n in ETF_PERMNOS.items()})
     r.index.name = "date"
@@ -127,8 +139,11 @@ def build_monthly(lvl, etf, ff_m, daily, calendar) -> pd.DataFrame:
     return out[list(MONTHLY_COLS)]
 
 
-def run_checks(daily, monthly, ff_d) -> list[Check]:
-    checks = [check("market-closed days dropped from the index returns",
+def run_checks(daily, monthly, ff_d, etf_dups=(0, 0)) -> list[Check]:
+    n_dups, n_conflicts = etf_dups
+    checks = [check("ETF rows: exact duplicates dropped, none conflicting", n_conflicts == 0,
+                    f"{n_dups} exact duplicate rows dropped, {n_conflicts} permno-dates differ"),
+              check("market-closed days dropped from the index returns",
                     not daily["date"].isin(pd.to_datetime(list(CLOSED_MARKET_DAYS))).any()
                     or daily.loc[daily["date"].isin(pd.to_datetime(list(CLOSED_MARKET_DAYS))),
                                  list(INDEX_COLS)].isna().all().all())]
@@ -162,6 +177,13 @@ def run_checks(daily, monthly, ff_d) -> list[Check]:
     run = daily["was_filled"].astype(int).groupby((~daily["was_filled"]).cumsum()).sum().max()
     checks.append(check(f"no yield filled for more than {MAX_FILLED_RUN_DAYS} days in a row",
                         int(run) <= MAX_FILLED_RUN_DAYS, f"longest run {int(run)} days", level=WARN))
+    late = {}
+    for name, by in ETF_FIRST_BY.items():
+        first = daily.loc[daily[f"{name}_total_ret"].notna(), "date"].min()
+        if pd.isna(first) or first > pd.Timestamp(by):
+            late[name] = str(first.date()) if pd.notna(first) else "none"
+    checks.append(check("ETF returns start by their first month (IWM 2000-05, IWN and IWO 2000-07)", not late,
+                        ", ".join(f"{k} starts {v}" for k, v in late.items()) or "all on time", level=WARN))
     months = pd.PeriodIndex(monthly["month"], freq="M")
     checks.append(check("monthly table has every month", len(months) == (months.max() - months.min()).n + 1,
                         f"{months.min()} to {months.max()}"))
@@ -171,19 +193,22 @@ def run_checks(daily, monthly, ff_d) -> list[Check]:
 def run(paths: DataPaths) -> dict:
     out = fresh_stage_dir(paths, STAGE)
     lvl = index_levels(paths.raw / "index_close.csv")
-    etf = etf_returns(paths.raw / "benchmark_etfs.csv")
+    etf_rows, n_dups, n_conflicts = read_etfs(paths.raw / "benchmark_etfs.csv")
+    etf = etf_returns(etf_rows)
     ff_d, ff_m = fama_french(paths.raw / "ff_daily.csv", paths.raw / "ff_monthly.csv")
     yields = fred_yields(paths)
     calendar = pd.read_parquet(paths.stage_dir("s02_prices") / "calendar.parquet")
     daily = build_daily(lvl, etf, ff_d, yields)
     monthly = build_monthly(lvl, etf, ff_m, daily, calendar)
-    checks = run_checks(daily, monthly, ff_d)
+    checks = run_checks(daily, monthly, ff_d, (n_dups, n_conflicts))
     write_parquet(daily, out / "market_daily.parquet")
     write_parquet(monthly, out / "market_monthly.parquet")
 
     ends = {c: str(daily.loc[daily[c].notna(), "date"].max().date()) for c in (*RETURN_COLS, *YIELD_COLS)}
     stat_cols = [*RETURN_COLS, *YIELD_COLS, *SPREADS]
-    extra = {"source_ends": ends, "filled_days": int(daily["was_filled"].sum()),
+    starts = {c: str(daily.loc[daily[c].notna(), "date"].min().date()) for c in (*RETURN_COLS, *YIELD_COLS)}
+    extra = {"source_starts": starts, "source_ends": ends, "etf_duplicate_rows_dropped": n_dups,
+             "filled_days": int(daily["was_filled"].sum()),
              "coverage_daily": {c: round(float(daily[c].notna().mean()), 4) for c in stat_cols},
              "coverage_monthly": {c: round(float(monthly[c].notna().mean()), 4) for c in stat_cols}}
     tables = {"market_daily.parquet": table_info(daily, "date", stat_cols),

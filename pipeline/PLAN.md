@@ -543,7 +543,9 @@ revenue and spares losses and pre-revenue companies.
 1. Index levels (Compustat I0124 Russell 2000, I0120 Growth, I0122 Value): market-closed days without CRSP rows
    (`config.CLOSED_MARKET_DAYS`, e.g. Hurricane Sandy) are dropped, so the next return spans them. Price return
    from consecutive levels; monthly = the level on the last day <= month_end vs the previous month's.
-2. ETFs (CRSP IWM, IWN, IWO): daily total returns as CRSP gives them; monthly = compounded.
+2. ETFs (CRSP IWM, IWN, IWO): exact duplicate rows are dropped first (decision 38; rows that share permno and
+   date but differ are counted and FAIL); daily total returns as CRSP gives them; monthly = compounded. IWM starts
+   2000-05, IWN and IWO 2000-07 (`config.ETF_FIRST_BY`); before that their columns are empty.
 3. Fama-French: daily as given (decimals); monthly = the published monthly factors, matched by the month of dateff.
 4. FRED: percent / 100. Blank days (bond-market holidays when stocks trade) are forward-filled, and `was_filled` =
    True on those days. term_spread = ust_10y - tbill_3m, credit_spread = moodys_baa - moodys_aaa. Monthly = the
@@ -551,8 +553,10 @@ revenue and spares losses and pre-revenue companies.
 5. The first month (no previous index level) is dropped. Each monthly row is that month's return; the panel's
    ret_next_1m at month t lines up with month t+1.
 
-**Checks:** market-closed days have no index return (FAIL); yields in range: ust_10y 0-6%, tbill_3m -0.5-7%,
-moodys_baa 2-10%, moodys_aaa 1-9% (FAIL); Fama-French daily rf mean below 0.001 (FAIL: units); IWM total minus
+**Checks:** market-closed days have no index return (FAIL); yields in range: ust_10y 0-8%, tbill_3m -0.5-7%,
+moodys_baa 2-10%, moodys_aaa 1-9% (FAIL; ust_10y up to 8%
+since data version 2, because 1997-2000 yields were near 7%); ETF exact duplicates dropped and none conflicting (FAIL);
+each ETF starting by its first month (WARN); Fama-French daily rf mean below 0.001 (FAIL: units); IWM total minus
 Russell 2000 price return 0.5-2.0% a year (WARN); published monthly mktrf and rf within 50 bp of the compounded
 daily factors (FAIL; decision 23); the same comparison for smb, hml, rmw, cma, umd reported as information (the
 daily long-short portfolios are formed differently from the monthly ones); no yield filled for more than 5 days in
