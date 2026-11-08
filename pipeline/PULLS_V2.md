@@ -3,8 +3,10 @@
 How every raw file in `raw_v2/` was pulled (2026-11-07), so the pulls can be rerun or extended. Each WRDS query
 is saved in the Query Manager:
 `https://wrds-www-wharton-upenn-edu.proxy.library.cornell.edu/query-manager/query/<ID>/` (Cornell proxy; log in
-first). The only numbers here are row counts, to check a rerun against. Data version 1 (wrds_2026_10) is in the
-refresh checklist of [README.md](README.md); the decisions behind these dates are 33-41 in [PLAN.md](PLAN.md).
+first). The only numbers here are row counts, to check a rerun against. The decisions behind these dates are 33-41
+in [PLAN.md](PLAN.md); data version 1 (wrds_2026_10) used the same products with shorter date ranges (its query list
+is in `pipeline/README.md` at the tag `data-wrds_2026_10`). The exact columns the pipeline expects are `RAW_FILES` in
+`pipeline/config.py`: s00_inventory FAILs on a missing column, so a changed query shows up before any cleaning runs.
 
 ## Upload lists
 
@@ -33,7 +35,7 @@ permno_list_v2.
 | ff_monthly.csv | [11882700](https://wrds-www-wharton-upenn-edu.proxy.library.cornell.edu/query-manager/query/11882700/) | ff_all | 357 |
 | crsp_names_history.csv | [11882425](https://wrds-www-wharton-upenn-edu.proxy.library.cornell.edu/query-manager/query/11882425/) | crsp_a_stock | 191,048 |
 | fred_DGS10.csv, fred_DGS3MO.csv, fred_DBAA.csv, fred_DAAA.csv | FRED, not WRDS | - | 7,786 each |
-| iwm_holdings_raw.csv | not re-pulled (the 2026-10 pull) | crsp_q_mutualfunds | 432,497 |
+| iwm_holdings_raw.csv | not re-pulled (the 2026-10 pull; see 12) | crsp_q_mutualfunds | 432,497 |
 
 ### 1. r2000_price_crsp_ciz.csv (11882814)
 
@@ -128,11 +130,15 @@ permno_list_v2.
 `https://fred.stlouisfed.org/graph/fredgraph.csv?id=<SERIES>&cosd=1997-01-01` for DGS10, DGS3MO, DBAA and DAAA,
 saved as `fred_<SERIES>.csv` (columns observation_date and the series, in percent).
 
-### IWM holdings (not re-pulled)
+### 12. iwm_holdings_raw.csv (not re-pulled for version 2)
 
-`iwm_holdings_raw.csv` is the 2026-10 pull (CRSP > Mutual Funds > Portfolio Holdings, crsp_q_mutualfunds,
-crsp_portno 1004185 and 1025818, report dates 2008-02 on). Membership before 2008-02 comes from the client lists,
-so the holdings did not need a longer range.
+- **Form:** CRSP > Mutual Funds > Portfolio Holdings (crsp_q_mutualfunds).
+- **Codes:** crsp_portno 1004185 and 1025818 (IWM's two fund ids).
+- **Dates:** report dates 2008-02 to the latest.
+- **Variables:** crsp_portno, report_dt, eff_dt, percent_tna, nbr_shares, security_name, cusip, permno, ticker.
+- Version 2 kept the 2026-10 pull (its query ID was not recorded): membership before 2008-02 comes from the client
+  lists, so the holdings did not need a longer range. A refresh pulls it first, to the latest report date, because
+  the permno list is built from it ([DATA_UPDATE_GUIDE.md](DATA_UPDATE_GUIDE.md), step 1).
 
 ### The client lists (not WRDS)
 

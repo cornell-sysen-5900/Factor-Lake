@@ -154,50 +154,12 @@ The app reads its data from Parquet files in AWS S3 (`s3://sysen-5900-factor-lak
 
 ### Latest WRDS data
 
-The newest data version is **`s3://sysen-5900-factor-lake/factor-lake-data/wrds_2026_11/`** (data version
-2026-11-07), built by the WRDS pipeline in [`pipeline/`](pipeline/README.md) from the November 2026 WRDS,
-Fama-French and FRED pulls ([`pipeline/PULLS_V2.md`](pipeline/PULLS_V2.md) lists every query). The point-in-time
-panel runs from **2002-07 to 2026-09**. Every column is described in
-[`pipeline/DATA_DICTIONARY.md`](pipeline/DATA_DICTIONARY.md) (schema only; its "Data version 2" note at the top
-sums up coverage, membership eras, index weights, GICS and thin early analyst data). To build the next version,
-follow [`pipeline/DATA_UPDATE_GUIDE.md`](pipeline/DATA_UPDATE_GUIDE.md). **The app's WRDS mode and the backtest Lambda read
-this folder** (`DEFAULT_WRDS_DIR` in `src/wrds_data.py`); Legacy reads its own files and is unchanged.
-
-| key under wrds_2026_11/ | contents |
-|---|---|
-| `factor_panel_monthly.parquet` | point-in-time factor panel: every Russell 2000 member at each month end from 2002-07, with fundamental, price and analyst factors, betas and next-month return |
-| `universe_periods.parquet` | each stock's Russell 2000 membership periods, with their source |
-| `returns_monthly.parquet` | monthly returns of every stock ever in the index, delisting returns included |
-| `prices_daily/year=YYYY/data.parquet` | daily CRSP prices, returns, shares and market cap, one file per year from 1997 |
-| `prices_daily/_manifest.json` | the years, rows and columns of the daily files (uploaded last) |
-| `market_daily.parquet`, `market_monthly.parquet` | Russell 2000 index and ETF returns, Fama-French factors, Treasury and Moody's yields, from 1997 (IWM from 2000-05, IWN and IWO from 2000-07) |
-| `rv_multiples_monthly.parquet` | valuation multiples with their GICS industry and sector percentile ranks |
-| `rv_peer_stats_monthly.parquet` | peer percentiles of every multiple by GICS industry and month |
-| `dcf_inputs_annual.parquet` | annual statements and FCFF for DCF valuation |
-| `estimates_consensus.parquet` | the full IBES consensus (7 measures, FY1-FY3 and long-term growth), linked to permno |
-| `fundamentals_quarterly.parquet` | quarterly Compustat statements, TTM sums and quarter-end factors |
-| `security_master.parquet` | ids, names and GICS classification of every stock |
-| `column_stats.parquet` | statistics of every column of the other files |
-
-New in this version:
-- **Membership from 2002.** `membership_source` says where a stock's membership comes from: `client_list` (the
-  annual Russell 2000 lists on each 9/30, used before 2008-02; each list counts from the June reconstitution until the
-  next, with no mid-year additions), `iwm` (IWM's holdings, from 2008-02) or `client_fill` (list members the old IWM
-  fund id hides, 2008-02 to 2010-05).
-- **`index_weight_source`**: `iwm`, or `client_list_static_930` before 2008-02, where `index_weight` is the list's 9/30
-  weight held for the year. Don't weight portfolios with it; backtests use market cap.
-- **GICS at four levels** with names (`gsector_name`, `ggroup_name`, `gind_name`, `gsubind_name`) and `gics_source`
-  (`current_header`: each company's current classification applied to all history; there is no historical GICS).
-
-Where each source ends: CRSP prices 2026-09-30, IWM holdings 2026-06-30, Compustat 2026-11 (datadate), IBES
-2026-08-20, Fama-French 2026-09-30, FRED 2026-11-05.
-
-**Previous version.** `wrds_2026_10/` (data version 2026-10-25, panel 2008-04 to 2026-09) stays in S3 unchanged.
-To roll back, set `DEFAULT_WRDS_DIR = 'wrds_2026_10'` and `FIRST_MONTH = '2008-04'` (`src/wrds_calendar.py`) and
-merge: CI redeploys the Lambda with that folder. Analyses saved on either version keep opening by their ID. Each new
-data pull gets its own `wrds_YYYY_MM/` folder, and this section is updated to point at it. How the folder is built,
-uploaded and inspected: [`pipeline/README.md`](pipeline/README.md); the S3 setup:
-[`DOCS/AWS_S3_DATA.md`](DOCS/AWS_S3_DATA.md).
+The app's WRDS mode and the backtest Lambda read **`s3://sysen-5900-factor-lake/factor-lake-data/wrds_2026_11/`**
+(data version 2026-11-07), a point-in-time Russell 2000 panel from **2002-07 to 2026-09**, built by the WRDS pipeline
+in [`pipeline/`](pipeline/README.md). Files, new columns, source dates and rollback:
+[`DOCS/AWS_S3_DATA.md`](DOCS/AWS_S3_DATA.md#latest-wrds-data). Columns:
+[`pipeline/DATA_DICTIONARY.md`](pipeline/DATA_DICTIONARY.md). Next refresh:
+[`pipeline/DATA_UPDATE_GUIDE.md`](pipeline/DATA_UPDATE_GUIDE.md).
 
 ## Supabase Archiver
 
