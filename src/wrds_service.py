@@ -42,7 +42,7 @@ def summarize_wrds_job(job: Dict[str, Any]) -> str:
     """
     A short description of a WRDS job for listings: the data source and frequency, then
     Legacy's summary, e.g. "WRDS, Quarterly | ROE (higher), ROA (higher) | Mixing |
-    2008-2026 | $1,000". Stored as S3 metadata, so it is kept ASCII and short.
+    2002-2026 | $1,000". Stored as S3 metadata, so it is kept ASCII and short.
     """
     frequency = FREQUENCY_LABELS.get(job['frequency'], job['frequency'])
     return f"WRDS, {frequency} | {summarize_job(job)}".encode('ascii', 'replace').decode()[:500]

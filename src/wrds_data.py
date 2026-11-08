@@ -27,7 +27,7 @@ import pandas as pd
 from .wrds_factors import WRDS_FACTOR_COLUMNS
 
 # Folder of the WRDS pull under the S3 data prefix (override with FACTOR_LAKE_WRDS_DIR)
-DEFAULT_WRDS_DIR = 'wrds_2026_10'
+DEFAULT_WRDS_DIR = 'wrds_2026_11'
 WRDS_DIR_ENV = 'FACTOR_LAKE_WRDS_DIR'
 
 PANEL_FILE = 'factor_panel_monthly.parquet'
