@@ -55,6 +55,8 @@ from src.backtest_jobs import build_job, describe_job, encode_result, run_job  #
 from src.backtest_service import result_file  # noqa: E402
 from src.lambda_client import DEFAULT_FUNCTION_NAME, BacktestLambdaClient  # noqa: E402
 from src.s3_client import S3DataManager  # noqa: E402
+from src.wrds_calendar import FIRST_YEAR as WRDS_FIRST_YEAR  # noqa: E402
+from src.wrds_calendar import LAST_YEAR as WRDS_LAST_YEAR  # noqa: E402
 from src.wrds_data import WRDS_DIR_ENV, wrds_dir  # noqa: E402
 from src.wrds_holdings import read_holdings_date  # noqa: E402
 from src.wrds_jobs import build_wrds_job, describe_wrds_job  # noqa: E402
@@ -94,10 +96,11 @@ def sample_jobs(unique: bool) -> List[dict]:
 
 
 def wrds_sample_job(unique: bool) -> dict:
-    """The checked WRDS backtest: quarterly, 2008-2026, ROE and momentum, Mixing."""
+    """The checked WRDS backtest: quarterly over the whole WRDS data (2002-2026), ROE and momentum, Mixing."""
     aum = BASE['initial_aum'] + (secrets.randbelow(1_000_000) / 100 if unique else 0)
     return build_wrds_job('backtest', list(WRDS_LABELS), {f: 'top' for f in WRDS_LABELS},
-                          {'frequency': 'quarterly', 'start_year': 2008, 'end_year': 2026, 'initial_aum': aum},
+                          {'frequency': 'quarterly', 'start_year': WRDS_FIRST_YEAR, 'end_year': WRDS_LAST_YEAR,
+                           'initial_aum': aum},
                           factor_labels=WRDS_LABELS)
 
 

@@ -27,8 +27,6 @@ import pandas as pd
 from pipeline.checks import PASS, WARN, Check, check
 from pipeline.config import (
     DCF_EXCLUDED_SECTORS,
-    GICS_INDUSTRIES,
-    GICS_SECTORS,
     REPORT_LAG_DAYS_ANNUAL,
     STATUTORY_TAX_RATE,
     STATUTORY_TAX_RATE_FROM_2018,
@@ -36,6 +34,7 @@ from pipeline.config import (
     DataPaths,
 )
 from pipeline.outputs import fresh_stage_dir, table_info, write_parquet, write_summary
+from pipeline.stages import s03_fundamentals_q
 from pipeline.stages.s03_fundamentals_q import OUTPUT as QUARTERLY_OUTPUT
 from pipeline.stages.s03_fundamentals_q import STAGE as QUARTERLY_STAGE
 
@@ -51,7 +50,8 @@ BLOCKS = ("revenue", "ebitda", "ebit", "da", "capex", "oancf", "pretax_income", 
           "buybacks", "share_issuance", "fcff", "revenue_growth", "ebitda_growth")
 ID_COLS = ("permno", "gvkey", "tic", "conm", "fyear", "fyr", "period_end", "report_date", "report_date_source",
            "curcd", "is_usd", "ajex", "price_fye", "epsfx", "emp", "sich", "gsector", "gsector_name", "ggroup",
-           "gind", "gind_name", "gsubind", "naics", "dcf_applicable", "interest_source")
+           "ggroup_name", "gind", "gind_name", "gsubind", "gsubind_name", "gics_source", "naics", "dcf_applicable",
+           "interest_source")
 
 
 def load_annual(path) -> pd.DataFrame:
@@ -132,8 +132,7 @@ def add_blocks(fa: pd.DataFrame) -> pd.DataFrame:
     fa["is_usd"] = fa["curcd"].eq("USD")
     for c in ("gsector", "ggroup", "gind", "gsubind", "naics", "sich"):
         fa[c] = pd.to_numeric(fa[c], errors="coerce").astype("Int64")
-    fa["gsector_name"] = fa["gsector"].map(GICS_SECTORS).astype(object)
-    fa["gind_name"] = fa["gind"].map(GICS_INDUSTRIES).astype(object)
+    fa = s03_fundamentals_q.add_gics_names(fa)
     fa["dcf_applicable"] = ~fa["gsector"].isin(DCF_EXCLUDED_SECTORS).fillna(False).astype(bool)
     return fa
 

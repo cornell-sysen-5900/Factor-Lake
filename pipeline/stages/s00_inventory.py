@@ -3,7 +3,8 @@ PROJECT: Factor-Lake Portfolio Analysis
 MODULE: pipeline/stages/s00_inventory.py
 PURPOSE: Stage s00_inventory: what is in raw/ before anything is cleaned.
 
-In:  raw/<file> for every file in config.RAW_FILES, raw/query_inputs/<list> for config.QUERY_INPUTS (read only)
+In:  raw/<file> for every file in config.RAW_FILES (the client file in the client folder), and the two upload lists
+     (raw/query_inputs/ by default; run.py --raw-dir, --client-dir, --permno-list, --ibes-tickers move them)
 Out: processed/s00_inventory/inventory.json  per file: size, sha256, rows, lowercase columns, date range of the
                                              main date column, distinct ids, row counts by group, missing values,
                                              coverage of the upload list, and the checks
@@ -45,9 +46,17 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def read_header(path: Path) -> list[str]:
+def read_header(path: Path, skip_lines: int = 0) -> list[str]:
     with open(path, newline="", encoding="utf-8-sig", errors="replace") as f:
-        return next(csv.reader(f), [])
+        rows = csv.reader(f)
+        for _ in range(skip_lines):
+            next(rows, None)
+        return next(rows, [])
+
+
+def column_names(header: list[str]) -> list[str]:
+    """Unique names for pyarrow: blank header cells become _unnamed_<i> (the client file has some)."""
+    return [h if h.strip() else f"_unnamed_{i}" for i, h in enumerate(header)]
 
 
 def norm_id(value: str) -> str:
@@ -57,7 +66,7 @@ def norm_id(value: str) -> str:
 
 def scan_csv(path: Path, spec: RawFile) -> dict:
     """Stream the CSV once and collect rows, date range, distinct ids, group counts and missing values."""
-    header = read_header(path)
+    header = column_names(read_header(path, spec.skip_lines))
     lower = [c.strip().lower() for c in header]
     original = dict(zip(lower, header))
     group_cols = {c for g in spec.groups for c in g}
@@ -67,7 +76,8 @@ def scan_csv(path: Path, spec: RawFile) -> dict:
     groups = [g for g in spec.groups if set(g) <= set(wanted)]
 
     reader = pacsv.open_csv(
-        path, read_options=pacsv.ReadOptions(block_size=_BLOCK_BYTES),
+        path, read_options=pacsv.ReadOptions(block_size=_BLOCK_BYTES, skip_rows=spec.skip_lines + 1,
+                                             column_names=header),
         convert_options=pacsv.ConvertOptions(include_columns=[original[c] for c in wanted],
                                              column_types={original[c]: pa.string() for c in wanted}))
     rows, blank_dates, bad_dates, first, last = 0, 0, 0, None, None
@@ -78,9 +88,12 @@ def scan_csv(path: Path, spec: RawFile) -> dict:
         t = pa.Table.from_batches([batch]).rename_columns([c.strip().lower() for c in batch.schema.names])
         rows += t.num_rows
         if spec.date_col in t.column_names:
-            d = pc.utf8_trim_whitespace(t[spec.date_col])
-            ok = pc.match_substring_regex(d, _ISO_DATE)
+            d = pc.utf8_trim_whitespace(pc.fill_null(t[spec.date_col], ""))
             blank = pc.equal(d, "")
+            if spec.date_format:          # e.g. m/d/Y: parsed, then compared as YYYY-MM-DD text
+                parsed = pc.strptime(d, format=spec.date_format, unit="s", error_is_null=True)
+                d = pc.fill_null(pc.strftime(parsed, format="%Y-%m-%d"), "")
+            ok = pc.match_substring_regex(d, _ISO_DATE)
             blank_dates += pc.sum(blank).as_py() or 0
             bad_dates += pc.sum(pc.and_(pc.invert(ok), pc.invert(blank))).as_py() or 0
             valid = d.filter(ok)
@@ -116,16 +129,24 @@ def scan_list(path: Path) -> dict:
             "blank_lines": len(lines) - len(ids), "ids": set(ids)}
 
 
-def inventory_file(path: Path, spec: RawFile, lists: dict[str, dict]) -> tuple[dict, list[Check]]:
-    """Inventory of one raw file and its checks."""
-    name = spec.name
+def raw_file_path(paths: DataPaths, spec: RawFile) -> Path:
+    return (paths.client if spec.folder == "client" else paths.raw) / spec.name
+
+
+def inventory_file(path: Path, spec: RawFile, lists: dict[str, dict], shown: str | None = None
+                   ) -> tuple[dict, list[Check]]:
+    """Inventory of one raw file and its checks. `shown` is the path written to the inventory."""
+    name, shown = spec.name, shown or f"raw/{spec.name}"
     if not path.exists():
-        return {"path": f"raw/{name}", "exists": False}, [Check(f"{name}: exists", FAIL, "file not found")]
+        return {"path": shown, "exists": False}, [Check(f"{name}: exists", FAIL, f"file not found: {path}")]
 
     scan = scan_csv(path, spec)
     checks = [Check(f"{name}: exists", PASS), columns_present(name, scan["columns"], spec.required),
               not_empty(name, scan["rows"])]
-    dup_cols = sorted(c for c, n in Counter(scan["columns"]).items() if n > 1)
+    no_optional = sorted(set(spec.optional) - set(scan["columns"]))
+    if no_optional:
+        checks.append(Check(f"{name}: optional columns", WARN, f"missing {', '.join(no_optional)} (kept when present)"))
+    dup_cols = sorted(c for c, n in Counter(scan["columns"]).items() if n > 1 and not c.startswith("_unnamed_"))
     if dup_cols:
         checks.append(Check(f"{name}: duplicate column names", FAIL, ", ".join(dup_cols)))
     if spec.date_col:
@@ -139,7 +160,7 @@ def inventory_file(path: Path, spec: RawFile, lists: dict[str, dict]) -> tuple[d
         if col in scan["distinct"]:
             checks += values_present(name, col, scan["distinct"][col], expected)
 
-    info = {"path": f"raw/{name}", "exists": True, "bytes": path.stat().st_size,
+    info = {"path": shown, "exists": True, "bytes": path.stat().st_size,
             "mb": round(path.stat().st_size / 1e6, 1), "sha256": sha256_file(path), "rows": scan["rows"],
             "n_columns": len(scan["columns"]), "columns": scan["columns"], "date_col": spec.date_col,
             "date_range": scan["date_range"], "bad_dates": scan["bad_dates"], "blank_dates": scan["blank_dates"],
@@ -159,28 +180,31 @@ def inventory_file(path: Path, spec: RawFile, lists: dict[str, dict]) -> tuple[d
 def run(paths: DataPaths) -> dict:
     out = fresh_stage_dir(paths, STAGE)
     started = time.time()
-    lists = {name: scan_list(paths.query_inputs / name) for name in QUERY_INPUTS}
+    lists = {name: scan_list(paths.list_path(name)) for name in QUERY_INPUTS}
     checks: list[Check] = []
     for name, lst in lists.items():
+        lst["path"] = paths.relative(paths.list_path(name))
         if not lst["exists"]:
-            checks.append(Check(f"query_inputs/{name}: exists", FAIL, "file not found"))
+            checks.append(Check(f"upload list {name}: exists", FAIL, f"file not found: {lst['path']}"))
         elif lst["duplicates"] or lst["blank_lines"]:
-            checks.append(Check(f"query_inputs/{name}: one id per line", WARN,
+            checks.append(Check(f"upload list {lst['path']}: one id per line", WARN,
                                 f"{lst['duplicates']} duplicates, {lst['blank_lines']} blank lines"))
 
     files = {}
     for spec in RAW_FILES:
         t0 = time.time()
-        files[spec.name], file_checks = inventory_file(paths.raw / spec.name, spec, lists)
+        path = raw_file_path(paths, spec)
+        files[spec.name], file_checks = inventory_file(path, spec, lists, paths.relative(path))
         checks += file_checks
         print(f"  scanned {spec.name} in {time.time() - t0:.0f}s", flush=True)
 
-    known = {s.name for s in RAW_FILES}
+    known = {s.name for s in RAW_FILES if not s.folder}
     unknown = sorted(p.name for p in paths.raw.iterdir() if p.is_file() and p.name not in known)
     if unknown:
-        checks.append(Check("raw/: files not in config.RAW_FILES", WARN, ", ".join(unknown)))
+        checks.append(Check("raw folder: files not in config.RAW_FILES", WARN, ", ".join(unknown)))
 
     inventory = {"stage": STAGE, "created_at": utc_now(), "data_dir": str(paths.root),
+                 "raw_dir": paths.relative(paths.raw), "client_dir": paths.relative(paths.client),
                  "status": overall_status(checks), "seconds": round(time.time() - started),
                  "files": files,
                  "query_inputs": {n: {k: v for k, v in lst.items() if k != "ids"} for n, lst in lists.items()},

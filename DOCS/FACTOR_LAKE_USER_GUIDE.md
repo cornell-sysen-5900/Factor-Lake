@@ -161,7 +161,7 @@ WRDS mode is a second data source next to Legacy. It backtests on point-in-time 
 
 1. In the sidebar, set **Data Source** to **WRDS**. It is only available when the app is connected to AWS Lambda, because WRDS backtests run there; otherwise it is greyed out with a note.
 2. Switching the data source clears the selected factors, because the two modes offer different factors.
-3. Pick the **rebalancing frequency** (Quarterly by default) and the start and end years (2008 to 2026). The backtest covers those calendar years, and the caption under the years shows the rebalances, for example "12 quarterly rebalances, 2009-12 to 2012-09; holds to 2012-12".
+3. Pick the **rebalancing frequency** (Quarterly by default) and the start and end years (2002 to 2026). The backtest covers those calendar years, and the caption under the years shows the rebalances, for example "12 quarterly rebalances, 2009-12 to 2012-09; holds to 2012-12".
 4. Weighting, factor combination, sector filter, fossil fuel filter and initial AUM work as in Legacy. The portfolio buys the top 10%, as in Legacy. There is no delisting option (see below).
 5. Add factors on the Analysis tab. They are grouped as **Momentum, Value, Profitability, Quality, Growth, Risk, Analyst and Size**, and each has a default direction and a tooltip. Factors that default to "Lower is better" say why.
 6. Click **Run Portfolio Analysis**. There is no Load Market Data step: the backtest reads the WRDS data in AWS.
@@ -186,7 +186,10 @@ The results have Legacy's sections, tiles, tables and charts, on dates instead o
 
 - **Sectors use today's GICS codes**, not the codes a company had at the time, so the sector filter is the one input that is not strictly point in time.
 - **The benchmarks are ETF total returns** (IWM, IWN, IWO): they include dividends and are net of the funds' fees. They differ slightly from the index returns Legacy uses, so do not compare Legacy and WRDS numbers directly.
-- **The data runs from April 2008 to September 2026.** A backtest ending in 2026 holds until September 2026 (semi-annual: June 2026), and one starting in 2008 starts with the first rebalance month in the data.
+- **The data runs from July 2002 to September 2026.** A backtest ending in 2026 holds until September 2026 (semi-annual: June 2026), and one starting in 2002 starts with the first rebalance month in the data (July 2002 monthly, September 2002 quarterly, December 2002 semi-annual).
+- **Before 2008 the index members come from annual Russell 2000 lists.** Each list is used from the June reconstitution until the next one; there are no mid-year additions (IPOs join at the next list), and a stock leaves when it stops trading. From 2008 the members are IWM's monthly holdings.
+- **Sectors are each company's current GICS classification**, applied to all of its history: there is no historical GICS, so a company that changed sector shows its latest one throughout.
+- **Analyst data is thin in the early years.** IBES capital expenditure estimates start in 2006, and EBIT, dividend and cash flow estimates are sparse in 2001-2004, so analyst factors cover fewer stocks then.
 - The Data Viewer shows Legacy data only.
 
 ## 16. Trading costs

@@ -23,14 +23,27 @@ uv run --group pipeline python -m pipeline.run --data-dir "C:/path/to/WRDS FA26"
 ```
 
 `--stage` takes a full name (`s02_prices`), a number (`s02`), a short name (`prices`) or `all` (every stage in
-order, stopping at the first FAIL). Exit code 0 = all checks PASS or WARN, 1 = a check FAILed. A full run takes
-about 10 minutes; s09_validate reruns every stage into a temporary folder to check the run is reproducible
-(`S09_SKIP_REPRO=1` skips that part).
+order, stopping at the first FAIL).
+
+A second data version runs in place with the folder options (relative paths are relative to `--data-dir`; the
+defaults are the layout below):
+
+```bash
+uv run --group pipeline python -m pipeline.run --data-dir "C:/path/to/WRDS FA26" --stage all \
+  --raw-dir raw_v2 --processed-dir processed_v2 --client-dir raw/client \
+  --permno-list raw/query_inputs/permno_list_v2.txt --ibes-tickers raw/query_inputs/ibes_tickers_v2.txt
+```
+
+Exit code 0 = all checks PASS or WARN, 1 = a check FAILed. A full run of data version 2 takes about 25 minutes;
+s09_validate reruns every stage into a temporary folder to check the run is reproducible (`S09_SKIP_REPRO=1` skips
+that part).
 
 | stage | what it does | status |
 |---|---|---|
 | s00_inventory | size, sha256, rows, columns, date range and expected columns of every raw file | done |
-| s01_membership | IWM snapshots, membership periods, permno fill from CUSIP, known gaps, non-member exclusions | done |
+| s00b_client | the client's 9/30 Russell 2000 lists as a clean table | done |
+| s00c_client_map | a CRSP permno for every client list row (CUSIP, then ticker + name), known gaps | done |
+| s01_membership | index snapshots from the client lists (before 2008-02), IWM and the client fill (2008-02 to 2010-05), membership periods, permno fill from CUSIP, known gaps and their fixes, non-member exclusions | done |
 | s02_prices | daily cleaning, momentum, volatility, monthly returns incl. delisting rows | done |
 | s03_fundamentals_q | quarterly factors, TTM, split adjustment, RV/DCF building blocks | done |
 | s04_fundamentals_a | annual statements for DCF (dcf_inputs_annual) | done |
@@ -60,6 +73,7 @@ The data never goes in the repo (`.gitignore` blocks `*.csv`, `*.parquet`, `*.zi
 <data folder>/
   raw/                  WRDS and FRED downloads, exactly as downloaded. Read only.
     query_inputs/       permno_list.txt, ibes_tickers.txt: the upload lists the WRDS queries were run with
+    client/             the client's Russell 2000 lists (FactSet, licensed: never commit it or anything from it)
   archive/              old notebook and its outputs. Reference only; the pipeline never reads it.
   pipeline_last_run.json  the notebook's last-run counts the "vs last run" checks compare with (kept out of git)
   processed/
@@ -95,8 +109,8 @@ columns, types and the first rows from the footer and the first row group, read 
 first 10 lines).
 
     uv run python scripts/s3_inspect.py --no-head                                     # the whole factor-lake-data/ tree
-    uv run python scripts/s3_inspect.py --prefix factor-lake-data/wrds_2026_10/        # with heads
-    uv run python scripts/s3_inspect.py --prefix factor-lake-data/wrds_2026_10/ --all-partitions --rows 3
+    uv run python scripts/s3_inspect.py --prefix factor-lake-data/wrds_2026_11/        # with heads
+    uv run python scripts/s3_inspect.py --prefix factor-lake-data/wrds_2026_11/ --all-partitions --rows 3
 
 Options: `--prefix` (default `factor-lake-data/`), `--rows` (default 5), `--max-files`, `--no-head`,
 `--all-partitions` (every `year=YYYY` head, not only the newest), `--head-mb` (column data read per head, default 8).
@@ -123,39 +137,7 @@ never been on GitHub, so each teammate needs their own copy at the same path.
 
 A stage module has `STAGE = "<name>"` and `run(paths: DataPaths) -> dict` that returns its summary.
 
-## WRDS refresh checklist
+## Data refresh
 
-Goal: rerun the queries below once a year, save each output under the same file name in `raw/`, then run
-`--stage all` and read each `summary.json`. Saved query IDs are not recorded yet; fill them in after the next pull.
-Menu paths are as of 2026.
-
-**Order matters for the two upload lists.** permno_list.txt comes from the holdings, ibes_tickers.txt from the
-link table. The pipeline writes both to `processed/`; copy them to `raw/query_inputs/` yourself before the queries
-that use them.
-
-1. Run query 1. Run `--stage s01`, copy `processed/s01_membership/permno_list.txt` to `raw/query_inputs/`.
-2. Run queries 2, 3, 6, 9, 11 with `permno_list.txt`, and queries 4, 5, 7, 8 (no codes file). Download the FRED
-   series (12). Run `--stage s05` up to the link step, copy `processed/s05_ibes/ibes_tickers.txt` to
-   `raw/query_inputs/`.
-3. Run query 10 with `ibes_tickers.txt`, then `--stage all`.
-
-| # | source | date range | codes upload | variables | file in raw/ |
-|---|---|---|---|---|---|
-| 1 | CRSP > Mutual Funds > Portfolio Holdings | report dates 2008-02 to latest | crsp_portno 1004185, 1025818 (IWM) | crsp_portno, report_dt, eff_dt, percent_tna, nbr_shares, security_name, cusip, permno, ticker | iwm_holdings_raw.csv |
-| 2 | CRSP > Stock (Version 2, CIZ) > Daily Stock File | 2006-12-01 to latest | permno_list.txt (PERMNO) | permno, HdrCUSIP, SecurityNm, DelReasonType, Ticker, PERMCO, SICCD, DlyCalDt, DlyDelFlg, DlyPrc, DlyRet, DlyVol, DlyClose, DlyLow, DlyHigh, DlyOpen, ShrOut, DlyCumFacPr, DlyCumFacShr, sprtrn | r2000_price_crsp_ciz.csv |
-| 3 | CRSP/Compustat Merged > Fundamentals Quarterly | datadate 2005-01 to latest | permno_list.txt (LPERMNO) | identifiers (GVKEY, LPERMNO, datadate, fyearq, fqtr, indfmt, consol, popsrc, datafmt, tic, conm, ajexq, curcdq, datacqtr, datafqtr, rdq, costat), balance sheet (actq, apq, atq, ceqq, cheq, cshfdq, cshoq, dlcq, dlttq, gdwlq, intanq, invtq, lctq, ltq, mibtq, ppentq, pstkq, rectq, seqq, txditcq), income (cogsq, dpq, epsfxq, epspxq, ibq, niq, oiadpq, oibdpq, piq, revtq, saleq, txtq, xintq, xrdq, xsgaq), year-to-date cash flow (aqcy, capxy, dltisy, dltry, dvy, oancfy, prstkcy, sstky), dvpsxq, prccq, industry (ggroup, gind, gsector, gsubind, naics) | fundamentals_raw.csv |
-| 4 | Compustat > North America > Index Prices (Daily) | 2006-12-01 to latest | tic I0124 (Russell 2000), I0120 (Growth), I0122 (Value) | tic, datadate, gvkeyx, prccd | index_close.csv |
-| 5 | CRSP > Stock (Version 2, CIZ) > Daily Stock File | 2006-12-01 to latest | PERMNO 88222 (IWM), 88399 (IWN), 88401 (IWO) | PERMNO, HdrCUSIP, SecurityNm, Ticker, PERMCO, DlyCalDt, DlyPrc, DlyRet | benchmark_etfs.csv |
-| 6 | Linking Suite by WRDS > IBES-CRSP Link | all | permno_list.txt (PERMNO) | TICKER, PERMNO, ncusip, sdate, edate, SCORE | crsp_ibes_link.csv |
-| 7 | Fama-French Portfolios and Factors > 5 Factors + Momentum, Daily | 2006-12-01 to latest | none | date, mktrf, smb, hml, rmw, cma, rf, umd | ff_daily.csv |
-| 8 | Fama-French Portfolios and Factors > 5 Factors + Momentum, Monthly | 2006-12 to latest | none | dateff, mktrf, smb, hml, rmw, cma, rf, umd | ff_monthly.csv |
-| 9 | CRSP > Stock (Version 2, CIZ) > Delisting events | all | permno_list.txt (permno) | delactiontype, permno, delistingdt, delreasontype, delpaymenttype, delret | delistings.csv |
-| 10 | IBES > Summary History > Summary Statistics (adjusted) | statpers 2005-01 to latest | ibes_tickers.txt (TICKER) | ticker, CUSIP, OFTIC, CNAME, STATPERS, MEASURE, FISCALP, FPI, CURCODE, NUMEST, NUMUP, NUMDOWN, MEDEST, MEANEST, STDEV, HIGHEST, LOWEST, FPEDATS, ACTUAL, ANNDATS_ACT, CURR_ACT; measures EPS, CPS, DPS, EBT (EBITDA), SAL, CPX, EBI (EBIT); FPI 0 (long-term growth) and 1-3 (FY1-FY3; FY4 is not used) | forward_estimates.csv |
-| 11 | CRSP/Compustat Merged > Fundamentals Annual | datadate 2005-01 to latest | permno_list.txt (LPERMNO) | the annual versions of query 3 (GVKEY, LPERMNO, datadate, fyear, fyr, ajex, curcd, act ... xsga, dvpsx_f, prcc_f, sich, emp, xintd, dvc) and the same industry columns | fundamentals_annual_raw.csv |
-| 12 | FRED (fred.stlouisfed.org, not WRDS): DGS10, DGS3MO, DBAA, DAAA, daily, "Download CSV" | 2006-01-01 to latest | none | observation_date, the series (percent) | fred_DGS10.csv, fred_DGS3MO.csv, fred_DBAA.csv, fred_DAAA.csv |
-
-The exact column lists the pipeline expects are `RAW_FILES` in `pipeline/config.py`; s00_inventory FAILs on a
-missing column, so a changed query shows up before any cleaning runs.
-
-After a refresh: compare each stage's `summary.json` with the previous run (row counts, date ranges, WARNs), and
-note the run in the PR that updates the data.
+Follow [DATA_UPDATE_GUIDE.md](DATA_UPDATE_GUIDE.md) step by step; the exact WRDS queries are in
+[PULLS_V2.md](PULLS_V2.md).

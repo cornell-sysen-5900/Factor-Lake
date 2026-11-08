@@ -79,7 +79,7 @@ def synthetic_job(monkeypatch):
 def test_the_checked_job_is_a_quarterly_wrds_backtest_over_the_whole_data():
     job = check.wrds_sample_job(unique=False)
     assert (job['data_mode'], job['kind'], job['frequency']) == ('wrds', 'backtest', 'quarterly')
-    assert (job['start_year'], job['end_year']) == (2008, 2026)
+    assert (job['start_year'], job['end_year']) == (2002, 2026)
 
 
 @pytest.mark.parametrize('lambda_class, failures, failed_line', [

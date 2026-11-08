@@ -11,8 +11,8 @@ trading day). See DOCS/WRDS_MODE_DESIGN.md, section 3.
 
 from typing import List
 
-# First month of the WRDS factor panel, and the last month with returns
-FIRST_MONTH = '2008-04'
+# First month of the WRDS factor panel (data version 2: the 2002-07 client list), and the last month with returns
+FIRST_MONTH = '2002-07'
 LAST_MONTH = '2026-09'
 FIRST_YEAR = int(FIRST_MONTH[:4])
 LAST_YEAR = int(LAST_MONTH[:4])

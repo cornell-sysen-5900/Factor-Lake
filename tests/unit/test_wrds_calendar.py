@@ -23,9 +23,11 @@ def _span(frequency, start, end):
 
 @pytest.mark.parametrize('frequency, start, end, expected', [
     # (first rebalance, last rebalance, last period end, number of rebalances)
-    ('monthly', 2008, 2026, ('2008-04', '2026-08', '2026-09', 221)),
-    ('quarterly', 2008, 2026, ('2008-06', '2026-06', '2026-09', 73)),
-    ('semiannual', 2008, 2026, ('2008-06', '2025-12', '2026-06', 36)),
+    # the whole data (version 2: the panel starts 2002-07): the first rebalance month in the data
+    ('monthly', 2002, 2026, ('2002-07', '2026-08', '2026-09', 290)),
+    ('quarterly', 2002, 2026, ('2002-09', '2026-06', '2026-09', 96)),
+    ('semiannual', 2002, 2026, ('2002-12', '2025-12', '2026-06', 47)),
+    ('quarterly', 2008, 2026, ('2007-12', '2026-06', '2026-09', 75)),
     ('quarterly', 2010, 2012, ('2009-12', '2012-09', '2012-12', 12)),
     ('monthly', 2015, 2015, ('2014-12', '2015-11', '2015-12', 12)),
     ('semiannual', 2015, 2016, ('2014-12', '2016-06', '2016-12', 4)),
@@ -58,8 +60,8 @@ def test_no_period_reaches_outside_the_data(frequency):
 
 @pytest.mark.parametrize('frequency, start, end, message', [
     ('weekly', 2010, 2012, 'frequency must be one of'),
-    ('monthly', 2007, 2010, 'Choose years from 2008 to 2026'),
-    ('monthly', 2010, 2027, 'Choose years from 2008 to 2026'),
+    ('monthly', 2001, 2010, 'Choose years from 2002 to 2026'),
+    ('monthly', 2010, 2027, 'Choose years from 2002 to 2026'),
     ('monthly', 2012, 2010, 'not after the end year'),
 ])
 def test_invalid_inputs_are_rejected(frequency, start, end, message):

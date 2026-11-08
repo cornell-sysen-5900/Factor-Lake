@@ -61,6 +61,7 @@ STAGE = "s05_ibes"
 RAW_FILE = "forward_estimates.csv"
 LINK_FILE = "crsp_ibes_link.csv"
 OUTPUT = "estimates_consensus.parquet"
+THIN_SHARE = 0.10           # a measure with fewer rows than 10% of EPS's in a year is thin that year
 VALUES = ("meanest", "medest", "stdev", "highest", "lowest")
 _TYPES = {"ticker": pa.string(), "statpers": pa.date32(), "measure": pa.string(), "fpi": pa.string(),
           "curcode": pa.string(), "fpedats": pa.date32(), "anndats_act": pa.date32(),
@@ -235,6 +236,28 @@ def apply_scale_rule(ib: pd.DataFrame, fund: pd.DataFrame, caps: pd.DataFrame) -
     return ib, info
 
 
+def rows_by_year_measure(out: pd.DataFrame) -> pd.DataFrame:
+    """Linked rows by statpers year and measure (FPI 1-3)."""
+    x = out[out["fpi"] > 0]
+    return x.groupby([x["statpers"].dt.year, "measure"]).size().unstack(fill_value=0)
+
+
+def measure_years_check(out: pd.DataFrame) -> Check:
+    """Informational (decision 41): each measure's first year, and the years where it has fewer than THIN_SHARE of
+    EPS's rows. Thin early years are expected (CPX starts 2006; EBI, DPS and CPS are thin in 2001-2004)."""
+    t = rows_by_year_measure(out)
+    if t.empty or "EPS" not in t:
+        return Check("measures by year (informational)", PASS, "no rows")
+    parts = []
+    for m in t.columns:
+        first = int(t.index[t[m] > 0].min()) if (t[m] > 0).any() else None
+        thin = [int(y) for y in t.index if t.loc[y, "EPS"] and t.loc[y, m] < THIN_SHARE * t.loc[y, "EPS"]]
+        if m != "EPS" and (thin or first != int(t.index.min())):
+            parts.append(f"{m} from {first}" + (f", thin {thin[0]}-{thin[-1]} ({len(thin)} years)" if thin else ""))
+    return Check("measures by year (informational; thin early data expected, decision 41)", PASS,
+                 "; ".join(parts) or "every measure in every year")
+
+
 def run_checks(out: pd.DataFrame, lk: pd.DataFrame, info: dict, raw_list: set | None, tickers: set) -> list[Check]:
     checks = [check("only USD and FPI 0-3", bool(out["fpi"].isin([0, 1, 2, 3]).all())),
               check("unique permno, statpers, measure, fpi",
@@ -260,10 +283,11 @@ def run_checks(out: pd.DataFrame, lk: pd.DataFrame, info: dict, raw_list: set | 
     restated = float((eps1["crsp_basis_factor"].dropna() != 1).mean())
     checks.append(check("crsp_basis_factor > 0 wherever present", bool((out["crsp_basis_factor"].dropna() > 0).all()),
                         f"{restated:.1%} of EPS FY1 rows have a split between statpers and the end of the data"))
+    checks.append(measure_years_check(out))
     checks += [vs_last_run("EPS FY1 linked rows", len(eps1), "ibes_eps_fy1_rows"),
                vs_last_run("EPS FY1 permnos", int(eps1["permno"].nunique()), "ibes_eps_fy1_permnos")]
     if raw_list is not None:
-        checks.append(check("ibes_tickers.txt equals raw/query_inputs/ibes_tickers.txt", tickers == raw_list,
+        checks.append(check("ibes_tickers.txt equals the IBES ticker upload list", tickers == raw_list,
                             f"{len(tickers - raw_list)} new, {len(raw_list - tickers)} dropped (if not 0: rerun the "
                             "IBES query)", level=WARN))
     return checks
@@ -291,7 +315,7 @@ def run(paths: DataPaths) -> dict:
     del daily, fq
     out = (ib.rename(columns={"ticker": "ibes_ticker"})[list(OUT_COLS)]
              .sort_values(["permno", "statpers", "measure", "fpi"]).reset_index(drop=True))
-    raw_path = paths.query_inputs / "ibes_tickers.txt"
+    raw_path = paths.ibes_tickers
     raw_list = set(x.strip() for x in raw_path.read_text().splitlines() if x.strip()) if raw_path.exists() else None
     checks = run_checks(out, lk, info, raw_list, tickers)
     write_parquet(out, out_dir / OUTPUT)
@@ -308,7 +332,9 @@ def run(paths: DataPaths) -> dict:
              "rows_by_measure_fpi": {f"{m} {f}": int(n) for (m, f), n in by_mf.size().items()},
              "coverage_by_measure_fpi": {f"{m} {f}": round(float(v), 4) for (m, f), v in
                                          by_mf["meanest"].apply(lambda s: s.notna().mean()).items()},
-             "by_year": {str(y): {k: int(v) for k, v in r.items()} for y, r in by_year.fillna(0).iterrows()}}
+             "by_year": {str(y): {k: int(v) for k, v in r.items()} for y, r in by_year.fillna(0).iterrows()},
+             "rows_by_year_measure": {str(y): {k: int(v) for k, v in r.items()}
+                                      for y, r in rows_by_year_measure(out).iterrows()}}
     stats = {f"{m}_fpi{f}_meanest": out.loc[(out["measure"] == m) & (out["fpi"] == f), "meanest"]
              for m in IBES_MEASURES for f in (0, 1, 2, 3)}
     tables = {OUTPUT: table_info(out, "statpers", ["numest", "meanest", "stdev", "price_statpers",

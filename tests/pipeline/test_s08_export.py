@@ -85,3 +85,14 @@ def test_upload_instructions_point_at_the_repo_script_and_a_new_folder():
     assert "scripts/upload_wrds.py" in md and "```python" not in md          # instructions only, no code
     n = sum(o["files"] for o in fake_outputs().values())
     assert f"{n + 1} of {n + 1} files match" in md and ".streamlit/secrets.toml" in md
+
+
+def test_data_version_is_the_build_date_unless_set(monkeypatch):
+    from datetime import date
+    monkeypatch.delenv(s08.DATA_VERSION_ENV, raising=False)
+    assert s08.data_version() == date.today().isoformat()
+    monkeypatch.setenv(s08.DATA_VERSION_ENV, "2026-11-07")
+    assert s08.data_version() == "2026-11-07" and s08.s3_folder(s08.data_version()) == "wrds_2026_11"
+    monkeypatch.setenv(s08.DATA_VERSION_ENV, "Nov 7")
+    with pytest.raises(ValueError):
+        s08.data_version()

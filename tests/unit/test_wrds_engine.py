@@ -236,14 +236,15 @@ def test_unknown_factor_sector_or_combination_is_refused():
 
 @pytest.fixture(scope='module')
 def full_range_data():
-    """Synthetic data over the whole WRDS range, 2008-04 to 2026-09."""
+    """Synthetic data over the whole WRDS range, 2002-07 to 2026-09."""
     return synthetic_frames(FIRST_MONTH, LAST_MONTH, n_stocks=12).data()
 
 
 @pytest.mark.parametrize('frequency, start, end, first, last, period_end, count', [
-    ('monthly', 2008, 2026, '2008-04', '2026-08', '2026-09', 221),
-    ('quarterly', 2008, 2026, '2008-06', '2026-06', '2026-09', 73),
-    ('semiannual', 2008, 2026, '2008-06', '2025-12', '2026-06', 36),
+    ('monthly', 2002, 2026, '2002-07', '2026-08', '2026-09', 290),
+    ('quarterly', 2002, 2026, '2002-09', '2026-06', '2026-09', 96),
+    ('semiannual', 2002, 2026, '2002-12', '2025-12', '2026-06', 47),
+    ('quarterly', 2008, 2026, '2007-12', '2026-06', '2026-09', 75),
     ('quarterly', 2010, 2012, '2009-12', '2012-09', '2012-12', 12),
     ('monthly', 2015, 2015, '2014-12', '2015-11', '2015-12', 12),
     ('semiannual', 2026, 2026, '2025-12', '2025-12', '2026-06', 1),

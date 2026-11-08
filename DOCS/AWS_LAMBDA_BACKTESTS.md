@@ -145,7 +145,7 @@ Each uncached backtest is one Lambda invocation of a few seconds. A cold start a
 
 WRDS backtests (see the user guide, section 15, and `DOCS/WRDS_MODE_DESIGN.md`) run in the same function. A job with `data_mode: "wrds"` goes to `src/wrds_service.py`; every other job is a Legacy job, handled exactly as before.
 
-- **Data.** The function reads three files under `factor-lake-data/wrds_2026_10/` (`factor_panel_monthly`, `returns_monthly`, `market_monthly`), only the columns it needs, once per container. The folder is set by the function's `FACTOR_LAKE_WRDS_DIR` variable (the deploy script's `--wrds-dir`). A new WRDS pull goes into a new folder.
+- **Data.** The function reads three files under `factor-lake-data/wrds_2026_11/` (`factor_panel_monthly`, `returns_monthly`, `market_monthly`; the panel runs from 2002-07), only the columns it needs, once per container. The folder is set by the function's `FACTOR_LAKE_WRDS_DIR` variable (the deploy script's `--wrds-dir`, which defaults to `DEFAULT_WRDS_DIR` in `src/wrds_data.py`, as CI deploys it). A new WRDS pull goes into a new folder; the previous one, `wrds_2026_10/`, stays for rollback (set `DEFAULT_WRDS_DIR` back and merge).
 - **Cache.** The key hashes the job, the S3 ETags of the three files and a WRDS code version. Legacy keeps its own code version, so WRDS changes never recompute Legacy results.
 - **Holdings.** A WRDS backtest writes `backtest-results/<hash>.holdings.parquet` (one row group per rebalance date) **before** `backtest-results/<hash>.json`. The app reads one date at a time with its own S3 keys, in two ranged GETs. A cached result whose holdings file is missing is computed again.
 - **Listings.** The result JSON's metadata has the job's `kind` and a summary starting "WRDS, <frequency>" (section 6). WRDS results saved before this (on the dev function) have none and show "Details not recorded" until the 90-day rule deletes them.
@@ -161,7 +161,7 @@ uv run python scripts/deploy_backtest_lambda.py --function-name sysen5900-factor
 ```
 
 - `--leave-lifecycle-rules` does not write the bucket's lifecycle rules (a normal deploy rewrites them, and the bucket is shared with the live app). It only reads them and says whether `backtest-results/` expires.
-- `--wrds-dir wrds_YYYY_MM` points the function at another WRDS folder (default `wrds_2026_10`).
+- `--wrds-dir wrds_YYYY_MM` points the function at another WRDS folder (default `DEFAULT_WRDS_DIR` in `src/wrds_data.py`, now `wrds_2026_11`).
 
 To point a local app at the dev function, set the function name next to the AWS keys in `.streamlit/secrets.toml` (top level):
 

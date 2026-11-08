@@ -5,13 +5,16 @@ PURPOSE: Configuration interface for global backtest parameters and ESG filters.
 VERSION: 2.7.0
 """
 
+import calendar
 from typing import Any, Callable, Dict, List, Optional
 
 import streamlit as st
 
 import streamlit_config as config
 from src.trading_costs import MAX_TRADING_COST_BPS
+from src.wrds_calendar import FIRST_MONTH as WRDS_FIRST_MONTH
 from src.wrds_calendar import FIRST_YEAR as WRDS_FIRST_YEAR
+from src.wrds_calendar import LAST_MONTH as WRDS_LAST_MONTH
 from src.wrds_calendar import LAST_YEAR as WRDS_LAST_YEAR
 from src.wrds_calendar import describe_schedule
 from src.wrds_factors import WRDS_SECTORS
@@ -308,6 +311,11 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
     }
 
 
+def _month_name(month: str) -> str:
+    """'2002-07' -> 'July 2002'."""
+    return f"{calendar.month_name[int(month[5:7])]} {month[:4]}"
+
+
 def _render_wrds_period(frequency: str):
     """WRDS start and end years, limited to the data, with the rebalances they give."""
     col1, col2 = st.columns(2)
@@ -319,7 +327,7 @@ def _render_wrds_period(frequency: str):
             value=WRDS_FIRST_YEAR,
             step=1,
             format="%d",
-            help="First calendar year of the backtest. The WRDS data starts in April 2008.",
+            help=f"First calendar year of the backtest. The WRDS data starts in {_month_name(WRDS_FIRST_MONTH)}.",
             key="wrds_start_year_input"
         )
     with col2:
@@ -330,7 +338,7 @@ def _render_wrds_period(frequency: str):
             value=WRDS_LAST_YEAR,
             step=1,
             format="%d",
-            help="Last calendar year of the backtest. The WRDS data ends in September 2026.",
+            help=f"Last calendar year of the backtest. The WRDS data ends in {_month_name(WRDS_LAST_MONTH)}.",
             key="wrds_end_year_input"
         )
 
