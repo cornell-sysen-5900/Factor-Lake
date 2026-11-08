@@ -135,6 +135,9 @@ A stage module has `STAGE = "<name>"` and `run(paths: DataPaths) -> dict` that r
 
 ## WRDS refresh checklist
 
+The pulls of data version 2 (wrds_2026_11, from 1997-2002) are documented query by query, with their WRDS
+query IDs, in [PULLS_V2.md](PULLS_V2.md). The checklist below is the yearly refresh of version 1.
+
 Goal: rerun the queries below once a year, save each output under the same file name in `raw/`, then run
 `--stage all` and read each `summary.json`. Saved query IDs are not recorded yet; fill them in after the next pull.
 Menu paths are as of 2026.
