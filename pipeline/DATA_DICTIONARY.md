@@ -15,7 +15,7 @@ Written by stage `s08_export` from `pipeline/dictionary.py`. It describes every 
 
 | file | one row per | key | built by |
 |---|---|---|---|
-| [factor_panel_monthly.parquet](#factor_panel_monthlyparquet) | Russell 2000 member (IWM holding), month end t | date, permno | `s07_panel` |
+| [factor_panel_monthly.parquet](#factor_panel_monthlyparquet) | Russell 2000 member, month end t | date, permno | `s07_panel` |
 | [universe_periods.parquet](#universe_periodsparquet) | stock, membership period | permno, index_effective | `s01_membership` |
 | [returns_monthly.parquet](#returns_monthlyparquet) | stock, month (every permno ever in the universe, also after it leaves) | month_end, permno | `s02_prices` |
 | [prices_daily/year=YYYY/data.parquet](#prices_dailyyearyyyydataparquet) | stock, trading day (one file per calendar year) | permno, date | `s02_prices` |
@@ -31,9 +31,9 @@ Written by stage `s08_export` from `pipeline/dictionary.py`. It describes every 
 
 ## factor_panel_monthly.parquet
 
-The point-in-time factor panel for backtests: at each month end t, every stock in the latest IWM snapshot effective by t, with factors built only from data public by t. Factors are raw values; rank or z-score them per date yourself.
+The point-in-time factor panel for backtests: at each month end t, every stock in the latest index snapshot effective by t (the client's 9/30 lists before 2008-02, IWM holdings after, see membership_source), with factors built only from data public by t. Factors are raw values; rank or z-score them per date yourself.
 
-One row per Russell 2000 member (IWM holding), month end t; key date, permno. Built by stage `s07_panel`.
+One row per Russell 2000 member, month end t; key date, permno. Built by stage `s07_panel`.
 
 | column | meaning | unit | source | stage |
 |---|---|---|---|---|
@@ -46,13 +46,17 @@ One row per Russell 2000 member (IWM holding), month end t; key date, permno. Bu
 | `gsector` | GICS sector code (2 digits); current classification, not historical | code | Compustat quarterly (CCM) | s07_panel |
 | `gsector_name` | GICS sector name | text | config.GICS_SECTORS | s07_panel |
 | `ggroup` | GICS industry group code (4 digits) | code | Compustat quarterly (CCM) | s07_panel |
+| `ggroup_name` | GICS industry group name | text | config.GICS_GROUPS | s07_panel |
 | `gind` | GICS industry code (6 digits); the RV peer group | code | Compustat quarterly (CCM) | s07_panel |
 | `gind_name` | GICS industry name | text | config.GICS_INDUSTRIES | s07_panel |
 | `gsubind` | GICS sub-industry code (8 digits) | code | Compustat quarterly (CCM) | s07_panel |
+| `gsubind_name` | GICS sub-industry name | text | config.GICS_SUB_INDUSTRIES | s07_panel |
+| `gics_source` | where the GICS codes come from: current_header = the company's current (or last) Compustat classification applied to all history, since no historical GICS is available (decision 39) | text | derived | s07_panel |
 | `sector_name` | GICS sector name, or where GICS is missing the SIC code mapped to a GICS sector name (see the SIC fallback below) | text | derived | s07_panel |
 | `gics_from_sic` | sector_name comes from the SIC fallback | true/false | derived | s07_panel |
 | `siccd` | CRSP SIC code at t (last non-zero) | code | CRSP daily stock file (CIZ) | s07_panel |
-| `index_weight` | weight in the IWM fund on the snapshot report date | percent of the fund | IWM holdings (CRSP mutual fund holdings) | s01_membership |
+| `index_weight` | weight in the IWM fund on the snapshot report date; for client_list and client_fill rows the stock's Russell 2000 weight on the list's 9/30 | percent of the fund (or index) | IWM holdings (CRSP mutual fund holdings); client Russell 2000 lists (9/30, FactSet) | s01_membership |
+| `membership_source` | where membership at t comes from: client_list (the client's 9/30 lists, before 2008-02), iwm (IWM holdings), client_fill (a list member the old IWM fund id hides, 2008-02 to 2010-05) | text | derived | s01_membership |
 | `snapshot_report_dt` | report date of the IWM snapshot used at t | date | IWM holdings (CRSP mutual fund holdings) | s01_membership |
 | `snapshot_eff_dt` | date the whole snapshot was public (latest eff_dt of its lines); always <= t | date | IWM holdings (CRSP mutual fund holdings) | s01_membership |
 | `new_entrant` | not in the universe at the previous month end | true/false | derived | s07_panel |
@@ -143,21 +147,22 @@ One row per Russell 2000 member (IWM holding), month end t; key date, permno. Bu
 
 ## universe_periods.parquet
 
-Periods each stock was in the IWM snapshots (consecutive snapshots, one missing snapshot bridged).
+Periods each stock was in the index snapshots (consecutive snapshots of one source, one missing snapshot bridged). Sources: the client's 9/30 lists before 2008-02, IWM holdings from 2008-02, and the list members the old IWM fund id hides, 2008-02 to 2010-05.
 
 One row per stock, membership period; key permno, index_effective. Built by stage `s01_membership`.
 
 | column | meaning | unit | source | stage |
 |---|---|---|---|---|
 | `permno` | CRSP security id (one share class) | code | CRSP daily stock file (CIZ) | s01_membership |
-| `index_effective` | report date of the period's first snapshot | date | IWM holdings (CRSP mutual fund holdings) | s01_membership |
-| `index_through` | report date of the period's last snapshot | date | IWM holdings (CRSP mutual fund holdings) | s01_membership |
-| `first_known` | first date the period was public (earliest eff_dt) | date | IWM holdings (CRSP mutual fund holdings) | s01_membership |
-| `n_snapshots` | snapshots in the period | count | IWM holdings (CRSP mutual fund holdings) | s01_membership |
+| `index_effective` | report date of the period's first snapshot (a client-list snapshot: the month's last trading day) | date | IWM holdings (CRSP mutual fund holdings); client Russell 2000 lists (9/30, FactSet) | s01_membership |
+| `index_through` | report date of the period's last snapshot | date | IWM holdings (CRSP mutual fund holdings); client Russell 2000 lists (9/30, FactSet) | s01_membership |
+| `first_known` | first date the period was public (earliest eff_dt) | date | IWM holdings (CRSP mutual fund holdings); client Russell 2000 lists (9/30, FactSet) | s01_membership |
+| `n_snapshots` | snapshots in the period | count | IWM holdings (CRSP mutual fund holdings); client Russell 2000 lists (9/30, FactSet) | s01_membership |
 | `n_excluded` | snapshots of the period excluded as non-members (decision 11) | count | derived | s01_membership |
 | `excluded_non_member` | every snapshot of the period is excluded: a merger stock that was never really a member, not in the panel | true/false | derived | s01_membership |
-| `ticker` | IWM ticker in the period's last snapshot | text | IWM holdings (CRSP mutual fund holdings) | s01_membership |
-| `security_name` | IWM security name in the period's last snapshot | text | IWM holdings (CRSP mutual fund holdings) | s01_membership |
+| `membership_source` | where the period's membership comes from: client_list (the client's 9/30 lists, before 2008-02), iwm (IWM holdings), client_fill (a list member missing from the IWM snapshot, 2008-02 to 2010-05); a period has one source | text | derived | s01_membership |
+| `ticker` | ticker in the period's last snapshot (IWM's, or CRSP's for client-list rows) | text | IWM holdings (CRSP mutual fund holdings); CRSP daily stock file (CIZ) | s01_membership |
+| `security_name` | security name in the period's last snapshot (IWM's, or CRSP's for client-list rows) | text | IWM holdings (CRSP mutual fund holdings); CRSP daily stock file (CIZ) | s01_membership |
 
 ## returns_monthly.parquet
 
@@ -423,9 +428,12 @@ One row per stock, fiscal year; key permno, fyear. Built by stage `s04_fundament
 | `gsector` | GICS sector code (2 digits); current classification, not historical | code | Compustat annual (CCM) | s04_fundamentals_a |
 | `gsector_name` | GICS sector name | text | Compustat annual (CCM) | s04_fundamentals_a |
 | `ggroup` | GICS industry group code (4 digits) | code | Compustat annual (CCM) | s04_fundamentals_a |
+| `ggroup_name` | GICS industry group name | text | Compustat annual (CCM) | s04_fundamentals_a |
 | `gind` | GICS industry code (6 digits); the RV peer group | code | Compustat annual (CCM) | s04_fundamentals_a |
 | `gind_name` | GICS industry name | text | Compustat annual (CCM) | s04_fundamentals_a |
 | `gsubind` | GICS sub-industry code (8 digits) | code | Compustat annual (CCM) | s04_fundamentals_a |
+| `gsubind_name` | GICS sub-industry name | text | Compustat annual (CCM) | s04_fundamentals_a |
+| `gics_source` | where the GICS codes come from: current_header = the company's current (or last) Compustat classification applied to all history, since no historical GICS is available (decision 39) | text | Compustat annual (CCM) | s04_fundamentals_a |
 | `naics` | NAICS industry code | code | Compustat annual (CCM) | s04_fundamentals_a |
 | `dcf_applicable` | False for GICS sectors 40 (Financials) and 60 (Real Estate), where a DCF on FCFF does not fit | true/false | derived | s04_fundamentals_a |
 | `interest_source` | where interest_expense comes from: xint, xintd or missing (never 0-filled; the DCF then uses the Baa yield) | text | derived | s04_fundamentals_a |
@@ -515,9 +523,12 @@ One row per stock, fiscal quarter; key permno, fyearq, fqtr. Built by stage `s03
 | `gsector` | GICS sector code (2 digits); current classification, not historical | code | Compustat quarterly (CCM) | s03_fundamentals_q |
 | `gsector_name` | GICS sector name | text | Compustat quarterly (CCM) | s03_fundamentals_q |
 | `ggroup` | GICS industry group code (4 digits) | code | Compustat quarterly (CCM) | s03_fundamentals_q |
+| `ggroup_name` | GICS industry group name | text | Compustat quarterly (CCM) | s03_fundamentals_q |
 | `gind` | GICS industry code (6 digits); the RV peer group | code | Compustat quarterly (CCM) | s03_fundamentals_q |
 | `gind_name` | GICS industry name | text | Compustat quarterly (CCM) | s03_fundamentals_q |
 | `gsubind` | GICS sub-industry code (8 digits) | code | Compustat quarterly (CCM) | s03_fundamentals_q |
+| `gsubind_name` | GICS sub-industry name | text | Compustat quarterly (CCM) | s03_fundamentals_q |
+| `gics_source` | where the GICS codes come from: current_header = the company's current (or last) Compustat classification applied to all history, since no historical GICS is available (decision 39) | text | Compustat quarterly (CCM) | s03_fundamentals_q |
 | `naics` | NAICS industry code | code | Compustat quarterly (CCM) | s03_fundamentals_q |
 | `price_qe` | closing price at the quarter end (prccq) | $ per share | Compustat quarterly (CCM) | s03_fundamentals_q |
 | `cshoq` | common shares outstanding, all classes | millions of shares | Compustat quarterly (CCM) | s03_fundamentals_q |
@@ -636,9 +647,12 @@ One row per permno ever in the universe (permno_list.txt); key permno. Built by 
 | `gsector` | GICS sector code (2 digits); latest | code | Compustat quarterly (CCM) | s07_panel |
 | `gsector_name` | GICS sector name | text | config.GICS_SECTORS | s07_panel |
 | `ggroup` | GICS industry group code (4 digits) | code | Compustat quarterly (CCM) | s07_panel |
+| `ggroup_name` | GICS industry group name | text | config.GICS_GROUPS | s07_panel |
 | `gind` | GICS industry code (6 digits); the RV peer group | code | Compustat quarterly (CCM) | s07_panel |
 | `gind_name` | GICS industry name | text | config.GICS_INDUSTRIES | s07_panel |
 | `gsubind` | GICS sub-industry code (8 digits) | code | Compustat quarterly (CCM) | s07_panel |
+| `gsubind_name` | GICS sub-industry name | text | config.GICS_SUB_INDUSTRIES | s07_panel |
+| `gics_source` | where the GICS codes come from: current_header = the company's current (or last) Compustat classification applied to all history, since no historical GICS is available (decision 39) | text | derived | s07_panel |
 | `siccd` | latest CRSP SIC code | code | CRSP daily stock file (CIZ) | s07_panel |
 | `first_price_date` | first CRSP trading day in our data | date | CRSP daily stock file (CIZ) | s07_panel |
 | `last_price_date` | last CRSP trading day in our data | date | CRSP daily stock file (CIZ) | s07_panel |
