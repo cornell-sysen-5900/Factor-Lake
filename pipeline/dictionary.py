@@ -36,9 +36,14 @@ GICS = {
     "gsector": ("GICS sector code (2 digits); current classification, not historical", CODE, CQ),
     "gsector_name": ("GICS sector name", TEXT, "config.GICS_SECTORS"),
     "ggroup": ("GICS industry group code (4 digits)", CODE, CQ),
+    "ggroup_name": ("GICS industry group name", TEXT, "config.GICS_GROUPS"),
     "gind": ("GICS industry code (6 digits); the RV peer group", CODE, CQ),
     "gind_name": ("GICS industry name", TEXT, "config.GICS_INDUSTRIES"),
     "gsubind": ("GICS sub-industry code (8 digits)", CODE, CQ),
+    "gsubind_name": ("GICS sub-industry name", TEXT, "config.GICS_SUB_INDUSTRIES"),
+    "gics_source": ("where the GICS codes come from: current_header = the company's current (or last) Compustat "
+                    "classification applied to all history, since no historical GICS is available (decision 39)",
+                    TEXT, DERIVED),
 }
 
 # ---------- statement factors and building blocks (s03, used in the panel) ----------
@@ -94,9 +99,10 @@ QE_PRICE = {
 FILES: dict[str, dict] = {}
 
 FILES["factor_panel_monthly.parquet"] = {
-    "stage": "s07_panel", "row": "Russell 2000 member (IWM holding), month end t", "key": ["date", "permno"],
-    "about": "The point-in-time factor panel for backtests: at each month end t, every stock in the latest IWM "
-             "snapshot effective by t, with factors built only from data public by t. Factors are raw values; rank "
+    "stage": "s07_panel", "row": "Russell 2000 member, month end t", "key": ["date", "permno"],
+    "about": "The point-in-time factor panel for backtests: at each month end t, every stock in the latest index "
+             "snapshot effective by t (the client's 9/30 lists before 2008-02, IWM holdings after, see "
+             "membership_source), with factors built only from data public by t. Factors are raw values; rank "
              "or z-score them per date yourself.",
     "columns": {
         "date": ("month end t: the last CRSP trading day of the month", DATE, CIZ),
@@ -109,8 +115,12 @@ FILES["factor_panel_monthly.parquet"] = {
                         "(see the SIC fallback below)", TEXT, DERIVED),
         "gics_from_sic": ("sector_name comes from the SIC fallback", FLAG, DERIVED),
         "siccd": ("CRSP SIC code at t (last non-zero)", CODE, CIZ),
-        "index_weight": ("weight in the IWM fund on the snapshot report date", "percent of the fund", IWM,
-                         "s01_membership"),
+        "index_weight": ("weight in the IWM fund on the snapshot report date; for client_list and client_fill rows "
+                         "the stock's Russell 2000 weight on the list's 9/30", "percent of the fund (or index)",
+                         f"{IWM}; {CLIENT}", "s01_membership"),
+        "membership_source": ("where membership at t comes from: client_list (the client's 9/30 lists, before "
+                              "2008-02), iwm (IWM holdings), client_fill (a list member the old IWM fund id hides, "
+                              "2008-02 to 2010-05)", TEXT, DERIVED, "s01_membership"),
         "snapshot_report_dt": ("report date of the IWM snapshot used at t", DATE, IWM, "s01_membership"),
         "snapshot_eff_dt": ("date the whole snapshot was public (latest eff_dt of its lines); always <= t", DATE,
                             IWM, "s01_membership"),

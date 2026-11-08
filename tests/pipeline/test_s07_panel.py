@@ -25,6 +25,10 @@ def test_universe_uses_the_latest_snapshot_whose_every_line_is_effective():
     assert u.loc[T[2]].index.tolist() == [1]                           # Mar: Jan report; permno 3 excluded
     assert u.loc[(T[2], 1), "snapshot_eff_dt"] == pd.Timestamp("2020-03-05")
     assert not u.loc[(T[2], 1), "new_entrant"] and not u.loc[(T[0], 1), "new_entrant"]
+    assert set(u["membership_source"]) == {"iwm"}                       # snapshots without a source: IWM
+    src = snaps.assign(membership_source=["client_list", "client_list", "iwm", "iwm"])
+    u = s07.build_universe(dates, src).set_index(["date", "permno"])
+    assert u.loc[(T[0], 1), "membership_source"] == "client_list" and u.loc[(T[2], 1), "membership_source"] == "iwm"
 
 
 def quarter(permno, end, report, **vals):

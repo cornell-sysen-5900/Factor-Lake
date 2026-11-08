@@ -35,7 +35,6 @@ from pipeline.config import (
     DISPERSION_MIN_NUMEST,
     FORWARD_YIELD_MAX_ABS,
     GICS_INDUSTRIES,
-    GICS_SECTORS,
     IBES_MAX_AGE_DAYS,
     MIN_OBS_SHARE,
     PEER_MIN,
@@ -57,6 +56,7 @@ from pipeline.config import (
 )
 from pipeline.outputs import fresh_stage_dir, table_info, write_parquet, write_summary
 from pipeline.stages import s02_prices
+from pipeline.stages.s03_fundamentals_q import add_gics_names
 
 STAGE = "s07_panel"
 PANEL, RV, PEERS, MASTER = ("factor_panel_monthly.parquet", "rv_multiples_monthly.parquet",
@@ -100,8 +100,10 @@ def build_universe(dates: pd.Series, snaps: pd.DataFrame) -> pd.DataFrame:
     prev = u[["date", "permno"]].assign(date=u["date"].map(nxt), was_in=True).dropna(subset=["date"])
     u = u.merge(prev, on=["date", "permno"], how="left")
     u["new_entrant"] = u["was_in"].isna() & (u["date"] > dates.min())
+    if "membership_source" not in u.columns:
+        u["membership_source"] = "iwm"
     return u[["date", "permno", "snapshot_report_dt", "snapshot_eff_dt", "index_weight", "ticker_snapshot",
-              "security_name", "new_entrant"]]
+              "security_name", "new_entrant", "membership_source"]]
 
 
 # ---------- Market data, betas ----------
@@ -217,8 +219,7 @@ def add_fundamentals(u: pd.DataFrame, fq: pd.DataFrame) -> tuple[pd.DataFrame, d
     for c in gics:
         u[c] = u[c].astype("Float64").fillna(u["permno"].map(latest[c]).astype("Float64")).astype("Int64")
     u["gics_from_sic"] = u["gsector"].isna()
-    u["gsector_name"] = u["gsector"].map(GICS_SECTORS).astype(object)
-    u["gind_name"] = u["gind"].map(GICS_INDUSTRIES).astype(object)
+    u = add_gics_names(u)
     u["sector_name"] = u["gsector_name"].where(~u["gics_from_sic"], sic_to_sector(u["siccd"]))
     return u, {"late_filed_quarters_dropped": late, "stale_rows": int(stale.sum())}
 
@@ -460,10 +461,9 @@ def build_master(listed, monthly, fq, link, panel, snaps) -> pd.DataFrame:
     m["excluded_non_member"] = m.index.map(excl).fillna(False).astype(bool)
     for c in ("gsector", "ggroup", "gind", "gsubind"):
         m[c] = m[c].astype("Int64")
-    m["gsector_name"] = m["gsector"].map(GICS_SECTORS).astype(object)
-    m["gind_name"] = m["gind"].map(GICS_INDUSTRIES).astype(object)
-    cols = ["permco", "gvkey", "ibes_ticker", "ticker", "security_name", "gsector", "gsector_name", "ggroup", "gind",
-            "gind_name", "gsubind", "siccd", "first_price_date", "last_price_date", "first_universe_date",
+    m = add_gics_names(m)
+    cols = ["permco", "gvkey", "ibes_ticker", "ticker", "security_name", *GICS_COLS, "siccd", "first_price_date",
+            "last_price_date", "first_universe_date",
             "last_universe_date", "excluded_non_member"]
     return m[cols].reset_index()
 
@@ -574,8 +574,10 @@ def run_checks(panel: pd.DataFrame, rv: pd.DataFrame, snaps: pd.DataFrame,
 
 # ---------- Stage ----------
 
-PANEL_COLS = ("date", "permno", "permco", "gvkey", "ticker", "security_name", "gsector", "gsector_name", "ggroup",
-              "gind", "gind_name", "gsubind", "sector_name", "gics_from_sic", "siccd", "index_weight",
+GICS_COLS = ("gsector", "gsector_name", "ggroup", "ggroup_name", "gind", "gind_name", "gsubind", "gsubind_name",
+             "gics_source")
+PANEL_COLS = ("date", "permno", "permco", "gvkey", "ticker", "security_name", *GICS_COLS, "sector_name",
+              "gics_from_sic", "siccd", "index_weight", "membership_source",
               "snapshot_report_dt", "snapshot_eff_dt", "new_entrant", "price_date", "prc", "shrout", "mkt_cap_musd",
               "company_mkt_cap_musd", "company_mkt_cap_crsp_musd", "company_cap_from_compustat", "is_adr",
               "n_share_classes",
