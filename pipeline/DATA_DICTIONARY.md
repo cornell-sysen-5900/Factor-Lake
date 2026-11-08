@@ -55,7 +55,8 @@ One row per Russell 2000 member, month end t; key date, permno. Built by stage `
 | `sector_name` | GICS sector name, or where GICS is missing the SIC code mapped to a GICS sector name (see the SIC fallback below) | text | derived | s07_panel |
 | `gics_from_sic` | sector_name comes from the SIC fallback | true/false | derived | s07_panel |
 | `siccd` | CRSP SIC code at t (last non-zero) | code | CRSP daily stock file (CIZ) | s07_panel |
-| `index_weight` | weight in the IWM fund on the snapshot report date; for client_list and client_fill rows the stock's Russell 2000 weight on the list's 9/30 | percent of the fund (or index) | IWM holdings (CRSP mutual fund holdings); client Russell 2000 lists (9/30, FactSet) | s01_membership |
+| `index_weight` | weight in the IWM fund on the snapshot report date; for client_list and client_fill rows the stock's Russell 2000 weight on the list's 9/30, held unchanged for the whole year (see index_weight_source). Do not weight portfolios with it before 2008-02: use mkt_cap_musd | percent of the fund (or index) | IWM holdings (CRSP mutual fund holdings); client Russell 2000 lists (9/30, FactSet) | s01_membership |
+| `index_weight_source` | iwm = IWM's own weight that month; client_list_static_930 = the client list's 9/30 weight held for the year (client_list and client_fill rows), not a monthly weight | text | derived | s07_panel |
 | `membership_source` | where membership at t comes from: client_list (the client's 9/30 lists, before 2008-02), iwm (IWM holdings), client_fill (a list member the old IWM fund id hides, 2008-02 to 2010-05) | text | derived | s01_membership |
 | `snapshot_report_dt` | report date of the IWM snapshot used at t | date | IWM holdings (CRSP mutual fund holdings) | s01_membership |
 | `snapshot_eff_dt` | date the whole snapshot was public (latest eff_dt of its lines); always <= t | date | IWM holdings (CRSP mutual fund holdings) | s01_membership |
