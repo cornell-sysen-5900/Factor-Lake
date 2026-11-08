@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import re
 import subprocess
 from datetime import date
 from pathlib import Path
@@ -288,6 +290,17 @@ def build_manifest(paths: DataPaths, out: Path, version: str, outputs: dict, inv
     }
 
 
+DATA_VERSION_ENV = "FACTOR_LAKE_DATA_VERSION"
+
+
+def data_version() -> str:
+    """The build date, or FACTOR_LAKE_DATA_VERSION (YYYY-MM-DD) to re-export a published version under its date."""
+    v = os.environ.get(DATA_VERSION_ENV, "").strip()
+    if v and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
+        raise ValueError(f"{DATA_VERSION_ENV} must be YYYY-MM-DD, not {v!r}")
+    return v or date.today().isoformat()
+
+
 def s3_folder(version: str) -> str:
     return f"wrds_{version[:4]}_{version[5:7]}"
 
@@ -429,7 +442,7 @@ def run_checks(paths: DataPaths, out: Path, exported: dict, outputs: dict, manif
 
 def run(paths: DataPaths) -> dict:
     out, sdir = fresh_stage_dir(paths, FINAL), fresh_stage_dir(paths, STAGE)
-    version = date.today().isoformat()
+    version = data_version()
     inventory = json.loads((paths.stage_dir("s00_inventory") / "inventory.json").read_text(encoding="utf-8"))
     exported = {}
     for name in SOURCES:

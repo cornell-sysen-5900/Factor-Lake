@@ -6,9 +6,11 @@ Use this guide when you need to configure, update, or troubleshoot where the Fac
 
 The newest data version is **`s3://sysen-5900-factor-lake/factor-lake-data/wrds_2026_11/`** (data version
 2026-11-07), built by the WRDS pipeline in [`pipeline/`](../pipeline/README.md) from the November 2026 WRDS,
-Fama-French and FRED pulls ([`pipeline/PULLS_V2.md`](../pipeline/PULLS_V2.md) lists every query). The point-in-time
+Fama-French and FRED pulls ([`pipeline/PULLS_V2.md`](https://github.com/cornell-sysen-5900/Factor-Lake/blob/main/pipeline/PULLS_V2.md) lists every query). The point-in-time
 panel runs from **2002-07 to 2026-09**. Every column is described in
-[`pipeline/DATA_DICTIONARY.md`](../pipeline/DATA_DICTIONARY.md). **The app's WRDS mode and the backtest Lambda read
+[`pipeline/DATA_DICTIONARY.md`](../pipeline/DATA_DICTIONARY.md) (schema only; its "Data version 2" note at the top
+sums up coverage, membership eras, index weights, GICS and thin early analyst data). To build the next version,
+follow [`pipeline/DATA_UPDATE_GUIDE.md`](https://github.com/cornell-sysen-5900/Factor-Lake/blob/main/pipeline/DATA_UPDATE_GUIDE.md). **The app's WRDS mode and the backtest Lambda read
 this folder** (`DEFAULT_WRDS_DIR` in `src/wrds_data.py`); Legacy reads its own files and is unchanged.
 
 | key under wrds_2026_11/ | contents |

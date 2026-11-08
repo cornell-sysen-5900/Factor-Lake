@@ -1,6 +1,16 @@
 # Factor-Lake WRDS data: data dictionary (schema)
 
-Written by stage `s08_export` from `pipeline/dictionary.py`. It describes every file the pipeline exports to `processed/final/` and every column in it. It holds no numbers from the data: the full version with statistics and coverage by year (`processed/DATA_DICTIONARY.md`) stays next to the data, because the data is licensed from WRDS. All files are Parquet; read them with `pandas.read_parquet`.
+Written by stage `s08_export` from `pipeline/dictionary.py`. It describes every file the pipeline exports to `processed/final/` (data version 2: `processed_v2/final/`) and every column in it. It holds no numbers from the data: the full version with statistics and coverage by year (`DATA_DICTIONARY.md` in the processed folder) stays next to the data, because the data is licensed from WRDS. All files are Parquet; read them with `pandas.read_parquet`.
+
+## Data version 2
+
+Data version 2 (`wrds_2026_11` on) extends the point-in-time data back to 2002.
+
+- **Coverage:** factor_panel_monthly runs from 2002-07 to 2026-09. The daily prices start in 1997, Compustat in 1999, IBES in 2001 and the market series in 1997 (IWM from 2000-05, IWN and IWO from 2000-07), so momentum, betas and growth are available from the first panel month.
+- **Membership eras** (`membership_source`): `client_list` before 2008-02 (the annual Russell 2000 lists on each 9/30, each used from the June reconstitution until the next, with no mid-year additions); `iwm` plus `client_fill` from 2008-02 to 2010-05 (list members the old IWM fund id hides); `iwm` only after.
+- **index_weight before 2008-02** is the list's 9/30 weight held for the whole year (`index_weight_source = client_list_static_930`), not a monthly weight: don't weight portfolios with it; use `mkt_cap_musd`.
+- **GICS** is each company's current (or last) classification applied to all of its history (`gics_source = current_header`): there is no historical GICS.
+- **Thin early analyst data:** IBES capital expenditure (CPX) estimates start in 2006, and EBIT (EBI), dividend (DPS) and cash flow (CPS) estimates are thin in 2001-2004, so analyst factors cover fewer stocks then.
 
 ## Conventions
 
@@ -427,14 +437,14 @@ One row per stock, fiscal year; key permno, fyear. Built by stage `s04_fundament
 | `emp` | employees | thousands | Compustat annual (CCM) | s04_fundamentals_a |
 | `sich` | historical SIC code | code | Compustat annual (CCM) | s04_fundamentals_a |
 | `gsector` | GICS sector code (2 digits); current classification, not historical | code | Compustat annual (CCM) | s04_fundamentals_a |
-| `gsector_name` | GICS sector name | text | Compustat annual (CCM) | s04_fundamentals_a |
+| `gsector_name` | GICS sector name | text | config.GICS_SECTORS | s04_fundamentals_a |
 | `ggroup` | GICS industry group code (4 digits) | code | Compustat annual (CCM) | s04_fundamentals_a |
-| `ggroup_name` | GICS industry group name | text | Compustat annual (CCM) | s04_fundamentals_a |
+| `ggroup_name` | GICS industry group name | text | config.GICS_GROUPS | s04_fundamentals_a |
 | `gind` | GICS industry code (6 digits); the RV peer group | code | Compustat annual (CCM) | s04_fundamentals_a |
-| `gind_name` | GICS industry name | text | Compustat annual (CCM) | s04_fundamentals_a |
+| `gind_name` | GICS industry name | text | config.GICS_INDUSTRIES | s04_fundamentals_a |
 | `gsubind` | GICS sub-industry code (8 digits) | code | Compustat annual (CCM) | s04_fundamentals_a |
-| `gsubind_name` | GICS sub-industry name | text | Compustat annual (CCM) | s04_fundamentals_a |
-| `gics_source` | where the GICS codes come from: current_header = the company's current (or last) Compustat classification applied to all history, since no historical GICS is available (decision 39) | text | Compustat annual (CCM) | s04_fundamentals_a |
+| `gsubind_name` | GICS sub-industry name | text | config.GICS_SUB_INDUSTRIES | s04_fundamentals_a |
+| `gics_source` | where the GICS codes come from: current_header = the company's current (or last) Compustat classification applied to all history, since no historical GICS is available (decision 39) | text | derived | s04_fundamentals_a |
 | `naics` | NAICS industry code | code | Compustat annual (CCM) | s04_fundamentals_a |
 | `dcf_applicable` | False for GICS sectors 40 (Financials) and 60 (Real Estate), where a DCF on FCFF does not fit | true/false | derived | s04_fundamentals_a |
 | `interest_source` | where interest_expense comes from: xint, xintd or missing (never 0-filled; the DCF then uses the Baa yield) | text | derived | s04_fundamentals_a |
@@ -522,14 +532,14 @@ One row per stock, fiscal quarter; key permno, fyearq, fqtr. Built by stage `s03
 | `is_usd` | reported in USD | true/false | Compustat quarterly (CCM) | s03_fundamentals_q |
 | `ajexq` | Compustat cumulative adjustment factor (divide per-share items, multiply shares) | ratio (times) | Compustat quarterly (CCM) | s03_fundamentals_q |
 | `gsector` | GICS sector code (2 digits); current classification, not historical | code | Compustat quarterly (CCM) | s03_fundamentals_q |
-| `gsector_name` | GICS sector name | text | Compustat quarterly (CCM) | s03_fundamentals_q |
+| `gsector_name` | GICS sector name | text | config.GICS_SECTORS | s03_fundamentals_q |
 | `ggroup` | GICS industry group code (4 digits) | code | Compustat quarterly (CCM) | s03_fundamentals_q |
-| `ggroup_name` | GICS industry group name | text | Compustat quarterly (CCM) | s03_fundamentals_q |
+| `ggroup_name` | GICS industry group name | text | config.GICS_GROUPS | s03_fundamentals_q |
 | `gind` | GICS industry code (6 digits); the RV peer group | code | Compustat quarterly (CCM) | s03_fundamentals_q |
-| `gind_name` | GICS industry name | text | Compustat quarterly (CCM) | s03_fundamentals_q |
+| `gind_name` | GICS industry name | text | config.GICS_INDUSTRIES | s03_fundamentals_q |
 | `gsubind` | GICS sub-industry code (8 digits) | code | Compustat quarterly (CCM) | s03_fundamentals_q |
-| `gsubind_name` | GICS sub-industry name | text | Compustat quarterly (CCM) | s03_fundamentals_q |
-| `gics_source` | where the GICS codes come from: current_header = the company's current (or last) Compustat classification applied to all history, since no historical GICS is available (decision 39) | text | Compustat quarterly (CCM) | s03_fundamentals_q |
+| `gsubind_name` | GICS sub-industry name | text | config.GICS_SUB_INDUSTRIES | s03_fundamentals_q |
+| `gics_source` | where the GICS codes come from: current_header = the company's current (or last) Compustat classification applied to all history, since no historical GICS is available (decision 39) | text | derived | s03_fundamentals_q |
 | `naics` | NAICS industry code | code | Compustat quarterly (CCM) | s03_fundamentals_q |
 | `price_qe` | closing price at the quarter end (prccq) | $ per share | Compustat quarterly (CCM) | s03_fundamentals_q |
 | `cshoq` | common shares outstanding, all classes | millions of shares | Compustat quarterly (CCM) | s03_fundamentals_q |

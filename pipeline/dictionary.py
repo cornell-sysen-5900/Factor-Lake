@@ -10,7 +10,13 @@ Each column is (meaning, unit, source[, stage]); the stage defaults to the file'
 
 from __future__ import annotations
 
-from pipeline.config import GICS_SECTORS, SIC_TO_GICS_SECTOR
+from pipeline.config import (
+    CLIENT_FILL_LAST_MONTH,
+    CLIENT_LIST_FIRST_MONTH,
+    GICS_SECTORS,
+    IWM_FIRST_MONTH,
+    SIC_TO_GICS_SECTOR,
+)
 
 # units
 DEC, MUSD, PS, DATE, TEXT, FLAG, CODE, N, X, MSH = ("decimal", "$ millions", "$ per share", "date", "text",
@@ -45,6 +51,8 @@ GICS = {
                     "classification applied to all history, since no historical GICS is available (decision 39)",
                     TEXT, DERIVED),
 }
+
+GICS_CODES = ("gsector", "ggroup", "gind", "gsubind")     # from Compustat; the names come from config tables
 
 # ---------- statement factors and building blocks (s03, used in the panel) ----------
 
@@ -390,7 +398,7 @@ FILES["dcf_inputs_annual.parquet"] = {
         "epsfx": ("diluted EPS excluding extraordinary items", PS, CA),
         "emp": ("employees", "thousands", CA),
         "sich": ("historical SIC code", CODE, CA),
-        **{k: v[:2] + (CA,) for k, v in GICS.items()},
+        **{k: v[:2] + (CA,) if k in GICS_CODES else v for k, v in GICS.items()},
         "naics": ("NAICS industry code", CODE, CA),
         "dcf_applicable": ("False for GICS sectors 40 (Financials) and 60 (Real Estate), where a DCF on FCFF does "
                            "not fit", FLAG, DERIVED),
@@ -500,7 +508,7 @@ FILES["fundamentals_quarterly.parquet"] = {
         "fyearq": ("fiscal year", "year", CQ), "fqtr": ("fiscal quarter (1-4)", CODE, CQ),
         "curcdq": ("reporting currency", TEXT, CQ), "is_usd": ("reported in USD", FLAG, CQ),
         "ajexq": ("Compustat cumulative adjustment factor (divide per-share items, multiply shares)", X, CQ),
-        **{k: v[:2] + (CQ,) for k, v in GICS.items()},
+        **{k: v[:2] + (CQ,) if k in GICS_CODES else v for k, v in GICS.items()},
         "naics": ("NAICS industry code", CODE, CQ),
         "price_qe": ("closing price at the quarter end (prccq)", PS, CQ),
         "cshoq": ("common shares outstanding, all classes", MSH, CQ),
@@ -599,6 +607,7 @@ def render(manifest: dict, stats=None, coverage=None) -> str:
           f"`{manifest['pipeline_git_commit'][:12]}`) from the WRDS, Fama-French and FRED downloads listed in "
           "manifest.json. All files are Parquet; read them with `pandas.read_parquet`. The schema-only version is "
           "`pipeline/DATA_DICTIONARY.md` in the repo; this one adds the stats of the data.", "",
+          *data_version_note(manifest),
           *CONVENTIONS,
           "## Files", "", "| file | one row per | key | rows | MB |", "|---|---|---|---|---|"]
     for name, f in FILES.items():
@@ -633,9 +642,11 @@ def render_schema() -> str:
     source and stage, from this module alone: nothing here comes from the data (no stats, counts or values)."""
     md = ["# Factor-Lake WRDS data: data dictionary (schema)", "",
           "Written by stage `s08_export` from `pipeline/dictionary.py`. It describes every file the pipeline exports "
-          "to `processed/final/` and every column in it. It holds no numbers from the data: the full version with "
-          "statistics and coverage by year (`processed/DATA_DICTIONARY.md`) stays next to the data, because the data "
-          "is licensed from WRDS. All files are Parquet; read them with `pandas.read_parquet`.", "",
+          "to `processed/final/` (data version 2: `processed_v2/final/`) and every column in it. It holds no numbers "
+          "from the data: the full version with statistics and coverage by year (`DATA_DICTIONARY.md` in the "
+          "processed folder) stays next to the data, because the data is licensed from WRDS. All files are Parquet; "
+          "read them with `pandas.read_parquet`.", "",
+          *data_version_note(),
           *CONVENTIONS,
           "## Files", "", "| file | one row per | key | built by |", "|---|---|---|---|"]
     for name, f in FILES.items():
@@ -650,6 +661,32 @@ def render_schema() -> str:
         md.append("")
     md += sectors()
     return "\n".join(md)
+
+
+def data_version_note(manifest: dict | None = None) -> list[str]:
+    """The 'Data version 2' block at the top of both dictionaries. With a manifest, the panel's own months;
+    without (the repo's schema-only version), the months of wrds_2026_11."""
+    panel = (manifest or {}).get("outputs", {}).get("factor_panel_monthly.parquet", {}).get("date_range")
+    first, last = (panel[0][:7], panel[1][:7]) if panel else (CLIENT_LIST_FIRST_MONTH, "2026-09")
+    fill_end = CLIENT_FILL_LAST_MONTH
+    return [
+        "## Data version 2", "",
+        "Data version 2 (`wrds_2026_11` on) extends the point-in-time data back to 2002.", "",
+        f"- **Coverage:** factor_panel_monthly runs from {first} to {last}. The daily prices start in 1997, "
+        "Compustat in 1999, IBES in 2001 and the market series in 1997 (IWM from 2000-05, IWN and IWO from "
+        "2000-07), so momentum, betas and growth are available from the first panel month.",
+        f"- **Membership eras** (`membership_source`): `client_list` before {IWM_FIRST_MONTH} (the annual Russell 2000 "
+        "lists on each 9/30, each used from the June reconstitution until the next, with no mid-year additions); "
+        f"`iwm` plus `client_fill` from {IWM_FIRST_MONTH} to {fill_end} (list members the old IWM fund id hides); "
+        "`iwm` only after.",
+        f"- **index_weight before {IWM_FIRST_MONTH}** is the list's 9/30 weight held for the whole year "
+        "(`index_weight_source = client_list_static_930`), not a monthly weight: don't weight portfolios with it; "
+        "use `mkt_cap_musd`.",
+        "- **GICS** is each company's current (or last) classification applied to all of its history "
+        "(`gics_source = current_header`): there is no historical GICS.",
+        "- **Thin early analyst data:** IBES capital expenditure (CPX) estimates start in 2006, and EBIT (EBI), "
+        "dividend (DPS) and cash flow (CPS) estimates are thin in 2001-2004, so analyst factors cover fewer stocks "
+        "then.", ""]
 
 
 CONVENTIONS = [
