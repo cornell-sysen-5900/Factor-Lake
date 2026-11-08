@@ -173,6 +173,8 @@ WRDS mode is a second data source next to Legacy. It backtests on point-in-time 
 3. The portfolio can only hold stocks in your choices at the picked level. If that list is empty, the filter is off.
 4. At the Sector level, a stock without GICS is placed by its SIC code, as before. At the finer levels, stocks without GICS are left out.
 
+Where the codes and names come from, and how many stocks have no GICS: [GICS mapping](GICS_MAPPING.md).
+
 The run's **Universe** caption and the **Sectors** row in Compare show the filter, e.g. "Industry: Banks, Insurance". The holdings table lists each stock's GICS sector, industry group, industry and sub-industry, and exported settings files keep the level and the choices.
 
 ### Read WRDS results
