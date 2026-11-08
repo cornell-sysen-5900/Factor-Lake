@@ -150,7 +150,7 @@ def test_legacy_comparison_and_next_year_return():
                        [(2002, 9)] + [(2002, k) for k in (10, 11, 12)] + [(2003, k) for k in range(1, 10)]])
     nyr = s09.next_year_returns(rets, [2002])
     assert nyr["next_year_ret"].item() == pytest.approx(1.01 ** 12 - 1)          # October to September only
-    m = pd.DataFrame({"Ending Price": np.arange(1.0, 21.0), "prc": np.arange(1.0, 21.0) * 1.005,
+    m = pd.DataFrame({"Ending Price": np.arange(1.0, 21.0), "prc_adj": np.arange(1.0, 21.0) * 1.005,
                       "12-Mo Momentum %": np.arange(20.0), "mom_12m": np.arange(20.0)[::-1] / 100})
     out = s09.compare_legacy(m)
     assert out["Ending Price"]["spearman"] == pytest.approx(1.0)
@@ -164,8 +164,11 @@ def test_membership_and_client_overlap_checks(tmp_path):
     rows = [(pd.Timestamp("2007-09-28"), p, "client_list", 1.0) for p in (1, 2)]
     rows += [(pd.Timestamp("2009-09-30"), p, s, 1.0) for p, s in ((1, "iwm"), (2, "client_fill"))]
     rows += [(pd.Timestamp("2011-09-30"), 1, "client_fill", 1.0)]                       # fill after 2010-05: wrong
-    pd.DataFrame(rows, columns=["date", "permno", "membership_source", "mkt_cap_musd"]).to_parquet(
-        final / "factor_panel_monthly.parquet")
+    panel = pd.DataFrame(rows, columns=["date", "permno", "membership_source", "mkt_cap_musd"])
+    panel["snapshot_report_dt"] = panel["date"]
+    lag = pd.DataFrame([(pd.Timestamp("2008-02-29"), 3, "client_list", 1.0, pd.Timestamp("2008-01-31"))],
+                       columns=panel.columns)                  # IWM's 2008-02 report not yet effective: still the list
+    pd.concat([panel, lag]).to_parquet(final / "factor_panel_monthly.parquet")
     checks, res = s09.check_membership(final)
-    assert checks[0].status == "WARN" and "1 rows outside" in checks[0].detail
+    assert checks[0].status == "WARN" and "1 rows outside" in checks[0].detail     # only the 2011 fill row
     assert res["by_year"][2009]["fill_cap_pct"] == 50.0

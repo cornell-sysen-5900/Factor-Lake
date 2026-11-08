@@ -756,10 +756,10 @@ manifest last, nothing else, under factor-lake-data/wrds_YYYY_MM/.
 Data version 2 adds: (1) and (2) also by membership era of the formation month (client lists to 2008-01, IWM +
 client fill 2008-02 to 2010-05, IWM after), each era's correlation with IWM >= 0.99; IWM's monthly return drops
 the ETF file's exact duplicate rows first; (8) membership by source: panel rows and stocks per month by
-membership_source, each source only in its own months, 1,800-2,150 stocks every month; (9) client lists vs IWM:
+membership_source, each source only in its own snapshot months (a panel month uses an older snapshot until the next is effective, so 2008-02 and 2008-03 still hold the 2008-01 list), 1,800-2,150 stocks every month; (9) client lists vs IWM:
 each 9/30 list against the IWM universe periods covering that 9/30, at least 99% of the list in IWM or (2008-2010)
 the client fill; (10) WRDS vs Legacy, 2002-2007: each Legacy stock-year matched by permno to the panel's September
-month end (at least 98% found), and per FactSet column (price, market cap, 12/6/1-month momentum, 1-year
+month end (at least 98% found), and per FactSet column (price, compared with CRSP's split-adjusted prc_adj because FactSet adjusts historical prices for later splits; market cap, 12/6/1-month momentum, 1-year
 volatility, Book/Price, ROA, next-FY E/P, asset growth, accruals, next-year return from returns_monthly October to
 September) the rank correlation, median difference and share within a tolerance, overall and by year; rank
 correlation at least 0.99 for price, 0.95 for market cap, 0.90 for 12-month momentum and next-year return; (11)

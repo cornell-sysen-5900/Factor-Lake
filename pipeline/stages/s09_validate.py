@@ -82,7 +82,10 @@ ERAS = (("client lists", None, pd.Period(IWM_FIRST_MONTH, "M") - 1),
 LEGACY_YEARS = (2002, 2007)
 # Legacy (client file) column -> (panel or derived column, multiplier to the Legacy unit, tolerance, kind)
 LEGACY_COMPARE = {
-    "Ending Price": ("prc", 1.0, 0.01, "relative"),
+    # FactSet adjusts its historical prices for later splits, so the Legacy price is compared with CRSP's
+    # split-adjusted price (prc / cfacpr, the basis at the end of the data); the raw price is shown for reference
+    "Ending Price": ("prc_adj", 1.0, 0.01, "relative"),
+    "Ending Price (vs unadjusted prc)": ("prc", 1.0, 0.01, "relative"),
     "Market Capitalization": ("company_mkt_cap_musd", 1.0, 0.10, "relative"),
     "12-Mo Momentum %": ("mom_12m", 100.0, 5.0, "absolute"),
     "6-Mo Momentum %": ("mom_6m", 100.0, 5.0, "absolute"),
@@ -364,9 +367,9 @@ def check_recompute(paths: DataPaths, out: Path, final: Path) -> tuple[list[Chec
 def check_membership(final: Path) -> tuple[list[Check], dict]:
     """Panel months and stocks by membership_source; each source only in its own months."""
     p = pd.read_parquet(final / "factor_panel_monthly.parquet", columns=["date", "permno", "membership_source",
-                                                                         "mkt_cap_musd"])
+                                                                         "mkt_cap_musd", "snapshot_report_dt"])
     month = p["date"].dt.to_period("M")
-    era = month.map(era_of)
+    era = p["snapshot_report_dt"].dt.to_period("M").map(era_of)       # the snapshot's month: s07 uses it later
     per = p.groupby(["date", "membership_source"]).agg(n=("permno", "size"), cap=("mkt_cap_musd", "sum")).unstack(
         fill_value=0)
     n, cap = per["n"].reindex(columns=list(MEMBERSHIP_SOURCES), fill_value=0), per["cap"].reindex(
@@ -385,7 +388,7 @@ def check_membership(final: Path) -> tuple[list[Check], dict]:
     res = {"first_month": str(month.min()), "last_month": str(month.max()), "months": int(month.nunique()),
            "rows_by_source": {k: int(v) for k, v in p["membership_source"].value_counts().items()},
            "by_year": by_year}
-    checks = [check("membership by source: each source only in its own months", wrong == 0,
+    checks = [check("membership by source: each source only in its own snapshot months", wrong == 0,
                     f"{wrong} rows outside; client_list before {IWM_FIRST_MONTH}, client_fill to "
                     f"{CLIENT_FILL_LAST_MONTH}, IWM after", level=WARN),
               check(f"membership by source: {lo:,}-{hi:,} stocks every month", outside.empty,
@@ -436,8 +439,9 @@ def read_legacy(path: Path) -> pd.DataFrame:
     raw = raw.dropna(how="all")
     out = pd.DataFrame({"row": (raw.index + 5).astype("int64")})
     cols = {c.strip(): c for c in raw.columns}
+    cols["Ending Price (vs unadjusted prc)"] = cols.get("Ending Price")
     for name in LEGACY_COMPARE:
-        if name in cols:
+        if cols.get(name):
             out[name] = pd.to_numeric(raw[cols[name]].str.replace(",", "", regex=False).str.strip(),
                                       errors="coerce").to_numpy()
     return out
@@ -480,10 +484,13 @@ def check_legacy(paths: DataPaths, final: Path) -> tuple[list[Check], dict]:
     leg = read_legacy(path).merge(cm, on="row")
     leg = leg[leg["year"].between(lo, hi) & leg["final_permno"].notna()].assign(
         permno=lambda d: d["final_permno"].astype("int32"))
-    cols = sorted({c for c, *_ in LEGACY_COMPARE.values()} - {"next_year_ret"})
-    panel = pd.read_parquet(final / "factor_panel_monthly.parquet", columns=["date", "permno", *cols])
+    cols = sorted({c for c, *_ in LEGACY_COMPARE.values()} - {"next_year_ret", "prc_adj"})
+    panel = pd.read_parquet(final / "factor_panel_monthly.parquet", columns=["date", "permno", "price_date", *cols])
     panel = panel[(panel["date"].dt.month == 9) & panel["date"].dt.year.between(lo, hi)].assign(
         year=lambda d: d["date"].dt.year)
+    daily = pd.concat([pd.read_parquet(f, columns=["permno", "date", "prc_adj"])
+                       for y in range(lo, hi + 1) for f in (final / "prices_daily" / f"year={y}").glob("*.parquet")])
+    panel = panel.merge(daily.rename(columns={"date": "price_date"}), on=["permno", "price_date"], how="left")
     rets = pd.read_parquet(final / "returns_monthly.parquet", columns=["month_end", "permno", "ret_m"])
     m = leg.merge(panel, on=["year", "permno"], how="left", indicator=True)
     m = m.merge(next_year_returns(rets, list(range(lo, hi + 1))), on=["year", "permno"], how="left")
@@ -829,7 +836,9 @@ def render_v2_sections(r: dict, checks: list[Check]) -> list[str]:
         md += [f"The app's Legacy data (the client's FactSet values on each 9/30, {lg['years']}) against this panel at "
                f"the September month end, matched by permno: {lg['legacy_rows_with_permno']:,} stock-years, "
                f"{lg['in_panel_pct']:.2f}% in the panel. Definitions differ (FactSet's dates and formulas), so the "
-               "rank correlation is the main measure.", "",
+               "rank correlation is the main measure. FactSet's historical prices are adjusted for later splits, so "
+               "the Legacy price is compared with CRSP's split-adjusted price (prc_adj); the unadjusted row shows "
+               "the difference.", "",
                "| Legacy | WRDS | pairs | rank correlation | median difference | within tolerance |",
                "|---|---|---|---|---|---|"]
         md += [f"| {k} | {v['wrds_column']} | {v['pairs']:,} | {v['spearman']:.4f} | {v['median_difference']:+.4f} | "
