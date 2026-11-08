@@ -20,6 +20,7 @@ import pandas as pd
 from app.saved_runs import trading_cost_suffix
 from app.wrds_tables import FREQUENCY_LABELS, period_label, short_benchmark
 from src.trading_costs import has_trading_costs, job_trading_cost
+from src.wrds_gics import describe_gics_filter
 
 MIN_COMPARED, MAX_COMPARED = 2, 4
 NA = 'n/a'
@@ -175,6 +176,8 @@ def _period(a: Dict[str, Any]) -> str:
 
 
 def _sectors(a: Dict[str, Any]) -> str:
+    if a['job'].get('gics_filter'):                  # WRDS jobs with a GICS filter
+        return describe_gics_filter(a['job']['gics_filter'])
     sectors = a['job'].get('selected_sectors') or []
     return ', '.join(sectors) if sectors else 'All sectors'
 

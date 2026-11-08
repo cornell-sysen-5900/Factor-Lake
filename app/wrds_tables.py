@@ -23,6 +23,9 @@ BENCHMARKS = [('benchmark', 'benchmark_returns', ''), ('value', 'value_benchmark
               ('growth', 'growth_benchmark_returns', 'Growth')]
 # Legacy's tables list the benchmark, then growth, then value
 TABLE_ORDER = ('benchmark', 'growth', 'value')
+# The holdings' four GICS name columns (src/wrds_engine.HOLDINGS_GICS_COLUMNS) and their headers
+GICS_HEADERS = {'gics_sector': 'GICS Sector', 'gics_industry_group': 'GICS Industry Group',
+                'gics_industry': 'GICS Industry', 'gics_sub_industry': 'GICS Sub-Industry'}
 
 
 def benchmark_label(results: Dict[str, Any], role: str) -> str:
@@ -108,10 +111,14 @@ def holdings_display_table(holdings: pd.DataFrame, factors: List[str], labels: D
     One rebalance date's holdings (as stored in the holdings Parquet) as Legacy's holdings
     table: the same columns, order and units (weights, returns and contributions in percent),
     factor values under their display names, then the WRDS-only PERMNO and months without
-    a return.
+    a return. After Sector come the four GICS names (empty for a stock without GICS), when
+    the holdings have them (holdings saved before them do not).
     """
     table = pd.DataFrame({'Rank': holdings['rank'].astype(int), 'Ticker': holdings['ticker'].astype(str),
                           'Name': holdings['name'].astype(str), 'Sector': holdings['sector'].astype(str)})
+    for column, header in GICS_HEADERS.items():
+        if column in holdings:
+            table[header] = holdings[column].astype(object).fillna('').astype(str).to_numpy()
     if 'picked_by' in holdings:
         table['Picked By'] = holdings['picked_by'].astype(str)
     table['Score'] = pd.to_numeric(holdings['score'])

@@ -16,6 +16,7 @@ import pandas as pd
 import pytest
 
 from app.wrds_tables import (
+    GICS_HEADERS,
     benchmark_label,
     calendar_year_results,
     factor_header,
@@ -93,8 +94,10 @@ def test_holdings_table_has_legacys_columns_order_and_units(backtest):
     date = holdings['rebalance_date'].iloc[-1]
     raw = holdings[holdings['rebalance_date'] == date].reset_index(drop=True)
     table = holdings_display_table(raw, FACTORS, LABELS)
-    assert list(table.columns) == LEGACY_HOLDINGS_BEFORE + ['ROE %', '12-1 Mo Momentum %', 'Market Cap ($M)',
-                                                             'Book/Price'] + LEGACY_HOLDINGS_AFTER + [
+    # Legacy's columns, with the four WRDS GICS names after Sector
+    before = LEGACY_HOLDINGS_BEFORE[:4] + list(GICS_HEADERS.values()) + LEGACY_HOLDINGS_BEFORE[4:]
+    assert list(table.columns) == before + ['ROE %', '12-1 Mo Momentum %', 'Market Cap ($M)',
+                                            'Book/Price'] + LEGACY_HOLDINGS_AFTER + [
         'PERMNO', 'Months Without Return']
     np.testing.assert_allclose(table['Weight %'], raw['weight'] * 100)
     np.testing.assert_allclose(table['Period Return %'], raw['period_return'] * 100)

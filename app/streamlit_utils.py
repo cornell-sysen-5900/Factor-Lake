@@ -179,10 +179,15 @@ def load_and_process_data(user_settings: Dict[str, Any]) -> None:
         st.error(f"Data Orchestration Error: {str(e)}")
 
 def _universe_filters(user_settings: Dict[str, Any]) -> Dict[str, Any]:
-    """The sidebar's universe filters, as shown in the Results tab captions."""
+    """
+    The sidebar's universe filters, as shown in the Results tab captions; a WRDS run's
+    GICS filter (gics_filter) only when it has one.
+    """
+    gics = user_settings.get('gics_filter')
     return {
         'restrict_fossil_fuels': bool(user_settings.get('restrict_fossil_fuels')),
         'selected_sectors': list(user_settings.get('selected_sectors') or []),
+        **({'gics_filter': gics} if gics else {}),
     }
 
 def get_backtest_lambda_name() -> str:
@@ -493,6 +498,8 @@ def open_saved_analysis(text: str) -> Dict[str, Any]:
     job = saved['job']
     # Jobs saved before trading costs (or at 0 bps) have none: they open at 0 bps, with settings as before
     costs = {'trading_cost_bps': job['trading_cost_bps']} if job.get('trading_cost_bps') else {}
+    # WRDS jobs saved before the GICS filter have selected_sectors only
+    gics = {'gics_filter': job['gics_filter']} if job.get('gics_filter') else {}
     factor_labels = [job['factor_labels'].get(f, f) for f in job['factors']]
     run_id = st.session_state.next_run_id
     compute = {'hash': saved['id'], 'opened': True, 'cached': True,
@@ -508,9 +515,9 @@ def open_saved_analysis(text: str) -> Dict[str, Any]:
             'factor_directions': dict(job['factor_directions']),
             'settings': {'data_mode': 'wrds', **{k: job[k] for k in (
                 'frequency', 'start_year', 'end_year', 'initial_aum', 'use_market_cap_weight',
-                'factor_combination', 'restrict_fossil_fuels', 'selected_sectors')}, **costs},
+                'factor_combination', 'restrict_fossil_fuels', 'selected_sectors')}, **gics, **costs},
             'universe': {'restrict_fossil_fuels': job['restrict_fossil_fuels'],
-                         'selected_sectors': list(job['selected_sectors'])},
+                         'selected_sectors': list(job['selected_sectors']), **gics},
             'data': None,
             'results': saved['result'],
             'compute': compute,

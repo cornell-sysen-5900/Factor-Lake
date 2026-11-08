@@ -41,6 +41,11 @@ types, modes, supported factors/sectors, directions, ranges and date ordering ar
 before any inputs change. Files larger than 64 KB, duplicate JSON keys, extra fields,
 unknown schema versions, nonfinite values and malformed JSON are rejected with an error.
 
+WRDS settings with a GICS filter (the sidebar's Filter level) also have `gics_filter`
+(`{"level": "industry", "codes": [401010]}`; levels `sector`, `industry_group`, `industry`,
+`sub_industry`) and an empty `selected_sectors`. Older WRDS files, with `selected_sectors`
+only, still import, at the Sector level.
+
 This version supports the portfolio percentage and benchmark exposed by the current app
 (default 10% and benchmark index 1). Export and Use these settings are unavailable (with the
 reason on hover) for previously saved Legacy runs with other values, instead of silently
