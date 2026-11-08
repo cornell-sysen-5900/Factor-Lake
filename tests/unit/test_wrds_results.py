@@ -16,6 +16,7 @@ import pandas as pd
 import pytest
 
 from app.wrds_tables import (
+    GICS_HEADERS,
     benchmark_label,
     calendar_year_results,
     factor_header,
@@ -93,8 +94,10 @@ def test_holdings_table_has_legacys_columns_order_and_units(backtest):
     date = holdings['rebalance_date'].iloc[-1]
     raw = holdings[holdings['rebalance_date'] == date].reset_index(drop=True)
     table = holdings_display_table(raw, FACTORS, LABELS)
-    assert list(table.columns) == LEGACY_HOLDINGS_BEFORE + ['ROE %', '12-1 Mo Momentum %', 'Market Cap ($M)',
-                                                             'Book/Price'] + LEGACY_HOLDINGS_AFTER + [
+    # Legacy's columns, with the four WRDS GICS names after Sector
+    before = LEGACY_HOLDINGS_BEFORE[:4] + list(GICS_HEADERS.values()) + LEGACY_HOLDINGS_BEFORE[4:]
+    assert list(table.columns) == before + ['ROE %', '12-1 Mo Momentum %', 'Market Cap ($M)',
+                                            'Book/Price'] + LEGACY_HOLDINGS_AFTER + [
         'PERMNO', 'Months Without Return']
     np.testing.assert_allclose(table['Weight %'], raw['weight'] * 100)
     np.testing.assert_allclose(table['Period Return %'], raw['period_return'] * 100)
@@ -422,6 +425,8 @@ def test_the_data_viewer_says_it_shows_legacy_data_in_wrds_mode(new_session):
     at.sidebar.radio(key='data_mode_input').set_value('WRDS').run()
     _click_main_tab(at, 'Data Viewer')
     assert any('The Data Viewer shows the Legacy data, not WRDS' in c.value for c in at.main.caption)
+    assert any('GICS sector, industry group, industry and sub-industry names are in its holdings table'
+               in c.value for c in at.main.caption)
     at.sidebar.radio(key='data_mode_input').set_value('Legacy').run()
     assert not any('The Data Viewer shows the Legacy data' in c.value for c in at.main.caption)
 

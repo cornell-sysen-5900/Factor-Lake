@@ -24,6 +24,7 @@ from src.wrds_data import (
     WrdsData,
 )
 from src.wrds_factors import WRDS_FACTOR_COLUMNS, WRDS_SECTORS
+from src.wrds_gics import GICS_NAME_COLUMNS, level_names, parent_code
 from tests.unit.test_backtest_lambda import FakeS3
 
 # WRDS sidebar settings the synthetic data covers (its months run 2009-11 to 2013-02)
@@ -78,6 +79,12 @@ def put_wrds_files(s3: FakeS3, frames: 'Frames', prefix: str = 'factor-lake-data
         s3.objects[f'{prefix}/{data_dir}/{name}'] = (body, {})
 
 
+def gics_names(gsubind) -> dict:
+    """The panel's four GICS name columns of a sub-industry code (all missing without one)."""
+    return {column: (None if pd.isna(gsubind) else level_names(level)[parent_code(gsubind, level)])
+            for level, column in GICS_NAME_COLUMNS.items()}
+
+
 @dataclass
 class Frames:
     """The three files as DataFrames, with only the columns the loader reads."""
@@ -120,6 +127,7 @@ def synthetic_frames(first: str = '2009-11', last: str = '2013-02', n_stocks: in
                    # Oil SIC code on an Unclassified stock (fossil by SIC) and on a GICS stock (GICS wins)
                    'siccd': 1311.0 if i % 12 in (0, 11) else 7372.0,
                    'prc': rng.uniform(2, 200), 'mkt_cap_musd': rng.uniform(100, 5000)}
+            row.update(gics_names(row['gsubind']))
             for f in WRDS_FACTOR_COLUMNS:
                 if f != 'mkt_cap_musd':
                     row[f] = rng.normal() if rng.random() > 0.05 else np.nan

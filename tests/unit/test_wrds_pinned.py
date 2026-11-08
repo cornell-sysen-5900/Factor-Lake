@@ -5,6 +5,7 @@ and holdings they gave on main before trading costs were added, when run at 0 bp
 The fixture (tests/fixtures/wrds_pinned_results.json) was captured with main's code
 (faeca5c) by running this file there: it only uses functions main has. Numbers must agree
 to a relative 1e-9, as in tests/unit/test_legacy_pinned.py; everything else exactly.
+The holdings' four GICS name columns were added later, so they are left out of the comparison.
 Regenerate it only when a change to WRDS results is intended:
 
     uv run python -m tests.unit.test_wrds_pinned
@@ -17,7 +18,7 @@ import pytest
 
 from scripts.check_backtest_lambda import TOLERANCE, max_difference, plain_rows
 from src.backtest_jobs import encode_result
-from src.wrds_engine import run_wrds_backtest
+from src.wrds_engine import HOLDINGS_GICS_COLUMNS, run_wrds_backtest
 from tests.unit.wrds_fixtures import synthetic_frames
 
 FIXTURE_PATH = Path(__file__).resolve().parents[1] / 'fixtures' / 'wrds_pinned_results.json'
@@ -83,7 +84,10 @@ def pinned():
 
 @pytest.mark.parametrize('name', JOBS)
 def test_wrds_backtest_at_0_bps_gives_the_results_it_gave_on_main(pinned, data, name):
-    got = as_json(*run_pinned(name, data, trading_cost_bps=0))
+    results, holdings = run_pinned(name, data, trading_cost_bps=0)
+    gics = list(HOLDINGS_GICS_COLUMNS.values())
+    assert set(gics) <= set(holdings.columns)
+    got = as_json(results, holdings.drop(columns=gics))
     difference, where = max_difference(got, pinned[name])
     assert difference <= TOLERANCE, f"{where} differs from main by {difference:.2e} (relative)"
 
@@ -99,6 +103,9 @@ def test_pinned_wrds_jobs_cover_delistings_missing_returns_and_empty_dates(pinne
 
 if __name__ == '__main__':
     frames_data = pinned_frames().data()
-    captured = {name: as_json(*run_pinned(name, frames_data)) for name in JOBS}
+    captured = {}
+    for name in JOBS:
+        results, holdings = run_pinned(name, frames_data)
+        captured[name] = as_json(results, holdings.drop(columns=list(HOLDINGS_GICS_COLUMNS.values())))
     FIXTURE_PATH.write_text(json.dumps(captured, indent=1, sort_keys=True) + '\n', encoding='utf-8')
     print(f"Wrote {len(captured)} WRDS backtests to {FIXTURE_PATH}")

@@ -33,6 +33,7 @@ from app.streamlit_utils import (
 from components.strategy_settings import render_run_actions
 from src.saved_analyses import SavedAnalysisError
 from src.trading_costs import has_trading_costs, job_trading_cost
+from src.wrds_gics import describe_gics_filter
 from Visualizations.portfolio_growth_plot import plot_portfolio_growth
 from Visualizations.top_bottom_portfolio_plot import plot_top_bottom_percent
 
@@ -431,6 +432,8 @@ def _render_header_captions(run: Dict[str, Any], data_source: Optional[str] = No
     if universe:
         sectors = universe.get('selected_sectors') or []
         sectors_str = ", ".join(sectors) if sectors else "All sectors"
+        if universe.get('gics_filter'):          # WRDS runs with a GICS filter
+            sectors_str = describe_gics_filter(universe['gics_filter'])
         fossil_str = "excluded" if universe.get('restrict_fossil_fuels') else "included"
         st.caption(f"**Universe:** {sectors_str} | Fossil fuels {fossil_str}")
     combination = settings.get('factor_combination', 'mixing')

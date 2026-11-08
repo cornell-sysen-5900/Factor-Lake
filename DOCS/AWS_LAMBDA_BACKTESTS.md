@@ -230,6 +230,18 @@ Deployed to `sysen5900-factor-lake-backtest-dev` with `--leave-lifecycle-rules` 
 - The before-cost values of the 25 bps runs equal the 0 bps runs' final values ($9,460.16 and $4,857.67).
 - `scripts/check_backtest_lambda.py --function-name sysen5900-factor-lake-backtest-dev`: all checks passed, including the Legacy (102.9% average turnover, 0.28% drag) and WRDS (75.8%, 0.82%) runs at 25 bps.
 
+### Validation on the dev function (2026-11-08): GICS filter
+
+Deployed to `sysen5900-factor-lake-backtest-dev` with `--leave-lifecycle-rules` (WRDS code version `2799f38f32311ed9`). WRDS, quarterly 2002-2026 (96 rebalances), ROE and 12-1 Mo Momentum, Mixing, equal weight, a fresh AUM so every run was computed. Each run matched the same job run locally on the S3 data (relative difference 0) and came from the cache the second time (0.15 s).
+
+| Job | Filter | Compute (round trip) | Holdings rows (per date) |
+|---|---|---|---|
+| Sector | Financials | 5.5 s (5.9 s), first run after the deploy: includes loading the data | 6,154 (53-75) |
+| Industry group | Software & Services | 0.7 s (1.0 s) | 2,087 (14-32) |
+| Industry | Banks | 0.8 s (0.9 s) | 3,338 (25-47) |
+| Sub-industry | Application Software, Regional Banks | 0.7 s (0.9 s) | 4,438 (32-59) |
+| Older job, `selected_sectors` | Financials | 0.8 s (0.9 s) | 6,154 (53-75), the same result as the Sector job |
+
 ## 11. Scoreboard scores
 
 The Scoreboard tab (user guide, section 18) ranks every saved analysis without downloading any. When the Lambda saves an analysis (`kind` `backtest`, Legacy or WRDS), it adds its **scores** to the result's S3 metadata, next to `kind` and `summary` (`src/analysis_scores.py`). For example (numbers rounded):

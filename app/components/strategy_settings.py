@@ -19,6 +19,7 @@ from app import strategy_config as configs
 from app.saved_runs import named_run_label
 from components.data_viewer import clear_viewer_data
 from components.factor_selection import reset_factor_selection
+from components.sidebar import clear_gics_inputs
 
 # Settings waiting to be applied before the sidebar is drawn: (source, payload, run_id), where
 # source is 'file' (payload: the file's bytes) or 'run' (payload: the run's settings document)
@@ -52,7 +53,7 @@ def _apply_document(document, lambda_available):
     updates = configs.widget_values(document)
     reset_factor_selection()
     st.session_state.pop('selected_sectors_input', None)
-    st.session_state.pop('wrds_sectors_input', None)
+    clear_gics_inputs()
     st.session_state.update(updates)
     st.session_state.update(data_loaded=False, rdata=None, loaded_filters=None)
     clear_viewer_data()

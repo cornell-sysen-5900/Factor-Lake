@@ -103,7 +103,8 @@ class WrdsBacktestRunner:
                     'cohort_pct': job['cohort_pct'], 'top_cagr': top['cagr'], 'bottom_cagr': bottom['cagr']}, None
         date = data.month_date(job['rebalance_date'])
         table = rank_stocks(data, date, factors, directions, job['factor_combination'], job['top_pct'],
-                            job['use_market_cap_weight'], job['restrict_fossil_fuels'], job['selected_sectors'])
+                            job['use_market_cap_weight'], job['restrict_fossil_fuels'], job['selected_sectors'],
+                            job.get('gics_filter'))
         return {'rebalance_date': date.strftime('%Y-%m-%d'), 'columns': list(table.columns),
                 'rows': table.to_dict('records')}, None
 
