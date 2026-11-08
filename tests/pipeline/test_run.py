@@ -40,6 +40,45 @@ def test_data_dir_needs_raw(tmp_path):
         DataPaths.from_data_dir(tmp_path)
 
 
+def test_folder_options_default_to_the_standard_layout_and_move_everything(tmp_path):
+    (tmp_path / "raw").mkdir()
+    std = DataPaths.from_data_dir(tmp_path)
+    assert (std.raw, std.processed) == (tmp_path / "raw", tmp_path / "processed")
+    assert std.client == tmp_path / "raw" / "client"
+    assert std.permno_list == tmp_path / "raw" / "query_inputs" / "permno_list.txt"
+    assert std.cli_args() == ["--data-dir", str(tmp_path)]
+    (tmp_path / "raw_v2").mkdir()
+    v2 = DataPaths.from_data_dir(tmp_path, "processed_v2", raw_dir="raw_v2", client_dir="raw/client",
+                                 permno_list="raw/query_inputs/permno_list_v2.txt",
+                                 ibes_tickers=tmp_path / "x" / "ibes_tickers_v2.txt")
+    assert (v2.raw, v2.processed) == (tmp_path / "raw_v2", tmp_path / "processed_v2")
+    assert v2.stage_dir("s01_membership") == tmp_path / "processed_v2" / "s01_membership"
+    assert v2.list_path("permno_list.txt") == tmp_path / "raw" / "query_inputs" / "permno_list_v2.txt"
+    assert v2.ibes_tickers == tmp_path / "x" / "ibes_tickers_v2.txt"
+    assert v2.relative(v2.permno_list) == "raw/query_inputs/permno_list_v2.txt"
+    again = DataPaths.from_data_dir(*v2.cli_args()[1:2], **dict(zip(
+        ["raw_dir", "client_dir", "permno_list", "ibes_tickers"], v2.cli_args()[3::2])))
+    assert again.raw == v2.raw and again.ibes_tickers == v2.ibes_tickers
+    with pytest.raises(FileNotFoundError):
+        DataPaths.from_data_dir(tmp_path, raw_dir="raw_v3")
+
+
+def test_main_passes_the_folder_options(tmp_path, monkeypatch):
+    (tmp_path / "raw_v2").mkdir()
+    seen = {}
+    from pipeline.stages import s00_inventory
+
+    def fake(paths):
+        seen["paths"] = paths
+        return {"status": "PASS"}
+    monkeypatch.setattr(s00_inventory, "run", fake)
+    assert run.main(["--data-dir", str(tmp_path), "--raw-dir", "raw_v2", "--processed-dir", "processed_v2",
+                     "--permno-list", "raw/query_inputs/permno_list_v2.txt", "--stage", "s00"]) == 0
+    p = seen["paths"]
+    assert (p.raw, p.processed) == (tmp_path / "raw_v2", tmp_path / "processed_v2")
+    assert p.permno_list.name == "permno_list_v2.txt"
+
+
 def test_unwritten_stage_returns_exit_code_2(paths, capsys, monkeypatch):
     from pipeline.stages import s08_export
 

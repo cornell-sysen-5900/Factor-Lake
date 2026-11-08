@@ -291,7 +291,7 @@ def run(paths: DataPaths) -> dict:
     del daily, fq
     out = (ib.rename(columns={"ticker": "ibes_ticker"})[list(OUT_COLS)]
              .sort_values(["permno", "statpers", "measure", "fpi"]).reset_index(drop=True))
-    raw_path = paths.query_inputs / "ibes_tickers.txt"
+    raw_path = paths.ibes_tickers
     raw_list = set(x.strip() for x in raw_path.read_text().splitlines() if x.strip()) if raw_path.exists() else None
     checks = run_checks(out, lk, info, raw_list, tickers)
     write_parquet(out, out_dir / OUTPUT)

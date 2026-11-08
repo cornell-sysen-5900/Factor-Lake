@@ -58,7 +58,8 @@ notebook's last-run counts are the expected values of the "vs last run" checks; 
 
 Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the fourth, 21-24 from the fifth,
 25-27 from the sixth, 28-29 from the seventh, 30-31 and the current 29 from the eighth, 32 from the ninth (all
-2026-10-25).
+2026-10-25). Decisions 33-41 are data version 2 (2026-11-07): membership back to 2002 from the client's Russell 2000
+lists, and every WRDS pull extended to match.
 
 | # | decision | where |
 |---|---|---|
@@ -94,16 +95,29 @@ Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the 
 | 30 | IBES scale rule: a total (SAL, EBT, EBI, CPX) estimate or actual more than 100x the largest of the company's Compustat TTM revenue, total assets and company market cap known at statpers (latest report_date <= statpers; market cap on the last trading day <= statpers, at most 7 days back) is NaN (suspect_scale); skipped when none of the three is known. | s05 rule 8 |
 | 31 | estimates_consensus drops cfacpr_last (always 1.0 in CIZ); crsp_basis_factor stays. s07 takes each permno's last cfacpr from the daily prices. | s05, s07 |
 | 32 | IBES margin rule, on top of the scale rule: with Compustat TTM revenue >= $50M known at statpers, a positive EBIT or EBITDA estimate (EBI, EBT) or a capex estimate (CPX) more than 20x that revenue is NaN. Negative EBIT and EBITDA are never touched; pre-revenue companies (< $50M) are skipped. Both rules set suspect_scale; suspect_scale_reason says which (scale or margin). | s05 rule 9 |
+| 33 | **Membership from three sources**, marked `membership_source` on snapshots and universe periods. (a) Before 2008-02: the client's 9/30 lists only (`client_list`). The 9/30/Y list counts from the July Y month end through the June Y+1 month end (the June-reconstitution switch); the first list (9/30/2002) starts at the 2002-07 month end. A stock whose first CRSP trading day is after that year's reconstitution date (an IPO added after June) counts only from the September Y month end. (b) 2008-02 to 2010-05: IWM holdings plus the list members missing from that IWM snapshot (`client_fill`; the old fund id 1004185 hides some members behind relabelled security records), same list timing, only when still trading at the month end. (c) From 2010-06: IWM only (`iwm`). (d) The IWM known-gap fixes, the merger exclusions and the non-member rule 6 apply to every source. (e) Months without an IWM report (2009-04 to 2009-06) keep the existing carry-forward: s07 uses the latest effective snapshot. | s01 rules 7-10; `config.MEMBERSHIP_SOURCES` |
+| 34 | **Client mapping is pipeline stages**, reproducible and without scratch scripts: s00b_client cleans the client file, s00c_client_map gives each row a permno (CUSIP valid on the 9/30, then ticker + name; a CUSIP of another company is corrected by ticker + name; a ticker with two permnos takes the share class named in the client name; the same permno twice in one list keeps the row whose name matches CRSP, else the CUSIP row; unmatched rows are known gaps). Its result must equal the reviewed map of 2026-11-07, row for row. | s00b, s00c |
+| 35 | **Start dates** of the WRDS pulls: prices 1997-09-01 (60-month beta from 2002), fundamentals datadate 1999-01-01, IBES statpers 2001-01-01, ETFs 2000-05, index levels, Fama-French and FRED 1997-01-01. The panel starts at the first membership month (2002-07). | `config` start dates; s00 `first_date_by` |
+| 36 | **Folders:** run.py takes `--raw-dir`, `--processed-dir`, `--client-dir`, `--permno-list` and `--ibes-tickers` (defaults unchanged: raw/, processed/, raw/client/, raw/query_inputs/), so data version 2 runs in place from raw_v2/ into processed_v2/ with the v2 upload lists. s09's rerun passes the same options. | `config.DataPaths`, run.py |
+| 37 | **RAW_FILES lists every column a stage reads** (dlyopen, securitynm, ticker, highest, lowest included) and the new raw files (the client file and crsp_names_history). Other columns (primaryexch, ewretd, ewretx, sprtrn, delpermno, delstatustype, delretmisstype) are allowed and ignored, except primaryexch, which is kept through s02 for a future Nasdaq volume adjustment (optional: WARN when missing). | `config.RAW_FILES`, s02 |
+| 38 | ETFs: s06 drops exact duplicate rows (as s02 does for prices); IWN and IWO start 2000-07, IWM 2000-05. | s06 |
+| 39 | GICS: there is no historical GICS, so GICS stays the current codes from the fundamentals files. All four levels get names (sector, industry group, industry, sub-industry) from a GICS code-to-name table in config, and `gics_source` = `current_header`. A limitation, documented in the dictionary. | s03, s07; `config` GICS tables |
+| 40 | IBES links ending 2025-12-31 (the link table's last update) are open-ended, as before (each permno's latest link, H2). | s05 rule 4 |
+| 41 | Expected thin data, not errors: IBES CPX starts 2006; EBI, DPS and CPS are thin in 2001-2004. | s05 checks |
 
 ## s00_inventory
 
-**Inputs:** every file in `raw/` and `raw/query_inputs/`. **Output:** `processed/s00_inventory/inventory.json`.
+**Inputs:** every file in `config.RAW_FILES` (in the raw folder; the client file in the client folder) and the two
+upload lists. **Output:** `processed/s00_inventory/inventory.json`.
 
 Per raw file: size, sha256, rows, lowercase columns, date range of its date column, blank and bad dates, required
 columns and values (e.g. the IWM fund portnos, the 7 IBES measures, FPI 0-3), distinct ids, and the IBES rows
-by measure and FPI; per upload list: lines, duplicates and blanks. The 2.9 GB CIZ and 1.1 GB IBES files are
-streamed. Missing files, missing required columns or values FAIL; unknown files WARN. s08 copies the checksums into
-the manifest, and re-hashes the raw files to check they did not change.
+by measure and FPI; per upload list: lines, duplicates and blanks. The 5 GB CIZ and 1.1 GB IBES files are
+streamed. Missing files, missing required columns or values FAIL; a missing optional column (primaryexch) and
+unknown files in the raw folder WARN. The client file has two title lines above its header, blank header cells and
+m/d/Y dates (`skip_lines`, `date_format` in its RawFile). Paths in the inventory are relative to the data folder
+(e.g. `raw_v2/...`). s08 copies the checksums into the manifest, and re-hashes the raw files to check they did not
+change.
 
 ## s01_membership
 

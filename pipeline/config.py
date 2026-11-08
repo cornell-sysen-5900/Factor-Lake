@@ -6,8 +6,12 @@ PURPOSE: Data folder paths (from --data-dir), the raw file specs, and the consta
 Data folder layout (see pipeline/README.md):
     raw/                 WRDS and FRED downloads (read only)
     raw/query_inputs/    upload lists used for the WRDS queries (permno_list.txt, ibes_tickers.txt)
+    raw/client/          the client's Russell 2000 lists (licensed, never committed)
     archive/             old notebook and outputs (reference only, never read by the pipeline)
     processed/<stage>/   each stage's outputs (written only by that stage)
+
+Every folder and upload list can be moved with run.py options (--raw-dir, --processed-dir, --client-dir,
+--permno-list, --ibes-tickers), so a second data version (raw_v2/ -> processed_v2/) runs in place.
 """
 
 from __future__ import annotations
@@ -17,26 +21,65 @@ from pathlib import Path
 
 # ---------- Paths ----------
 
+PERMNO_LIST = "permno_list.txt"
+IBES_TICKERS = "ibes_tickers.txt"
+
+
+def _resolve(root: Path, value: str | Path | None) -> Path | None:
+    """A path option: absolute, or relative to the data folder."""
+    if value is None:
+        return None
+    p = Path(value).expanduser()
+    return (p if p.is_absolute() else root / p).resolve()
+
+
 @dataclass(frozen=True)
 class DataPaths:
-    """Folders inside the data folder passed with --data-dir."""
+    """Folders inside the data folder passed with --data-dir. Every other location defaults to the data folder's
+    standard layout; relative overrides are relative to the data folder."""
     root: Path
     processed_dir: Path | None = None   # default <root>/processed; s09 reruns everything into a temporary one
+    raw_dir: Path | None = None         # default <root>/raw
+    client_dir: Path | None = None      # default <raw>/client
+    permno_list_file: Path | None = None    # default <raw>/query_inputs/permno_list.txt
+    ibes_tickers_file: Path | None = None   # default <raw>/query_inputs/ibes_tickers.txt
 
     @classmethod
-    def from_data_dir(cls, data_dir: str | Path, processed_dir: str | Path | None = None) -> "DataPaths":
+    def from_data_dir(cls, data_dir: str | Path, processed_dir: str | Path | None = None, *,
+                      raw_dir: str | Path | None = None, client_dir: str | Path | None = None,
+                      permno_list: str | Path | None = None,
+                      ibes_tickers: str | Path | None = None) -> "DataPaths":
         root = Path(data_dir).expanduser().resolve()
-        if not (root / "raw").is_dir():
-            raise FileNotFoundError(f"{root} has no raw/ folder; pass the data folder with --data-dir")
-        return cls(root, Path(processed_dir).expanduser().resolve() if processed_dir else None)
+        paths = cls(root, _resolve(root, processed_dir), _resolve(root, raw_dir), _resolve(root, client_dir),
+                    _resolve(root, permno_list), _resolve(root, ibes_tickers))
+        if not paths.raw.is_dir():
+            raise FileNotFoundError(f"{paths.raw} is not a folder; pass the data folder with --data-dir "
+                                    "(and the raw folder with --raw-dir if it is not <data-dir>/raw)")
+        return paths
 
     @property
     def raw(self) -> Path:
-        return self.root / "raw"
+        return self.raw_dir or self.root / "raw"
 
     @property
     def query_inputs(self) -> Path:
         return self.raw / "query_inputs"
+
+    @property
+    def client(self) -> Path:
+        return self.client_dir or self.raw / "client"
+
+    @property
+    def permno_list(self) -> Path:
+        return self.permno_list_file or self.query_inputs / PERMNO_LIST
+
+    @property
+    def ibes_tickers(self) -> Path:
+        return self.ibes_tickers_file or self.query_inputs / IBES_TICKERS
+
+    def list_path(self, name: str) -> Path:
+        """The upload list behind a QUERY_INPUTS name."""
+        return {PERMNO_LIST: self.permno_list, IBES_TICKERS: self.ibes_tickers}[name]
 
     @property
     def processed(self) -> Path:
@@ -44,6 +87,22 @@ class DataPaths:
 
     def stage_dir(self, stage: str) -> Path:
         return self.processed / STAGE_FOLDERS.get(stage, stage)
+
+    def relative(self, path: Path) -> str:
+        """`path` relative to the data folder when it is inside it (posix), else absolute."""
+        try:
+            return path.resolve().relative_to(self.root).as_posix()
+        except ValueError:
+            return str(path.resolve())
+
+    def cli_args(self) -> list[str]:
+        """The run.py options that rebuild these paths (s09 reruns every stage with them)."""
+        args = ["--data-dir", str(self.root)]
+        for opt, value in (("--raw-dir", self.raw_dir), ("--client-dir", self.client_dir),
+                           ("--permno-list", self.permno_list_file), ("--ibes-tickers", self.ibes_tickers_file)):
+            if value is not None:
+                args += [opt, str(value)]
+        return args
 
 
 STAGE_FOLDERS = {"s09_validate": "s09_validation"}       # stages whose folder is not named after them
@@ -53,11 +112,16 @@ OLD_PANEL_PATHS = ("archive/r2000_monthly_panel.parquet",  # the notebook's pane
 
 # ---------- Date ranges of the WRDS pulls (also in the refresh checklist in README.md) ----------
 
-DAILY_START = "2006-12-01"          # CRSP CIZ daily, ETFs, index levels, Fama-French daily
+# Data version 2 (decision 35): membership from 2002-07, so prices start 1997-09 (60-month beta from 2002) and the
+# market series 1997-01. s00 WARNs when a raw file starts after its target.
+PRICES_START = "1997-09-01"         # CRSP CIZ daily stock file
+ETF_START = "2000-05-01"            # IWM listed 2000-05; IWN and IWO start 2000-07
+MARKET_START = "1997-01-01"         # index levels, Fama-French daily and monthly, FRED; market_daily starts here
 HOLDINGS_START = "2008-02-29"       # first IWM holdings report on CRSP
-FUNDAMENTALS_START = "2005-01-01"   # quarterly and annual datadate (TTM and 4-quarter growth need history)
-IBES_START = "2005-01-01"           # statpers
-FRED_START = "2006-01-01"
+FUNDAMENTALS_START = "1999-01-01"   # quarterly and annual datadate (TTM and 4-quarter growth need history)
+IBES_START = "2001-01-01"           # statpers
+FRED_START = MARKET_START
+CLIENT_LISTS_START = "2002-09-30"   # first client list (9/30/2002)
 
 
 # ---------- Raw files ----------
@@ -74,6 +138,10 @@ class RawFile:
     expected_values: dict[str, tuple[str, ...]] = field(default_factory=dict)   # all must appear
     first_date_by: str | None = None                # WARN if the first date is later
     upload_list: tuple[str, str] | None = None      # (query_inputs file, id column) the query was run with
+    optional: tuple[str, ...] = ()                  # columns kept when present (WARN when missing)
+    folder: str = ""                                # "client": in the client folder instead of raw/
+    skip_lines: int = 0                             # title lines above the header row
+    date_format: str | None = None                  # strptime format when the date column is not YYYY-MM-DD
 
 
 _FF_COLS = ("mktrf", "smb", "hml", "rmw", "cma", "rf", "umd")
@@ -84,6 +152,13 @@ FRED_SERIES = {"DGS10": "ust_10y", "DGS3MO": "tbill_3m", "DBAA": "moodys_baa", "
 INDEX_TICS = {"I0124": "r2000", "I0120": "r2000_growth", "I0122": "r2000_value"}
 ETF_PERMNOS = {88222: "iwm", 88399: "iwn", 88401: "iwo"}
 
+# Every column a stage reads is required (s00 FAILs when one is missing). Other columns in the files are allowed
+# and ignored (decision 37); `optional` ones are kept when present.
+CLIENT_FILE = "FR2000 Annual Quant Data(Data).csv"
+CLIENT_COLUMNS = {"security name": "name", "ticker-region": "ticker_region", "cusip": "cusip9", "date": "date",
+                  "russell 2000 port. weight": "weight"}      # client file column (lowercase) -> s00b column
+NAMES_FILE = "crsp_names_history.csv"
+
 RAW_FILES: tuple[RawFile, ...] = (
     RawFile("iwm_holdings_raw.csv", "report_dt",
             ("crsp_portno", "report_dt", "eff_dt", "percent_tna", "nbr_shares", "security_name", "cusip", "permno",
@@ -91,24 +166,25 @@ RAW_FILES: tuple[RawFile, ...] = (
             unique=("permno", "cusip"), groups=(("crsp_portno",),), blanks=("permno", "eff_dt"),
             expected_values={"crsp_portno": ("1004185", "1025818")}, first_date_by=HOLDINGS_START),
     RawFile("r2000_price_crsp_ciz.csv", "dlycaldt",
-            ("permno", "hdrcusip", "ticker", "permco", "siccd", "dlycaldt", "dlydelflg", "delreasontype", "dlyprc",
-             "dlyret", "dlyvol", "dlyclose", "dlylow", "dlyhigh", "dlyopen", "shrout", "dlycumfacpr", "dlycumfacshr"),
+            ("permno", "hdrcusip", "ticker", "permco", "siccd", "dlycaldt", "dlydelflg", "delreasontype", "securitynm",
+             "dlyprc", "dlyret", "dlyvol", "dlyclose", "dlylow", "dlyhigh", "dlyopen", "shrout", "dlycumfacpr",
+             "dlycumfacshr"),
             unique=("permno",), groups=(("dlydelflg",),), blanks=("dlyprc", "dlyret"),
-            first_date_by=DAILY_START, upload_list=("permno_list.txt", "permno")),
+            first_date_by=PRICES_START, upload_list=(PERMNO_LIST, "permno"), optional=("primaryexch",)),
     RawFile("benchmark_etfs.csv", "dlycaldt", ("permno", "ticker", "dlycaldt", "dlyprc", "dlyret"),
             unique=("permno",), groups=(("ticker",),), blanks=("dlyret",),
-            expected_values={"permno": tuple(str(p) for p in ETF_PERMNOS)}, first_date_by=DAILY_START),
+            expected_values={"permno": tuple(str(p) for p in ETF_PERMNOS)}, first_date_by="2000-05-31"),
     RawFile("delistings.csv", "delistingdt",
             ("permno", "delistingdt", "delactiontype", "delreasontype", "delpaymenttype", "delret"),
             unique=("permno",), groups=(("delactiontype",),), blanks=("delret",),
-            upload_list=("permno_list.txt", "permno")),
+            upload_list=(PERMNO_LIST, "permno")),
     RawFile("index_close.csv", "datadate", ("tic", "datadate", "prccd"), groups=(("tic",),), blanks=("prccd",),
-            expected_values={"tic": tuple(INDEX_TICS)}, first_date_by=DAILY_START),
+            expected_values={"tic": tuple(INDEX_TICS)}, first_date_by="1997-01-31"),
     RawFile("crsp_ibes_link.csv", "sdate", ("ticker", "permno", "ncusip", "sdate", "edate", "score"),
             unique=("permno", "ticker"), groups=(("score",),), blanks=("edate",),
-            upload_list=("permno_list.txt", "permno")),
-    RawFile("ff_daily.csv", "date", ("date",) + _FF_COLS, blanks=_FF_COLS, first_date_by=DAILY_START),
-    RawFile("ff_monthly.csv", "dateff", ("dateff",) + _FF_COLS, blanks=_FF_COLS, first_date_by="2006-12-31"),
+            upload_list=(PERMNO_LIST, "permno")),
+    RawFile("ff_daily.csv", "date", ("date",) + _FF_COLS, blanks=_FF_COLS, first_date_by="1997-01-31"),
+    RawFile("ff_monthly.csv", "dateff", ("dateff",) + _FF_COLS, blanks=_FF_COLS, first_date_by="1997-01-31"),
     RawFile("fundamentals_raw.csv", "datadate",
             ("gvkey", "lpermno", "datadate", "fyearq", "fqtr", "indfmt", "consol", "popsrc", "datafmt", "tic", "conm",
              "ajexq", "curcdq", "datacqtr", "datafqtr", "rdq",
@@ -118,7 +194,7 @@ RAW_FILES: tuple[RawFile, ...] = (
              "aqcy", "capxy", "dltisy", "dltry", "dvy", "oancfy", "prstkcy", "sstky",
              "costat", "dvpsxq", "prccq", "ggroup", "gind", "gsector", "gsubind", "naics"),
             unique=("lpermno", "gvkey"), groups=(("curcdq",),), blanks=("rdq", "ajexq", "gsector"),
-            first_date_by="2005-03-31", upload_list=("permno_list.txt", "lpermno")),
+            first_date_by="1999-03-31", upload_list=(PERMNO_LIST, "lpermno")),
     RawFile("fundamentals_annual_raw.csv", "datadate",
             ("gvkey", "lpermno", "datadate", "fyear", "indfmt", "consol", "popsrc", "datafmt", "tic", "conm", "ajex",
              "curcd", "fyr", "act", "ap", "aqc", "at", "capx", "ceq", "che", "cogs", "cshfd", "csho", "dlc", "dltis",
@@ -127,20 +203,27 @@ RAW_FILES: tuple[RawFile, ...] = (
              "sstk", "txditc", "txt", "xint", "xintd", "xrd", "xsga", "costat", "sich", "dvpsx_f", "prcc_f",
              "ggroup", "gind", "gsector", "gsubind", "naics"),
             unique=("lpermno", "gvkey"), groups=(("curcd",),), blanks=("ajex", "oiadp", "dp"),
-            first_date_by="2005-12-31", upload_list=("permno_list.txt", "lpermno")),
+            first_date_by="1999-12-31", upload_list=(PERMNO_LIST, "lpermno")),
     RawFile("forward_estimates.csv", "statpers",
             ("ticker", "cusip", "oftic", "statpers", "measure", "fiscalp", "fpi", "curcode", "numest", "numup",
-             "numdown", "medest", "meanest", "stdev", "fpedats", "actual", "anndats_act"),
+             "numdown", "medest", "meanest", "stdev", "highest", "lowest", "fpedats", "actual", "anndats_act"),
             unique=("ticker",), groups=(("measure", "fpi"), ("curcode",), ("fiscalp",)), blanks=("meanest", "stdev"),
-            expected_values={"measure": tuple(IBES_MEASURES), "fpi": tuple(IBES_FPI)}, first_date_by="2005-01-31",
-            upload_list=("ibes_tickers.txt", "ticker")),
+            expected_values={"measure": tuple(IBES_MEASURES), "fpi": tuple(IBES_FPI)}, first_date_by="2001-01-31",
+            upload_list=(IBES_TICKERS, "ticker")),
+    RawFile(NAMES_FILE, "secinfostartdt",
+            ("permno", "permco", "secinfostartdt", "secinfoenddt", "cusip", "ticker", "issuernm", "shareclass",
+             "securitytype", "sharetype"),
+            unique=("permno", "cusip")),
+    RawFile(CLIENT_FILE, "date", tuple(CLIENT_COLUMNS), unique=("cusip",), groups=(("date",),),
+            blanks=("ticker-region", "cusip", "russell 2000 port. weight"), first_date_by=CLIENT_LISTS_START,
+            folder="client", skip_lines=2, date_format="%m/%d/%Y"),
 ) + tuple(
     RawFile(f"fred_{series}.csv", "observation_date", ("observation_date", series.lower()),
-            blanks=(series.lower(),), first_date_by="2006-01-31")
+            blanks=(series.lower(),), first_date_by="1997-01-31")
     for series in FRED_SERIES
 )
 
-QUERY_INPUTS = ("permno_list.txt", "ibes_tickers.txt")
+QUERY_INPUTS = (PERMNO_LIST, IBES_TICKERS)
 
 
 # ---------- Cleaning rules (ported from archive/WRDS_Cleaning.ipynb; see PLAN.md) ----------
@@ -169,6 +252,51 @@ SNAPSHOT_SIZE_RANGE = (1800, 2150)
 SNAPSHOT_WEIGHT_RANGE = (90.0, 110.0)          # percent of the fund
 KNOWN_MISSING_MONTHS = ("2009-04", "2009-05", "2009-06")
 NEIGHBOUR_MISSING_MAX = 20
+
+# Membership sources (decision 33). membership_source on snapshots and universe periods:
+#   client_list  before IWM_FIRST_MONTH: the client's 9/30 lists only
+#   iwm          IWM holdings
+#   client_fill  IWM_FIRST_MONTH..CLIENT_FILL_LAST_MONTH: client-list members missing from the IWM snapshot (the old
+#                fund id 1004185 hides some members behind relabelled security records)
+MEMBERSHIP_SOURCES = ("client_list", "iwm", "client_fill")
+CLIENT_LIST_FIRST_MONTH = "2002-07"     # the 9/30/2002 list counts from the 2002-07 month end
+IWM_FIRST_MONTH = "2008-02"
+CLIENT_FILL_LAST_MONTH = "2010-05"
+LIST_SWITCH_MONTH = 7                   # the 9/30/Y list counts from the July Y through the June Y+1 month end
+
+
+def client_list_year(year: int, month: int) -> int:
+    """The client list (its 9/30 year) in force at a month end: the June-reconstitution switch."""
+    return year if month >= LIST_SWITCH_MONTH else year - 1
+
+
+def reconstitution_date(year: int):
+    """Russell's annual reconstitution: the last Friday of June, or the Friday before when that is the 29th or
+    30th. A stock first trading after it (an IPO added after June) counts only from its list's 9/30."""
+    import datetime as _dt
+    day = _dt.date(year, 6, 30)
+    day -= _dt.timedelta(days=(day.weekday() - 4) % 7)
+    return day - _dt.timedelta(days=7) if day.day >= 29 else day
+
+
+# Client list mapping to permnos (s00c_client_map, decision 34)
+CLIENT_LIST_MONTH_DAY = (9, 30)
+CLIENT_NO_CUSIP = "#Calc"               # FactSet's placeholder when it has no CUSIP: matched by ticker + name
+CLIENT_NO_TICKER = "--"
+NAME_STOPWORDS = frozenset({
+    "INC", "CORP", "CORPORATION", "CO", "COMPANY", "LTD", "LIMITED", "PLC", "HOLDINGS", "HOLDING", "HLDGS", "GROUP",
+    "GRP", "THE", "LP", "LLC", "NV", "SA", "AG", "CL", "CLASS", "A", "B", "C", "NEW", "DEL", "OF", "COM",
+    "INCORPORATED", "NON", "VOTING", "SHARES", "SHS", "ORD", "AND"})
+NAME_GENERIC_WORDS = frozenset({
+    "FIRST", "AMERICAN", "AMERICA", "NATIONAL", "UNITED", "CENTRAL", "GENERAL", "INTERNATIONAL", "US", "USA",
+    "NORTH", "SOUTH", "WEST", "EAST", "PACIFIC", "ATLANTIC", "CITIZENS", "COMMUNITY", "SECURITY", "CAPITAL", "BANK",
+    "HOME", "PEOPLES", "GREAT", "SOUTHERN", "NORTHERN", "WESTERN", "EASTERN", "MIDWEST", "TRUST"})
+
+# IWM known-gap fixes (s01 rule 2b): a gap CUSIP gets the permno CRSP gives it while the permno traded during the
+# gap's IWM dates, else a client-list match whose 9/30 is within this many months of those dates; a gap whose
+# every line holds fewer than GAP_FIX_MIN_SHARES shares is a stray line and is not fixed
+GAP_FIX_CLIENT_WINDOW_MONTHS = 3
+GAP_FIX_MIN_SHARES = 100
 
 # Counts and factor coverage of the notebook's last run, which the stages compare with. They describe the licensed
 # data, so they live next to it (<data-dir>/pipeline_last_run.json: {"counts": {...}, "coverage_2015": {...}}), not in

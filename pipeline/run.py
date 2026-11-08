@@ -7,6 +7,10 @@ Usage (from the repo root):
     uv run --group pipeline python -m pipeline.run --data-dir "C:/path/to/WRDS FA26" --stage s00_inventory
     uv run --group pipeline python -m pipeline.run --data-dir "C:/path/to/WRDS FA26" --stage all
 
+A second data version runs in place with folder options (relative paths are relative to --data-dir):
+    ... --raw-dir raw_v2 --processed-dir processed_v2 --client-dir raw/client
+        --permno-list raw/query_inputs/permno_list_v2.txt --ibes-tickers raw/query_inputs/ibes_tickers_v2.txt
+
 --stage takes a full stage name (s02_prices), its number (s02), its short name (prices) or all.
 Exit code: 0 all checks PASS or WARN, 1 a check FAILed, 2 a stage is not written yet.
 """
@@ -37,11 +41,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--data-dir", required=True, help="data folder that contains raw/ (processed/ is written)")
     parser.add_argument("--stage", required=True, help="stage name, number, short name, or all")
     parser.add_argument("--processed-dir", help="write the stage folders here instead of <data-dir>/processed")
+    parser.add_argument("--raw-dir", help="read the raw files here instead of <data-dir>/raw")
+    parser.add_argument("--client-dir", help="the client lists folder instead of <raw-dir>/client")
+    parser.add_argument("--permno-list",
+                        help="the permno upload list instead of <raw-dir>/query_inputs/permno_list.txt")
+    parser.add_argument("--ibes-tickers",
+                        help="the IBES ticker upload list instead of <raw-dir>/query_inputs/ibes_tickers.txt")
     args = parser.parse_args(argv)
 
-    paths = DataPaths.from_data_dir(args.data_dir, args.processed_dir)
+    paths = DataPaths.from_data_dir(args.data_dir, args.processed_dir, raw_dir=args.raw_dir,
+                                    client_dir=args.client_dir, permno_list=args.permno_list,
+                                    ibes_tickers=args.ibes_tickers)
     if not load_last_run(paths.root / LAST_RUN_FILE):
         print(f"(no {LAST_RUN_FILE} in {paths.root}: the last-run comparisons will WARN)")
+    print(f"raw: {paths.raw} | processed: {paths.processed} | lists: {paths.permno_list.name}, "
+          f"{paths.ibes_tickers.name}", flush=True)
     for stage in resolve_stages(args.stage):
         print(f"== {stage}", flush=True)
         started = time.time()

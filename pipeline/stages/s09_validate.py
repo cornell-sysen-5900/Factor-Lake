@@ -340,7 +340,7 @@ def check_reproducible(paths: DataPaths, out: Path) -> tuple[list[Check], dict]:
     started = time.time()
     for stage in stages:
         t0 = time.time()
-        proc = subprocess.run([sys.executable, "-m", "pipeline.run", "--data-dir", str(paths.root),
+        proc = subprocess.run([sys.executable, "-m", "pipeline.run", *paths.cli_args(),
                                "--processed-dir", str(tmp), "--stage", stage], capture_output=True, text=True,
                               cwd=Path(__file__).resolve().parents[2])
         seconds[stage] = round(time.time() - t0)

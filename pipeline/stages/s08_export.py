@@ -208,7 +208,7 @@ def build_manifest(paths: DataPaths, out: Path, version: str, outputs: dict, inv
         "s3_target": f"s3://{S3_BUCKET}/{S3_PREFIX}/{s3_folder(version)}/",
         "raw_files": {k: {"path": v["path"], "bytes": v["bytes"], "sha256": v["sha256"], "rows": v.get("rows"),
                           "date_range": v.get("date_range")} for k, v in inventory["files"].items()},
-        "query_inputs": {k: {"path": f"raw/query_inputs/{v['path']}", "sha256": v["sha256"], "lines": v.get("lines")}
+        "query_inputs": {k: {"path": v["path"], "sha256": v["sha256"], "lines": v.get("lines")}
                          for k, v in inventory.get("query_inputs", {}).items()},
         "outputs": outputs,
         "units": {**{k: v for k, v in UNITS.items() if not k.startswith("mkt_cap (daily")},

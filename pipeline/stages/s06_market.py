@@ -27,12 +27,12 @@ import pandas as pd
 from pipeline.checks import PASS, WARN, Check, check
 from pipeline.config import (
     CLOSED_MARKET_DAYS,
-    DAILY_START,
     ETF_PERMNOS,
     FF_MONTHLY_TOLERANCE,
     FRED_SERIES,
     INDEX_TICS,
     IWM_MINUS_INDEX_RANGE,
+    MARKET_START,
     MAX_FILLED_RUN_DAYS,
     YIELD_RANGES,
     DataPaths,
@@ -103,7 +103,7 @@ def build_daily(lvl, etf, ff_d, yields) -> pd.DataFrame:
         list(YIELD_COLS)].notna().any(axis=1)
     daily["term_spread"] = daily["ust_10y"] - daily["tbill_3m"]
     daily["credit_spread"] = daily["moodys_baa"] - daily["moodys_aaa"]
-    daily = daily[daily.index >= pd.Timestamp(DAILY_START)]
+    daily = daily[daily.index >= pd.Timestamp(MARKET_START)]
     daily = daily.iloc[1:] if daily[list(INDEX_COLS)].iloc[0].isna().all() else daily   # first day has no return
     return daily.reset_index()[["date", *RETURN_COLS, *YIELD_COLS, *SPREADS, "was_filled"]]
 

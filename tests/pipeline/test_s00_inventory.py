@@ -120,3 +120,43 @@ def test_run_writes_only_its_own_folder_and_reruns(data_dir, monkeypatch, capsys
     assert summary["tables"]["holdings.csv"] == {"rows": 7, "date_range": ["2008-02-29", "2026-06-30"],
                                                  "permnos": 4}
     assert "holdings.csv" in capsys.readouterr().out
+
+
+def test_title_lines_blank_headers_and_other_date_format(tmp_path):
+    # a client-style file: two title lines, blank header cells, m/d/Y dates, an optional column missing
+    spec = RawFile("client.csv", "date", ("security name", "date"), groups=(("date",),), skip_lines=2,
+                   date_format="%m/%d/%Y", optional=("weight",))
+    (tmp_path / "client.csv").write_text('"Title, with a comma",,\n,,----\nSecurity Name,,Date,\n'
+                                         "Zorblax Inc,x,9/30/2002,\nQuiverly Corp,y,09/30/2003,\n,,,\n")
+    out = s00.scan_csv(tmp_path / "client.csv", spec)
+    assert out["columns"] == ["security name", "_unnamed_1", "date", "_unnamed_3"]
+    assert out["rows"] == 3
+    assert out["date_range"] == ["2002-09-30", "2003-09-30"]
+    assert (out["bad_dates"], out["blank_dates"]) == (0, 1)
+    _, checks = s00.inventory_file(tmp_path / "client.csv", spec, {}, "raw/client/client.csv")
+    status = {c.name: c.status for c in checks}
+    assert status["client.csv: required columns"] == "PASS"
+    assert status["client.csv: optional columns"] == "WARN"
+    assert "client.csv: duplicate column names" not in status
+
+
+def test_run_reads_moved_folders_and_lists(tmp_path, monkeypatch):
+    # data version 2 layout: raw files in raw_v2/, client file and lists elsewhere, output in processed_v2/
+    (tmp_path / "raw_v2").mkdir()
+    (tmp_path / "raw_v2" / "holdings.csv").write_text(HEADER + "\n".join(ROWS) + "\n")
+    (tmp_path / "lists").mkdir()
+    (tmp_path / "lists" / "permno_list_v2.txt").write_text("10001\n")
+    (tmp_path / "clients").mkdir()
+    (tmp_path / "clients" / "c.csv").write_text("t\nt\nDate\n9/30/2002\n")
+    client = RawFile("c.csv", "date", ("date",), folder="client", skip_lines=2, date_format="%m/%d/%Y")
+    monkeypatch.setattr(s00, "RAW_FILES", (HOLDINGS, client))
+    monkeypatch.setattr(s00, "QUERY_INPUTS", ("permno_list.txt",))
+    paths = DataPaths.from_data_dir(tmp_path, "processed_v2", raw_dir="raw_v2", client_dir="clients",
+                                    permno_list="lists/permno_list_v2.txt")
+    s00.run(paths)
+    inv = json.loads((tmp_path / "processed_v2" / "s00_inventory" / "inventory.json").read_text())
+    assert inv["files"]["holdings.csv"]["path"] == "raw_v2/holdings.csv"
+    assert inv["files"]["c.csv"]["path"] == "clients/c.csv" and inv["files"]["c.csv"]["rows"] == 1
+    assert inv["query_inputs"]["permno_list.txt"]["path"] == "lists/permno_list_v2.txt"
+    assert inv["files"]["holdings.csv"]["upload_list"]["listed"] == 1
+    assert not (tmp_path / "processed").exists()

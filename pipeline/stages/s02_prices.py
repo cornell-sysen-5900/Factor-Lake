@@ -331,7 +331,7 @@ def run(paths: DataPaths) -> dict:
     calendar = build_calendar(px)
     monthly = build_monthly(px, calendar)
     delistings = build_delistings(dl, px)
-    listed_path = paths.query_inputs / "permno_list.txt"
+    listed_path = paths.permno_list
     listed = set(int(x) for x in listed_path.read_text().split()) if listed_path.exists() else None
     checks = run_checks(px, monthly, calendar, dl, n_dups, n_conflicts, listed)
 
