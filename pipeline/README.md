@@ -105,8 +105,8 @@ columns, types and the first rows from the footer and the first row group, read 
 first 10 lines).
 
     uv run python scripts/s3_inspect.py --no-head                                     # the whole factor-lake-data/ tree
-    uv run python scripts/s3_inspect.py --prefix factor-lake-data/wrds_2026_10/        # with heads
-    uv run python scripts/s3_inspect.py --prefix factor-lake-data/wrds_2026_10/ --all-partitions --rows 3
+    uv run python scripts/s3_inspect.py --prefix factor-lake-data/wrds_2026_11/        # with heads
+    uv run python scripts/s3_inspect.py --prefix factor-lake-data/wrds_2026_11/ --all-partitions --rows 3
 
 Options: `--prefix` (default `factor-lake-data/`), `--rows` (default 5), `--max-files`, `--no-head`,
 `--all-partitions` (every `year=YYYY` head, not only the newest), `--head-mb` (column data read per head, default 8).
