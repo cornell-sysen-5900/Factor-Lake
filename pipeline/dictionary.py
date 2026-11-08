@@ -53,6 +53,8 @@ GICS = {
 }
 
 GICS_CODES = ("gsector", "ggroup", "gind", "gsubind")     # from Compustat; the names come from config tables
+# The GICS page (DOCS/GICS_MAPPING.md), as a full URL so the link also works in the full dictionary next to the data
+GICS_MAPPING_URL = "https://github.com/cornell-sysen-5900/Factor-Lake/blob/main/DOCS/GICS_MAPPING.md"
 
 # ---------- statement factors and building blocks (s03, used in the panel) ----------
 
@@ -119,6 +121,8 @@ FILES["factor_panel_monthly.parquet"] = {
         "ticker": ("CRSP ticker at t (IWM ticker when CRSP has none)", TEXT, CIZ),
         "security_name": ("security name in the IWM snapshot", TEXT, IWM, "s01_membership"),
         **{k: v + ("s07_panel",) if len(v) == 3 else v for k, v in GICS.items()},
+        "gsector": (f"{GICS['gsector'][0]}. How the four levels nest, where the names come from and how the app "
+                    f"filters on them: [GICS_MAPPING.md]({GICS_MAPPING_URL})", CODE, CQ, "s07_panel"),
         "sector_name": ("GICS sector name, or where GICS is missing the SIC code mapped to a GICS sector name "
                         "(see the SIC fallback below)", TEXT, DERIVED),
         "gics_from_sic": ("sector_name comes from the SIC fallback", FLAG, DERIVED),

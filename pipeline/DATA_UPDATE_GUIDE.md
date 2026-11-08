@@ -102,7 +102,9 @@ share a company with an IWM holding); **s05** (its `ibes_tickers.txt` differs a 
 Open `processed_vN/s09_validation/VALIDATION.md` next to the previous version's. Check **index tracking** (section
 1: correlation with IWM at least 0.99 overall and in each membership era, tracking error at most about 2% a year),
 **membership by source** (section 8: 1,800 to 2,150 stocks every month), and **factor sanity**, **client lists vs
-IWM** and **the independent recompute** (sections 2, 9, 4). **Stop and investigate** on any FAIL, on a WARN not listed above, when tracking is worse than in the previous
+IWM** and **the independent recompute** (sections 2, 9, 4), and **GICS** (section 11: every code named, coverage close
+to the previous version's; for new, renamed, retired or unnamed codes follow
+[GICS_MAPPING.md, "At each data update"](../DOCS/GICS_MAPPING.md#at-each-data-update)). **Stop and investigate** on any FAIL, on a WARN not listed above, when tracking is worse than in the previous
 version, or when the stocks per month leave that range.
 
 ## Step 6. Publish
