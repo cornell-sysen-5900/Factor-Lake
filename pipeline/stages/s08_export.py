@@ -33,9 +33,17 @@ from pipeline import column_stats as cs
 from pipeline import dictionary
 from pipeline.checks import PASS, Check, check
 from pipeline.config import (
+    CLIENT_FILE,
+    CLIENT_FILL_LAST_MONTH,
+    CLIENT_LIST_FIRST_MONTH,
     DELISTING_FILL,
     DELISTING_FILL_DEFAULT,
+    GICS_GROUPS,
+    GICS_INDUSTRIES,
     GICS_SECTORS,
+    GICS_SOURCE,
+    GICS_SUB_INDUSTRIES,
+    IWM_FIRST_MONTH,
     PARQUET_COMPRESSION,
     SIC_TO_GICS_SECTOR,
     SIC_UNCLASSIFIED,
@@ -182,18 +190,41 @@ def output_info(out: Path, name: str, date_col: str | None) -> dict:
     return info
 
 
-def source_ends(inventory: dict) -> dict:
+def source_ends(inventory: dict, side: int = 1) -> dict:
+    """Where each source ends (side 1) or starts (side 0), from the s00 inventory."""
     rng = {k: v.get("date_range") for k, v in inventory["files"].items()}
     def end(k):
-        return rng[k][1] if rng.get(k) else None
+        return rng[k][side] if rng.get(k) else None
+    pick = max if side else min
     return {"prices (CRSP CIZ daily)": end("r2000_price_crsp_ciz.csv"),
             "holdings (IWM)": end("iwm_holdings_raw.csv"),
             "Fama-French": end("ff_daily.csv"),
             "IBES (statpers)": end("forward_estimates.csv"),
-            "FRED": max(end(k) for k in rng if k.startswith("fred_")),
+            "FRED": pick(end(k) for k in rng if k.startswith("fred_") and rng.get(k)),
+            "client lists (9/30)": end(CLIENT_FILE),
             "Compustat quarterly (datadate)": end("fundamentals_raw.csv"),
             "Compustat annual (datadate)": end("fundamentals_annual_raw.csv"),
             "index levels": end("index_close.csv"), "ETFs": end("benchmark_etfs.csv")}
+
+
+def membership_manifest(paths: DataPaths) -> dict:
+    """Where membership comes from (decision 33), with row counts from s01 and the client-map gaps from s00c
+    (counts only: the client lists are licensed)."""
+    s01 = json.loads((paths.stage_dir("s01_membership") / "summary.json").read_text(encoding="utf-8"))
+    cmap = paths.stage_dir("s00c_client_map") / "summary.json"
+    s00c = json.loads(cmap.read_text(encoding="utf-8")) if cmap.exists() else {}
+    mem = s01.get("membership", {})
+    return {"sources": {"client_list": f"the client's 9/30 Russell 2000 lists, {CLIENT_LIST_FIRST_MONTH} to the month "
+                                       f"before {IWM_FIRST_MONTH}",
+                        "iwm": f"IWM holdings (CRSP mutual fund holdings) from {IWM_FIRST_MONTH}",
+                        "client_fill": f"list members missing from the IWM snapshot, {IWM_FIRST_MONTH} to "
+                                       f"{CLIENT_FILL_LAST_MONTH} (the old fund id hides them)"},
+            "list_timing": "each 9/30 list counts from the first month end after that year's reconstitution; an IPO "
+                           "after the reconstitution from the September month end; members only while trading",
+            "snapshot_rows_by_source": mem.get("rows_by_source"),
+            "iwm_gap_fixes": mem.get("gap_fixes"),
+            "client_rows_without_permno": s00c.get("known_gap_rows"),
+            "client_securities_without_permno": s00c.get("known_gap_securities")}
 
 
 def build_manifest(paths: DataPaths, out: Path, version: str, outputs: dict, inventory: dict) -> dict:
@@ -214,7 +245,11 @@ def build_manifest(paths: DataPaths, out: Path, version: str, outputs: dict, inv
         "units": {**{k: v for k, v in UNITS.items() if not k.startswith("mkt_cap (daily")},
                   "prices_daily mkt_cap_musd": "$ millions (the old daily_prices mkt_cap was $ thousands)",
                   "shrout": "thousands of shares (CRSP)", "dates": "datetime64[ns], no time zone"},
-        "sectors": {"source": "Compustat GICS, the current classification applied to all history (not historical)",
+        "membership": membership_manifest(paths),
+        "sectors": {"source": "Compustat GICS, the current classification applied to all history (not historical; "
+                              "no historical GICS is available)", "gics_source": GICS_SOURCE,
+                    "levels": {"gsector": len(GICS_SECTORS), "ggroup": len(GICS_GROUPS),
+                               "gind": len(GICS_INDUSTRIES), "gsubind": len(GICS_SUB_INDUSTRIES)},
                     "gics_sectors": {str(k): v for k, v in GICS_SECTORS.items()},
                     "sic_fallback": {"used_when": "GICS is missing (factor_panel_monthly.gics_from_sic)",
                                      "first_match_wins": [{"sector": SIC_UNCLASSIFIED, "sic": "missing, 0, 9900-9999"}]
@@ -232,9 +267,10 @@ def build_manifest(paths: DataPaths, out: Path, version: str, outputs: dict, inv
                                                "multiples). Sum of our permnos with the same permco, or with "
                                                "company_cap_from_compustat the Compustat share count at the listed "
                                                "price when it exceeds ours by more than 5%"},
-        "point_in_time": "factor_panel_monthly at t uses only data public by t: IWM snapshot eff_dt, Compustat "
-                         "report_date, IBES statpers (at most 60 days old), announcement dates. Other tables are not "
-                         "lagged; filter on report_date / statpers.",
+        "point_in_time": "factor_panel_monthly at t uses only data public by t (membership: the snapshot effective "
+                         "at t; before 2008-02 the client's 9/30 list in force, see membership): IWM snapshot eff_dt, "
+                         "Compustat report_date, IBES statpers (at most 60 days old), announcement dates. Other "
+                         "tables are not lagged; filter on report_date / statpers.",
         "known_gaps": {
             "unmatched_holdings": {"securities": len(gaps), "note": "IWM holdings that look like common stock but "
                                    "have no permno on any report date; not in any table (no extra pull, audit A8)",
@@ -247,6 +283,7 @@ def build_manifest(paths: DataPaths, out: Path, version: str, outputs: dict, inv
                                                "(decision 25), never for ADRs (decision 28), and only once the gap "
                                                "held at 3 month ends (decision 29)"},
             "sources_end": source_ends(inventory),
+            "sources_start": source_ends(inventory, side=0),
         },
     }
 
