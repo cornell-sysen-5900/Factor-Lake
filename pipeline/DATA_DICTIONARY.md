@@ -53,7 +53,7 @@ One row per Russell 2000 member, month end t; key date, permno. Built by stage `
 | `gvkey` | Compustat company id of the fundamentals row used at t | text | Compustat quarterly (CCM) | s07_panel |
 | `ticker` | CRSP ticker at t (IWM ticker when CRSP has none) | text | CRSP daily stock file (CIZ) | s07_panel |
 | `security_name` | security name in the IWM snapshot | text | IWM holdings (CRSP mutual fund holdings) | s01_membership |
-| `gsector` | GICS sector code (2 digits); current classification, not historical. How the four levels nest, where the names come from and how the app filters on them: [GICS_MAPPING.md](../DOCS/GICS_MAPPING.md) | code | Compustat quarterly (CCM) | s07_panel |
+| `gsector` | GICS sector code (2 digits); current classification, not historical. How the four levels nest, where the names come from and how the app filters on them: [GICS_MAPPING.md](https://github.com/cornell-sysen-5900/Factor-Lake/blob/main/DOCS/GICS_MAPPING.md) | code | Compustat quarterly (CCM) | s07_panel |
 | `gsector_name` | GICS sector name | text | config.GICS_SECTORS | s07_panel |
 | `ggroup` | GICS industry group code (4 digits) | code | Compustat quarterly (CCM) | s07_panel |
 | `ggroup_name` | GICS industry group name | text | config.GICS_GROUPS | s07_panel |

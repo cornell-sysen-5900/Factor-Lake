@@ -54,10 +54,11 @@ A WRDS job's `gics_filter` is `{"level": ..., "codes": [...]}`, and saved filter
 - **Industry group, industry and sub-industry** keep the stocks whose `gsubind` starts with one of the chosen codes.
   Stocks without GICS are left out, because a SIC code has no finer GICS equivalent.
 
-How much this affects, in `wrds_2026_11`: about **0.09%** of panel rows have no GICS, so the finer levels leave out
-fewer than 1 row in 1,000 that the Sector level keeps. About **0.01%** of rows are Unclassified and are left out
-whenever any GICS filter is on. Every row with a sector code also has a sub-industry code. The by-year shares
-are in section 11 of the version's private `VALIDATION.md`.
+How much this affects, in `wrds_2026_11`: **fewer than 1 panel row in 1,000** has no GICS, so the finer levels
+leave out very few stocks that the Sector level keeps. Unclassified rows are fewer still, and every filter level
+leaves them out. Every row with a sector code also has a sub-industry code. The exact shares by year (each level, and
+the SIC fallback) are in section 11 of the version's private `VALIDATION.md`; the data is licensed, so they stay
+out of the repo.
 
 ## At each data update
 
