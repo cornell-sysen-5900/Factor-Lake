@@ -425,6 +425,8 @@ def test_the_data_viewer_says_it_shows_legacy_data_in_wrds_mode(new_session):
     at.sidebar.radio(key='data_mode_input').set_value('WRDS').run()
     _click_main_tab(at, 'Data Viewer')
     assert any('The Data Viewer shows the Legacy data, not WRDS' in c.value for c in at.main.caption)
+    assert any('GICS sector, industry group, industry and sub-industry names are in its holdings table'
+               in c.value for c in at.main.caption)
     at.sidebar.radio(key='data_mode_input').set_value('Legacy').run()
     assert not any('The Data Viewer shows the Legacy data' in c.value for c in at.main.caption)
 
