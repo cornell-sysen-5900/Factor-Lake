@@ -173,6 +173,7 @@ def load_and_process_data(user_settings: Dict[str, Any]) -> None:
 
         st.session_state.rdata = df
         st.session_state.loaded_filters = _universe_filters(user_settings)
+        st.session_state.loaded_period = (int(user_settings['start_year']), int(user_settings['end_year']))
         st.session_state.data_loaded = True
         st.success(f"Universe Refined: {len(df):,} records prepared.")
     except Exception as e:
@@ -308,7 +309,23 @@ def run_backtest_logic(user_settings: Dict[str, Any],
             results, compute = get_lambda_client(get_backtest_lambda_name()).run(job)
             data, universe = None, _universe_filters(user_settings)
         else:
-            data, compute = st.session_state.rdata, None
+            # Apply current filters again: the sidebar may have changed since loading.
+            from src.universe_selection import select_universe
+            raw = st.session_state.get('raw_data')
+            period = (int(user_settings['start_year']), int(user_settings['end_year']))
+            filters_changed = (st.session_state.get('loaded_filters') != _universe_filters(user_settings)
+                               or st.session_state.get('loaded_period') != period)
+            if raw is not None and filters_changed:
+                data = select_universe(
+                    raw, int(user_settings['start_year']), int(user_settings['end_year']),
+                    selected_sectors=user_settings.get('selected_sectors'),
+                    restrict_fossil_fuels=bool(user_settings.get('restrict_fossil_fuels')))
+                st.session_state.rdata = data
+                st.session_state.loaded_filters = _universe_filters(user_settings)
+                st.session_state.loaded_period = period
+            else:
+                data = st.session_state.rdata
+            compute = None
             universe = dict(st.session_state.get('loaded_filters') or {})
             # Portfolio simulation execution
             results = rebalance_portfolio(

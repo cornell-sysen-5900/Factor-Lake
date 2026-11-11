@@ -69,11 +69,17 @@ def test_sidebar_changes_update_formula_without_data(at):
 def test_results_keep_exact_formula_after_sidebar_changes(at):
     _add_factor(at, "ROA %")
     _click(at, "Load Market Data")
+    # Change filters after loading: actual run and preview must still agree.
+    control(at.checkbox, "Enable Sector Filter").check().run()
+    control(at.multiselect, "Include following sectors:").set_value(["Technology"]).run()
+    at.number_input(key="start_year_input").set_value(2010).run()
     expected = formula(at)
     _click(at, "Run Portfolio Analysis")
     _assert_clean(at)
     assert formula(at) == expected
     run = at.session_state["saved_runs"][0]
+    assert run["data"]["Year"].min() == 2010
+    assert run["universe"]["selected_sectors"] == ["Technology"]
     assert run["calculation_preview"]["formula"] == expected
     control(at.radio, "Select weighting method:").set_value("Market Cap Weight").run()
     assert formula(at) == expected

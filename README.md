@@ -106,7 +106,8 @@ delisting and compounding details.
 
 After running, **Calculation Used in This Run** in Results preserves the formula from that
 run. Current sidebar changes do not change historical formulas. Opened saved analyses use
-their stored inputs.
+their stored inputs. For local runs, changing universe filters or years after loading data
+reapplies those selections to the cached raw data before execution.
 
 Run the acceptance tests with `uv run pytest tests/unit/test_calculation_preview.py`.
 
