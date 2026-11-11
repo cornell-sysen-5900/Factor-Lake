@@ -30,6 +30,7 @@ import streamlit_config as config
 import streamlit_css as css
 import streamlit_utils as utils
 from analysis_history import BROWSER_ANALYSES_KEY, earlier_analyses, sync_browser_analyses
+from app.calculation_preview import build_calculation_preview, render_calculation_preview
 from compare_state import OPEN_COMPARE_KEY
 from components.about import render_about_tab
 from components.compare_tab import render_compare_tab
@@ -218,6 +219,10 @@ def main():
             # Import settings from file fills the inputs above (and the sidebar), then the run buttons
             render_import_settings()
             render_next_run_name()
+
+            if data_mode == "legacy":
+                render_calculation_preview(build_calculation_preview(
+                    user_settings, selected_factor_names, factor_directions))
 
             if data_mode == 'wrds':
                 _render_wrds_run(user_settings, selected_factor_names, factor_directions)

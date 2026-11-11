@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+from app.calculation_preview import preview_for_run, render_calculation_preview
 from app.compare_state import FULL_MESSAGE, OPEN_COMPARE_KEY, add_to_comparison, ids_in_comparison
 from app.holdings_table import (
     FACTOR_COMBINATION_LABELS,
@@ -140,6 +141,7 @@ def render_results_tab(run: Dict[str, Any]) -> None:
 
     # 1. Header Information
     _render_header_captions(run)
+    render_calculation_preview(preview_for_run(run), saved=True)
 
     # 2. Performance Summary
     st.subheader("Performance Summary")

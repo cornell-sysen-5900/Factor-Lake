@@ -173,6 +173,7 @@ def load_and_process_data(user_settings: Dict[str, Any]) -> None:
 
         st.session_state.rdata = df
         st.session_state.loaded_filters = _universe_filters(user_settings)
+        st.session_state.loaded_period = (int(user_settings['start_year']), int(user_settings['end_year']))
         st.session_state.data_loaded = True
         st.success(f"Universe Refined: {len(df):,} records prepared.")
     except Exception as e:
@@ -308,7 +309,23 @@ def run_backtest_logic(user_settings: Dict[str, Any],
             results, compute = get_lambda_client(get_backtest_lambda_name()).run(job)
             data, universe = None, _universe_filters(user_settings)
         else:
-            data, compute = st.session_state.rdata, None
+            # Apply current filters again: the sidebar may have changed since loading.
+            from src.universe_selection import select_universe
+            raw = st.session_state.get('raw_data')
+            period = (int(user_settings['start_year']), int(user_settings['end_year']))
+            filters_changed = (st.session_state.get('loaded_filters') != _universe_filters(user_settings)
+                               or st.session_state.get('loaded_period') != period)
+            if raw is not None and filters_changed:
+                data = select_universe(
+                    raw, int(user_settings['start_year']), int(user_settings['end_year']),
+                    selected_sectors=user_settings.get('selected_sectors'),
+                    restrict_fossil_fuels=bool(user_settings.get('restrict_fossil_fuels')))
+                st.session_state.rdata = data
+                st.session_state.loaded_filters = _universe_filters(user_settings)
+                st.session_state.loaded_period = period
+            else:
+                data = st.session_state.rdata
+            compute = None
             universe = dict(st.session_state.get('loaded_filters') or {})
             # Portfolio simulation execution
             results = rebalance_portfolio(
@@ -337,6 +354,8 @@ def run_backtest_logic(user_settings: Dict[str, Any],
         )
         return None
 
+    from app.calculation_preview import build_calculation_preview
+
     # Save a snapshot so later sidebar/factor changes never alter this run
     run_id = st.session_state.next_run_id
     run = {
@@ -345,6 +364,8 @@ def run_backtest_logic(user_settings: Dict[str, Any],
         'factor_labels': factor_labels,
         'factors': internal_factor_cols,
         'factor_directions': internal_directions,
+        'calculation_preview': build_calculation_preview(
+            {**user_settings, **universe}, factor_labels, factor_dirs),
         'settings': dict(user_settings),
         'universe': universe,
         'data': data,
