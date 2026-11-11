@@ -27,6 +27,7 @@ import numpy as np
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.wrds_calendar import FIRST_YEAR, LAST_YEAR  # noqa: E402
 from src.wrds_data import WRDS_FILES, read_local_wrds_data  # noqa: E402
 from src.wrds_engine import run_wrds_backtest  # noqa: E402
 from src.wrds_factors import WRDS_FACTOR_COLUMNS  # noqa: E402
@@ -71,12 +72,13 @@ def run_case(folder: str, case: str) -> dict:
     loaded = time.perf_counter()
     if case == 'universe':
         results, holdings = run_wrds_backtest(
-            data, ['mkt_cap_musd'], {'mkt_cap_musd': 'top'}, 'monthly', 2008, 2026, 1000.0, top_pct=100.0,
+            data, ['mkt_cap_musd'], {'mkt_cap_musd': 'top'}, 'monthly', FIRST_YEAR, LAST_YEAR, 1000.0, top_pct=100.0,
             use_market_cap_weight=True, factor_combination='integrating')
     else:
         factors = TEN_FACTORS[:int(case)]
         assert set(factors) <= set(WRDS_FACTOR_COLUMNS)
-        results, holdings = run_wrds_backtest(data, factors, {f: 'top' for f in factors}, 'monthly', 2008, 2026, 1000.0)
+        results, holdings = run_wrds_backtest(data, factors, {f: 'top' for f in factors}, 'monthly', FIRST_YEAR,
+                                              LAST_YEAR, 1000.0)
     return {'load_s': loaded - started, 'run_s': time.perf_counter() - loaded, 'peak_mb': peak_memory_mb(),
             'holdings_mb': holdings.memory_usage(deep=True).sum() / 2**20,
             'portfolio': results['yearly_returns'], 'iwm': results['benchmark_returns']}

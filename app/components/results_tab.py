@@ -31,9 +31,10 @@ from app.streamlit_utils import (
     open_saved_analysis,
     run_cohort,
 )
-from components.strategy_settings import render_run_settings
+from components.strategy_settings import render_run_actions
 from src.saved_analyses import SavedAnalysisError
 from src.trading_costs import has_trading_costs, job_trading_cost
+from src.wrds_gics import describe_gics_filter
 from Visualizations.portfolio_growth_plot import plot_portfolio_growth
 from Visualizations.top_bottom_portfolio_plot import plot_top_bottom_percent
 
@@ -93,18 +94,27 @@ def render_saved_runs(saved_runs: List[Dict[str, Any]]) -> None:
         if not tab.open:
             continue
         with tab:
-            st.button(
+            render_run_actions(run, remove=lambda run_id=run['id']: st.button(
                 "Remove this run",
-                key=f"remove_run_{run['id']}",
+                key=f"remove_run_{run_id}",
                 on_click=_remove_run,
-                args=(run['id'],),
-            )
-            render_run_settings(run)
+                args=(run_id,),
+            ), keep_open=_keep_open_run)
             # A run that fails to render must not break the other tabs or its Remove button
             try:
                 render_results_tab(run)
             except Exception as e:
                 st.error(f"Could not display {run['label']}: {str(e)}")
+
+
+def _keep_open_run(label: str) -> None:
+    """
+    In a callback that changes a run's label (Rename): keep that run's tab open. New labels
+    make a new tab bar, which opens the newest run, unless the open run is restored (above).
+    """
+    labels = [run['label'] for run in st.session_state.get('saved_runs', [])]
+    st.session_state[OPEN_RUN_TAB_KEY] = {'labels': labels, 'open': label}
+    st.session_state.pop(RUN_TABS_KEY, None)
 
 
 def _remove_run(run_id: int) -> None:
@@ -424,6 +434,8 @@ def _render_header_captions(run: Dict[str, Any], data_source: Optional[str] = No
     if universe:
         sectors = universe.get('selected_sectors') or []
         sectors_str = ", ".join(sectors) if sectors else "All sectors"
+        if universe.get('gics_filter'):          # WRDS runs with a GICS filter
+            sectors_str = describe_gics_filter(universe['gics_filter'])
         fossil_str = "excluded" if universe.get('restrict_fossil_fuels') else "included"
         st.caption(f"**Universe:** {sectors_str} | Fossil fuels {fossil_str}")
     combination = settings.get('factor_combination', 'mixing')

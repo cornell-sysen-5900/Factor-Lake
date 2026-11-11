@@ -10,7 +10,13 @@ Each column is (meaning, unit, source[, stage]); the stage defaults to the file'
 
 from __future__ import annotations
 
-from pipeline.config import GICS_SECTORS, SIC_TO_GICS_SECTOR
+from pipeline.config import (
+    CLIENT_FILL_LAST_MONTH,
+    CLIENT_LIST_FIRST_MONTH,
+    GICS_SECTORS,
+    IWM_FIRST_MONTH,
+    SIC_TO_GICS_SECTOR,
+)
 
 # units
 DEC, MUSD, PS, DATE, TEXT, FLAG, CODE, N, X, MSH = ("decimal", "$ millions", "$ per share", "date", "text",
@@ -25,6 +31,7 @@ CA = "Compustat annual (CCM)"
 IBES = "IBES summary statistics"
 LINK = "CRSP-IBES link"
 DERIVED = "derived"
+CLIENT = "client Russell 2000 lists (9/30, FactSet)"
 
 ID = {
     "permno": ("CRSP security id (one share class)", CODE, CIZ),
@@ -35,10 +42,19 @@ GICS = {
     "gsector": ("GICS sector code (2 digits); current classification, not historical", CODE, CQ),
     "gsector_name": ("GICS sector name", TEXT, "config.GICS_SECTORS"),
     "ggroup": ("GICS industry group code (4 digits)", CODE, CQ),
+    "ggroup_name": ("GICS industry group name", TEXT, "config.GICS_GROUPS"),
     "gind": ("GICS industry code (6 digits); the RV peer group", CODE, CQ),
     "gind_name": ("GICS industry name", TEXT, "config.GICS_INDUSTRIES"),
     "gsubind": ("GICS sub-industry code (8 digits)", CODE, CQ),
+    "gsubind_name": ("GICS sub-industry name", TEXT, "config.GICS_SUB_INDUSTRIES"),
+    "gics_source": ("where the GICS codes come from: current_header = the company's current (or last) Compustat "
+                    "classification applied to all history, since no historical GICS is available (decision 39)",
+                    TEXT, DERIVED),
 }
+
+GICS_CODES = ("gsector", "ggroup", "gind", "gsubind")     # from Compustat; the names come from config tables
+# The GICS page (DOCS/GICS_MAPPING.md), as a full URL so the link also works in the full dictionary next to the data
+GICS_MAPPING_URL = "https://github.com/cornell-sysen-5900/Factor-Lake/blob/main/DOCS/GICS_MAPPING.md"
 
 # ---------- statement factors and building blocks (s03, used in the panel) ----------
 
@@ -93,9 +109,10 @@ QE_PRICE = {
 FILES: dict[str, dict] = {}
 
 FILES["factor_panel_monthly.parquet"] = {
-    "stage": "s07_panel", "row": "Russell 2000 member (IWM holding), month end t", "key": ["date", "permno"],
-    "about": "The point-in-time factor panel for backtests: at each month end t, every stock in the latest IWM "
-             "snapshot effective by t, with factors built only from data public by t. Factors are raw values; rank "
+    "stage": "s07_panel", "row": "Russell 2000 member, month end t", "key": ["date", "permno"],
+    "about": "The point-in-time factor panel for backtests: at each month end t, every stock in the latest index "
+             "snapshot effective by t (the client's 9/30 lists before 2008-02, IWM holdings after, see "
+             "membership_source), with factors built only from data public by t. Factors are raw values; rank "
              "or z-score them per date yourself.",
     "columns": {
         "date": ("month end t: the last CRSP trading day of the month", DATE, CIZ),
@@ -104,12 +121,22 @@ FILES["factor_panel_monthly.parquet"] = {
         "ticker": ("CRSP ticker at t (IWM ticker when CRSP has none)", TEXT, CIZ),
         "security_name": ("security name in the IWM snapshot", TEXT, IWM, "s01_membership"),
         **{k: v + ("s07_panel",) if len(v) == 3 else v for k, v in GICS.items()},
+        "gsector": (f"{GICS['gsector'][0]}. How the four levels nest, where the names come from and how the app "
+                    f"filters on them: [GICS_MAPPING.md]({GICS_MAPPING_URL})", CODE, CQ, "s07_panel"),
         "sector_name": ("GICS sector name, or where GICS is missing the SIC code mapped to a GICS sector name "
                         "(see the SIC fallback below)", TEXT, DERIVED),
         "gics_from_sic": ("sector_name comes from the SIC fallback", FLAG, DERIVED),
         "siccd": ("CRSP SIC code at t (last non-zero)", CODE, CIZ),
-        "index_weight": ("weight in the IWM fund on the snapshot report date", "percent of the fund", IWM,
-                         "s01_membership"),
+        "index_weight": ("weight in the IWM fund on the snapshot report date; for client_list and client_fill rows "
+                         "the stock's Russell 2000 weight on the list's 9/30, held unchanged for the whole year (see "
+                         "index_weight_source). Do not weight portfolios with it before 2008-02: use mkt_cap_musd",
+                         "percent of the fund (or index)", f"{IWM}; {CLIENT}", "s01_membership"),
+        "index_weight_source": ("iwm = IWM's own weight that month; client_list_static_930 = the client list's 9/30 "
+                                "weight held for the year (client_list and client_fill rows), not a monthly weight",
+                                TEXT, DERIVED, "s07_panel"),
+        "membership_source": ("where membership at t comes from: client_list (the client's 9/30 lists, before "
+                              "2008-02), iwm (IWM holdings), client_fill (a list member the old IWM fund id hides, "
+                              "2008-02 to 2010-05)", TEXT, DERIVED, "s01_membership"),
         "snapshot_report_dt": ("report date of the IWM snapshot used at t", DATE, IWM, "s01_membership"),
         "snapshot_eff_dt": ("date the whole snapshot was public (latest eff_dt of its lines); always <= t", DATE,
                             IWM, "s01_membership"),
@@ -201,18 +228,26 @@ FILES["factor_panel_monthly.parquet"] = {
 
 FILES["universe_periods.parquet"] = {
     "stage": "s01_membership", "row": "stock, membership period", "key": ["permno", "index_effective"],
-    "about": "Periods each stock was in the IWM snapshots (consecutive snapshots, one missing snapshot bridged).",
+    "about": "Periods each stock was in the index snapshots (consecutive snapshots of one source, one missing "
+             "snapshot bridged). Sources: the client's 9/30 lists before 2008-02, IWM holdings from 2008-02, and the "
+             "list members the old IWM fund id hides, 2008-02 to 2010-05.",
     "columns": {
         "permno": ID["permno"],
-        "index_effective": ("report date of the period's first snapshot", DATE, IWM),
-        "index_through": ("report date of the period's last snapshot", DATE, IWM),
-        "first_known": ("first date the period was public (earliest eff_dt)", DATE, IWM),
-        "n_snapshots": ("snapshots in the period", N, IWM),
+        "index_effective": ("report date of the period's first snapshot (a client-list snapshot: the month's "
+                            "last trading day)", DATE, f"{IWM}; {CLIENT}"),
+        "index_through": ("report date of the period's last snapshot", DATE, f"{IWM}; {CLIENT}"),
+        "first_known": ("first date the period was public (earliest eff_dt)", DATE, f"{IWM}; {CLIENT}"),
+        "n_snapshots": ("snapshots in the period", N, f"{IWM}; {CLIENT}"),
         "n_excluded": ("snapshots of the period excluded as non-members (decision 11)", N, DERIVED),
         "excluded_non_member": ("every snapshot of the period is excluded: a merger stock that was never really a "
                                 "member, not in the panel", FLAG, DERIVED),
-        "ticker": ("IWM ticker in the period's last snapshot", TEXT, IWM),
-        "security_name": ("IWM security name in the period's last snapshot", TEXT, IWM),
+        "membership_source": ("where the period's membership comes from: client_list (the client's 9/30 lists, "
+                              "before 2008-02), iwm (IWM holdings), client_fill (a list member missing from the "
+                              "IWM snapshot, 2008-02 to 2010-05); a period has one source", TEXT, DERIVED),
+        "ticker": ("ticker in the period's last snapshot (IWM's, or CRSP's for client-list rows)", TEXT,
+                   f"{IWM}; {CIZ}"),
+        "security_name": ("security name in the period's last snapshot (IWM's, or CRSP's for client-list rows)",
+                          TEXT, f"{IWM}; {CIZ}"),
     },
 }
 
@@ -367,7 +402,7 @@ FILES["dcf_inputs_annual.parquet"] = {
         "epsfx": ("diluted EPS excluding extraordinary items", PS, CA),
         "emp": ("employees", "thousands", CA),
         "sich": ("historical SIC code", CODE, CA),
-        **{k: v[:2] + (CA,) for k, v in GICS.items()},
+        **{k: v[:2] + (CA,) if k in GICS_CODES else v for k, v in GICS.items()},
         "naics": ("NAICS industry code", CODE, CA),
         "dcf_applicable": ("False for GICS sectors 40 (Financials) and 60 (Real Estate), where a DCF on FCFF does "
                            "not fit", FLAG, DERIVED),
@@ -477,7 +512,7 @@ FILES["fundamentals_quarterly.parquet"] = {
         "fyearq": ("fiscal year", "year", CQ), "fqtr": ("fiscal quarter (1-4)", CODE, CQ),
         "curcdq": ("reporting currency", TEXT, CQ), "is_usd": ("reported in USD", FLAG, CQ),
         "ajexq": ("Compustat cumulative adjustment factor (divide per-share items, multiply shares)", X, CQ),
-        **{k: v[:2] + (CQ,) for k, v in GICS.items()},
+        **{k: v[:2] + (CQ,) if k in GICS_CODES else v for k, v in GICS.items()},
         "naics": ("NAICS industry code", CODE, CQ),
         "price_qe": ("closing price at the quarter end (prccq)", PS, CQ),
         "cshoq": ("common shares outstanding, all classes", MSH, CQ),
@@ -576,6 +611,7 @@ def render(manifest: dict, stats=None, coverage=None) -> str:
           f"`{manifest['pipeline_git_commit'][:12]}`) from the WRDS, Fama-French and FRED downloads listed in "
           "manifest.json. All files are Parquet; read them with `pandas.read_parquet`. The schema-only version is "
           "`pipeline/DATA_DICTIONARY.md` in the repo; this one adds the stats of the data.", "",
+          *data_version_note(manifest),
           *CONVENTIONS,
           "## Files", "", "| file | one row per | key | rows | MB |", "|---|---|---|---|---|"]
     for name, f in FILES.items():
@@ -610,9 +646,11 @@ def render_schema() -> str:
     source and stage, from this module alone: nothing here comes from the data (no stats, counts or values)."""
     md = ["# Factor-Lake WRDS data: data dictionary (schema)", "",
           "Written by stage `s08_export` from `pipeline/dictionary.py`. It describes every file the pipeline exports "
-          "to `processed/final/` and every column in it. It holds no numbers from the data: the full version with "
-          "statistics and coverage by year (`processed/DATA_DICTIONARY.md`) stays next to the data, because the data "
-          "is licensed from WRDS. All files are Parquet; read them with `pandas.read_parquet`.", "",
+          "to `processed/final/` (data version 2: `processed_v2/final/`) and every column in it. It holds no numbers "
+          "from the data: the full version with statistics and coverage by year (`DATA_DICTIONARY.md` in the "
+          "processed folder) stays next to the data, because the data is licensed from WRDS. All files are Parquet; "
+          "read them with `pandas.read_parquet`.", "",
+          *data_version_note(),
           *CONVENTIONS,
           "## Files", "", "| file | one row per | key | built by |", "|---|---|---|---|"]
     for name, f in FILES.items():
@@ -627,6 +665,32 @@ def render_schema() -> str:
         md.append("")
     md += sectors()
     return "\n".join(md)
+
+
+def data_version_note(manifest: dict | None = None) -> list[str]:
+    """The 'Data version 2' block at the top of both dictionaries. With a manifest, the panel's own months;
+    without (the repo's schema-only version), the months of wrds_2026_11."""
+    panel = (manifest or {}).get("outputs", {}).get("factor_panel_monthly.parquet", {}).get("date_range")
+    first, last = (panel[0][:7], panel[1][:7]) if panel else (CLIENT_LIST_FIRST_MONTH, "2026-09")
+    fill_end = CLIENT_FILL_LAST_MONTH
+    return [
+        "## Data version 2", "",
+        "Data version 2 (`wrds_2026_11` on) extends the point-in-time data back to 2002.", "",
+        f"- **Coverage:** factor_panel_monthly runs from {first} to {last}. The daily prices start in 1997, "
+        "Compustat in 1999, IBES in 2001 and the market series in 1997 (IWM from 2000-05, IWN and IWO from "
+        "2000-07), so momentum, betas and growth are available from the first panel month.",
+        f"- **Membership eras** (`membership_source`): `client_list` before {IWM_FIRST_MONTH} (the annual Russell 2000 "
+        "lists on each 9/30, each used from the June reconstitution until the next, with no mid-year additions); "
+        f"`iwm` plus `client_fill` from {IWM_FIRST_MONTH} to {fill_end} (list members the old IWM fund id hides); "
+        "`iwm` only after.",
+        f"- **index_weight before {IWM_FIRST_MONTH}** is the list's 9/30 weight held for the whole year "
+        "(`index_weight_source = client_list_static_930`), not a monthly weight: don't weight portfolios with it; "
+        "use `mkt_cap_musd`.",
+        "- **GICS** is each company's current (or last) classification applied to all of its history "
+        "(`gics_source = current_header`): there is no historical GICS.",
+        "- **Thin early analyst data:** IBES capital expenditure (CPX) estimates start in 2006, and EBIT (EBI), "
+        "dividend (DPS) and cash flow (CPS) estimates are thin in 2001-2004, so analyst factors cover fewer stocks "
+        "then.", ""]
 
 
 CONVENTIONS = [

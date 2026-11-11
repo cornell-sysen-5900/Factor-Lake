@@ -6,37 +6,81 @@ PURPOSE: Data folder paths (from --data-dir), the raw file specs, and the consta
 Data folder layout (see pipeline/README.md):
     raw/                 WRDS and FRED downloads (read only)
     raw/query_inputs/    upload lists used for the WRDS queries (permno_list.txt, ibes_tickers.txt)
+    raw/client/          the client's Russell 2000 lists (licensed, never committed)
     archive/             old notebook and outputs (reference only, never read by the pipeline)
     processed/<stage>/   each stage's outputs (written only by that stage)
+
+Every folder and upload list can be moved with run.py options (--raw-dir, --processed-dir, --client-dir,
+--permno-list, --ibes-tickers), so a second data version (raw_v2/ -> processed_v2/) runs in place.
 """
 
 from __future__ import annotations
 
+import datetime as _dt
 from dataclasses import dataclass, field
 from pathlib import Path
 
 # ---------- Paths ----------
 
+PERMNO_LIST = "permno_list.txt"
+IBES_TICKERS = "ibes_tickers.txt"
+
+
+def _resolve(root: Path, value: str | Path | None) -> Path | None:
+    """A path option: absolute, or relative to the data folder."""
+    if value is None:
+        return None
+    p = Path(value).expanduser()
+    return (p if p.is_absolute() else root / p).resolve()
+
+
 @dataclass(frozen=True)
 class DataPaths:
-    """Folders inside the data folder passed with --data-dir."""
+    """Folders inside the data folder passed with --data-dir. Every other location defaults to the data folder's
+    standard layout; relative overrides are relative to the data folder."""
     root: Path
     processed_dir: Path | None = None   # default <root>/processed; s09 reruns everything into a temporary one
+    raw_dir: Path | None = None         # default <root>/raw
+    client_dir: Path | None = None      # default <raw>/client
+    permno_list_file: Path | None = None    # default <raw>/query_inputs/permno_list.txt
+    ibes_tickers_file: Path | None = None   # default <raw>/query_inputs/ibes_tickers.txt
 
     @classmethod
-    def from_data_dir(cls, data_dir: str | Path, processed_dir: str | Path | None = None) -> "DataPaths":
+    def from_data_dir(cls, data_dir: str | Path, processed_dir: str | Path | None = None, *,
+                      raw_dir: str | Path | None = None, client_dir: str | Path | None = None,
+                      permno_list: str | Path | None = None,
+                      ibes_tickers: str | Path | None = None) -> "DataPaths":
         root = Path(data_dir).expanduser().resolve()
-        if not (root / "raw").is_dir():
-            raise FileNotFoundError(f"{root} has no raw/ folder; pass the data folder with --data-dir")
-        return cls(root, Path(processed_dir).expanduser().resolve() if processed_dir else None)
+        paths = cls(root, _resolve(root, processed_dir), _resolve(root, raw_dir), _resolve(root, client_dir),
+                    _resolve(root, permno_list), _resolve(root, ibes_tickers))
+        if not paths.raw.is_dir():
+            raise FileNotFoundError(f"{paths.raw} is not a folder; pass the data folder with --data-dir "
+                                    "(and the raw folder with --raw-dir if it is not <data-dir>/raw)")
+        return paths
 
     @property
     def raw(self) -> Path:
-        return self.root / "raw"
+        return self.raw_dir or self.root / "raw"
 
     @property
     def query_inputs(self) -> Path:
         return self.raw / "query_inputs"
+
+    @property
+    def client(self) -> Path:
+        return self.client_dir or self.raw / "client"
+
+    @property
+    def permno_list(self) -> Path:
+        return self.permno_list_file or self.query_inputs / PERMNO_LIST
+
+    @property
+    def ibes_tickers(self) -> Path:
+        return self.ibes_tickers_file or self.query_inputs / IBES_TICKERS
+
+    def list_path(self, name: str) -> Path:
+        """The upload list behind a QUERY_INPUTS name."""
+        return {PERMNO_LIST: self.permno_list, IBES_TICKERS: self.ibes_tickers}[name]
 
     @property
     def processed(self) -> Path:
@@ -44,6 +88,22 @@ class DataPaths:
 
     def stage_dir(self, stage: str) -> Path:
         return self.processed / STAGE_FOLDERS.get(stage, stage)
+
+    def relative(self, path: Path) -> str:
+        """`path` relative to the data folder when it is inside it (posix), else absolute."""
+        try:
+            return path.resolve().relative_to(self.root).as_posix()
+        except ValueError:
+            return str(path.resolve())
+
+    def cli_args(self) -> list[str]:
+        """The run.py options that rebuild these paths (s09 reruns every stage with them)."""
+        args = ["--data-dir", str(self.root)]
+        for opt, value in (("--raw-dir", self.raw_dir), ("--client-dir", self.client_dir),
+                           ("--permno-list", self.permno_list_file), ("--ibes-tickers", self.ibes_tickers_file)):
+            if value is not None:
+                args += [opt, str(value)]
+        return args
 
 
 STAGE_FOLDERS = {"s09_validate": "s09_validation"}       # stages whose folder is not named after them
@@ -53,11 +113,16 @@ OLD_PANEL_PATHS = ("archive/r2000_monthly_panel.parquet",  # the notebook's pane
 
 # ---------- Date ranges of the WRDS pulls (also in the refresh checklist in README.md) ----------
 
-DAILY_START = "2006-12-01"          # CRSP CIZ daily, ETFs, index levels, Fama-French daily
+# Data version 2 (decision 35): membership from 2002-07, so prices start 1997-09 (60-month beta from 2002) and the
+# market series 1997-01. s00 WARNs when a raw file starts after its target.
+PRICES_START = "1997-09-01"         # CRSP CIZ daily stock file
+ETF_START = "2000-05-01"            # IWM listed 2000-05; IWN and IWO start 2000-07
+MARKET_START = "1997-01-01"         # index levels, Fama-French daily and monthly, FRED; market_daily starts here
 HOLDINGS_START = "2008-02-29"       # first IWM holdings report on CRSP
-FUNDAMENTALS_START = "2005-01-01"   # quarterly and annual datadate (TTM and 4-quarter growth need history)
-IBES_START = "2005-01-01"           # statpers
-FRED_START = "2006-01-01"
+FUNDAMENTALS_START = "1999-01-01"   # quarterly and annual datadate (TTM and 4-quarter growth need history)
+IBES_START = "2001-01-01"           # statpers
+FRED_START = MARKET_START
+CLIENT_LISTS_START = "2002-09-30"   # first client list (9/30/2002)
 
 
 # ---------- Raw files ----------
@@ -74,6 +139,10 @@ class RawFile:
     expected_values: dict[str, tuple[str, ...]] = field(default_factory=dict)   # all must appear
     first_date_by: str | None = None                # WARN if the first date is later
     upload_list: tuple[str, str] | None = None      # (query_inputs file, id column) the query was run with
+    optional: tuple[str, ...] = ()                  # columns kept when present (WARN when missing)
+    folder: str = ""                                # "client": in the client folder instead of raw/
+    skip_lines: int = 0                             # title lines above the header row
+    date_format: str | None = None                  # strptime format when the date column is not YYYY-MM-DD
 
 
 _FF_COLS = ("mktrf", "smb", "hml", "rmw", "cma", "rf", "umd")
@@ -83,6 +152,14 @@ IBES_FPI = {"0": "long-term growth", "1": "FY1", "2": "FY2", "3": "FY3"}     # F
 FRED_SERIES = {"DGS10": "ust_10y", "DGS3MO": "tbill_3m", "DBAA": "moodys_baa", "DAAA": "moodys_aaa"}
 INDEX_TICS = {"I0124": "r2000", "I0120": "r2000_growth", "I0122": "r2000_value"}
 ETF_PERMNOS = {88222: "iwm", 88399: "iwn", 88401: "iwo"}
+ETF_FIRST_BY = {"iwm": "2000-05-31", "iwn": "2000-07-31", "iwo": "2000-07-31"}     # IWM listed 2000-05, IWN/IWO 2000-07
+
+# Every column a stage reads is required (s00 FAILs when one is missing). Other columns in the files are allowed
+# and ignored (decision 37); `optional` ones are kept when present.
+CLIENT_FILE = "FR2000 Annual Quant Data(Data).csv"
+CLIENT_COLUMNS = {"security name": "name", "ticker-region": "ticker_region", "cusip": "cusip9", "date": "date",
+                  "russell 2000 port. weight": "weight"}      # client file column (lowercase) -> s00b column
+NAMES_FILE = "crsp_names_history.csv"
 
 RAW_FILES: tuple[RawFile, ...] = (
     RawFile("iwm_holdings_raw.csv", "report_dt",
@@ -91,24 +168,25 @@ RAW_FILES: tuple[RawFile, ...] = (
             unique=("permno", "cusip"), groups=(("crsp_portno",),), blanks=("permno", "eff_dt"),
             expected_values={"crsp_portno": ("1004185", "1025818")}, first_date_by=HOLDINGS_START),
     RawFile("r2000_price_crsp_ciz.csv", "dlycaldt",
-            ("permno", "hdrcusip", "ticker", "permco", "siccd", "dlycaldt", "dlydelflg", "delreasontype", "dlyprc",
-             "dlyret", "dlyvol", "dlyclose", "dlylow", "dlyhigh", "dlyopen", "shrout", "dlycumfacpr", "dlycumfacshr"),
+            ("permno", "hdrcusip", "ticker", "permco", "siccd", "dlycaldt", "dlydelflg", "delreasontype", "securitynm",
+             "dlyprc", "dlyret", "dlyvol", "dlyclose", "dlylow", "dlyhigh", "dlyopen", "shrout", "dlycumfacpr",
+             "dlycumfacshr"),
             unique=("permno",), groups=(("dlydelflg",),), blanks=("dlyprc", "dlyret"),
-            first_date_by=DAILY_START, upload_list=("permno_list.txt", "permno")),
+            first_date_by=PRICES_START, upload_list=(PERMNO_LIST, "permno"), optional=("primaryexch",)),
     RawFile("benchmark_etfs.csv", "dlycaldt", ("permno", "ticker", "dlycaldt", "dlyprc", "dlyret"),
             unique=("permno",), groups=(("ticker",),), blanks=("dlyret",),
-            expected_values={"permno": tuple(str(p) for p in ETF_PERMNOS)}, first_date_by=DAILY_START),
+            expected_values={"permno": tuple(str(p) for p in ETF_PERMNOS)}, first_date_by="2000-05-31"),
     RawFile("delistings.csv", "delistingdt",
             ("permno", "delistingdt", "delactiontype", "delreasontype", "delpaymenttype", "delret"),
             unique=("permno",), groups=(("delactiontype",),), blanks=("delret",),
-            upload_list=("permno_list.txt", "permno")),
+            upload_list=(PERMNO_LIST, "permno")),
     RawFile("index_close.csv", "datadate", ("tic", "datadate", "prccd"), groups=(("tic",),), blanks=("prccd",),
-            expected_values={"tic": tuple(INDEX_TICS)}, first_date_by=DAILY_START),
+            expected_values={"tic": tuple(INDEX_TICS)}, first_date_by="1997-01-31"),
     RawFile("crsp_ibes_link.csv", "sdate", ("ticker", "permno", "ncusip", "sdate", "edate", "score"),
             unique=("permno", "ticker"), groups=(("score",),), blanks=("edate",),
-            upload_list=("permno_list.txt", "permno")),
-    RawFile("ff_daily.csv", "date", ("date",) + _FF_COLS, blanks=_FF_COLS, first_date_by=DAILY_START),
-    RawFile("ff_monthly.csv", "dateff", ("dateff",) + _FF_COLS, blanks=_FF_COLS, first_date_by="2006-12-31"),
+            upload_list=(PERMNO_LIST, "permno")),
+    RawFile("ff_daily.csv", "date", ("date",) + _FF_COLS, blanks=_FF_COLS, first_date_by="1997-01-31"),
+    RawFile("ff_monthly.csv", "dateff", ("dateff",) + _FF_COLS, blanks=_FF_COLS, first_date_by="1997-01-31"),
     RawFile("fundamentals_raw.csv", "datadate",
             ("gvkey", "lpermno", "datadate", "fyearq", "fqtr", "indfmt", "consol", "popsrc", "datafmt", "tic", "conm",
              "ajexq", "curcdq", "datacqtr", "datafqtr", "rdq",
@@ -118,7 +196,7 @@ RAW_FILES: tuple[RawFile, ...] = (
              "aqcy", "capxy", "dltisy", "dltry", "dvy", "oancfy", "prstkcy", "sstky",
              "costat", "dvpsxq", "prccq", "ggroup", "gind", "gsector", "gsubind", "naics"),
             unique=("lpermno", "gvkey"), groups=(("curcdq",),), blanks=("rdq", "ajexq", "gsector"),
-            first_date_by="2005-03-31", upload_list=("permno_list.txt", "lpermno")),
+            first_date_by="1999-03-31", upload_list=(PERMNO_LIST, "lpermno")),
     RawFile("fundamentals_annual_raw.csv", "datadate",
             ("gvkey", "lpermno", "datadate", "fyear", "indfmt", "consol", "popsrc", "datafmt", "tic", "conm", "ajex",
              "curcd", "fyr", "act", "ap", "aqc", "at", "capx", "ceq", "che", "cogs", "cshfd", "csho", "dlc", "dltis",
@@ -127,20 +205,27 @@ RAW_FILES: tuple[RawFile, ...] = (
              "sstk", "txditc", "txt", "xint", "xintd", "xrd", "xsga", "costat", "sich", "dvpsx_f", "prcc_f",
              "ggroup", "gind", "gsector", "gsubind", "naics"),
             unique=("lpermno", "gvkey"), groups=(("curcd",),), blanks=("ajex", "oiadp", "dp"),
-            first_date_by="2005-12-31", upload_list=("permno_list.txt", "lpermno")),
+            first_date_by="1999-12-31", upload_list=(PERMNO_LIST, "lpermno")),
     RawFile("forward_estimates.csv", "statpers",
             ("ticker", "cusip", "oftic", "statpers", "measure", "fiscalp", "fpi", "curcode", "numest", "numup",
-             "numdown", "medest", "meanest", "stdev", "fpedats", "actual", "anndats_act"),
+             "numdown", "medest", "meanest", "stdev", "highest", "lowest", "fpedats", "actual", "anndats_act"),
             unique=("ticker",), groups=(("measure", "fpi"), ("curcode",), ("fiscalp",)), blanks=("meanest", "stdev"),
-            expected_values={"measure": tuple(IBES_MEASURES), "fpi": tuple(IBES_FPI)}, first_date_by="2005-01-31",
-            upload_list=("ibes_tickers.txt", "ticker")),
+            expected_values={"measure": tuple(IBES_MEASURES), "fpi": tuple(IBES_FPI)}, first_date_by="2001-01-31",
+            upload_list=(IBES_TICKERS, "ticker")),
+    RawFile(NAMES_FILE, "secinfostartdt",
+            ("permno", "permco", "secinfostartdt", "secinfoenddt", "cusip", "ticker", "issuernm", "shareclass",
+             "securitytype", "sharetype"),
+            unique=("permno", "cusip")),
+    RawFile(CLIENT_FILE, "date", tuple(CLIENT_COLUMNS), unique=("cusip",), groups=(("date",),),
+            blanks=("ticker-region", "cusip", "russell 2000 port. weight"), first_date_by=CLIENT_LISTS_START,
+            folder="client", skip_lines=2, date_format="%m/%d/%Y"),
 ) + tuple(
     RawFile(f"fred_{series}.csv", "observation_date", ("observation_date", series.lower()),
-            blanks=(series.lower(),), first_date_by="2006-01-31")
+            blanks=(series.lower(),), first_date_by="1997-01-31")
     for series in FRED_SERIES
 )
 
-QUERY_INPUTS = ("permno_list.txt", "ibes_tickers.txt")
+QUERY_INPUTS = (PERMNO_LIST, IBES_TICKERS)
 
 
 # ---------- Cleaning rules (ported from archive/WRDS_Cleaning.ipynb; see PLAN.md) ----------
@@ -169,6 +254,52 @@ SNAPSHOT_SIZE_RANGE = (1800, 2150)
 SNAPSHOT_WEIGHT_RANGE = (90.0, 110.0)          # percent of the fund
 KNOWN_MISSING_MONTHS = ("2009-04", "2009-05", "2009-06")
 NEIGHBOUR_MISSING_MAX = 20
+
+# Membership sources (decision 33). membership_source on snapshots and universe periods:
+#   client_list  before IWM_FIRST_MONTH: the client's 9/30 lists only
+#   iwm          IWM holdings
+#   client_fill  IWM_FIRST_MONTH..CLIENT_FILL_LAST_MONTH: client-list members missing from the IWM snapshot (the old
+#                fund id 1004185 hides some members behind relabelled security records)
+MEMBERSHIP_SOURCES = ("client_list", "iwm", "client_fill")
+CLIENT_LIST_FIRST_MONTH = "2002-07"     # the 9/30/2002 list counts from the 2002-07 month end
+IWM_FIRST_MONTH = "2008-02"
+CLIENT_FILL_LAST_MONTH = "2010-05"
+
+
+def reconstitution_date(year: int) -> _dt.date:
+    """Russell's annual reconstitution: the last Friday of June, or the Friday before when that is the 29th or
+    30th. A stock first trading after it (an IPO added after June) counts only from its list's 9/30."""
+    day = _dt.date(year, 6, 30)
+    day -= _dt.timedelta(days=(day.weekday() - 4) % 7)
+    return day - _dt.timedelta(days=7) if day.day >= 29 else day
+
+
+def client_list_year(month_end) -> int:
+    """The client list (its 9/30 year) in force at a month end (the month's last CRSP trading day): each list
+    counts from the first month end after that year's reconstitution, so June in most years and July when the
+    reconstitution is on June's last trading day (e.g. 2002)."""
+    day = month_end.date() if isinstance(month_end, _dt.datetime) else month_end
+    return day.year if day > reconstitution_date(day.year) else day.year - 1
+
+
+# Client list mapping to permnos (s00c_client_map, decision 34)
+CLIENT_LIST_MONTH_DAY = (9, 30)
+CLIENT_NO_CUSIP = "#Calc"               # FactSet's placeholder when it has no CUSIP: matched by ticker + name
+CLIENT_NO_TICKER = "--"
+NAME_STOPWORDS = frozenset({
+    "INC", "CORP", "CORPORATION", "CO", "COMPANY", "LTD", "LIMITED", "PLC", "HOLDINGS", "HOLDING", "HLDGS", "GROUP",
+    "GRP", "THE", "LP", "LLC", "NV", "SA", "AG", "CL", "CLASS", "A", "B", "C", "NEW", "DEL", "OF", "COM",
+    "INCORPORATED", "NON", "VOTING", "SHARES", "SHS", "ORD", "AND"})
+NAME_GENERIC_WORDS = frozenset({
+    "FIRST", "AMERICAN", "AMERICA", "NATIONAL", "UNITED", "CENTRAL", "GENERAL", "INTERNATIONAL", "US", "USA",
+    "NORTH", "SOUTH", "WEST", "EAST", "PACIFIC", "ATLANTIC", "CITIZENS", "COMMUNITY", "SECURITY", "CAPITAL", "BANK",
+    "HOME", "PEOPLES", "GREAT", "SOUTHERN", "NORTHERN", "WESTERN", "EASTERN", "MIDWEST", "TRUST"})
+
+# IWM known-gap fixes (s01 rule 2b): a gap CUSIP gets the permno CRSP gives it while the permno traded during the
+# gap's IWM dates, else a client-list match whose 9/30 is within this many months of those dates; a gap whose
+# every line holds fewer than GAP_FIX_MIN_SHARES shares is a stray line and is not fixed
+GAP_FIX_CLIENT_WINDOW_MONTHS = 3
+GAP_FIX_MIN_SHARES = 100
 
 # Counts and factor coverage of the notebook's last run, which the stages compare with. They describe the licensed
 # data, so they live next to it (<data-dir>/pipeline_last_run.json: {"counts": {...}, "coverage_2015": {...}}), not in
@@ -223,9 +354,9 @@ SUE_HISTORY_QUARTERS = 8            # SUE is scaled by the std of the previous 8
 SUE_MIN_HISTORY = 6                 # ... and needs at least 6 of them
 SUE_MAX_ABS = 50                    # |SUE| above this is NaN (counted)
 
-# GICS names. Compustat's GICS is each company's latest classification (current for active companies, the last
-# one used for inactive ones, so some discontinued industry codes appear). Industry names follow the 2023
-# structure; discontinued codes keep their last name.
+# GICS names, all four levels (decision 39). Compustat's GICS is each company's latest classification (current for
+# active companies, the last one used for inactive ones, so discontinued codes appear). Names follow the 2023
+# structure; discontinued codes keep their last name, marked with the year they were dropped or renumbered.
 GICS_SECTORS = {10: "Energy", 15: "Materials", 20: "Industrials", 25: "Consumer Discretionary",
                 30: "Consumer Staples", 35: "Health Care", 40: "Financials", 45: "Information Technology",
                 50: "Communication Services", 55: "Utilities", 60: "Real Estate"}
@@ -263,7 +394,123 @@ GICS_INDUSTRIES = {
     601040: "Office REITs", 601050: "Health Care REITs", 601060: "Residential REITs", 601070: "Retail REITs",
     601080: "Specialized REITs", 602010: "Real Estate Management & Development",
     601020: "Real Estate Management & Development (2016-2023 code, renumbered 602010)",
+    404010: "Real Estate (discontinued 2006)", 452050: "Semiconductor Equipment & Products (discontinued 2002)",
 }
+GICS_GROUPS = {
+    1010: "Energy", 1510: "Materials", 2010: "Capital Goods", 2020: "Commercial & Professional Services",
+    2030: "Transportation", 2510: "Automobiles & Components", 2520: "Consumer Durables & Apparel",
+    2530: "Consumer Services", 2540: "Media (discontinued 2018)",
+    2550: "Consumer Discretionary Distribution & Retail", 3010: "Consumer Staples Distribution & Retail",
+    3020: "Food, Beverage & Tobacco", 3030: "Household & Personal Products", 3510: "Health Care Equipment & Services",
+    3520: "Pharmaceuticals, Biotechnology & Life Sciences", 4010: "Banks", 4020: "Financial Services",
+    4030: "Insurance", 4040: "Real Estate (discontinued 2016)", 4510: "Software & Services",
+    4520: "Technology Hardware & Equipment", 4530: "Semiconductors & Semiconductor Equipment",
+    5010: "Telecommunication Services", 5020: "Media & Entertainment", 5510: "Utilities",
+    6010: "Equity Real Estate Investment Trusts (REITs)", 6020: "Real Estate Management & Development",
+}
+GICS_SUB_INDUSTRIES = {
+    10101010: "Oil & Gas Drilling", 10101020: "Oil & Gas Equipment & Services", 10102010: "Integrated Oil & Gas",
+    10102020: "Oil & Gas Exploration & Production", 10102030: "Oil & Gas Refining & Marketing",
+    10102040: "Oil & Gas Storage & Transportation", 10102050: "Coal & Consumable Fuels",
+    15101010: "Commodity Chemicals", 15101020: "Diversified Chemicals",
+    15101030: "Fertilizers & Agricultural Chemicals",
+    15101040: "Industrial Gases", 15101050: "Specialty Chemicals", 15102010: "Construction Materials",
+    15103010: "Metal, Glass & Plastic Containers", 15103020: "Paper & Plastic Packaging Products & Materials",
+    15104010: "Aluminum", 15104020: "Diversified Metals & Mining", 15104025: "Copper", 15104030: "Gold",
+    15104040: "Precious Metals & Minerals", 15104045: "Silver", 15104050: "Steel", 15105010: "Forest Products",
+    15105020: "Paper Products",
+    20101010: "Aerospace & Defense", 20102010: "Building Products", 20103010: "Construction & Engineering",
+    20104010: "Electrical Components & Equipment", 20104020: "Heavy Electrical Equipment",
+    20105010: "Industrial Conglomerates", 20106010: "Construction Machinery & Heavy Transportation Equipment",
+    20106015: "Agricultural & Farm Machinery", 20106020: "Industrial Machinery & Supplies & Components",
+    20107010: "Trading Companies & Distributors", 20201010: "Commercial Printing",
+    20201030: "Diversified Commercial & Professional Services (discontinued 2008)",
+    20201040: "Human Resource & Employment Services (discontinued 2008)",
+    20201050: "Environmental & Facilities Services", 20201060: "Office Services & Supplies",
+    20201070: "Diversified Support Services", 20201080: "Security & Alarm Services",
+    20202010: "Human Resource & Employment Services", 20202020: "Research & Consulting Services",
+    20202030: "Data Processing & Outsourced Services", 20301010: "Air Freight & Logistics",
+    20302010: "Passenger Airlines", 20303010: "Marine Transportation", 20304010: "Rail Transportation",
+    20304020: "Trucking (discontinued 2023)", 20304030: "Cargo Ground Transportation",
+    20304040: "Passenger Ground Transportation", 20305010: "Airport Services", 20305020: "Highways & Railtracks",
+    20305030: "Marine Ports & Services",
+    25101010: "Automotive Parts & Equipment", 25101020: "Tires & Rubber", 25102010: "Automobile Manufacturers",
+    25102020: "Motorcycle Manufacturers", 25201010: "Consumer Electronics", 25201020: "Home Furnishings",
+    25201030: "Homebuilding", 25201040: "Household Appliances", 25201050: "Housewares & Specialties",
+    25202010: "Leisure Products", 25202020: "Photographic Products (discontinued 2014)",
+    25203010: "Apparel, Accessories & Luxury Goods", 25203020: "Footwear", 25203030: "Textiles",
+    25301010: "Casinos & Gaming", 25301020: "Hotels, Resorts & Cruise Lines", 25301030: "Leisure Facilities",
+    25301040: "Restaurants", 25302010: "Education Services", 25302020: "Specialized Consumer Services",
+    25401010: "Advertising (discontinued 2018)", 25401020: "Broadcasting (discontinued 2018)",
+    25401025: "Cable & Satellite (discontinued 2018)", 25401030: "Movies & Entertainment (discontinued 2018)",
+    25401040: "Publishing (discontinued 2018)", 25501010: "Distributors",
+    25502010: "Catalog Retail (discontinued 2018)", 25502020: "Internet & Direct Marketing Retail (discontinued 2023)",
+    25503010: "Department Stores (discontinued 2023)", 25503020: "General Merchandise Stores (discontinued 2023)",
+    25503030: "Broadline Retail", 25504010: "Apparel Retail", 25504020: "Computer & Electronics Retail",
+    25504030: "Home Improvement Retail", 25504040: "Other Specialty Retail", 25504050: "Automotive Retail",
+    25504060: "Homefurnishing Retail",
+    30101010: "Drug Retail", 30101020: "Food Distributors", 30101030: "Food Retail",
+    30101040: "Consumer Staples Merchandise Retail", 30201010: "Brewers", 30201020: "Distillers & Vintners",
+    30201030: "Soft Drinks & Non-alcoholic Beverages", 30202010: "Agricultural Products & Services",
+    30202030: "Packaged Foods & Meats", 30203010: "Tobacco", 30301010: "Household Products",
+    30302010: "Personal Care Products",
+    35101010: "Health Care Equipment", 35101020: "Health Care Supplies", 35102010: "Health Care Distributors",
+    35102015: "Health Care Services", 35102020: "Health Care Facilities", 35102030: "Managed Health Care",
+    35103010: "Health Care Technology", 35201010: "Biotechnology", 35202010: "Pharmaceuticals",
+    35203010: "Life Sciences Tools & Services",
+    40101010: "Diversified Banks", 40101015: "Regional Banks",
+    40102010: "Thrifts & Mortgage Finance (discontinued 2023)", 40201020: "Diversified Financial Services",
+    40201030: "Multi-Sector Holdings", 40201040: "Specialized Finance",
+    40201050: "Commercial & Residential Mortgage Finance", 40201060: "Transaction & Payment Processing Services",
+    40202010: "Consumer Finance", 40203010: "Asset Management & Custody Banks",
+    40203020: "Investment Banking & Brokerage", 40203030: "Diversified Capital Markets",
+    40203040: "Financial Exchanges & Data", 40204010: "Mortgage REITs", 40301010: "Insurance Brokers",
+    40301020: "Life & Health Insurance", 40301030: "Multi-line Insurance", 40301040: "Property & Casualty Insurance",
+    40301050: "Reinsurance",
+    40401010: "Real Estate Investment Trusts (discontinued 2006)",
+    40401020: "Real Estate Management & Development (discontinued 2006)",
+    40402010: "Diversified REITs (discontinued 2016)", 40402020: "Industrial REITs (discontinued 2016)",
+    40402030: "Mortgage REITs (discontinued 2016)", 40402035: "Hotel & Resort REITs (discontinued 2016)",
+    40402040: "Office REITs (discontinued 2016)", 40402045: "Health Care REITs (discontinued 2016)",
+    40402050: "Residential REITs (discontinued 2016)", 40402060: "Retail REITs (discontinued 2016)",
+    40402070: "Specialized REITs (discontinued 2016)",
+    40403010: "Diversified Real Estate Activities (discontinued 2016)",
+    40403020: "Real Estate Operating Companies (discontinued 2016)",
+    40403030: "Real Estate Development (discontinued 2016)", 40403040: "Real Estate Services (discontinued 2016)",
+    45101010: "Internet Software & Services (discontinued 2018)", 45102010: "IT Consulting & Other Services",
+    45102020: "Data Processing & Outsourced Services (discontinued 2023)",
+    45102030: "Internet Services & Infrastructure", 45103010: "Application Software", 45103020: "Systems Software",
+    45103030: "Home Entertainment Software (discontinued 2018)", 45201020: "Communications Equipment",
+    45202010: "Computer Hardware (discontinued 2014)", 45202020: "Computer Storage & Peripherals (discontinued 2014)",
+    45202030: "Technology Hardware, Storage & Peripherals", 45203010: "Electronic Equipment & Instruments",
+    45203015: "Electronic Components", 45203020: "Electronic Manufacturing Services",
+    45203030: "Technology Distributors", 45205010: "Semiconductor Equipment (discontinued 2002)",
+    45205020: "Semiconductors (discontinued 2002)", 45301010: "Semiconductor Materials & Equipment",
+    45301020: "Semiconductors",
+    50101010: "Alternative Carriers", 50101020: "Integrated Telecommunication Services",
+    50102010: "Wireless Telecommunication Services", 50201010: "Advertising", 50201020: "Broadcasting",
+    50201030: "Cable & Satellite", 50201040: "Publishing", 50202010: "Movies & Entertainment",
+    50202020: "Interactive Home Entertainment", 50203010: "Interactive Media & Services",
+    55101010: "Electric Utilities", 55102010: "Gas Utilities", 55103010: "Multi-Utilities", 55104010: "Water Utilities",
+    55105010: "Independent Power Producers & Energy Traders", 55105020: "Renewable Electricity",
+    60101010: "Diversified REITs", 60101020: "Industrial REITs (2016-2023 code)",
+    60101030: "Hotel & Resort REITs (2016-2023 code)", 60101040: "Office REITs (2016-2023 code)",
+    60101050: "Health Care REITs (2016-2023 code)", 60101060: "Residential REITs (2016-2023 code)",
+    60101070: "Retail REITs (2016-2023 code)", 60101080: "Specialized REITs (2016-2023 code)",
+    60102010: "Diversified Real Estate Activities (2016-2023 code)",
+    60102020: "Real Estate Operating Companies (2016-2023 code)",
+    60102030: "Real Estate Development (2016-2023 code)", 60102040: "Real Estate Services (2016-2023 code)",
+    60102510: "Industrial REITs", 60103010: "Hotel & Resort REITs", 60104010: "Office REITs",
+    60105010: "Health Care REITs", 60106010: "Multi-Family Residential REITs",
+    60106020: "Single-Family Residential REITs", 60107010: "Retail REITs", 60108010: "Other Specialized REITs",
+    60108020: "Self-Storage REITs", 60108030: "Telecom Tower REITs", 60108040: "Timber REITs",
+    60108050: "Data Center REITs", 60201010: "Diversified Real Estate Activities",
+    60201020: "Real Estate Operating Companies", 60201030: "Real Estate Development",
+    60201040: "Real Estate Services",
+}
+# Where the GICS codes come from (decision 39): no historical GICS is available, so every row carries the company's
+# current (or last) classification from the Compustat header
+GICS_SOURCE = "current_header"
 
 # Near-zero denominators (s03): below these the ratio is missing
 MIN_TTM_SALES_MUSD = 1.0            # f_sales_growth_1yr (prior TTM sales), f_rd_to_sales (current TTM sales)
@@ -292,7 +539,8 @@ CLOSED_MARKET_DAYS = ("2012-10-29", "2012-10-30")
 
 # s06 checks: sensible yield ranges (decimals), IWM total minus Russell 2000 price return per year (dividends minus
 # fees), and how far a published monthly Fama-French factor may be from its compounded daily values
-YIELD_RANGES = {"ust_10y": (0.0, 0.06), "tbill_3m": (-0.005, 0.07), "moodys_baa": (0.02, 0.10),
+# (ust_10y up to 8%: 1997-2000 had 10-year yields near 7%)
+YIELD_RANGES = {"ust_10y": (0.0, 0.08), "tbill_3m": (-0.005, 0.07), "moodys_baa": (0.02, 0.10),
                 "moodys_aaa": (0.01, 0.09)}
 IWM_MINUS_INDEX_RANGE = (0.005, 0.02)
 FF_MONTHLY_TOLERANCE = 0.005

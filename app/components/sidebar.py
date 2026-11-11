@@ -2,19 +2,22 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/components/sidebar.py
 PURPOSE: Configuration interface for global backtest parameters and ESG filters.
-VERSION: 2.7.0
+VERSION: 2.8.0
 """
 
+import calendar
 from typing import Any, Callable, Dict, List, Optional
 
 import streamlit as st
 
 import streamlit_config as config
 from src.trading_costs import MAX_TRADING_COST_BPS
+from src.wrds_calendar import FIRST_MONTH as WRDS_FIRST_MONTH
 from src.wrds_calendar import FIRST_YEAR as WRDS_FIRST_YEAR
+from src.wrds_calendar import LAST_MONTH as WRDS_LAST_MONTH
 from src.wrds_calendar import LAST_YEAR as WRDS_LAST_YEAR
 from src.wrds_calendar import describe_schedule
-from src.wrds_factors import WRDS_SECTORS
+from src.wrds_gics import GICS_LEVELS, codes_under, level_names, make_gics_filter, names_to_codes
 
 # Widget key of the Legacy / WRDS switch
 DATA_MODE_KEY = "data_mode_input"
@@ -23,6 +26,20 @@ WRDS_NEEDS_LAMBDA = "WRDS mode runs in AWS Lambda, which is not configured for t
 TRADING_COST_KEY = "trading_cost_bps_input"
 TRADING_COST_HELP = ("Charged on every buy and sell. Russell 2000 stocks often cost roughly 20-60 bps "
                      "per side, more for the smallest names.")
+# WRDS GICS filter: the level picker's key and options (label -> level), and each level's
+# multiselect key and plural name (the sector list keeps its original key)
+GICS_LEVEL_KEY = "wrds_gics_level_input"
+GICS_LEVEL_OPTIONS = {label: level for level, (label, _, _) in GICS_LEVELS.items()}
+GICS_WIDGETS = {
+    'sector': ("wrds_sectors_input", "sectors"),
+    'industry_group': ("wrds_industry_groups_input", "industry groups"),
+    'industry': ("wrds_industries_input", "industries"),
+    'sub_industry': ("wrds_sub_industries_input", "sub-industries"),
+}
+GICS_LEVEL_HELP = ("Filter by GICS sector, industry group, industry or sub-industry. GICS is each company's "
+                   "current classification applied to its whole history (gics_source = current_header), "
+                   "not the historical one. Sector also places stocks without GICS by their SIC code; "
+                   "the finer levels leave those stocks out.")
 
 
 def _render_data_mode(backtest_lambda: str, on_change: Optional[Callable[[], None]]) -> bool:
@@ -56,8 +73,8 @@ PARAMETER_DEFAULTS = {
     'factor_combination_input': 'Mixing',
     'delisting_strategy_input': 'Zero Return',
     'sector_filter_enabled_input': False,
-    'start_year_input': 2002,
-    'end_year_input': 2024,
+    'start_year_input': config.LEGACY_FIRST_YEAR,
+    'end_year_input': config.LEGACY_LAST_YEAR,
     'initial_aum_input': 1000.0,
     TRADING_COST_KEY: 0,
 }
@@ -87,7 +104,14 @@ def clear_sidebar_parameters() -> None:
     # The sector multiselects disappear when filtering is disabled. When enabled
     # again they use render_sidebar's existing default (all available sectors).
     st.session_state.pop('selected_sectors_input', None)
-    st.session_state.pop('wrds_sectors_input', None)
+    clear_gics_inputs()
+
+
+def clear_gics_inputs() -> None:
+    """Forgets the WRDS GICS filter's level and lists, so they show their defaults."""
+    st.session_state.pop(GICS_LEVEL_KEY, None)
+    for key, _ in GICS_WIDGETS.values():
+        st.session_state.pop(key, None)
 
 
 def render_sidebar(sector_options: List[str], data_source_label: str,
@@ -233,17 +257,10 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
             help="Limit the portfolio to chosen sectors."
         )
         selected_sectors = []
+        gics_filter = None
         if sector_filter_enabled:
             if wrds:
-                selected_sectors = st.multiselect(
-                    "Include following sectors:",
-                    options=list(WRDS_SECTORS),
-                    default=list(WRDS_SECTORS),
-                    key="wrds_sectors_input",
-                    help="Only stocks in these GICS sectors can be held. Sectors use today's GICS "
-                         "codes, not historical ones, and stocks without a sector are left out "
-                         "while this filter is on."
-                )
+                gics_filter = _render_wrds_gics_filter()
             else:
                 selected_sectors = st.multiselect(
                     "Include following sectors:",
@@ -285,7 +302,8 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
             "restrict_fossil_fuels": restrict_fossil_fuels,
             "use_market_cap_weight": use_market_cap_weight,
             "factor_combination": factor_combination,
-            "selected_sectors": selected_sectors if sector_filter_enabled else None,
+            "selected_sectors": [] if sector_filter_enabled else None,
+            "gics_filter": gics_filter,
             "sector_filter_enabled": sector_filter_enabled,
             "start_year": start_year,
             "end_year": end_year,
@@ -308,6 +326,56 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
     }
 
 
+def _render_wrds_gics_filter() -> Optional[Dict[str, Any]]:
+    """
+    The WRDS GICS filter: a level, then one list per level down to it. Each list offers
+    only what is inside the choices above it (all of it while nothing is chosen there).
+    Returns the filter of the choices at the picked level, or None when there are none.
+    """
+    chosen = GICS_LEVEL_OPTIONS[st.radio(
+        "Filter level",
+        options=list(GICS_LEVEL_OPTIONS),
+        index=0,
+        key=GICS_LEVEL_KEY,
+        help=GICS_LEVEL_HELP
+    )]
+    levels = list(GICS_LEVELS)[:list(GICS_LEVELS).index(chosen) + 1]
+    parent, allowed, picked = None, [], []
+    for level in levels:
+        names = level_names(level)
+        codes = sorted(names) if parent is None else codes_under(level, allowed, parent)
+        options = sorted(names[c] for c in codes)
+        key, plural = GICS_WIDGETS[level]
+        # Drop choices a narrower choice above took away (a list's value must be among its options)
+        if key in st.session_state and any(v not in options for v in st.session_state[key]):
+            st.session_state[key] = [v for v in st.session_state[key] if v in options]
+        last = level == chosen
+        if level == 'sector':
+            help_text = ("Only stocks in these GICS sectors can be held; stocks without a sector are left "
+                         "out while this filter is on." if last else "Narrows the lists below to these sectors.")
+        else:
+            help_text = (f"Only stocks in these GICS {plural} can be held; stocks without GICS are left out."
+                         if last else f"Narrows the lists below to these {plural}.")
+        choice = st.multiselect(
+            f"Include following {plural}:",
+            options=options,
+            default=options if level == 'sector' else [],
+            key=key,
+            placeholder=f"Choose {plural}" if last else f"All {plural}",
+            help=help_text
+        )
+        picked = names_to_codes(level, choice)
+        parent, allowed = level, picked or codes
+    if not picked:
+        st.caption(f"No {GICS_WIDGETS[chosen][1]} chosen: the filter is off.")
+    return make_gics_filter(chosen, picked)
+
+
+def _month_name(month: str) -> str:
+    """'2002-07' -> 'July 2002'."""
+    return f"{calendar.month_name[int(month[5:7])]} {month[:4]}"
+
+
 def _render_wrds_period(frequency: str):
     """WRDS start and end years, limited to the data, with the rebalances they give."""
     col1, col2 = st.columns(2)
@@ -319,7 +387,7 @@ def _render_wrds_period(frequency: str):
             value=WRDS_FIRST_YEAR,
             step=1,
             format="%d",
-            help="First calendar year of the backtest. The WRDS data starts in April 2008.",
+            help=f"First calendar year of the backtest. The WRDS data starts in {_month_name(WRDS_FIRST_MONTH)}.",
             key="wrds_start_year_input"
         )
     with col2:
@@ -330,7 +398,7 @@ def _render_wrds_period(frequency: str):
             value=WRDS_LAST_YEAR,
             step=1,
             format="%d",
-            help="Last calendar year of the backtest. The WRDS data ends in September 2026.",
+            help=f"Last calendar year of the backtest. The WRDS data ends in {_month_name(WRDS_LAST_MONTH)}.",
             key="wrds_end_year_input"
         )
 
@@ -350,9 +418,9 @@ def _render_legacy_period():
     with col1:
         start_year = st.number_input(
             "Start Year",
-            min_value=2002,
-            max_value=2023,
-            value=2002,
+            min_value=config.LEGACY_FIRST_YEAR,
+            max_value=config.LEGACY_LAST_START_YEAR,
+            value=config.LEGACY_FIRST_YEAR,
             step=1,
             format="%d",
             help="First year of the backtest. Earliest is 2008.",
@@ -361,12 +429,12 @@ def _render_legacy_period():
     with col2:
         end_year = st.number_input(
             "End Year",
-            min_value=2002,
-            max_value=2024,
-            value=2024,
+            min_value=config.LEGACY_FIRST_YEAR,
+            max_value=config.LEGACY_LAST_YEAR,
+            value=config.LEGACY_LAST_YEAR,
             step=1,
             format="%d",
-            help="Last year of the backtest. Latest is 2024.",
+            help=f"Last year of the backtest. Latest is {config.LEGACY_LAST_YEAR}.",
             key="end_year_input"
         )
 

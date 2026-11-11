@@ -29,6 +29,31 @@ SOURCE_PACKAGES = ["src", "app", "Visualizations"]
 
 nav = mkdocs_gen_files.Nav()
 
+# Pages kept next to the code they describe (pipeline/), copied into the site at build time. Their links to other
+# repo files are rewritten to GitHub, because those files are outside the docs folder.
+REPO_BLOB = "https://github.com/cornell-sysen-5900/Factor-Lake/blob/main"
+COPIED_PAGES = {"pipeline/DATA_UPDATE_GUIDE.md": "DATA_UPDATE_GUIDE.md"}
+
+
+def _github_links(text: str, source: Path) -> str:
+    """Relative Markdown links ([x](PLAN.md), [x](../README.md)) -> GitHub blob URLs, from the source's folder."""
+    import posixpath
+    import re
+
+    def fix(m):
+        target = m.group(2)
+        if re.match(r"[a-z]+:|#|/", target):
+            return m.group(0)
+        path, _, anchor = target.partition("#")
+        full = posixpath.normpath(posixpath.join(source.parent.as_posix(), path))
+        return f"{m.group(1)}({REPO_BLOB}/{full}{'#' + anchor if anchor else ''})"
+    return re.sub(r"(\[[^\]]*\])\(([^)\s]+)\)", fix, text)
+
+
+for source, page in COPIED_PAGES.items():
+    with mkdocs_gen_files.open(page, "w") as fh:
+        fh.write(_github_links((ROOT / source).read_text(encoding="utf-8"), Path(source)))
+
 for package in SOURCE_PACKAGES:
     package_dir = ROOT / package
     if not package_dir.exists():

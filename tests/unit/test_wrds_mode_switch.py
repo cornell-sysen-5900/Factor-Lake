@@ -199,14 +199,14 @@ def test_wrds_controls(lambda_at):
     # Years limited to the data, with the rebalances they give
     years = _number_inputs(at)
     assert (years['wrds_start_year_input'].min, years['wrds_start_year_input'].max,
-            years['wrds_start_year_input'].value) == (2008, 2026, 2008)
+            years['wrds_start_year_input'].value) == (2002, 2026, 2002)
     assert (years['wrds_end_year_input'].min, years['wrds_end_year_input'].max,
-            years['wrds_end_year_input'].value) == (2008, 2026, 2026)
+            years['wrds_end_year_input'].value) == (2002, 2026, 2026)
     assert 'start_year_input' not in years
-    assert '73 quarterly rebalances, 2008-06 to 2026-06; holds to 2026-09.' in _captions(at)
+    assert '96 quarterly rebalances, 2002-09 to 2026-06; holds to 2026-09.' in _captions(at)
 
     at.sidebar.radio(key='wrds_frequency_input').set_value('Monthly').run()
-    assert '221 monthly rebalances, 2008-04 to 2026-08; holds to 2026-09.' in _captions(at)
+    assert '290 monthly rebalances, 2002-07 to 2026-08; holds to 2026-09.' in _captions(at)
 
     # The 11 GICS sectors, without Unclassified
     next(c for c in at.sidebar.checkbox if c.label == 'Enable Sector Filter').check().run()
@@ -245,7 +245,7 @@ def test_wrds_run_sends_a_wrds_job_built_from_the_sidebar(lambda_at):
 
     (job,) = at.fake_lambda.jobs
     assert job['kind'] == 'backtest' and job['data_mode'] == 'wrds'
-    assert (job['frequency'], job['start_year'], job['end_year'], job['top_pct']) == ('quarterly', 2008, 2026, 10.0)
+    assert (job['frequency'], job['start_year'], job['end_year'], job['top_pct']) == ('quarterly', 2002, 2026, 10.0)
     assert job['factors'] == ['f_book_to_price', 'mkt_cap_musd']
     assert job['factor_directions'] == {'f_book_to_price': 'top', 'mkt_cap_musd': 'bottom'}
     assert job['factor_labels'] == {'f_book_to_price': 'Book/Price', 'mkt_cap_musd': 'Market Cap'}

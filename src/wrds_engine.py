@@ -7,7 +7,8 @@ VERSION: 1.0.0
 See DOCS/WRDS_MODE_DESIGN.md, sections 3, 4 and 7. At each rebalance date t:
 
 1. Universe: the panel rows at t (Russell 2000 members known at t) with a price and a
-   market cap, after the sector and fossil fuel filters. Nothing dated after t is read.
+   market cap, after the GICS (src/wrds_gics.py) and fossil fuel filters. Nothing dated
+   after t is read.
 2. Scores: each factor's z-score per date, exactly as Legacy's normalize_series
    (winsorize at 1% / 99%, negate for 'bottom', z-score with ddof=1).
    Integrating ranks the mean z-score of stocks that have every factor; Mixing ranks
@@ -35,7 +36,8 @@ from .performance_metrics import compute_comprehensive_metrics
 from .trading_costs import cost_fraction, cost_results, drifted_weights, net_return, turnover, validate_trading_cost_bps
 from .wrds_calendar import FIRST_MONTH, LAST_MONTH, PERIODS_PER_YEAR, period_boundaries
 from .wrds_data import WrdsData
-from .wrds_factors import WRDS_FACTOR_COLUMNS, WRDS_SECTORS
+from .wrds_factors import WRDS_FACTOR_COLUMNS
+from .wrds_gics import gics_mask, job_gics_filter
 
 FACTOR_COMBINATIONS = ('mixing', 'integrating')
 # Tail share capped at both ends before z-scoring (Legacy's normalize_series default)
@@ -48,11 +50,21 @@ BENCHMARK_COLUMNS = {'benchmark': 'iwm_total_ret', 'growth': 'iwo_total_ret', 'v
 BENCHMARK_LABELS = {'benchmark': 'IWM (ETF, total return)', 'growth': 'IWO (ETF, total return)',
                     'value': 'IWN (ETF, total return)'}
 RISK_FREE_SOURCE = "Fama-French one-month T-bill (a missing month: 3-month T-bill / 12)"
+# Panel columns every run reads besides its factors
+UNIVERSE_COLUMNS = ['date', 'permno', 'ticker', 'security_name', 'sector_name', 'gsubind', 'siccd', 'prc',
+                    'mkt_cap_musd']
+# The panel's four GICS name columns -> their holdings columns
+HOLDINGS_GICS_COLUMNS = {'gsector_name': 'gics_sector', 'ggroup_name': 'gics_industry_group',
+                         'gind_name': 'gics_industry', 'gsubind_name': 'gics_sub_industry'}
 
 
 def validate_inputs(factors: List[str], factor_directions: Dict[str, str], factor_combination: str,
-                    top_pct: float, selected_sectors: Optional[Iterable[str]]) -> None:
-    """Raises ValueError for inputs a WRDS backtest cannot run."""
+                    top_pct: float, selected_sectors: Optional[Iterable[str]],
+                    gics_filter: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    """
+    Raises ValueError for inputs a WRDS backtest cannot run. Returns the GICS filter to
+    apply (src/wrds_gics.job_gics_filter): gics_filter, or selected_sectors as a sector filter.
+    """
     if not factors:
         raise ValueError("A backtest needs at least one factor.")
     if bad := [f for f in factors if f not in WRDS_FACTOR_COLUMNS]:
@@ -63,21 +75,21 @@ def validate_inputs(factors: List[str], factor_directions: Dict[str, str], facto
         raise ValueError(f"factor_combination must be one of {FACTOR_COMBINATIONS}, not '{factor_combination}'.")
     if not 0 < top_pct <= 100:
         raise ValueError("top_pct must be above 0 and at most 100.")
-    if bad := [s for s in (selected_sectors or []) if s not in WRDS_SECTORS]:
-        raise ValueError(f"Unknown GICS sectors: {bad}.")
+    return job_gics_filter(gics_filter, selected_sectors)
 
 
 def eligible_universe(panel: pd.DataFrame, restrict_fossil_fuels: bool = False,
-                      selected_sectors: Optional[Iterable[str]] = None) -> pd.DataFrame:
+                      selected_sectors: Optional[Iterable[str]] = None,
+                      gics_filter: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
     """
-    The panel rows a backtest can buy: a positive price and market cap at t, in the
-    selected GICS sectors (Unclassified stocks are left out while a sector filter is
-    on) and, with restrict_fossil_fuels, not a fossil fuel company.
+    The panel rows a backtest can buy: a positive price and market cap at t, kept by the
+    GICS filter (gics_filter, or an older job's selected_sectors as a sector filter; see
+    src/wrds_gics.py) and, with restrict_fossil_fuels, not a fossil fuel company.
     """
     keep = (panel['prc'] > 0) & (panel['mkt_cap_musd'] > 0)
-    sectors = list(selected_sectors or [])
-    if sectors:
-        keep &= panel['sector_name'].isin(sectors)
+    gics_filter = job_gics_filter(gics_filter, selected_sectors)
+    if gics_filter:
+        keep &= gics_mask(panel, gics_filter)
     if restrict_fossil_fuels:
         gsubind = panel['gsubind']
         fossil = (gsubind.isin(FOSSIL_GSUBIND).to_numpy(dtype=bool, na_value=False)
@@ -157,20 +169,21 @@ def _ranks(scores: pd.Series, permnos: pd.Series) -> pd.Series:
 def rank_stocks(data: WrdsData, date: pd.Timestamp, factors: List[str], factor_directions: Dict[str, str],
                 factor_combination: str = 'mixing', top_pct: float = 10.0, use_market_cap_weight: bool = False,
                 restrict_fossil_fuels: bool = False,
-                selected_sectors: Optional[Iterable[str]] = None) -> pd.DataFrame:
+                selected_sectors: Optional[Iterable[str]] = None,
+                gics_filter: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
     """
     Every stock a backtest could buy on one rebalance date, ranked: its raw factor
     values and z-scores (z_<column>), the composite score (mean z-score, only for stocks
     with every factor) with its rank, each factor's own rank (rank_<column>, the Mixing
     sleeves), and whether the strategy holds it and with what weight.
     """
-    validate_inputs(factors, factor_directions, factor_combination, top_pct, selected_sectors)
-    columns = list(dict.fromkeys(['date', 'permno', 'ticker', 'security_name', 'sector_name', 'gsubind',
-                                  'siccd', 'prc', 'mkt_cap_musd'] + list(factors)))
+    gics_filter = validate_inputs(factors, factor_directions, factor_combination, top_pct, selected_sectors,
+                                  gics_filter)
+    columns = list(dict.fromkeys(UNIVERSE_COLUMNS + list(factors)))
     panel = data.panel.loc[(data.panel['date'] == date).to_numpy(), columns]
     if panel.empty:
         raise ValueError(f"The WRDS panel has no rows on {date.date()}.")
-    universe = eligible_universe(panel, restrict_fossil_fuels, selected_sectors)
+    universe = eligible_universe(panel, restrict_fossil_fuels, gics_filter=gics_filter)
 
     table = universe[['permno', 'ticker', 'security_name', 'sector_name', 'prc', 'mkt_cap_musd']].copy()
     zscores = {}
@@ -235,12 +248,14 @@ def run_periods(data: WrdsData, dates: List[pd.Timestamp], factors: List[str],
                 use_market_cap_weight: bool = False, factor_combination: str = 'mixing',
                 restrict_fossil_fuels: bool = False, selected_sectors: Optional[Iterable[str]] = None,
                 factor_labels: Optional[Dict[str, str]] = None,
-                trading_cost_bps: float = 0.0) -> Tuple[Dict[str, Any], pd.DataFrame]:
+                trading_cost_bps: float = 0.0,
+                gics_filter: Optional[Dict[str, Any]] = None) -> Tuple[Dict[str, Any], pd.DataFrame]:
     """
     Backtests the holding periods between consecutive dates (rebalancing at every date
     but the last). See run_wrds_backtest for the arguments and the results.
     """
-    validate_inputs(factors, factor_directions, factor_combination, top_pct, selected_sectors)
+    gics_filter = validate_inputs(factors, factor_directions, factor_combination, top_pct, selected_sectors,
+                                  gics_filter)
     trading_cost_bps = validate_trading_cost_bps(trading_cost_bps)
     if len(dates) < 2:
         raise ValueError("A backtest needs at least one holding period.")
@@ -251,10 +266,9 @@ def run_periods(data: WrdsData, dates: List[pd.Timestamp], factors: List[str],
         raise ValueError(f"The WRDS panel has no rows on the rebalance dates {missing}.")
 
     # Only the columns this run needs, and only the rebalance dates' rows, are copied
-    columns = list(dict.fromkeys(['date', 'permno', 'ticker', 'security_name', 'sector_name', 'gsubind',
-                                  'siccd', 'prc', 'mkt_cap_musd'] + list(factors)))
+    columns = list(dict.fromkeys(UNIVERSE_COLUMNS + list(HOLDINGS_GICS_COLUMNS) + list(factors)))
     panel = data.panel.loc[data.panel['date'].isin(rebalance_dates).to_numpy(), columns]
-    universe = eligible_universe(panel, restrict_fossil_fuels, selected_sectors)
+    universe = eligible_universe(panel, restrict_fossil_fuels, gics_filter=gics_filter)
     positions = select_positions(universe, factors, factor_directions, factor_combination,
                                  top_pct, use_market_cap_weight)
 
@@ -279,7 +293,7 @@ def run_periods(data: WrdsData, dates: List[pd.Timestamp], factors: List[str],
             benchmarks[role].append(float(np.prod(1.0 + monthly) - 1.0))
 
         held = by_date.get(start)
-        if held is None:          # nothing to buy (e.g. a narrow sector filter): the money earns rf
+        if held is None:          # nothing to buy (e.g. a narrow GICS filter): the money earns rf
             gross = rf_period[-1]
             target = end_weights = pd.Series(dtype=float)     # sold into cash, held as cash
         else:
@@ -372,7 +386,7 @@ def _holdings_table(positions: pd.DataFrame, growth: pd.DataFrame, panel: pd.Dat
         picked['picked_by'] = picked.pop('mask').map(labels)
         table = table.merge(picked, on=['date', 'permno'])
     attributes = panel[['date', 'permno', 'ticker', 'security_name', 'sector_name', 'prc']
-                       + list(dict.fromkeys(factors))]
+                       + list(HOLDINGS_GICS_COLUMNS) + list(dict.fromkeys(factors))]
     table = table.merge(attributes, on=['date', 'permno'], how='left').merge(growth, on=['date', 'permno'], how='left')
     if traded is not None:
         table = table.merge(traded.astype({'permno': table['permno'].dtype}), on=['date', 'permno'], how='left')
@@ -384,16 +398,17 @@ def _holdings_table(positions: pd.DataFrame, growth: pd.DataFrame, panel: pd.Dat
     table['period_return'] = table['growth'] - 1.0
     table['contribution'] = table['weight'] * table['period_return']
     table = table.rename(columns={'date': 'rebalance_date', 'security_name': 'name', 'sector_name': 'sector',
-                                  'prc': 'buy_price'})
+                                  'prc': 'buy_price', **HOLDINGS_GICS_COLUMNS})
     table['_order'] = -table['score'].round(10)
     table = table.sort_values(['rebalance_date', 'rank', '_order', 'permno']).drop(columns=['_order', 'growth'])
-    columns = (['rebalance_date', 'rank', 'permno', 'ticker', 'name', 'sector']
+    gics = list(HOLDINGS_GICS_COLUMNS.values())
+    columns = (['rebalance_date', 'rank', 'permno', 'ticker', 'name', 'sector'] + gics
                + (['picked_by'] if factor_combination == 'mixing' else []) + ['score']
                + list(dict.fromkeys(factors))
                + ['weight'] + (['traded'] if with_traded else [])
                + ['shares', 'buy_price', 'dollar_value', 'period_return', 'contribution',
                   'delisted', 'missing_return_months'])
-    for col in ('ticker', 'name', 'sector'):     # only the values still used
+    for col in ['ticker', 'name', 'sector'] + gics:     # only the values still used
         table[col] = table[col].cat.remove_unused_categories()
     return table[columns].reset_index(drop=True)
 
@@ -406,7 +421,8 @@ def run_wrds_backtest(data: WrdsData, factors: List[str], factor_directions: Dic
                       factor_labels: Optional[Dict[str, str]] = None,
                       first_month: str = FIRST_MONTH,
                       last_month: str = LAST_MONTH,
-                      trading_cost_bps: float = 0.0) -> Tuple[Dict[str, Any], pd.DataFrame]:
+                      trading_cost_bps: float = 0.0,
+                      gics_filter: Optional[Dict[str, Any]] = None) -> Tuple[Dict[str, Any], pd.DataFrame]:
     """
     Backtests factor portfolios on the WRDS data, rebalanced at the frequency's month
     ends over the calendar years start_year to end_year (src/wrds_calendar.py).
@@ -421,6 +437,9 @@ def run_wrds_backtest(data: WrdsData, factors: List[str], factor_directions: Dic
         trading_cost_bps: cost of every buy and sell in basis points (0 to 500), charged on
             each rebalance's turnover (see src/trading_costs.py). Metrics use the returns
             after costs.
+        gics_filter: {'level', 'codes'} (src/wrds_gics.py), or None. selected_sectors (GICS
+            sector names, from older jobs) is the same as a sector-level gics_filter; a run
+            takes one or the other.
 
     Returns:
         (results, holdings). results has the keys of compute_comprehensive_metrics, with
@@ -439,4 +458,4 @@ def run_wrds_backtest(data: WrdsData, factors: List[str], factor_directions: Dic
                        frequency=frequency, top_pct=top_pct, use_market_cap_weight=use_market_cap_weight,
                        factor_combination=factor_combination, restrict_fossil_fuels=restrict_fossil_fuels,
                        selected_sectors=selected_sectors, factor_labels=factor_labels,
-                       trading_cost_bps=trading_cost_bps)
+                       trading_cost_bps=trading_cost_bps, gics_filter=gics_filter)

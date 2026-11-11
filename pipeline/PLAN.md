@@ -18,8 +18,8 @@ Every factor and multiple is a raw value; the app z-scores or ranks at each reba
 
 | S3 key under wrds_YYYY_MM/ | one row per | contents | built in | used by |
 |---|---|---|---|---|
-| factor_panel_monthly.parquet | index member, month end t (point in time) | ids, GICS sector and industry, index weight, price, listed and company market cap, momentum, volatility, betas, the fundamentals used and their 12 statement factors, 8 price-scaled factors and 5 quarter-end versions, 9 analyst factors, ret_next_1m | s07 | factor selection, backtests, sector filter, Data Viewer |
-| universe_periods.parquet | stock, membership period | permno, index_effective, index_through, first_known, n_snapshots, n_excluded, excluded_non_member, ticker, security_name | s01 | universe selection |
+| factor_panel_monthly.parquet | index member, month end t (point in time) | ids, GICS at four levels with names and gics_source, membership_source, index weight, price, listed and company market cap, momentum, volatility, betas, the fundamentals used and their 12 statement factors, 8 price-scaled factors and 5 quarter-end versions, 9 analyst factors, ret_next_1m | s07 | factor selection, backtests, sector filter, Data Viewer |
+| universe_periods.parquet | stock, membership period | permno, index_effective, index_through, first_known, n_snapshots, n_excluded, excluded_non_member, membership_source, ticker, security_name | s01 | universe selection |
 | returns_monthly.parquet | stock, month (every permno ever in the universe, also after it leaves) | month-end price, shares, market cap, ret_m with delisting returns, delisting flags, trading days, is_adr | s02 | backtest holding returns |
 | prices_daily/year=YYYY/data.parquet (one per year) | stock, trading day | permno, ticker, date, prc, prc_adj, cfacpr, shrout, mkt_cap_musd, ret, vol, is_delisting_row | s02 | daily loader, sub-annual rebalancing |
 | prices_daily/_manifest.json | - | years, rows, bytes and columns of the daily files (uploaded last) | s08 | readers of the daily files |
@@ -58,7 +58,8 @@ notebook's last-run counts are the expected values of the "vs last run" checks; 
 
 Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the fourth, 21-24 from the fifth,
 25-27 from the sixth, 28-29 from the seventh, 30-31 and the current 29 from the eighth, 32 from the ninth (all
-2026-10-25).
+2026-10-25). Decisions 33-41 are data version 2 (2026-11-07): membership back to 2002 from the client's Russell 2000
+lists, and every WRDS pull extended to match.
 
 | # | decision | where |
 |---|---|---|
@@ -94,28 +95,102 @@ Decisions 1-10 are from the first review, 11-15 from the second, 16-20 from the 
 | 30 | IBES scale rule: a total (SAL, EBT, EBI, CPX) estimate or actual more than 100x the largest of the company's Compustat TTM revenue, total assets and company market cap known at statpers (latest report_date <= statpers; market cap on the last trading day <= statpers, at most 7 days back) is NaN (suspect_scale); skipped when none of the three is known. | s05 rule 8 |
 | 31 | estimates_consensus drops cfacpr_last (always 1.0 in CIZ); crsp_basis_factor stays. s07 takes each permno's last cfacpr from the daily prices. | s05, s07 |
 | 32 | IBES margin rule, on top of the scale rule: with Compustat TTM revenue >= $50M known at statpers, a positive EBIT or EBITDA estimate (EBI, EBT) or a capex estimate (CPX) more than 20x that revenue is NaN. Negative EBIT and EBITDA are never touched; pre-revenue companies (< $50M) are skipped. Both rules set suspect_scale; suspect_scale_reason says which (scale or margin). | s05 rule 9 |
+| 33 | **Membership from three sources**, marked `membership_source` on snapshots and universe periods. (a) Before 2008-02: the client's 9/30 lists only (`client_list`). The 9/30/Y list counts from the first month end after year Y's reconstitution date until the next list does: June in most years, July when the reconstitution is on June's last trading day (2002, so the first list starts at the 2002-07 month end). A stock whose first CRSP trading day is after that year's reconstitution date (an IPO added after June) counts only from the September Y month end. Choices made with this decision (2026-11-07): client rows carry the list's 9/30 index weight; every client row (list and fill) counts only while CRSP names show it trading on the date; client-list snapshots are dated report_dt = eff_dt = the month's last CRSP trading day; the reconstitution date is the last Friday of June, or the Friday before when that is the 29th or 30th; the first CRSP trading day is the permno's first non-delisting row in the CIZ daily file; a membership period never mixes sources. (b) 2008-02 to 2010-05: IWM holdings plus the list members missing from that IWM snapshot (`client_fill`; the old fund id 1004185 hides some members behind relabelled security records), same list timing, only when still trading at the month end. (c) From 2010-06: IWM only (`iwm`). (d) The IWM known-gap fixes, the merger exclusions and the non-member rule 6 apply to every source. (e) Months without an IWM report (2009-04 to 2009-06) keep the existing carry-forward: s07 uses the latest effective snapshot. | s01 rules 7-10; `config.MEMBERSHIP_SOURCES` |
+| 34 | **Client mapping is pipeline stages**, reproducible and without scratch scripts: s00b_client cleans the client file, s00c_client_map gives each row a permno (CUSIP valid on the 9/30, then ticker + name; a CUSIP of another company is corrected by ticker + name; a ticker with two permnos takes the share class named in the client name; the same permno twice in one list keeps the row whose name matches CRSP, else the CUSIP row; unmatched rows are known gaps). Its result must equal the reviewed map of 2026-11-07, row for row. | s00b, s00c |
+| 35 | **Start dates** of the WRDS pulls: prices 1997-09-01 (60-month beta from 2002), fundamentals datadate 1999-01-01, IBES statpers 2001-01-01, ETFs 2000-05, index levels, Fama-French and FRED 1997-01-01. The panel starts at the first membership month (2002-07). | `config` start dates; s00 `first_date_by` |
+| 36 | **Folders:** run.py takes `--raw-dir`, `--processed-dir`, `--client-dir`, `--permno-list` and `--ibes-tickers` (defaults unchanged: raw/, processed/, raw/client/, raw/query_inputs/), so data version 2 runs in place from raw_v2/ into processed_v2/ with the v2 upload lists. s09's rerun passes the same options. | `config.DataPaths`, run.py |
+| 37 | **RAW_FILES lists every column a stage reads** (dlyopen, securitynm, ticker, highest, lowest included) and the new raw files (the client file and crsp_names_history). Other columns (primaryexch, ewretd, ewretx, sprtrn, delpermno, delstatustype, delretmisstype) are allowed and ignored, except primaryexch, which is kept through s02 for a future Nasdaq volume adjustment (optional: WARN when missing). | `config.RAW_FILES`, s02 |
+| 38 | ETFs: s06 drops exact duplicate rows (as s02 does for prices); IWN and IWO start 2000-07, IWM 2000-05. | s06 |
+| 39 | GICS: there is no historical GICS, so GICS stays the current codes from the fundamentals files. All four levels get names (sector, industry group, industry, sub-industry) from a GICS code-to-name table in config, and `gics_source` = `current_header`. A limitation, documented in the dictionary. | s03, s07; `config` GICS tables |
+| 40 | IBES links ending 2025-12-31 (the link table's last update) are open-ended, as before (each permno's latest link, H2). | s05 rule 4 |
+| 41 | Expected thin data, not errors: IBES CPX starts 2006; EBI, DPS and CPS are thin in 2001-2004. | s05 checks |
 
 ## s00_inventory
 
-**Inputs:** every file in `raw/` and `raw/query_inputs/`. **Output:** `processed/s00_inventory/inventory.json`.
+**Inputs:** every file in `config.RAW_FILES` (in the raw folder; the client file in the client folder) and the two
+upload lists. **Output:** `processed/s00_inventory/inventory.json`.
 
 Per raw file: size, sha256, rows, lowercase columns, date range of its date column, blank and bad dates, required
 columns and values (e.g. the IWM fund portnos, the 7 IBES measures, FPI 0-3), distinct ids, and the IBES rows
-by measure and FPI; per upload list: lines, duplicates and blanks. The 2.9 GB CIZ and 1.1 GB IBES files are
-streamed. Missing files, missing required columns or values FAIL; unknown files WARN. s08 copies the checksums into
-the manifest, and re-hashes the raw files to check they did not change.
+by measure and FPI; per upload list: lines, duplicates and blanks. The 5 GB CIZ and 1.1 GB IBES files are
+streamed. Missing files, missing required columns or values FAIL; a missing optional column (primaryexch) and
+unknown files in the raw folder WARN. The client file has two title lines above its header, blank header cells and
+m/d/Y dates (`skip_lines`, `date_format` in its RawFile). Paths in the inventory are relative to the data folder
+(e.g. `raw_v2/...`). s08 copies the checksums into the manifest, and re-hashes the raw files to check they did not
+change.
+
+## s00b_client
+
+**Inputs:** `<client folder>/FR2000 Annual Quant Data(Data).csv` (the client's Russell 2000 lists as of each 9/30,
+from FactSet; licensed: the file and everything derived from it stay out of the repo). **Output:**
+`processed/s00b_client/client_lists.parquet`: row, date, year, name, ticker_region, ticker, cusip9, cusip8, method,
+weight.
+
+**Rules:**
+1. The header is the third line (two title lines above it); rows blank in every column are dropped. Text is read
+   as text (`keep_default_na=False`). `row` = the pandas row index + 5, the key of the client map.
+2. ticker = Ticker-Region without "-US". CUSIP "#Calc" (FactSet has none) -> method `ticker`; otherwise method
+   `cusip`, cusip8 = the first 8 characters, upper case.
+3. weight = "Russell 2000 Port. Weight" (percent of the index on that 9/30). The FactSet factor columns are not
+   read.
+
+**Checks:** unique row key (FAIL); every list dated 9/30 (FAIL); one list per year, none missing (FAIL); rows per
+list 1,800-2,150, weights summing to 99-101%, every row with a weight, CUSIPs 9 characters or #Calc, no CUSIP
+twice in one list (WARN; a repeated CUSIP is a FactSet error that s00c rule 3 resolves).
+
+**Tests:** title lines, blank row, row key, -US suffix, #Calc, CUSIP case; a list not dated 9/30 FAILs.
+
+## s00c_client_map
+
+**Inputs:** `processed/s00b_client/client_lists.parquet`, `raw/crsp_names_history.csv` (every CRSP name row with
+its validity dates), `raw/r2000_price_crsp_ciz.csv` (streamed; only each year's last September trading day).
+**Outputs** (`processed/s00c_client_map/`): `client_permno_map.parquet` (one row per client row: status,
+candidates, CRSP names, suggested_permno, fallback_rejected, final_permno, final_method), `known_gaps.parquet` and
+`known_gaps.md` (client securities without a permno, with the reason).
+
+**Rules** (decision 34; reviewed by hand on 2026-11-07, and the stage reproduces that review row for row):
+1. **CUSIP rows:** cusip8 equals a CRSP CUSIP whose names row is valid on the 9/30.
+2. **Rows without a CUSIP:** the ticker valid on the 9/30, and the client name matches a CRSP name of that permno.
+   FactSet back-fills today's names, so every name the permno ever had counts. Names match when, after dropping
+   punctuation and legal words (`config.NAME_STOPWORDS`), one's words contain the other's; or the first word is
+   the same (and not generic, `config.NAME_GENERIC_WORDS`, unless the second is the same too); or one joined name
+   contains the other (5+ letters); or the first words start alike (4+ letters, not generic).
+3. **A CUSIP of another company:** a CUSIP match whose company never had the client's name, while the client ticker
+   + name point to a different permno trading on the 9/30, takes that permno (`cusip_corrected_by_ticker`).
+4. **Fallback** for rows still without a permno: the ticker without FactSet's `.XXn` suffix on any date, names
+   matching, the permno trading on the 9/30, exactly one candidate, and a CRSP price (a real trading row, DlyPrc not
+   0) on the last September trading day (`ticker_any_date`, or `cusip_row_ticker_any_date` for CUSIP rows). Without
+   the price the fallback is rejected. (The hand review could check the price only from 2007, when the first price
+   file began; with prices from 1997 every year is checked, and every earlier row passes.)
+5. **A ticker with two permnos:** the one whose CRSP share class on the 9/30 is the class in the client name
+   ("... Class B" -> `ticker_shareclass_B`).
+6. **The same permno twice in one list:** keep the row whose client name matches CRSP; when both or neither do,
+   the CUSIP row. The other row is `dropped_duplicate`.
+7. Everything else has no permno (`unmatched`) and is listed in known_gaps with the reason.
+
+**Checks:** one map row per client row (FAIL); no permno twice in one list (FAIL); every row has a permno or is a
+known gap or a dropped duplicate (FAIL); every fallback has its September price (FAIL); match rate per list at
+least 99% (WARN); every mapped permno is in the permno upload list (WARN: rerun the permno-based queries).
+
+**Tests:** the name rule; each matching rule on invented companies (CUSIP, ticker + name, the fallback with and
+without a price, the share class, a CUSIP of another company, unmatched); duplicates keep the name match, else the
+CUSIP row; the September price uses the last trading day and skips delisting rows and zero prices; an end-to-end
+run.
 
 ## s01_membership
 
-**Inputs:** `raw/iwm_holdings_raw.csv`, `raw/r2000_price_crsp_ciz.csv` (permno, date, flag, price, shares only,
-for rule 6), `raw/query_inputs/permno_list.txt` (only to compare).
+**Inputs:** `raw/iwm_holdings_raw.csv`, `raw/r2000_price_crsp_ciz.csv` (permno, date, flag, price, shares only:
+month ends, first trading days, and market caps for rule 6), `raw/crsp_names_history.csv` (trading on a date,
+names of client rows), `processed/s00c_client_map/client_permno_map.parquet` (the lists' permnos), the permno
+upload list (only to compare).
 
 **Outputs** (`processed/s01_membership/`):
 
 | file | one row per | columns |
 |---|---|---|
-| snapshots.parquet | report_dt, permno | report_dt, eff_dt, permno, weight, ticker, security_name, cusip, n_lines, permno_from_cusip, mkt_cap_musd, max_other_mkt_cap_musd, p95_mkt_cap_musd, n_snapshots_total, exclusion_rule, in_universe |
-| periods.parquet | membership period | permno, index_effective, index_through, first_known, n_snapshots, n_excluded, excluded_non_member, ticker, security_name |
+| snapshots.parquet | report_dt, permno | report_dt, eff_dt, permno, weight, ticker, security_name, cusip, n_lines, permno_from_cusip, permno_from_gap_fix, membership_source, list_year, mkt_cap_musd, max_other_mkt_cap_musd, p95_mkt_cap_musd, n_snapshots_total, exclusion_rule, in_universe |
+| periods.parquet | membership period | permno, index_effective, index_through, first_known, n_snapshots, n_excluded, excluded_non_member, membership_source, ticker, security_name |
+| gap_fixes.parquet | known-gap CUSIP before the fixes | the gap, crsp_permnos_valid, crsp_permnos_any, client_permnos, client_via, fix_permno, fix_source |
 | excluded_non_members.parquet | excluded stock-snapshot | report_dt, permno, ticker, security_name, mkt_cap_musd, max_other_mkt_cap_musd, weight, n_snapshots_total, rule (`a`, `b` or `a+b`) |
 | known_gaps.parquet, known_gaps.md | security without a permno | cusip, security_name, ticker, first, last, snapshots, max_weight |
 | permno_list.txt | permno | the upload list for the permno-based queries (every snapshot permno, excluded ones too, since their data is kept) |
@@ -126,6 +201,14 @@ for rule 6), `raw/query_inputs/permno_list.txt` (only to compare).
 2. Lines that still have no permno, have a CUSIP and a ticker, and whose name does not match the non-stock pattern
    (cash, futures, swaps, rights, CVRs, notes, ...; the regex is ported unchanged into config) are the known gaps.
    No extra WRDS pull (A8).
+   **2b. Known-gap fixes** (decision 33d). The IWM file labels old holdings with the security's current CUSIP, so a
+   gap CUSIP gets CRSP's permno for it when that permno traded at any time during the gap's IWM dates (a permno
+   still trading at the end of the names file counts for IWM dates after it); several such permnos are left for
+   review. Otherwise a client-list row with that CUSIP, or with the ticker and a matching name, whose 9/30 is
+   within 3 months of the gap's IWM dates (`config.GAP_FIX_CLIENT_WINDOW_MONTHS`). A gap whose lines all hold fewer
+   than 100 shares (`config.GAP_FIX_MIN_SHARES`) is a stray line and stays a gap. The lines get the permno
+   (`permno_from_gap_fix`) before the snapshots are built; the gaps left are known_gaps. These rules reproduce the
+   hand review of 2026-11-07 CUSIP for CUSIP.
 3. One row per stock per snapshot: share-class lines are summed (`weight` = sum of percent_tna), `eff_dt` = the
    earliest line. ticker, security_name and cusip come from the line with the largest weight, then the most shares,
    instead of the last line in file order, so the result does not depend on row order (equal weights happen when a
@@ -154,26 +237,55 @@ for rule 6), `raw/query_inputs/permno_list.txt` (only to compare).
      trip it. A stock without a CIZ market cap is never excluded by rule (a).
    - `periods.parquet` keeps the excluded stocks' periods with `excluded_non_member` = True when every snapshot of
      the period is excluded.
+   - The rule runs on every source (decision 33d). Client rows carry the list's 9/30 index weight as `weight`.
+7. **Client-list snapshots** (decision 33a). One snapshot per month end from 2002-07 to 2008-01
+   (`config.CLIENT_LIST_FIRST_MONTH`, `IWM_FIRST_MONTH`), membership_source `client_list`. report_dt = eff_dt = the
+   month's last CRSP trading day, so s07 uses the snapshot at that month end. weight = the list's 9/30 index weight
+   (percent); ticker, security_name and cusip = CRSP's on the date (latest names row starting on or before it);
+   `list_year` = the list used.
+8. **Client fill** (decision 33b). Each IWM snapshot from 2008-02 to 2010-05 (`config.CLIENT_FILL_LAST_MONTH`)
+   gets the members of the list in force that it does not hold, membership_source `client_fill`, with the
+   snapshot's latest eff_dt (the snapshot becomes effective when it did before) and the list weight.
+9. **List timing** (rules 7 and 8). The list in force at a month end is decided on the month's last CRSP
+   trading day t (`config.client_list_year`): the 9/30/Y list once t is after year Y's reconstitution date
+   (`config.reconstitution_date`: the last Friday of June, or the Friday before when that is the 29th or 30th), so
+   from the June month end in most years and from July when the reconstitution is June's last trading day (2002).
+   The fill uses the same rule on its IWM report month, so the June IWM snapshot, which already holds the
+   reconstituted index, is filled from the new list. A member counts only while trading on the date (a CRSP names
+   row covers it). A member whose first CRSP trading day (its first non-delisting row in the CIZ daily file) is
+   after year Y's reconstitution date counts from the September Y month end.
+10. **Periods never mix sources:** a change of membership_source starts a new period, so a stock that moves from a
+    client list to IWM in 2008-02 has two adjacent periods. The months without an IWM report (2009-04 to 2009-06)
+    are not filled; s07 keeps using the latest effective snapshot (decision 33e).
 
-**Checks:** no duplicate (report_dt, permno) (FAIL); eff_dt >= report_dt (FAIL); no CUSIP maps to two permnos
+**Checks:** no duplicate (report_dt, permno) (FAIL); eff_dt >= report_dt (FAIL); membership_source is one of the
+three, client_list only before 2008-02 and iwm only from it, client_fill only 2008-02 to 2010-05, a client_list
+snapshot every month 2002-07 to 2008-01 (FAIL); list members without CRSP prices, fill rows whose company IWM
+already holds under another share class (WARN); no CUSIP maps to two permnos
 (WARN, list them); in-universe stocks per snapshot 1,800-2,150 (WARN); weight sum per snapshot 90-110% (WARN);
 missing months are exactly the known ones in `config.KNOWN_MISSING_MONTHS` (WARN on any new one); stocks missing
 from a snapshot but in both neighbours (WARN above 20); permno_list.txt equals raw/query_inputs/permno_list.txt
 (WARN: the permno-based queries must be rerun); snapshot stocks without a CIZ market cap (WARN if more than 1%);
-excluded stock-snapshots listed in the summary; counts within 2% of the last run (WARN).
+excluded stock-snapshots listed in the summary; counts within 2% of the last run (WARN). The summary's
+`membership` block has stocks per month and source, the fill's share of market cap, the July list switches
+(entered, left), the IPO rule by list, the gap fixes, and the overlap of IWM on each 9/30 with that year's list.
 
 **Tests:** CUSIP fill (including a CUSIP with no permno anywhere -> gap); non-stock names are not gaps; share
 classes summed; ticker from the largest line regardless of row order; a one-snapshot absence is bridged and a
 two-snapshot absence splits the period; first_known = min eff_dt of the period; rule (a) excludes a stock at
 3.1x the next largest with weight 0.04%, but not at 2.9x or with weight 0.05%; rule (b) excludes a large stock in
 3 zero-weight snapshots, but not a small one, one with 4 snapshots, or one with a non-zero weight; ties in weight
-broken on shares; reruns give identical files.
+broken on shares; the reconstitution date and the July list switch; list members count only while trading, an IPO
+after the reconstitution from September; client-list snapshots and the fill (members IWM misses, only in the fill
+months, the snapshot's eff_dt); periods split at a source change; gap fixes from CRSP, from a client row within 3
+months (not one years away), a stray line and no fix; reruns give identical files.
 
 ## s02_prices
 
 **Inputs:** `raw/r2000_price_crsp_ciz.csv` (columns permno, permco, dlycaldt, ticker, siccd, dlydelflg,
-securitynm, dlyprc, dlyret, dlyvol, shrout, dlyopen, dlyhigh, dlylow, dlycumfacpr, dlycumfacshr),
-`raw/delistings.csv`.
+securitynm, dlyprc, dlyret, dlyvol, shrout, dlyopen, dlyhigh, dlylow, dlycumfacpr, dlycumfacshr, and primaryexch
+when the file has it), `raw/delistings.csv`. primaryexch (N, Q, A, ...) is kept in the daily files for a future
+Nasdaq volume adjustment (decision 37); s08 does not export it.
 
 **Outputs** (`processed/s02_prices/`):
 
@@ -431,7 +543,9 @@ revenue and spares losses and pre-revenue companies.
 1. Index levels (Compustat I0124 Russell 2000, I0120 Growth, I0122 Value): market-closed days without CRSP rows
    (`config.CLOSED_MARKET_DAYS`, e.g. Hurricane Sandy) are dropped, so the next return spans them. Price return
    from consecutive levels; monthly = the level on the last day <= month_end vs the previous month's.
-2. ETFs (CRSP IWM, IWN, IWO): daily total returns as CRSP gives them; monthly = compounded.
+2. ETFs (CRSP IWM, IWN, IWO): exact duplicate rows are dropped first (decision 38; rows that share permno and
+   date but differ are counted and FAIL); daily total returns as CRSP gives them; monthly = compounded. IWM starts
+   2000-05, IWN and IWO 2000-07 (`config.ETF_FIRST_BY`); before that their columns are empty.
 3. Fama-French: daily as given (decimals); monthly = the published monthly factors, matched by the month of dateff.
 4. FRED: percent / 100. Blank days (bond-market holidays when stocks trade) are forward-filled, and `was_filled` =
    True on those days. term_spread = ust_10y - tbill_3m, credit_spread = moodys_baa - moodys_aaa. Monthly = the
@@ -439,8 +553,10 @@ revenue and spares losses and pre-revenue companies.
 5. The first month (no previous index level) is dropped. Each monthly row is that month's return; the panel's
    ret_next_1m at month t lines up with month t+1.
 
-**Checks:** market-closed days have no index return (FAIL); yields in range: ust_10y 0-6%, tbill_3m -0.5-7%,
-moodys_baa 2-10%, moodys_aaa 1-9% (FAIL); Fama-French daily rf mean below 0.001 (FAIL: units); IWM total minus
+**Checks:** market-closed days have no index return (FAIL); yields in range: ust_10y 0-8%, tbill_3m -0.5-7%,
+moodys_baa 2-10%, moodys_aaa 1-9% (FAIL; ust_10y up to 8%
+since data version 2, because 1997-2000 yields were near 7%); ETF exact duplicates dropped and none conflicting (FAIL);
+each ETF starting by its first month (WARN); Fama-French daily rf mean below 0.001 (FAIL: units); IWM total minus
 Russell 2000 price return 0.5-2.0% a year (WARN); published monthly mktrf and rf within 50 bp of the compounded
 daily factors (FAIL; decision 23); the same comparison for smb, hml, rmw, cma, umd reported as information (the
 daily long-short portfolios are formed differently from the monthly ones); no yield filled for more than 5 days in
@@ -462,7 +578,7 @@ estimates_consensus.parquet (EPS, CPS, SAL, EBT; FPI 0-2) and link.parquet; s06 
 
 | file | one row per | columns |
 |---|---|---|
-| factor_panel_monthly.parquet | universe stock, month end t | identity (permno, permco, gvkey, ticker, security_name, gsector, gsector_name, ggroup, gind, gind_name, gsubind, sector_name, gics_from_sic, siccd), index_weight, snapshot_report_dt, snapshot_eff_dt, new_entrant, price_date, prc, shrout, mkt_cap_musd, company_mkt_cap_musd, company_mkt_cap_crsp_musd, company_cap_from_compustat, is_adr, n_share_classes, company_shares_crsp_m, company_shares_compustat_m, cfacpr_t, cfacpr_last (s08 drops these two), mom_1m, mom_6m, mom_12m, mom_12_1, vol_gk_* and vol_close_*, beta_252d, beta_60m, fund_period_end, fund_report_date, fund_is_usd, fund_stale, the building blocks used (book_equity, ib_ttm, revenue_ttm, dv_ttm, fcf_ttm, ev_claims, ebitda_ttm, ebit_ttm, cshoq), ev, the 12 statement factors, the 8 price-scaled factors, the 5 quarter-end versions (`_qe`), ibes_statpers, numest_fy1, the 9 analyst factors, surprise_anndats, surprise_fpedats, ret_next_1m, delisted_next_month, and the statpers of each IBES series used |
+| factor_panel_monthly.parquet | universe stock, month end t | identity (permno, permco, gvkey, ticker, security_name, gsector, gsector_name, ggroup, ggroup_name, gind, gind_name, gsubind, gsubind_name, gics_source, sector_name, gics_from_sic, siccd), index_weight, membership_source, snapshot_report_dt, snapshot_eff_dt, new_entrant, price_date, prc, shrout, mkt_cap_musd, company_mkt_cap_musd, company_mkt_cap_crsp_musd, company_cap_from_compustat, is_adr, n_share_classes, company_shares_crsp_m, company_shares_compustat_m, cfacpr_t, cfacpr_last (s08 drops these two), mom_1m, mom_6m, mom_12m, mom_12_1, vol_gk_* and vol_close_*, beta_252d, beta_60m, fund_period_end, fund_report_date, fund_is_usd, fund_stale, the building blocks used (book_equity, ib_ttm, revenue_ttm, dv_ttm, fcf_ttm, ev_claims, ebitda_ttm, ebit_ttm, cshoq), ev, the 12 statement factors, the 8 price-scaled factors, the 5 quarter-end versions (`_qe`), ibes_statpers, numest_fy1, the 9 analyst factors, surprise_anndats, surprise_fpedats, ret_next_1m, delisted_next_month, and the statpers of each IBES series used |
 | rv_multiples_monthly.parquet | same rows | date, permno, gsector, gind, prc, company_mkt_cap_musd, company_cap_from_compustat, ev, the 15 multiples, and `<multiple>_pct_gind`, `<multiple>_pct_gsector` |
 | rv_peer_stats_monthly.parquet | gind, month end | date, gind, gind_name, n_peers, and per multiple `_n`, `_p25`, `_p50`, `_p75` |
 | security_master.parquet | permno in permno_list.txt | permco, gvkey, ibes_ticker (all linked tickers, `;`-separated), ticker, security_name, GICS codes and names, siccd, first and last price date, first and last universe date, excluded_non_member |
@@ -472,7 +588,12 @@ The monthly returns table is s02's monthly.parquet; s08 exports it as returns_mo
 
 **Rules:**
 1. **Calendar:** every month end t (last CRSP trading day) from the first month with an effective snapshot to the
-   last month with prices.
+   last month with prices. With data version 2 the first snapshot is the 2002-07 client list, so the panel starts
+   at the 2002-07 month end (decision 35); the earlier prices only feed the momentum, volatility and beta windows.
+   membership_source and index_weight come from the snapshot in use (client rows carry the list's 9/30 weight).
+   index_weight_source says which: `iwm` (IWM's weight that month) or `client_list_static_930` (the list's 9/30
+   weight held for the whole year, on client_list and client_fill rows). Those static weights must not be used to
+   weight portfolios before 2008-02; backtests weight by market cap (mkt_cap_musd).
 2. **Universe at t:** the latest s01 snapshot whose every line has eff_dt <= t, lines with in_universe = True
    (decision 11). In the known missing months the previous snapshot is used. new_entrant = not in the universe at
    the previous t.
@@ -587,7 +708,7 @@ two data dictionaries:
 | estimates_consensus.parquet | s05 |
 | fundamentals_quarterly.parquet | s03 |
 | column_stats.parquet | computed by s08 from the other final tables (prices_daily's years combined): numeric dtype, rows, non-null %, min, p1, p25, median, mean, p75, p99, max; dates non-null %, min, max, unique; text non-null %, unique, top 5 with their share of rows; booleans non-null %, share True |
-| manifest.json | data_version (build date), created_at, pipeline git commit (and whether the tree was dirty), sha256 of every raw file (from s00), per output file path, rows, MB, date range, permnos, column types; units, sectors (GICS and the SIC fallback), delisting fill rule, month-end convention, which market cap to use for what, point-in-time note, known gaps (unmatched IWM holdings, unlisted share classes, where each source ends), factor coverage by year |
+| manifest.json | data_version (build date), created_at, pipeline git commit (and whether the tree was dirty), sha256 of every raw file (from s00), per output file path, rows, MB, date range, permnos, column types; units, membership (the three sources, list timing, snapshot rows by source, IWM gap fixes, client rows without a permno as counts only), sectors (GICS at four levels, gics_source, and the SIC fallback), delisting fill rule, month-end convention, which market cap to use for what, point-in-time note, known gaps (unmatched IWM holdings, unlisted share classes, where each source starts and ends), factor coverage by year |
 | UPLOAD.md | how to run `scripts/upload_wrds.py` on this folder (dry run, upload, check) |
 | processed/DATA_DICTIONARY.md (next to final/, not uploaded) | rendered from `pipeline/dictionary.py`: per file what it is, its key and rows, every column with type, meaning, unit, source and stage, a Stats table from column_stats.parquet (4 significant figures), and for factor_panel_monthly the non-null % of every factor by year |
 | pipeline/DATA_DICTIONARY.md (in the repo) | the same files and columns with meaning, unit, source and stage only: nothing from the data |
@@ -615,7 +736,9 @@ files keep the publish layout and sort; UPLOAD.md points at the repo script and 
 
 ## s09_validate
 
-**Inputs:** `processed/final/` and `raw/` only, plus the old notebook panel (`config.OLD_PANEL_PATHS`) for check 3.
+**Inputs:** `processed/final/` and `raw/`, the old notebook panel (`config.OLD_PANEL_PATHS`) for check 3, and for
+checks 9 and 10 the client file (its FactSet values are the app's Legacy data) with
+`processed/s00c_client_map/client_permno_map.parquet` (its permnos).
 **Outputs:** `processed/s09_validation/` (summary.json, VALIDATION.md for teammates, the recompute sample and its
 raw-side values). Never writes into final/.
 
@@ -633,10 +756,23 @@ and a hash of the data sorted by its key (JSON and Markdown as text, created_at 
 of factor_panel_monthly in pandas, full and with 9 columns, vs the ~1 GB Streamlit free tier (WARN above half); (7)
 `scripts/upload_wrds.py --offline` with no credentials and network blocked: one key per Parquet file plus the daily
 manifest last, nothing else, under factor-lake-data/wrds_YYYY_MM/.
+Data version 2 adds: (1) and (2) also by membership era of the formation month (client lists to 2008-01, IWM +
+client fill 2008-02 to 2010-05, IWM after), each era's correlation with IWM >= 0.99; IWM's monthly return drops
+the ETF file's exact duplicate rows first; (8) membership by source: panel rows and stocks per month by
+membership_source, each source only in its own snapshot months (a panel month uses an older snapshot until the next is effective, so 2008-02 and 2008-03 still hold the 2008-01 list), 1,800-2,150 stocks every month; (9) client lists vs IWM:
+each 9/30 list against the IWM universe periods covering that 9/30, at least 99% of the list in IWM or (2008-2010)
+the client fill; (10) WRDS vs Legacy, 2002-2007: each Legacy stock-year matched by permno to the panel's September
+month end (at least 98% found), and per FactSet column (price, compared with CRSP's split-adjusted prc_adj because FactSet adjusts historical prices for later splits; market cap, 12/6/1-month momentum, 1-year
+volatility, Book/Price, ROA, next-FY E/P, asset growth, accruals, next-year return from returns_monthly October to
+September) the rank correlation, median difference and share within a tolerance, overall and by year; rank
+correlation at least 0.99 for price, 0.95 for market cap, 0.90 for 12-month momentum and next-year return; (11)
+GICS: share of rows with each of the four levels by year, every code named, gics_source = current_header wherever
+there is GICS.
 
 **Tests:** cap-weighted next-month returns, tracking statistics, long-short sorts both ways, the June portfolio,
 the rerun comparison (changed data found, row order and created_at ignored), the offline dry run, the recompute
-script on tiny raw files.
+script on tiny raw files; the membership eras and tracking by era; the next-year return window and the Legacy
+comparison; a source outside its months found.
 
 ## Problems in the old notebook
 
@@ -666,6 +802,18 @@ Ordered by how much they can move results. Each now has a fix in the stage rules
    `known_gaps.md` are missing, so their checks cannot be compared. Their checks that the notebook prints are
    ported into the stage checks above.
 
+## Data versions
+
+| data version | built from | raw files | output |
+|---|---|---|---|
+| wrds_2026_10 (published, in S3) | tag `data-wrds_2026_10` (commit 6943a80) | the 2026-10 pull, kept as `raw_2026_10/` | `processed/final/` |
+| wrds_2026_11 (local only) | branch feature/data-v2 | `raw_v2/` with the client lists and the v2 upload lists | `processed_v2/final/` |
+
+v1 is rebuilt from the tag with the 2026-10 raw files: check out `data-wrds_2026_10` and run
+`python -m pipeline.run --data-dir <folder> --stage all`, where `<folder>/raw/` holds the files of `raw_2026_10/`
+(that version reads `<data-dir>/raw/` and has no folder options). The current code does not rebuild v1: it needs the
+client lists, the names history and the v2 columns.
+
 ## Status
 
 | phase | scope | status |
@@ -678,6 +826,8 @@ Ordered by how much they can move results. Each now has a fix in the stage rules
 | 2e | s08_export, data dictionary | done |
 | 3 | s09_validate; causal share flag, IBES scale and margin rules, column stats | done |
 | upload | the 2026-10 pull to `s3://sysen-5900-factor-lake/factor-lake-data/wrds_2026_10/` (34 keys), checked by size, ETag and content | done |
+| v2 A | data version 2: folder options, every raw column, start dates, s00 on raw_v2, s00b_client, s00c_client_map, s01 with three membership sources | done |
+| v2 B | s02-s07 on the v2 data, s08 export as wrds_2026_11 (local only, not uploaded), s09 extended to 2002 | done |
 
 Every stage was compared with the notebook's cells rerun unchanged on the same raw files; each difference comes
 from a decision above. The results of each phase and of the validation are in the stages' summary.json files and
@@ -690,6 +840,10 @@ VALIDATION.md next to the data.
   `processed/DATA_DICTIONARY.md`.
 - The full factor_panel_monthly takes about 540 MB in pandas, more than half of Streamlit's free tier: the app
   should load only the columns it needs.
-- GICS is the current classification applied to all history (decision 4).
+- GICS is the current classification applied to all history (decisions 4 and 39); no historical GICS is
+  available.
+- Before 2008-02 membership comes from the client's 9/30 lists only: no IPO additions between lists, and the list's
+  9/30 weight is held all year (index_weight_source = client_list_static_930), so index_weight must not be used for
+  weighting before 2008-02; backtests use market cap.
 - The app still reads the older S3 files; switching it to wrds_YYYY_MM (with `SECTOR_OPTIONS` as GICS names and the
   daily reader on `prices_daily/` and `mkt_cap_musd`) is a separate story.

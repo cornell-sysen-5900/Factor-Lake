@@ -16,7 +16,8 @@ from .backtest_jobs import add_trading_cost, code_version
 from .trading_costs import describe_trading_cost, job_trading_cost, validate_trading_cost_bps
 from .wrds_calendar import FREQUENCIES, period_boundaries
 from .wrds_engine import FACTOR_COMBINATIONS
-from .wrds_factors import WRDS_FACTOR_COLUMNS, WRDS_SECTORS
+from .wrds_factors import WRDS_FACTOR_COLUMNS
+from .wrds_gics import describe_gics_filter, job_gics_filter, sector_codes, validate_gics_filter
 
 WRDS_JOB_KINDS = ('backtest', 'cohort', 'ranked')
 WRDS_JOB_VERSION = 1
@@ -26,8 +27,11 @@ WRDS_JOB_FIELDS = ('kind', 'data_mode', 'wrds_job_version', 'factors', 'factor_d
                    'factor_combination', 'restrict_fossil_fuels', 'selected_sectors', 'cohort_pct',
                    'rebalance_date')
 # Keys a WRDS job has only when they are set: trading_cost_bps, for backtests and cohorts
-# above 0 bps (see src/backtest_jobs.OPTIONAL_JOB_FIELDS)
-WRDS_OPTIONAL_JOB_FIELDS = ('trading_cost_bps',)
+# above 0 bps (see src/backtest_jobs.OPTIONAL_JOB_FIELDS), and gics_filter, the GICS filter
+# {'level', 'codes'} (src/wrds_gics.py). Jobs without them keep the shape and cache key
+# they had before. Older jobs filter by sector with selected_sectors (GICS sector names);
+# a job has selected_sectors or gics_filter, not both.
+WRDS_OPTIONAL_JOB_FIELDS = ('trading_cost_bps', 'gics_filter')
 # Top % of every WRDS backtest (fixed, as in Legacy)
 WRDS_TOP_PCT = 10.0
 
@@ -35,7 +39,8 @@ WRDS_TOP_PCT = 10.0
 # ENGINE_SOURCES are kept separate, so changing WRDS code never recomputes Legacy results.
 WRDS_ENGINE_SOURCES = (
     'backtest_jobs.py', 'performance_metrics.py', 's3_client.py', 'trading_costs.py', 'wrds_calendar.py',
-    'wrds_data.py', 'wrds_engine.py', 'wrds_factors.py', 'wrds_holdings.py', 'wrds_jobs.py', 'wrds_service.py',
+    'wrds_data.py', 'wrds_engine.py', 'wrds_factors.py', 'wrds_gics.py', 'wrds_holdings.py', 'wrds_jobs.py',
+    'wrds_service.py',
 )
 
 _MONTH = re.compile(r'^\d{4}-(0[1-9]|1[0-2])$')
@@ -61,6 +66,7 @@ def build_wrds_job(kind: str, factors: List[str], factor_directions: Dict[str, s
     identical job and therefore the same cache key. Factor order is kept.
     settings['trading_cost_bps'] is added to backtests and cohorts only when it is not 0;
     ranked lists have no returns, so they never have it (and keep their cache keys).
+    settings['gics_filter'] ({'level', 'codes'}) is added when it is set.
     """
     labels = factor_labels or {}
     factors = list(factors)
@@ -83,6 +89,9 @@ def build_wrds_job(kind: str, factors: List[str], factor_directions: Dict[str, s
         'cohort_pct': float(cohort_pct) if kind == 'cohort' and cohort_pct is not None else None,
         'rebalance_date': rebalance_date if kind == 'ranked' else None,
     }
+    if settings.get('gics_filter'):
+        job['gics_filter'] = {'level': settings['gics_filter']['level'],
+                              'codes': sorted(settings['gics_filter']['codes'])}
     if kind != 'ranked':
         add_trading_cost(job, settings)
     validate_wrds_job(job)
@@ -136,8 +145,11 @@ def validate_wrds_job(job: Dict[str, Any]) -> None:
     sectors = job['selected_sectors']
     if not isinstance(sectors, list) or sectors != sorted(set(sectors)):
         raise ValueError("selected_sectors must be a sorted list without repeats.")
-    if bad := [s for s in sectors if s not in WRDS_SECTORS]:
-        raise ValueError(f"Unknown GICS sectors: {bad}.")
+    sector_codes(sectors)                                               # readable ValueError
+    if 'gics_filter' in job:
+        validate_gics_filter(job['gics_filter'])
+        if sectors:
+            raise ValueError("A job has either gics_filter or selected_sectors, not both.")
 
     if job['kind'] == 'cohort':
         if not _is_number(job['cohort_pct']) or not 0 < job['cohort_pct'] <= 50:
@@ -169,6 +181,7 @@ def engine_arguments(job: Dict[str, Any]) -> Tuple[List[str], Dict[str, str], Di
                                    'use_market_cap_weight', 'factor_combination', 'restrict_fossil_fuels',
                                    'selected_sectors', 'factor_labels')}
     options['trading_cost_bps'] = job_trading_cost(job)
+    options['gics_filter'] = job.get('gics_filter')
     return list(job['factors']), dict(job['factor_directions']), options
 
 
@@ -179,5 +192,7 @@ def describe_wrds_job(job: Dict[str, Any]) -> str:
              else f", ranked {job['rebalance_date']}" if job['kind'] == 'ranked' else '')
     if job_trading_cost(job) > 0:
         extra += f", {describe_trading_cost(job_trading_cost(job))}"
+    if gics := job_gics_filter(job.get('gics_filter'), job['selected_sectors']):
+        extra += f", {describe_gics_filter(gics)}"
     return (f"wrds {job['kind']} {job['frequency']} {job['start_year']}-{job['end_year']} "
             f"{job['factor_combination']}: {factors}{extra}")

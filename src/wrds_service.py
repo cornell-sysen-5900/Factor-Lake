@@ -42,7 +42,7 @@ def summarize_wrds_job(job: Dict[str, Any]) -> str:
     """
     A short description of a WRDS job for listings: the data source and frequency, then
     Legacy's summary, e.g. "WRDS, Quarterly | ROE (higher), ROA (higher) | Mixing |
-    2008-2026 | $1,000". Stored as S3 metadata, so it is kept ASCII and short.
+    2002-2026 | $1,000". Stored as S3 metadata, so it is kept ASCII and short.
     """
     frequency = FREQUENCY_LABELS.get(job['frequency'], job['frequency'])
     return f"WRDS, {frequency} | {summarize_job(job)}".encode('ascii', 'replace').decode()[:500]
@@ -103,7 +103,8 @@ class WrdsBacktestRunner:
                     'cohort_pct': job['cohort_pct'], 'top_cagr': top['cagr'], 'bottom_cagr': bottom['cagr']}, None
         date = data.month_date(job['rebalance_date'])
         table = rank_stocks(data, date, factors, directions, job['factor_combination'], job['top_pct'],
-                            job['use_market_cap_weight'], job['restrict_fossil_fuels'], job['selected_sectors'])
+                            job['use_market_cap_weight'], job['restrict_fossil_fuels'], job['selected_sectors'],
+                            job.get('gics_filter'))
         return {'rebalance_date': date.strftime('%Y-%m-%d'), 'columns': list(table.columns),
                 'rows': table.to_dict('records')}, None
 

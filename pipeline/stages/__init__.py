@@ -2,6 +2,8 @@
 
 STAGES = (
     "s00_inventory",
+    "s00b_client",
+    "s00c_client_map",
     "s01_membership",
     "s02_prices",
     "s03_fundamentals_q",

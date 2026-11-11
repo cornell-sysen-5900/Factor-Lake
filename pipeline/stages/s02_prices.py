@@ -3,7 +3,8 @@ PROJECT: Factor-Lake Portfolio Analysis
 MODULE: pipeline/stages/s02_prices.py
 PURPOSE: Stage s02_prices: clean the CRSP CIZ daily file, add momentum and volatility, build monthly returns.
 
-In:  raw/r2000_price_crsp_ciz.csv (15 columns), raw/delistings.csv, raw/query_inputs/permno_list.txt (to compare)
+In:  raw/r2000_price_crsp_ciz.csv (16 columns, and primaryexch when present), raw/delistings.csv, the permno
+     upload list (to compare)
 Out: processed/s02_prices/daily/year=YYYY/data.parquet   one row per permno per trading day
      processed/s02_prices/monthly.parquet                 one row per permno per month (returns + month-end data)
      processed/s02_prices/calendar.parquet                month, month_end (last CRSP trading day), trading_days
@@ -48,9 +49,11 @@ CIZ_FILE = "r2000_price_crsp_ciz.csv"
 _NUMERIC = ("dlyprc", "dlyret", "dlyvol", "shrout", "dlyopen", "dlyhigh", "dlylow", "dlycumfacpr", "dlycumfacshr")
 ALL_COLUMNS = ("permno", "permco", "dlycaldt", "ticker", "siccd", "dlydelflg", "securitynm") + _NUMERIC
 MARKET_CAP_COLUMNS = ("permno", "dlycaldt", "dlydelflg", "dlyprc", "shrout")       # what s01 needs
+OPTIONAL_COLUMNS = ("primaryexch",)     # kept in the daily files when present, for a Nasdaq volume adjustment
 _TYPES = {"permno": pa.int32(), "permco": pa.int32(), "dlycaldt": pa.date32(), "siccd": pa.string(),
           "ticker": pa.dictionary(pa.int32(), pa.string()), "dlydelflg": pa.dictionary(pa.int32(), pa.string()),
           "securitynm": pa.dictionary(pa.int32(), pa.string()),
+          "primaryexch": pa.dictionary(pa.int32(), pa.string()),
           **{c: pa.float64() for c in _NUMERIC}}
 MOM_COLS = tuple(MOMENTUM_WINDOWS)
 VOL_COLS = tuple(f"vol_{kind}_{label}" for label in VOL_WINDOWS for kind in ("gk", "close"))
@@ -60,10 +63,11 @@ DAILY_COLUMNS = ("date", "permno", "permco", "ticker", "siccd", "prc", "prc_adj"
 
 # ---------- Reading and cleaning (also used by s01 for month-end market caps) ----------
 
-def read_ciz(path, columns=ALL_COLUMNS) -> pd.DataFrame:
-    """Read only `columns` of the CIZ daily file (names matched case-insensitively), sorted by permno and date in
-    a stable way, so 'first' among duplicates means first in the file."""
+def read_ciz(path, columns=ALL_COLUMNS, optional=()) -> pd.DataFrame:
+    """Read only `columns` of the CIZ daily file (names matched case-insensitively), plus the `optional` ones the
+    file has, sorted by permno and date in a stable way, so 'first' among duplicates means first in the file."""
     original = {c.strip().lower(): c for c in read_header(path)}
+    columns = list(columns) + [c for c in optional if c in original]
     tbl = pacsv.read_csv(path, convert_options=pacsv.ConvertOptions(
         include_columns=[original[c] for c in columns], column_types={original[c]: _TYPES[c] for c in columns}))
     df = tbl.rename_columns([c.strip().lower() for c in tbl.column_names]).to_pandas(date_as_object=False)
@@ -214,7 +218,7 @@ def build_daily(px: pd.DataFrame) -> pd.DataFrame:
     px["cfacpr"], px["cfacshr"] = px["dlycumfacpr"], px["dlycumfacshr"]
     px["prc_adj"] = (px["prc"] / px["cfacpr"].where(px["cfacpr"] > 0)).fillna(px["prc"])
     px["vol"] = px["dlyvol"].where(px["dlyvol"] >= 0)
-    return px[list(DAILY_COLUMNS)]
+    return px[list(DAILY_COLUMNS) + [c for c in OPTIONAL_COLUMNS if c in px.columns]]
 
 
 def write_daily(daily: pd.DataFrame, out_dir) -> dict:
@@ -224,6 +228,8 @@ def write_daily(daily: pd.DataFrame, out_dir) -> dict:
         path = out_dir / "daily" / f"year={year}" / "data.parquet"
         path.parent.mkdir(parents=True, exist_ok=True)
         part = part.assign(ticker=part["ticker"].astype(object))
+        if "primaryexch" in part.columns:
+            part["primaryexch"] = part["primaryexch"].astype(object)
         pq.write_table(pa.Table.from_pandas(part, preserve_index=False), path, compression=PARQUET_COMPRESSION,
                        row_group_size=250_000)
         years[str(year)] = len(part)
@@ -321,7 +327,7 @@ def run_checks(px, monthly, calendar, dl, n_dups, n_conflicts, listed, seed=7) -
 def run(paths: DataPaths) -> dict:
     out = fresh_stage_dir(paths, STAGE)
     t0 = time.time()
-    px = read_ciz(paths.raw / CIZ_FILE)
+    px = read_ciz(paths.raw / CIZ_FILE, ALL_COLUMNS, OPTIONAL_COLUMNS)
     n_raw = len(px)
     px, n_dups, n_conflicts = drop_duplicates(px)
     dl = read_delistings(paths.raw / "delistings.csv")
@@ -331,7 +337,7 @@ def run(paths: DataPaths) -> dict:
     calendar = build_calendar(px)
     monthly = build_monthly(px, calendar)
     delistings = build_delistings(dl, px)
-    listed_path = paths.query_inputs / "permno_list.txt"
+    listed_path = paths.permno_list
     listed = set(int(x) for x in listed_path.read_text().split()) if listed_path.exists() else None
     checks = run_checks(px, monthly, calendar, dl, n_dups, n_conflicts, listed)
 

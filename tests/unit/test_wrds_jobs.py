@@ -52,7 +52,7 @@ def test_cohort_and_ranked_jobs():
     ({'factor_labels': {'f_roe': '', 'mom_12_1': 'x'}}, "must be text"),
     ({'frequency': 'weekly'}, "frequency must be one of"),
     ({'start_year': 2010.5}, "start_year must be a whole number"),
-    ({'start_year': 2005}, "Choose years from 2008 to 2026"),
+    ({'start_year': 2001}, "Choose years from 2002 to 2026"),
     ({'start_year': 2013, 'end_year': 2012}, "not after the end year"),
     ({'initial_aum': 0}, "greater than \\$0"),
     ({'initial_aum': '1000'}, "greater than \\$0"),

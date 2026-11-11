@@ -16,6 +16,7 @@ import pandas as pd
 import pytest
 
 from app.wrds_tables import (
+    GICS_HEADERS,
     benchmark_label,
     calendar_year_results,
     factor_header,
@@ -93,8 +94,10 @@ def test_holdings_table_has_legacys_columns_order_and_units(backtest):
     date = holdings['rebalance_date'].iloc[-1]
     raw = holdings[holdings['rebalance_date'] == date].reset_index(drop=True)
     table = holdings_display_table(raw, FACTORS, LABELS)
-    assert list(table.columns) == LEGACY_HOLDINGS_BEFORE + ['ROE %', '12-1 Mo Momentum %', 'Market Cap ($M)',
-                                                             'Book/Price'] + LEGACY_HOLDINGS_AFTER + [
+    # Legacy's columns, with the four WRDS GICS names after Sector
+    before = LEGACY_HOLDINGS_BEFORE[:4] + list(GICS_HEADERS.values()) + LEGACY_HOLDINGS_BEFORE[4:]
+    assert list(table.columns) == before + ['ROE %', '12-1 Mo Momentum %', 'Market Cap ($M)',
+                                            'Book/Price'] + LEGACY_HOLDINGS_AFTER + [
         'PERMNO', 'Months Without Return']
     np.testing.assert_allclose(table['Weight %'], raw['weight'] * 100)
     np.testing.assert_allclose(table['Period Return %'], raw['period_return'] * 100)
@@ -288,6 +291,11 @@ def test_a_wrds_run_looks_like_legacys_results(new_session, legacy):
     _assert_clean(at)
     results, shown = run['results'], main_area(at)
     assert run['label'] == 'Run 1: WRDS, Quarterly'
+    # The Saved analyses panel beside the runs shows the boxes Legacy's snapshot has above them
+    from tests.unit.results_snapshot import moved_to_panel
+    panel = shown.pop('panel')
+    assert panel['expander'][0] == 'Open a saved analysis'
+    legacy = moved_to_panel(legacy, panel, strict=False)
 
     # Sections, titles and metric tiles: Legacy's, with the period and the ETF for its names
     assert shown['header'] == [_wrds_names(h) for h in legacy['header']]
@@ -339,7 +347,7 @@ def test_a_wrds_run_looks_like_legacys_results(new_session, legacy):
     # The snapshot's runs were computed in the app (no ID); this WRDS run has an ID, so it also has
     # the Add to comparison button beside its Analysis ID (the one new button in Results)
     assert set(shown['button']) - set(legacy['button']) == {
-        'Rank every stock on this date', 'Add to comparison', 'Save name and note'}
+        'Rank every stock on this date', 'Add to comparison', 'Apply', 'Use these settings'}
     def uncounted(labels):          # "This session's analyses (2)": main's snapshot had two runs
         return [re.sub(r' \(\d+\)$', '', label) for label in labels]
     assert _is_subsequence(uncounted(legacy['expander']), uncounted(shown['expander']))
@@ -417,6 +425,8 @@ def test_the_data_viewer_says_it_shows_legacy_data_in_wrds_mode(new_session):
     at.sidebar.radio(key='data_mode_input').set_value('WRDS').run()
     _click_main_tab(at, 'Data Viewer')
     assert any('The Data Viewer shows the Legacy data, not WRDS' in c.value for c in at.main.caption)
+    assert any('GICS sector, industry group, industry and sub-industry names are in its holdings table'
+               in c.value for c in at.main.caption)
     at.sidebar.radio(key='data_mode_input').set_value('Legacy').run()
     assert not any('The Data Viewer shows the Legacy data' in c.value for c in at.main.caption)
 
@@ -441,10 +451,14 @@ def test_legacy_results_tab_renders_exactly_as_on_main(monkeypatch):
         assert render['tabs'].index('Scoreboard') == render['tabs'].index('Data Viewer') - 1, step
         render['tabs'].remove('Compare')
         render['tabs'].remove('Scoreboard')
-    from tests.unit.results_snapshot import without_strategy_controls
-    for render in actual.values():
-        assert 'Save name and note' in render['button']
-        assert 'Name, note and settings file' in render['expander']
+    # The Saved analyses panel: beside the runs, it shows the boxes main drew above them (and
+    # Import settings). Take it out of both, after checking each of its items is one main showed.
+    from tests.unit.results_snapshot import moved_to_panel, without_strategy_controls
+    for step, render in actual.items():
+        assert 'Use these settings' in render['button'] and 'Apply' in render['button'], step
+        panel = without_strategy_controls(render.pop('panel'))
+        assert panel['expander'][0] == 'Open a saved analysis', step
+        expected[step] = moved_to_panel(expected[step], panel)
     actual = {step: without_strategy_controls(render) for step, render in actual.items()}
     # Text, widgets and table cells must be equal; numbers to the Lambda check's relative 1e-9
     # (main's snapshot was rendered on Windows, CI renders on Linux)

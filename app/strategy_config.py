@@ -1,4 +1,10 @@
-"""Versioned, inputs-only strategy files. Validation never mutates application state."""
+"""
+Versioned, inputs-only strategy files. Validation never mutates application state.
+
+WRDS settings may also have gics_filter ({'level', 'codes'}, src/wrds_gics.py), the GICS
+filter of the sidebar's Filter level; with it, selected_sectors is []. Files without it
+(older ones, with selected_sectors) open at the Sector level.
+"""
 import json
 import math
 from copy import deepcopy
@@ -7,11 +13,19 @@ from app import streamlit_config as config
 from src.trading_costs import MAX_TRADING_COST_BPS
 from src.wrds_calendar import FIRST_YEAR, LAST_YEAR
 from src.wrds_factors import WRDS_SECTORS
+from src.wrds_gics import GICS_LEVELS, level_names, parent_code, validate_gics_filter
 
 MAX_FILE_BYTES = 64 * 1024
 COMMON = {'start_year', 'end_year', 'initial_aum', 'restrict_fossil_fuels',
           'use_market_cap_weight', 'factor_combination', 'selected_sectors',
           'sector_filter_enabled', 'trading_cost_bps'}
+# WRDS settings that are there only when set
+WRDS_OPTIONAL = {'gics_filter'}
+# Sidebar widgets of the WRDS GICS filter (app/components/sidebar.py): the level picker and
+# each level's list
+GICS_LEVEL_INPUT = 'wrds_gics_level_input'
+GICS_LEVEL_INPUTS = {'sector': 'wrds_sectors_input', 'industry_group': 'wrds_industry_groups_input',
+                     'industry': 'wrds_industries_input', 'sub_industry': 'wrds_sub_industries_input'}
 
 
 def catalog(mode):
@@ -38,12 +52,14 @@ def validate(document):
             raise ValueError(f'{field.capitalize()} contains invalid Unicode text.') from exc
     s = document['settings']
     fields = COMMON | ({'frequency'} if mode == 'wrds' else {'delisting_strategy'})
-    require(isinstance(s, dict) and set(s) == fields, 'Settings contain missing or unsupported fields.')
+    optional = WRDS_OPTIONAL if mode == 'wrds' else set()
+    require(isinstance(s, dict) and fields <= set(s) <= fields | optional,
+            'Settings contain missing or unsupported fields.')
     for key in ('restrict_fossil_fuels', 'use_market_cap_weight', 'sector_filter_enabled'):
         require(type(s[key]) is bool, f'{key} must be true or false.')
-    lo, hi = (FIRST_YEAR, LAST_YEAR) if mode == 'wrds' else (2002, 2024)
+    lo, hi = (FIRST_YEAR, LAST_YEAR) if mode == 'wrds' else (config.LEGACY_FIRST_YEAR, config.LEGACY_LAST_YEAR)
     for key in ('start_year', 'end_year'):
-        limit = 2023 if mode == 'legacy' and key == 'start_year' else hi
+        limit = config.LEGACY_LAST_START_YEAR if mode == 'legacy' and key == 'start_year' else hi
         require(type(s[key]) is int and lo <= s[key] <= limit, f'{key} must be between {lo} and {limit}.')
     require(s['start_year'] <= s['end_year'], 'Start year must not exceed end year.')
     aum = s['initial_aum']
@@ -65,6 +81,13 @@ def validate(document):
         require(len(set(sectors)) == len(sectors), 'Selected sectors contain duplicates.')
     else:
         require(sectors is None, 'Selected sectors must be null when sector filtering is off.')
+    if 'gics_filter' in s:
+        try:
+            validate_gics_filter(s['gics_filter'])
+        except ValueError as exc:
+            raise ValueError(f'Invalid GICS filter: {exc}') from exc
+        require(s['sector_filter_enabled'] and sectors == [],
+                'A GICS filter needs sector filtering on and an empty selected_sectors.')
     factors = document['factors']
     columns = {m['column'] for m in catalog(mode).values()}
     require(isinstance(factors, list) and 0 < len(factors) <= len(columns), 'Select at least one supported factor.')
@@ -102,6 +125,8 @@ def build(settings, factors, directions, name='', note='', mode=None):
                          'not supported by the current controls.')
     fields = COMMON | ({'frequency'} if mode == 'wrds' else {'delisting_strategy'})
     s = {k: deepcopy(settings[k]) for k in fields if k in settings}
+    if mode == 'wrds' and settings.get('gics_filter'):
+        s['gics_filter'] = deepcopy(settings['gics_filter'])
     s.setdefault('trading_cost_bps', 0)
     s.setdefault('sector_filter_enabled', bool(s.get('selected_sectors')))
     if not s['sector_filter_enabled']:
@@ -114,6 +139,23 @@ def dumps(document):
     return json.dumps(validate(document), indent=2, ensure_ascii=False, allow_nan=False)
 
 
+def gics_widget_values(settings):
+    """
+    The WRDS GICS filter's widgets for these settings: the level, its choices, and above
+    them the sectors, groups and industries they are in. Older settings (selected_sectors) are
+    the Sector level.
+    """
+    gics = settings.get('gics_filter')
+    if not gics:
+        return {GICS_LEVEL_INPUT: GICS_LEVELS['sector'][0], GICS_LEVEL_INPUTS['sector']: settings['selected_sectors']}
+    values = {GICS_LEVEL_INPUT: GICS_LEVELS[gics['level']][0]}
+    levels = list(GICS_LEVELS)
+    for level in levels[:levels.index(gics['level']) + 1]:
+        codes = sorted({parent_code(c, level) for c in gics['codes']})
+        values[GICS_LEVEL_INPUTS[level]] = sorted(level_names(level)[c] for c in codes)
+    return values
+
+
 def widget_values(document):
     """Create a complete update before touching widgets (including hidden mode controls)."""
     d = validate(document)
@@ -124,14 +166,14 @@ def widget_values(document):
               'factor_combination_input': s['factor_combination'].title(),
               'sector_filter_enabled_input': s['sector_filter_enabled'],
               'initial_aum_input': float(s['initial_aum']),
-              'trading_cost_bps_input': int(s['trading_cost_bps']),
-              'strategy_name': d['name'], 'strategy_note': d['note'],
-              'strategy_name_input': d['name'], 'strategy_note_input': d['note']}
+              'trading_cost_bps_input': int(s['trading_cost_bps'])}
     prefix = 'wrds_' if mode == 'wrds' else ''
     values[prefix + 'start_year_input'] = s['start_year']
     values[prefix + 'end_year_input'] = s['end_year']
-    if s['sector_filter_enabled']:
-        values['wrds_sectors_input' if mode == 'wrds' else 'selected_sectors_input'] = s['selected_sectors']
+    if s['sector_filter_enabled'] and mode == 'wrds':
+        values.update(gics_widget_values(s))
+    elif s['sector_filter_enabled']:
+        values['selected_sectors_input'] = s['selected_sectors']
     if mode == 'wrds':
         values['wrds_frequency_input'] = next(k for k, v in config.WRDS_FREQUENCY_OPTIONS.items()
                                               if v == s['frequency'])

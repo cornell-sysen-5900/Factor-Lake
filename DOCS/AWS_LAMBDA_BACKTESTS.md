@@ -145,7 +145,7 @@ Each uncached backtest is one Lambda invocation of a few seconds. A cold start a
 
 WRDS backtests (see the user guide, section 15, and `DOCS/WRDS_MODE_DESIGN.md`) run in the same function. A job with `data_mode: "wrds"` goes to `src/wrds_service.py`; every other job is a Legacy job, handled exactly as before.
 
-- **Data.** The function reads three files under `factor-lake-data/wrds_2026_10/` (`factor_panel_monthly`, `returns_monthly`, `market_monthly`), only the columns it needs, once per container. The folder is set by the function's `FACTOR_LAKE_WRDS_DIR` variable (the deploy script's `--wrds-dir`). A new WRDS pull goes into a new folder.
+- **Data.** The function reads three files under `factor-lake-data/wrds_2026_11/` (`factor_panel_monthly`, `returns_monthly`, `market_monthly`; the panel runs from 2002-07), only the columns it needs, once per container. The folder is set by the function's `FACTOR_LAKE_WRDS_DIR` variable (the deploy script's `--wrds-dir`, which defaults to `DEFAULT_WRDS_DIR` in `src/wrds_data.py`, as CI deploys it). A new WRDS pull goes into a new folder; the previous one, `wrds_2026_10/`, stays for rollback (set `DEFAULT_WRDS_DIR` back and merge).
 - **Cache.** The key hashes the job, the S3 ETags of the three files and a WRDS code version. Legacy keeps its own code version, so WRDS changes never recompute Legacy results.
 - **Holdings.** A WRDS backtest writes `backtest-results/<hash>.holdings.parquet` (one row group per rebalance date) **before** `backtest-results/<hash>.json`. The app reads one date at a time with its own S3 keys, in two ranged GETs. A cached result whose holdings file is missing is computed again.
 - **Listings.** The result JSON's metadata has the job's `kind` and a summary starting "WRDS, <frequency>" (section 6). WRDS results saved before this (on the dev function) have none and show "Details not recorded" until the 90-day rule deletes them.
@@ -161,7 +161,7 @@ uv run python scripts/deploy_backtest_lambda.py --function-name sysen5900-factor
 ```
 
 - `--leave-lifecycle-rules` does not write the bucket's lifecycle rules (a normal deploy rewrites them, and the bucket is shared with the live app). It only reads them and says whether `backtest-results/` expires.
-- `--wrds-dir wrds_YYYY_MM` points the function at another WRDS folder (default `wrds_2026_10`).
+- `--wrds-dir wrds_YYYY_MM` points the function at another WRDS folder (default `DEFAULT_WRDS_DIR` in `src/wrds_data.py`, now `wrds_2026_11`).
 
 To point a local app at the dev function, set the function name next to the AWS keys in `.streamlit/secrets.toml` (top level):
 
@@ -229,6 +229,18 @@ Deployed to `sysen5900-factor-lake-backtest-dev` with `--leave-lifecycle-rules` 
 - "0 bps vs `main`" ran `main`'s code (faeca5c) locally on the same S3 data and compared every number with the dev function's result (relative 1e-9, as the check script).
 - The before-cost values of the 25 bps runs equal the 0 bps runs' final values ($9,460.16 and $4,857.67).
 - `scripts/check_backtest_lambda.py --function-name sysen5900-factor-lake-backtest-dev`: all checks passed, including the Legacy (102.9% average turnover, 0.28% drag) and WRDS (75.8%, 0.82%) runs at 25 bps.
+
+### Validation on the dev function (2026-11-08): GICS filter
+
+Deployed to `sysen5900-factor-lake-backtest-dev` with `--leave-lifecycle-rules` (WRDS code version `2799f38f32311ed9`). WRDS, quarterly 2002-2026 (96 rebalances), ROE and 12-1 Mo Momentum, Mixing, equal weight, a fresh AUM so every run was computed. Each run matched the same job run locally on the S3 data (relative difference 0) and came from the cache the second time (0.15 s).
+
+| Job | Filter | Compute (round trip) | Holdings rows (per date) |
+|---|---|---|---|
+| Sector | Financials | 5.5 s (5.9 s), first run after the deploy: includes loading the data | 6,154 (53-75) |
+| Industry group | Software & Services | 0.7 s (1.0 s) | 2,087 (14-32) |
+| Industry | Banks | 0.8 s (0.9 s) | 3,338 (25-47) |
+| Sub-industry | Application Software, Regional Banks | 0.7 s (0.9 s) | 4,438 (32-59) |
+| Older job, `selected_sectors` | Financials | 0.8 s (0.9 s) | 6,154 (53-75), the same result as the Sector job |
 
 ## 11. Scoreboard scores
 
