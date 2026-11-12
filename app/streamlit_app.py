@@ -30,6 +30,8 @@ import streamlit_config as config
 import streamlit_css as css
 import streamlit_utils as utils
 from analysis_history import BROWSER_ANALYSES_KEY, earlier_analyses, sync_browser_analyses
+from app.share_links import consume_share_link
+from app.streamlit_utils import open_saved_analysis
 from compare_state import OPEN_COMPARE_KEY
 from components.about import render_about_tab
 from components.compare_tab import render_compare_tab
@@ -173,6 +175,10 @@ def main():
     # before the sidebar and factors are drawn; for Use these settings the Analysis tab then opens
     load_settings = apply_pending_settings(bool(utils.get_backtest_lambda_name()))
 
+    shared_run, share_error = consume_share_link(st.query_params, st.session_state, open_saved_analysis)
+    if share_error:
+        st.error(share_error)
+
     # Render Global Sidebar and capture configuration
     user_settings = sidebar.render_sidebar(config.SECTOR_OPTIONS, utils.describe_data_source(),
                                            utils.get_backtest_lambda_name(),
@@ -193,6 +199,9 @@ def main():
         _open_main_tab("Results")
     if load_settings:
         _open_main_tab("Analysis")
+    if shared_run is not None:
+        _open_main_tab("Results")
+        st.session_state[OPENED_MESSAGE_KEY] = f'Opened shared analysis as "{shared_run["label"]}".'
 
     # Define primary application layout. Only the open tab is rendered.
     main_tabs = st.tabs(MAIN_TABS, key=_main_tabs_widget_key(), on_change=_on_main_tab_change)

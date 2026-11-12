@@ -11,6 +11,7 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 from app.streamlit_config import FACTOR_METADATA, WRDS_FACTOR_GROUPS, WRDS_FACTOR_METADATA
+from app.wrds_factor_review import factor_tooltip
 from src.backtest_jobs import JOB_FIELDS, build_job, run_job
 from src.wrds_factors import WRDS_SECTORS
 from tests.unit.test_saved_runs import _synthetic_universe
@@ -225,7 +226,8 @@ def test_wrds_factor_list_grouped_with_names_tooltips_and_defaults(lambda_at):
     assert titles == [f"**{g}**" for g in WRDS_FACTOR_GROUPS]
     for name, meta in WRDS_FACTOR_METADATA.items():
         button = at.button(key=f"factor_add_{meta['key']}")
-        assert button.label == name and button.help == meta['tooltip']
+        assert button.label == name and button.help == factor_tooltip(name)
+        assert button.help.startswith(meta['tooltip'])
     add_keys = [b.key for b in at.button if (b.key or '').startswith('factor_add_')]
     assert add_keys and all(k.startswith('factor_add_w_') for k in add_keys)   # no Legacy factors
 

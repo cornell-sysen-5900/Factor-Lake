@@ -71,13 +71,13 @@ The steps below are for the default **Legacy** data source. For WRDS data with s
 
 When backtests run in AWS Lambda, every analysis is saved for 90 days under an **analysis ID**.
 
-1. The ID is shown in the captions at the top of each run's tab. Click the copy button on the right of the ID.
+1. The ID is shown at the top of each run's tab. Click **Copy share link** beside it and send the link. Opening it goes directly to that saved run in **Results**, for both Legacy and WRDS. No backtest runs and no market dataset is loaded. If clipboard access is blocked, a selectable link appears for manual copying. The original ID copy button still works.
 2. To open an analysis (yours or a colleague's), go to **Results → Open a saved analysis**, paste the ID and click **Open analysis**. It opens as a new tab, labelled "(opened)", with the original results, factors and settings. It loads from S3 and does not rerun the backtest.
 3. **This session's analyses** in the Results tab lists every analysis you ran or opened since the page was loaded, with its ID, including runs no longer shown as tabs. It never shows other people's analyses.
 4. Forgot to copy an ID? **Earlier analyses on this browser** lists the analyses you ran or opened in earlier sessions on the same browser, each with its ID and an **Open** button. They are kept in your browser only, so they don't follow you to another computer and disappear if you clear the site's data.
 5. **All saved analyses** lists everyone's saved analyses (newest 20), with their factors, method, period and starting amount, and an **Open** button. It loads only when you expand it. WRDS analyses start with "WRDS" and their frequency, e.g. "WRDS, Quarterly | ROE (higher), ROA (higher) | ...", and the two lists above show the same line under a WRDS run.
 6. Runs computed in the app (with the Lambda switch off) are not saved, so they have no ID.
-7. An ID that is mistyped, or older than 90 days, shows an error saying no saved analysis has that ID.
+7. A mistyped, missing, or expired ID in a share link shows a clear message while the app remains usable. A normal app URL without an ID opens normally. Shared links retain the same 90-day lifetime as the saved result.
 8. To see 2 to 4 saved analyses side by side, use the **Compare** tab ([17. Compare analyses](#17-compare-analyses)).
 9. To see which saved analyses did best, use the **Scoreboard** tab ([18. Backtest scoreboard](#18-backtest-scoreboard)).
 
@@ -163,7 +163,7 @@ WRDS mode is a second data source next to Legacy. It backtests on point-in-time 
 2. Switching the data source clears the selected factors, because the two modes offer different factors.
 3. Pick the **rebalancing frequency** (Quarterly by default) and the start and end years (2002 to 2026). The backtest covers those calendar years, and the caption under the years shows the rebalances, for example "12 quarterly rebalances, 2009-12 to 2012-09; holds to 2012-12".
 4. Weighting, factor combination, sector filter, fossil fuel filter and initial AUM work as in Legacy, and the sector filter can go finer (see **Filter by GICS industry** below). The portfolio buys the top 10%, as in Legacy. There is no delisting option (see below).
-5. Add factors on the Analysis tab. They are grouped as **Momentum, Value, Profitability, Quality, Growth, Risk, Analyst and Size**, and each has a default direction and a tooltip. Factors that default to "Lower is better" say why.
+5. Add factors on the Analysis tab. They are grouped as **Momentum, Value, Profitability, Quality, Growth, Risk, Analyst and Size**, and each has a default direction and a tooltip. Colored cards with a link icon identify a documented Legacy definition match. Hover over any WRDS factor for its default rationale and matching details. Related factors with different or unspecified definitions remain uncolored. Defaults remain editable. The [factor review](WRDS_FACTOR_REVIEW.md) lists every factor, unmatched Legacy candidates, and the procedure for producing the private 2002–2026 long–short evidence report. Historical spreads never flip defaults automatically.
 6. Click **Run Portfolio Analysis**. There is no Load Market Data step: the backtest reads the WRDS data in AWS.
 
 ### Filter by GICS industry
