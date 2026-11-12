@@ -36,6 +36,12 @@ The active branch will have an asterisk.
 
 ### Step 6: Edit the files you need
 
+Once per clone, install the commit hook. It fixes PEP 8 errors in the files you commit (see "Code Style" in the README):
+
+```bash
+uv run pre-commit install --allow-missing-config
+```
+
 Use VS Code or your preferred editor to make the change. Before committing, check the code style (PEP 8) and run the tests; CI runs both on every pull request:
 
 ```bash
@@ -56,6 +62,8 @@ git add <filename>
 ```bash
 git commit -m "Describe the change clearly"
 ```
+
+If the commit hook fixed something, the commit stops with "files were modified by this hook": review the fixes, run `git add` on them and commit again. If it lists a problem it cannot fix (such as a line over 120 characters), fix it by hand, `git add` and commit again.
 
 ### Step 9: Push the branch
 

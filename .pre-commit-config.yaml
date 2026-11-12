@@ -1,0 +1,18 @@
+# Git hooks run before each commit (https://pre-commit.com). Install them once per clone:
+#     uv run pre-commit install --allow-missing-config
+# (--allow-missing-config: commits on branches from before this file, which share the hooks folder, still go
+# through.) See "Code Style" in the README.
+repos:
+  - repo: local
+    hooks:
+      # PEP 8: the same check as the CI Lint step, with the project's own ruff (uv.lock) and rules
+      # (pyproject.toml), on the staged Python files. What ruff can fix (whitespace, import order,
+      # escapes) is fixed in place, and the commit stops so you can review and `git add` the fixes;
+      # what it cannot (e.g. a line over 120 characters) is listed, and the commit stops until it is fixed.
+      - id: ruff
+        name: ruff (PEP 8, fixes what it can)
+        entry: uv run --frozen ruff check --fix
+        language: system
+        types_or: [python, pyi]
+        # ruff checks every file it is given in one run
+        require_serial: true
