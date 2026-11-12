@@ -115,6 +115,22 @@ uv run ruff check --fix .    # fix whitespace, import order and other safe fixes
 
 The rules are in `pyproject.toml` (`[tool.ruff]`): PEP 8's errors and warnings (`E`, `W`), its naming rules (`N`) and import order (`I`), with lines up to **120 characters**, the width the code was already written at. Three exceptions are allowed, each explained there: the fake AWS clients in `tests/` take boto3's argument names (`Bucket=`, `Key=`), `app/streamlit_app.py` sets up the environment before its imports, and the `Visualizations` package keeps its capitalized name.
 
+### Commit hook: fix lint errors before you commit
+
+A git hook (`.pre-commit-config.yaml`, run by [pre-commit](https://pre-commit.com)) runs the same check on every `git commit`, on the Python files you staged. Install it once per clone:
+
+```bash
+uv run pre-commit install --allow-missing-config
+```
+
+Then on each commit:
+
+- **Nothing to fix:** the commit goes through.
+- **ruff can fix it** (whitespace, import order, escapes): it fixes the files and stops the commit with "files were modified by this hook". Review the changes, `git add` them and commit again.
+- **ruff can't fix it** (e.g. a line over 120 characters): the commit stops and lists each problem with its file, line and rule. Fix it, `git add` and commit again.
+
+The hook uses the project's own ruff (`uv run --frozen ruff`), so it always agrees with CI. It checks only staged files and leaves unstaged edits alone. `--allow-missing-config` lets commits through on branches from before the hook existed (git worktrees share one hooks folder). A hook can be skipped (`git commit --no-verify`) or not installed, so the CI Lint step still checks every pull request. To check every file without committing: `uv run pre-commit run --all-files`.
+
 Changing a backtest engine file (`ENGINE_SOURCES` in `src/backtest_jobs.py`, `WRDS_ENGINE_SOURCES` in `src/wrds_jobs.py`), even only its formatting, changes the backtest code version: after the deploy, each backtest run again is computed once more and gets a new analysis ID. Old IDs still open.
 
 ## Documentation
