@@ -1,0 +1,4377 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="API Reference and Guides for the Factor-Lake Portfolio Analysis System">
+      
+      
+      
+      
+        <link rel="prev" href="../wrds_factors/">
+      
+      
+        <link rel="next" href="../wrds_holdings/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>wrds_gics - Factor-Lake</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="red" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#srcwrds_gics" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Factor-Lake" class="md-header__button md-logo" aria-label="Factor-Lake" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Factor-Lake
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              wrds_gics
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="red" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="red" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../FACTOR_LAKE_USER_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../analysis_scores/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Factor-Lake" class="md-nav__button md-logo" aria-label="Factor-Lake" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Factor-Lake
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../FACTOR_LAKE_USER_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Factor Lake User Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../STRATEGY_SETTINGS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy Settings and Run Names
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../DEV_ONBOARDING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Onboarding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../STREAMLIT_ADMIN_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streamlit Admin Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../DOCS_CONTRIBUTOR_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Contributor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../DEPLOYMENT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../AWS_S3_DATA/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS S3 Data Source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../AWS_LAMBDA_BACKTESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtests in AWS Lambda
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../WRDS_MODE_DESIGN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WRDS Mode Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../WRDS_FACTOR_REVIEW/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WRDS Factor Review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../DATA_UPDATE_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WRDS Data Update Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../GICS_MAPPING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GICS Mapping
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../SUPABASE_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supabase Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../SUPABASE_UPLOAD_TOOL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supabase Upload Tool
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../SUPABASE_MAINTENANCE_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supabase Maintenance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../STREAMLIT_STYLING_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streamlit Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Bandit%20%26%20Safety/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security Scanning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../REORGANIZATION_SUMMARY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reorganization Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    src
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    src
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis_scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    analysis_scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest_engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    backtest_engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest_jobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    backtest_jobs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    backtest_service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    benchmarks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data_standardization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    data_standardization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../factor_registry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factor_registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../factor_utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factor_utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../factors_doc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factors_doc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lambda_client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    lambda_client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    performance_metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../portfolio/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    portfolio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../portfolio_filters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    portfolio_filters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../s3_client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    s3_client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../saved_analyses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    saved_analyses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../supabase_client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    supabase_client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trading_costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    trading_costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../universe_selection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    universe_selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wrds_calendar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_calendar
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wrds_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wrds_engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wrds_factor_evidence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_factor_evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wrds_factors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_factors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_gics
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_gics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#src.wrds_gics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        wrds_gics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="wrds_gics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.GICS_SECTORS" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GICS_SECTORS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.GICS_INDUSTRY_GROUPS" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GICS_INDUSTRY_GROUPS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.GICS_INDUSTRIES" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GICS_INDUSTRIES
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.GICS_SUB_INDUSTRIES" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GICS_SUB_INDUSTRIES
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.GICS_LEVELS" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GICS_LEVELS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.GICS_NAME_COLUMNS" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GICS_NAME_COLUMNS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.level_label" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        level_label
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.level_names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        level_names
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.parent_code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parent_code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.codes_under" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        codes_under
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.names_to_codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        names_to_codes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.sector_codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sector_codes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.validate_gics_filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validate_gics_filter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.make_gics_filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        make_gics_filter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.job_gics_filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        job_gics_filter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.gics_mask" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gics_mask
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.describe_gics_filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        describe_gics_filter
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wrds_holdings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_holdings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wrds_jobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_jobs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wrds_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    app
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    app
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/analysis_history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    analysis_history
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/compare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    compare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/compare_state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    compare_state
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_4" id="__nav_3_2_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    components
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    components
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/components/about/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    about
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/components/compare_tab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    compare_tab
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/components/data_viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    data_viewer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/components/factor_selection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factor_selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/components/results_tab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    results_tab
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/components/saved_panel/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    saved_panel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/components/scoreboard_tab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scoreboard_tab
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/components/sidebar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidebar
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/components/strategy_settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    strategy_settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/components/wrds_results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/holdings_table/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    holdings_table
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/saved_runs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    saved_runs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/scoreboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scoreboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/share_links/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    share_links
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/strategy_config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    strategy_config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/streamlit_app/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_app
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/streamlit_config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/streamlit_css/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_css
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/streamlit_utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/viewer_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    viewer_data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/wrds_factor_review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_factor_review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../app/wrds_tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visualizations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Visualizations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Visualizations/compare_growth_plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    compare_growth_plot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Visualizations/portfolio_growth_plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    portfolio_growth_plot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Visualizations/top_bottom_portfolio_plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    top_bottom_portfolio_plot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Visualizations/wrds_plots/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_plots
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#src.wrds_gics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        wrds_gics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="wrds_gics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.GICS_SECTORS" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GICS_SECTORS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.GICS_INDUSTRY_GROUPS" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GICS_INDUSTRY_GROUPS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.GICS_INDUSTRIES" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GICS_INDUSTRIES
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.GICS_SUB_INDUSTRIES" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GICS_SUB_INDUSTRIES
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.GICS_LEVELS" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GICS_LEVELS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.GICS_NAME_COLUMNS" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GICS_NAME_COLUMNS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.level_label" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        level_label
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.level_names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        level_names
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.parent_code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parent_code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.codes_under" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        codes_under
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.names_to_codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        names_to_codes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.sector_codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sector_codes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.validate_gics_filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validate_gics_filter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.make_gics_filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        make_gics_filter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.job_gics_filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        job_gics_filter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.gics_mask" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gics_mask
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src.wrds_gics.describe_gics_filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        describe_gics_filter
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="srcwrds_gics"><code>src.wrds_gics</code></h1>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="src.wrds_gics" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">src.wrds_gics</span>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+        <p>PROJECT: Factor-Lake Portfolio Analysis
+MODULE: src/wrds_gics.py
+PURPOSE: The GICS hierarchy of the WRDS panel and the GICS filter of a WRDS backtest.
+VERSION: 1.0.0</p>
+<p>The panel's GICS is each company's current (or last) classification applied to all of
+its history (gics_source = current_header, pipeline/DATA_DICTIONARY.md). The codes nest:
+the first 2, 4 and 6 digits of an 8-digit sub-industry (gsubind) are its sector,
+industry group and industry. The tables below hold every code in the panel with its
+name, as pipeline/config.py names them (tests/unit/test_wrds_gics.py checks both).</p>
+<p>A GICS filter is {'level': one of GICS_LEVELS, 'codes': sorted codes of that level}:
+- 'sector' keeps the stocks whose sector_name is one of the sectors. sector_name fills a
+  missing GICS code from the SIC code, so this is exactly the older selected_sectors
+  filter (only stocks without any sector, 'Unclassified', are left out).
+- 'industry_group', 'industry' and 'sub_industry' keep the stocks whose gsubind starts
+  with one of the codes. Stocks without GICS are left out.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="src.wrds_gics.GICS_SECTORS" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">GICS_SECTORS</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">GICS_SECTORS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="mi">10</span><span class="p">:</span> <span class="s2">&quot;Energy&quot;</span><span class="p">,</span>
+    <span class="mi">15</span><span class="p">:</span> <span class="s2">&quot;Materials&quot;</span><span class="p">,</span>
+    <span class="mi">20</span><span class="p">:</span> <span class="s2">&quot;Industrials&quot;</span><span class="p">,</span>
+    <span class="mi">25</span><span class="p">:</span> <span class="s2">&quot;Consumer Discretionary&quot;</span><span class="p">,</span>
+    <span class="mi">30</span><span class="p">:</span> <span class="s2">&quot;Consumer Staples&quot;</span><span class="p">,</span>
+    <span class="mi">35</span><span class="p">:</span> <span class="s2">&quot;Health Care&quot;</span><span class="p">,</span>
+    <span class="mi">40</span><span class="p">:</span> <span class="s2">&quot;Financials&quot;</span><span class="p">,</span>
+    <span class="mi">45</span><span class="p">:</span> <span class="s2">&quot;Information Technology&quot;</span><span class="p">,</span>
+    <span class="mi">50</span><span class="p">:</span> <span class="s2">&quot;Communication Services&quot;</span><span class="p">,</span>
+    <span class="mi">55</span><span class="p">:</span> <span class="s2">&quot;Utilities&quot;</span><span class="p">,</span>
+    <span class="mi">60</span><span class="p">:</span> <span class="s2">&quot;Real Estate&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="src.wrds_gics.GICS_INDUSTRY_GROUPS" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">GICS_INDUSTRY_GROUPS</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">GICS_INDUSTRY_GROUPS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="mi">1010</span><span class="p">:</span> <span class="s2">&quot;Energy&quot;</span><span class="p">,</span>
+    <span class="mi">1510</span><span class="p">:</span> <span class="s2">&quot;Materials&quot;</span><span class="p">,</span>
+    <span class="mi">2010</span><span class="p">:</span> <span class="s2">&quot;Capital Goods&quot;</span><span class="p">,</span>
+    <span class="mi">2020</span><span class="p">:</span> <span class="s2">&quot;Commercial &amp; Professional Services&quot;</span><span class="p">,</span>
+    <span class="mi">2030</span><span class="p">:</span> <span class="s2">&quot;Transportation&quot;</span><span class="p">,</span>
+    <span class="mi">2510</span><span class="p">:</span> <span class="s2">&quot;Automobiles &amp; Components&quot;</span><span class="p">,</span>
+    <span class="mi">2520</span><span class="p">:</span> <span class="s2">&quot;Consumer Durables &amp; Apparel&quot;</span><span class="p">,</span>
+    <span class="mi">2530</span><span class="p">:</span> <span class="s2">&quot;Consumer Services&quot;</span><span class="p">,</span>
+    <span class="mi">2540</span><span class="p">:</span> <span class="s2">&quot;Media (discontinued 2018)&quot;</span><span class="p">,</span>
+    <span class="mi">2550</span><span class="p">:</span> <span class="s2">&quot;Consumer Discretionary Distribution &amp; Retail&quot;</span><span class="p">,</span>
+    <span class="mi">3010</span><span class="p">:</span> <span class="s2">&quot;Consumer Staples Distribution &amp; Retail&quot;</span><span class="p">,</span>
+    <span class="mi">3020</span><span class="p">:</span> <span class="s2">&quot;Food, Beverage &amp; Tobacco&quot;</span><span class="p">,</span>
+    <span class="mi">3030</span><span class="p">:</span> <span class="s2">&quot;Household &amp; Personal Products&quot;</span><span class="p">,</span>
+    <span class="mi">3510</span><span class="p">:</span> <span class="s2">&quot;Health Care Equipment &amp; Services&quot;</span><span class="p">,</span>
+    <span class="mi">3520</span><span class="p">:</span> <span class="s2">&quot;Pharmaceuticals, Biotechnology &amp; Life Sciences&quot;</span><span class="p">,</span>
+    <span class="mi">4010</span><span class="p">:</span> <span class="s2">&quot;Banks&quot;</span><span class="p">,</span>
+    <span class="mi">4020</span><span class="p">:</span> <span class="s2">&quot;Financial Services&quot;</span><span class="p">,</span>
+    <span class="mi">4030</span><span class="p">:</span> <span class="s2">&quot;Insurance&quot;</span><span class="p">,</span>
+    <span class="mi">4040</span><span class="p">:</span> <span class="s2">&quot;Real Estate (discontinued 2016)&quot;</span><span class="p">,</span>
+    <span class="mi">4510</span><span class="p">:</span> <span class="s2">&quot;Software &amp; Services&quot;</span><span class="p">,</span>
+    <span class="mi">4520</span><span class="p">:</span> <span class="s2">&quot;Technology Hardware &amp; Equipment&quot;</span><span class="p">,</span>
+    <span class="mi">4530</span><span class="p">:</span> <span class="s2">&quot;Semiconductors &amp; Semiconductor Equipment&quot;</span><span class="p">,</span>
+    <span class="mi">5010</span><span class="p">:</span> <span class="s2">&quot;Telecommunication Services&quot;</span><span class="p">,</span>
+    <span class="mi">5020</span><span class="p">:</span> <span class="s2">&quot;Media &amp; Entertainment&quot;</span><span class="p">,</span>
+    <span class="mi">5510</span><span class="p">:</span> <span class="s2">&quot;Utilities&quot;</span><span class="p">,</span>
+    <span class="mi">6010</span><span class="p">:</span> <span class="s2">&quot;Equity Real Estate Investment Trusts (REITs)&quot;</span><span class="p">,</span>
+    <span class="mi">6020</span><span class="p">:</span> <span class="s2">&quot;Real Estate Management &amp; Development&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="src.wrds_gics.GICS_INDUSTRIES" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">GICS_INDUSTRIES</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">GICS_INDUSTRIES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="mi">101010</span><span class="p">:</span> <span class="s2">&quot;Energy Equipment &amp; Services&quot;</span><span class="p">,</span>
+    <span class="mi">101020</span><span class="p">:</span> <span class="s2">&quot;Oil, Gas &amp; Consumable Fuels&quot;</span><span class="p">,</span>
+    <span class="mi">151010</span><span class="p">:</span> <span class="s2">&quot;Chemicals&quot;</span><span class="p">,</span>
+    <span class="mi">151020</span><span class="p">:</span> <span class="s2">&quot;Construction Materials&quot;</span><span class="p">,</span>
+    <span class="mi">151030</span><span class="p">:</span> <span class="s2">&quot;Containers &amp; Packaging&quot;</span><span class="p">,</span>
+    <span class="mi">151040</span><span class="p">:</span> <span class="s2">&quot;Metals &amp; Mining&quot;</span><span class="p">,</span>
+    <span class="mi">151050</span><span class="p">:</span> <span class="s2">&quot;Paper &amp; Forest Products&quot;</span><span class="p">,</span>
+    <span class="mi">201010</span><span class="p">:</span> <span class="s2">&quot;Aerospace &amp; Defense&quot;</span><span class="p">,</span>
+    <span class="mi">201020</span><span class="p">:</span> <span class="s2">&quot;Building Products&quot;</span><span class="p">,</span>
+    <span class="mi">201030</span><span class="p">:</span> <span class="s2">&quot;Construction &amp; Engineering&quot;</span><span class="p">,</span>
+    <span class="mi">201040</span><span class="p">:</span> <span class="s2">&quot;Electrical Equipment&quot;</span><span class="p">,</span>
+    <span class="mi">201050</span><span class="p">:</span> <span class="s2">&quot;Industrial Conglomerates&quot;</span><span class="p">,</span>
+    <span class="mi">201060</span><span class="p">:</span> <span class="s2">&quot;Machinery&quot;</span><span class="p">,</span>
+    <span class="mi">201070</span><span class="p">:</span> <span class="s2">&quot;Trading Companies &amp; Distributors&quot;</span><span class="p">,</span>
+    <span class="mi">202010</span><span class="p">:</span> <span class="s2">&quot;Commercial Services &amp; Supplies&quot;</span><span class="p">,</span>
+    <span class="mi">202020</span><span class="p">:</span> <span class="s2">&quot;Professional Services&quot;</span><span class="p">,</span>
+    <span class="mi">203010</span><span class="p">:</span> <span class="s2">&quot;Air Freight &amp; Logistics&quot;</span><span class="p">,</span>
+    <span class="mi">203020</span><span class="p">:</span> <span class="s2">&quot;Passenger Airlines&quot;</span><span class="p">,</span>
+    <span class="mi">203030</span><span class="p">:</span> <span class="s2">&quot;Marine Transportation&quot;</span><span class="p">,</span>
+    <span class="mi">203040</span><span class="p">:</span> <span class="s2">&quot;Ground Transportation&quot;</span><span class="p">,</span>
+    <span class="mi">203050</span><span class="p">:</span> <span class="s2">&quot;Transportation Infrastructure&quot;</span><span class="p">,</span>
+    <span class="mi">251010</span><span class="p">:</span> <span class="s2">&quot;Automobile Components&quot;</span><span class="p">,</span>
+    <span class="mi">251020</span><span class="p">:</span> <span class="s2">&quot;Automobiles&quot;</span><span class="p">,</span>
+    <span class="mi">252010</span><span class="p">:</span> <span class="s2">&quot;Household Durables&quot;</span><span class="p">,</span>
+    <span class="mi">252020</span><span class="p">:</span> <span class="s2">&quot;Leisure Products&quot;</span><span class="p">,</span>
+    <span class="mi">252030</span><span class="p">:</span> <span class="s2">&quot;Textiles, Apparel &amp; Luxury Goods&quot;</span><span class="p">,</span>
+    <span class="mi">253010</span><span class="p">:</span> <span class="s2">&quot;Hotels, Restaurants &amp; Leisure&quot;</span><span class="p">,</span>
+    <span class="mi">253020</span><span class="p">:</span> <span class="s2">&quot;Diversified Consumer Services&quot;</span><span class="p">,</span>
+    <span class="mi">254010</span><span class="p">:</span> <span class="s2">&quot;Media (discontinued 2018)&quot;</span><span class="p">,</span>
+    <span class="mi">255010</span><span class="p">:</span> <span class="s2">&quot;Distributors&quot;</span><span class="p">,</span>
+    <span class="mi">255020</span><span class="p">:</span> <span class="s2">&quot;Internet &amp; Direct Marketing Retail (discontinued 2023)&quot;</span><span class="p">,</span>
+    <span class="mi">255030</span><span class="p">:</span> <span class="s2">&quot;Broadline Retail&quot;</span><span class="p">,</span>
+    <span class="mi">255040</span><span class="p">:</span> <span class="s2">&quot;Specialty Retail&quot;</span><span class="p">,</span>
+    <span class="mi">301010</span><span class="p">:</span> <span class="s2">&quot;Consumer Staples Distribution &amp; Retail&quot;</span><span class="p">,</span>
+    <span class="mi">302010</span><span class="p">:</span> <span class="s2">&quot;Beverages&quot;</span><span class="p">,</span>
+    <span class="mi">302020</span><span class="p">:</span> <span class="s2">&quot;Food Products&quot;</span><span class="p">,</span>
+    <span class="mi">302030</span><span class="p">:</span> <span class="s2">&quot;Tobacco&quot;</span><span class="p">,</span>
+    <span class="mi">303010</span><span class="p">:</span> <span class="s2">&quot;Household Products&quot;</span><span class="p">,</span>
+    <span class="mi">303020</span><span class="p">:</span> <span class="s2">&quot;Personal Care Products&quot;</span><span class="p">,</span>
+    <span class="mi">351010</span><span class="p">:</span> <span class="s2">&quot;Health Care Equipment &amp; Supplies&quot;</span><span class="p">,</span>
+    <span class="mi">351020</span><span class="p">:</span> <span class="s2">&quot;Health Care Providers &amp; Services&quot;</span><span class="p">,</span>
+    <span class="mi">351030</span><span class="p">:</span> <span class="s2">&quot;Health Care Technology&quot;</span><span class="p">,</span>
+    <span class="mi">352010</span><span class="p">:</span> <span class="s2">&quot;Biotechnology&quot;</span><span class="p">,</span>
+    <span class="mi">352020</span><span class="p">:</span> <span class="s2">&quot;Pharmaceuticals&quot;</span><span class="p">,</span>
+    <span class="mi">352030</span><span class="p">:</span> <span class="s2">&quot;Life Sciences Tools &amp; Services&quot;</span><span class="p">,</span>
+    <span class="mi">401010</span><span class="p">:</span> <span class="s2">&quot;Banks&quot;</span><span class="p">,</span>
+    <span class="mi">401020</span><span class="p">:</span> <span class="s2">&quot;Thrifts &amp; Mortgage Finance (discontinued 2023)&quot;</span><span class="p">,</span>
+    <span class="mi">402010</span><span class="p">:</span> <span class="s2">&quot;Financial Services&quot;</span><span class="p">,</span>
+    <span class="mi">402020</span><span class="p">:</span> <span class="s2">&quot;Consumer Finance&quot;</span><span class="p">,</span>
+    <span class="mi">402030</span><span class="p">:</span> <span class="s2">&quot;Capital Markets&quot;</span><span class="p">,</span>
+    <span class="mi">402040</span><span class="p">:</span> <span class="s2">&quot;Mortgage Real Estate Investment Trusts (REITs)&quot;</span><span class="p">,</span>
+    <span class="mi">403010</span><span class="p">:</span> <span class="s2">&quot;Insurance&quot;</span><span class="p">,</span>
+    <span class="mi">404010</span><span class="p">:</span> <span class="s2">&quot;Real Estate (discontinued 2006)&quot;</span><span class="p">,</span>
+    <span class="mi">404020</span><span class="p">:</span> <span class="s2">&quot;Real Estate Investment Trusts (discontinued 2016)&quot;</span><span class="p">,</span>
+    <span class="mi">404030</span><span class="p">:</span> <span class="s2">&quot;Real Estate Management &amp; Development (discontinued 2016)&quot;</span><span class="p">,</span>
+    <span class="mi">451010</span><span class="p">:</span> <span class="s2">&quot;Internet Software &amp; Services (discontinued 2018)&quot;</span><span class="p">,</span>
+    <span class="mi">451020</span><span class="p">:</span> <span class="s2">&quot;IT Services&quot;</span><span class="p">,</span>
+    <span class="mi">451030</span><span class="p">:</span> <span class="s2">&quot;Software&quot;</span><span class="p">,</span>
+    <span class="mi">452010</span><span class="p">:</span> <span class="s2">&quot;Communications Equipment&quot;</span><span class="p">,</span>
+    <span class="mi">452020</span><span class="p">:</span> <span class="s2">&quot;Technology Hardware, Storage &amp; Peripherals&quot;</span><span class="p">,</span>
+    <span class="mi">452030</span><span class="p">:</span> <span class="s2">&quot;Electronic Equipment, Instruments &amp; Components&quot;</span><span class="p">,</span>
+    <span class="mi">452050</span><span class="p">:</span> <span class="s2">&quot;Semiconductor Equipment &amp; Products (discontinued 2002)&quot;</span><span class="p">,</span>
+    <span class="mi">453010</span><span class="p">:</span> <span class="s2">&quot;Semiconductors &amp; Semiconductor Equipment&quot;</span><span class="p">,</span>
+    <span class="mi">501010</span><span class="p">:</span> <span class="s2">&quot;Diversified Telecommunication Services&quot;</span><span class="p">,</span>
+    <span class="mi">501020</span><span class="p">:</span> <span class="s2">&quot;Wireless Telecommunication Services&quot;</span><span class="p">,</span>
+    <span class="mi">502010</span><span class="p">:</span> <span class="s2">&quot;Media&quot;</span><span class="p">,</span>
+    <span class="mi">502020</span><span class="p">:</span> <span class="s2">&quot;Entertainment&quot;</span><span class="p">,</span>
+    <span class="mi">502030</span><span class="p">:</span> <span class="s2">&quot;Interactive Media &amp; Services&quot;</span><span class="p">,</span>
+    <span class="mi">551010</span><span class="p">:</span> <span class="s2">&quot;Electric Utilities&quot;</span><span class="p">,</span>
+    <span class="mi">551020</span><span class="p">:</span> <span class="s2">&quot;Gas Utilities&quot;</span><span class="p">,</span>
+    <span class="mi">551030</span><span class="p">:</span> <span class="s2">&quot;Multi-Utilities&quot;</span><span class="p">,</span>
+    <span class="mi">551040</span><span class="p">:</span> <span class="s2">&quot;Water Utilities&quot;</span><span class="p">,</span>
+    <span class="mi">551050</span><span class="p">:</span> <span class="s2">&quot;Independent Power and Renewable Electricity Producers&quot;</span><span class="p">,</span>
+    <span class="mi">601010</span><span class="p">:</span> <span class="s2">&quot;Diversified REITs&quot;</span><span class="p">,</span>
+    <span class="mi">601020</span><span class="p">:</span> <span class="s2">&quot;Real Estate Management &amp; Development (2016-2023 code, renumbered 602010)&quot;</span><span class="p">,</span>
+    <span class="mi">601025</span><span class="p">:</span> <span class="s2">&quot;Industrial REITs&quot;</span><span class="p">,</span>
+    <span class="mi">601030</span><span class="p">:</span> <span class="s2">&quot;Hotel &amp; Resort REITs&quot;</span><span class="p">,</span>
+    <span class="mi">601040</span><span class="p">:</span> <span class="s2">&quot;Office REITs&quot;</span><span class="p">,</span>
+    <span class="mi">601050</span><span class="p">:</span> <span class="s2">&quot;Health Care REITs&quot;</span><span class="p">,</span>
+    <span class="mi">601060</span><span class="p">:</span> <span class="s2">&quot;Residential REITs&quot;</span><span class="p">,</span>
+    <span class="mi">601070</span><span class="p">:</span> <span class="s2">&quot;Retail REITs&quot;</span><span class="p">,</span>
+    <span class="mi">601080</span><span class="p">:</span> <span class="s2">&quot;Specialized REITs&quot;</span><span class="p">,</span>
+    <span class="mi">602010</span><span class="p">:</span> <span class="s2">&quot;Real Estate Management &amp; Development&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="src.wrds_gics.GICS_SUB_INDUSTRIES" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">GICS_SUB_INDUSTRIES</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">GICS_SUB_INDUSTRIES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="mi">10101010</span><span class="p">:</span> <span class="s2">&quot;Oil &amp; Gas Drilling&quot;</span><span class="p">,</span>
+    <span class="mi">10101020</span><span class="p">:</span> <span class="s2">&quot;Oil &amp; Gas Equipment &amp; Services&quot;</span><span class="p">,</span>
+    <span class="mi">10102010</span><span class="p">:</span> <span class="s2">&quot;Integrated Oil &amp; Gas&quot;</span><span class="p">,</span>
+    <span class="mi">10102020</span><span class="p">:</span> <span class="s2">&quot;Oil &amp; Gas Exploration &amp; Production&quot;</span><span class="p">,</span>
+    <span class="mi">10102030</span><span class="p">:</span> <span class="s2">&quot;Oil &amp; Gas Refining &amp; Marketing&quot;</span><span class="p">,</span>
+    <span class="mi">10102040</span><span class="p">:</span> <span class="s2">&quot;Oil &amp; Gas Storage &amp; Transportation&quot;</span><span class="p">,</span>
+    <span class="mi">10102050</span><span class="p">:</span> <span class="s2">&quot;Coal &amp; Consumable Fuels&quot;</span><span class="p">,</span>
+    <span class="mi">15101010</span><span class="p">:</span> <span class="s2">&quot;Commodity Chemicals&quot;</span><span class="p">,</span>
+    <span class="mi">15101020</span><span class="p">:</span> <span class="s2">&quot;Diversified Chemicals&quot;</span><span class="p">,</span>
+    <span class="mi">15101030</span><span class="p">:</span> <span class="s2">&quot;Fertilizers &amp; Agricultural Chemicals&quot;</span><span class="p">,</span>
+    <span class="mi">15101040</span><span class="p">:</span> <span class="s2">&quot;Industrial Gases&quot;</span><span class="p">,</span>
+    <span class="mi">15101050</span><span class="p">:</span> <span class="s2">&quot;Specialty Chemicals&quot;</span><span class="p">,</span>
+    <span class="mi">15102010</span><span class="p">:</span> <span class="s2">&quot;Construction Materials&quot;</span><span class="p">,</span>
+    <span class="mi">15103010</span><span class="p">:</span> <span class="s2">&quot;Metal, Glass &amp; Plastic Containers&quot;</span><span class="p">,</span>
+    <span class="mi">15103020</span><span class="p">:</span> <span class="s2">&quot;Paper &amp; Plastic Packaging Products &amp; Materials&quot;</span><span class="p">,</span>
+    <span class="mi">15104010</span><span class="p">:</span> <span class="s2">&quot;Aluminum&quot;</span><span class="p">,</span>
+    <span class="mi">15104020</span><span class="p">:</span> <span class="s2">&quot;Diversified Metals &amp; Mining&quot;</span><span class="p">,</span>
+    <span class="mi">15104025</span><span class="p">:</span> <span class="s2">&quot;Copper&quot;</span><span class="p">,</span>
+    <span class="mi">15104030</span><span class="p">:</span> <span class="s2">&quot;Gold&quot;</span><span class="p">,</span>
+    <span class="mi">15104040</span><span class="p">:</span> <span class="s2">&quot;Precious Metals &amp; Minerals&quot;</span><span class="p">,</span>
+    <span class="mi">15104045</span><span class="p">:</span> <span class="s2">&quot;Silver&quot;</span><span class="p">,</span>
+    <span class="mi">15104050</span><span class="p">:</span> <span class="s2">&quot;Steel&quot;</span><span class="p">,</span>
+    <span class="mi">15105010</span><span class="p">:</span> <span class="s2">&quot;Forest Products&quot;</span><span class="p">,</span>
+    <span class="mi">15105020</span><span class="p">:</span> <span class="s2">&quot;Paper Products&quot;</span><span class="p">,</span>
+    <span class="mi">20101010</span><span class="p">:</span> <span class="s2">&quot;Aerospace &amp; Defense&quot;</span><span class="p">,</span>
+    <span class="mi">20102010</span><span class="p">:</span> <span class="s2">&quot;Building Products&quot;</span><span class="p">,</span>
+    <span class="mi">20103010</span><span class="p">:</span> <span class="s2">&quot;Construction &amp; Engineering&quot;</span><span class="p">,</span>
+    <span class="mi">20104010</span><span class="p">:</span> <span class="s2">&quot;Electrical Components &amp; Equipment&quot;</span><span class="p">,</span>
+    <span class="mi">20104020</span><span class="p">:</span> <span class="s2">&quot;Heavy Electrical Equipment&quot;</span><span class="p">,</span>
+    <span class="mi">20105010</span><span class="p">:</span> <span class="s2">&quot;Industrial Conglomerates&quot;</span><span class="p">,</span>
+    <span class="mi">20106010</span><span class="p">:</span> <span class="s2">&quot;Construction Machinery &amp; Heavy Transportation Equipment&quot;</span><span class="p">,</span>
+    <span class="mi">20106015</span><span class="p">:</span> <span class="s2">&quot;Agricultural &amp; Farm Machinery&quot;</span><span class="p">,</span>
+    <span class="mi">20106020</span><span class="p">:</span> <span class="s2">&quot;Industrial Machinery &amp; Supplies &amp; Components&quot;</span><span class="p">,</span>
+    <span class="mi">20107010</span><span class="p">:</span> <span class="s2">&quot;Trading Companies &amp; Distributors&quot;</span><span class="p">,</span>
+    <span class="mi">20201010</span><span class="p">:</span> <span class="s2">&quot;Commercial Printing&quot;</span><span class="p">,</span>
+    <span class="mi">20201030</span><span class="p">:</span> <span class="s2">&quot;Diversified Commercial &amp; Professional Services (discontinued 2008)&quot;</span><span class="p">,</span>
+    <span class="mi">20201040</span><span class="p">:</span> <span class="s2">&quot;Human Resource &amp; Employment Services (discontinued 2008)&quot;</span><span class="p">,</span>
+    <span class="mi">20201050</span><span class="p">:</span> <span class="s2">&quot;Environmental &amp; Facilities Services&quot;</span><span class="p">,</span>
+    <span class="mi">20201060</span><span class="p">:</span> <span class="s2">&quot;Office Services &amp; Supplies&quot;</span><span class="p">,</span>
+    <span class="mi">20201070</span><span class="p">:</span> <span class="s2">&quot;Diversified Support Services&quot;</span><span class="p">,</span>
+    <span class="mi">20201080</span><span class="p">:</span> <span class="s2">&quot;Security &amp; Alarm Services&quot;</span><span class="p">,</span>
+    <span class="mi">20202010</span><span class="p">:</span> <span class="s2">&quot;Human Resource &amp; Employment Services&quot;</span><span class="p">,</span>
+    <span class="mi">20202020</span><span class="p">:</span> <span class="s2">&quot;Research &amp; Consulting Services&quot;</span><span class="p">,</span>
+    <span class="mi">20202030</span><span class="p">:</span> <span class="s2">&quot;Data Processing &amp; Outsourced Services&quot;</span><span class="p">,</span>
+    <span class="mi">20301010</span><span class="p">:</span> <span class="s2">&quot;Air Freight &amp; Logistics&quot;</span><span class="p">,</span>
+    <span class="mi">20302010</span><span class="p">:</span> <span class="s2">&quot;Passenger Airlines&quot;</span><span class="p">,</span>
+    <span class="mi">20303010</span><span class="p">:</span> <span class="s2">&quot;Marine Transportation&quot;</span><span class="p">,</span>
+    <span class="mi">20304010</span><span class="p">:</span> <span class="s2">&quot;Rail Transportation&quot;</span><span class="p">,</span>
+    <span class="mi">20304020</span><span class="p">:</span> <span class="s2">&quot;Trucking (discontinued 2023)&quot;</span><span class="p">,</span>
+    <span class="mi">20304030</span><span class="p">:</span> <span class="s2">&quot;Cargo Ground Transportation&quot;</span><span class="p">,</span>
+    <span class="mi">20304040</span><span class="p">:</span> <span class="s2">&quot;Passenger Ground Transportation&quot;</span><span class="p">,</span>
+    <span class="mi">20305010</span><span class="p">:</span> <span class="s2">&quot;Airport Services&quot;</span><span class="p">,</span>
+    <span class="mi">20305020</span><span class="p">:</span> <span class="s2">&quot;Highways &amp; Railtracks&quot;</span><span class="p">,</span>
+    <span class="mi">20305030</span><span class="p">:</span> <span class="s2">&quot;Marine Ports &amp; Services&quot;</span><span class="p">,</span>
+    <span class="mi">25101010</span><span class="p">:</span> <span class="s2">&quot;Automotive Parts &amp; Equipment&quot;</span><span class="p">,</span>
+    <span class="mi">25101020</span><span class="p">:</span> <span class="s2">&quot;Tires &amp; Rubber&quot;</span><span class="p">,</span>
+    <span class="mi">25102010</span><span class="p">:</span> <span class="s2">&quot;Automobile Manufacturers&quot;</span><span class="p">,</span>
+    <span class="mi">25102020</span><span class="p">:</span> <span class="s2">&quot;Motorcycle Manufacturers&quot;</span><span class="p">,</span>
+    <span class="mi">25201010</span><span class="p">:</span> <span class="s2">&quot;Consumer Electronics&quot;</span><span class="p">,</span>
+    <span class="mi">25201020</span><span class="p">:</span> <span class="s2">&quot;Home Furnishings&quot;</span><span class="p">,</span>
+    <span class="mi">25201030</span><span class="p">:</span> <span class="s2">&quot;Homebuilding&quot;</span><span class="p">,</span>
+    <span class="mi">25201040</span><span class="p">:</span> <span class="s2">&quot;Household Appliances&quot;</span><span class="p">,</span>
+    <span class="mi">25201050</span><span class="p">:</span> <span class="s2">&quot;Housewares &amp; Specialties&quot;</span><span class="p">,</span>
+    <span class="mi">25202010</span><span class="p">:</span> <span class="s2">&quot;Leisure Products&quot;</span><span class="p">,</span>
+    <span class="mi">25202020</span><span class="p">:</span> <span class="s2">&quot;Photographic Products (discontinued 2014)&quot;</span><span class="p">,</span>
+    <span class="mi">25203010</span><span class="p">:</span> <span class="s2">&quot;Apparel, Accessories &amp; Luxury Goods&quot;</span><span class="p">,</span>
+    <span class="mi">25203020</span><span class="p">:</span> <span class="s2">&quot;Footwear&quot;</span><span class="p">,</span>
+    <span class="mi">25203030</span><span class="p">:</span> <span class="s2">&quot;Textiles&quot;</span><span class="p">,</span>
+    <span class="mi">25301010</span><span class="p">:</span> <span class="s2">&quot;Casinos &amp; Gaming&quot;</span><span class="p">,</span>
+    <span class="mi">25301020</span><span class="p">:</span> <span class="s2">&quot;Hotels, Resorts &amp; Cruise Lines&quot;</span><span class="p">,</span>
+    <span class="mi">25301030</span><span class="p">:</span> <span class="s2">&quot;Leisure Facilities&quot;</span><span class="p">,</span>
+    <span class="mi">25301040</span><span class="p">:</span> <span class="s2">&quot;Restaurants&quot;</span><span class="p">,</span>
+    <span class="mi">25302010</span><span class="p">:</span> <span class="s2">&quot;Education Services&quot;</span><span class="p">,</span>
+    <span class="mi">25302020</span><span class="p">:</span> <span class="s2">&quot;Specialized Consumer Services&quot;</span><span class="p">,</span>
+    <span class="mi">25401010</span><span class="p">:</span> <span class="s2">&quot;Advertising (discontinued 2018)&quot;</span><span class="p">,</span>
+    <span class="mi">25401020</span><span class="p">:</span> <span class="s2">&quot;Broadcasting (discontinued 2018)&quot;</span><span class="p">,</span>
+    <span class="mi">25401025</span><span class="p">:</span> <span class="s2">&quot;Cable &amp; Satellite (discontinued 2018)&quot;</span><span class="p">,</span>
+    <span class="mi">25401030</span><span class="p">:</span> <span class="s2">&quot;Movies &amp; Entertainment (discontinued 2018)&quot;</span><span class="p">,</span>
+    <span class="mi">25401040</span><span class="p">:</span> <span class="s2">&quot;Publishing (discontinued 2018)&quot;</span><span class="p">,</span>
+    <span class="mi">25501010</span><span class="p">:</span> <span class="s2">&quot;Distributors&quot;</span><span class="p">,</span>
+    <span class="mi">25502010</span><span class="p">:</span> <span class="s2">&quot;Catalog Retail (discontinued 2018)&quot;</span><span class="p">,</span>
+    <span class="mi">25502020</span><span class="p">:</span> <span class="s2">&quot;Internet &amp; Direct Marketing Retail (discontinued 2023)&quot;</span><span class="p">,</span>
+    <span class="mi">25503010</span><span class="p">:</span> <span class="s2">&quot;Department Stores (discontinued 2023)&quot;</span><span class="p">,</span>
+    <span class="mi">25503020</span><span class="p">:</span> <span class="s2">&quot;General Merchandise Stores (discontinued 2023)&quot;</span><span class="p">,</span>
+    <span class="mi">25503030</span><span class="p">:</span> <span class="s2">&quot;Broadline Retail&quot;</span><span class="p">,</span>
+    <span class="mi">25504010</span><span class="p">:</span> <span class="s2">&quot;Apparel Retail&quot;</span><span class="p">,</span>
+    <span class="mi">25504020</span><span class="p">:</span> <span class="s2">&quot;Computer &amp; Electronics Retail&quot;</span><span class="p">,</span>
+    <span class="mi">25504030</span><span class="p">:</span> <span class="s2">&quot;Home Improvement Retail&quot;</span><span class="p">,</span>
+    <span class="mi">25504040</span><span class="p">:</span> <span class="s2">&quot;Other Specialty Retail&quot;</span><span class="p">,</span>
+    <span class="mi">25504050</span><span class="p">:</span> <span class="s2">&quot;Automotive Retail&quot;</span><span class="p">,</span>
+    <span class="mi">25504060</span><span class="p">:</span> <span class="s2">&quot;Homefurnishing Retail&quot;</span><span class="p">,</span>
+    <span class="mi">30101010</span><span class="p">:</span> <span class="s2">&quot;Drug Retail&quot;</span><span class="p">,</span>
+    <span class="mi">30101020</span><span class="p">:</span> <span class="s2">&quot;Food Distributors&quot;</span><span class="p">,</span>
+    <span class="mi">30101030</span><span class="p">:</span> <span class="s2">&quot;Food Retail&quot;</span><span class="p">,</span>
+    <span class="mi">30101040</span><span class="p">:</span> <span class="s2">&quot;Consumer Staples Merchandise Retail&quot;</span><span class="p">,</span>
+    <span class="mi">30201010</span><span class="p">:</span> <span class="s2">&quot;Brewers&quot;</span><span class="p">,</span>
+    <span class="mi">30201020</span><span class="p">:</span> <span class="s2">&quot;Distillers &amp; Vintners&quot;</span><span class="p">,</span>
+    <span class="mi">30201030</span><span class="p">:</span> <span class="s2">&quot;Soft Drinks &amp; Non-alcoholic Beverages&quot;</span><span class="p">,</span>
+    <span class="mi">30202010</span><span class="p">:</span> <span class="s2">&quot;Agricultural Products &amp; Services&quot;</span><span class="p">,</span>
+    <span class="mi">30202030</span><span class="p">:</span> <span class="s2">&quot;Packaged Foods &amp; Meats&quot;</span><span class="p">,</span>
+    <span class="mi">30203010</span><span class="p">:</span> <span class="s2">&quot;Tobacco&quot;</span><span class="p">,</span>
+    <span class="mi">30301010</span><span class="p">:</span> <span class="s2">&quot;Household Products&quot;</span><span class="p">,</span>
+    <span class="mi">30302010</span><span class="p">:</span> <span class="s2">&quot;Personal Care Products&quot;</span><span class="p">,</span>
+    <span class="mi">35101010</span><span class="p">:</span> <span class="s2">&quot;Health Care Equipment&quot;</span><span class="p">,</span>
+    <span class="mi">35101020</span><span class="p">:</span> <span class="s2">&quot;Health Care Supplies&quot;</span><span class="p">,</span>
+    <span class="mi">35102010</span><span class="p">:</span> <span class="s2">&quot;Health Care Distributors&quot;</span><span class="p">,</span>
+    <span class="mi">35102015</span><span class="p">:</span> <span class="s2">&quot;Health Care Services&quot;</span><span class="p">,</span>
+    <span class="mi">35102020</span><span class="p">:</span> <span class="s2">&quot;Health Care Facilities&quot;</span><span class="p">,</span>
+    <span class="mi">35102030</span><span class="p">:</span> <span class="s2">&quot;Managed Health Care&quot;</span><span class="p">,</span>
+    <span class="mi">35103010</span><span class="p">:</span> <span class="s2">&quot;Health Care Technology&quot;</span><span class="p">,</span>
+    <span class="mi">35201010</span><span class="p">:</span> <span class="s2">&quot;Biotechnology&quot;</span><span class="p">,</span>
+    <span class="mi">35202010</span><span class="p">:</span> <span class="s2">&quot;Pharmaceuticals&quot;</span><span class="p">,</span>
+    <span class="mi">35203010</span><span class="p">:</span> <span class="s2">&quot;Life Sciences Tools &amp; Services&quot;</span><span class="p">,</span>
+    <span class="mi">40101010</span><span class="p">:</span> <span class="s2">&quot;Diversified Banks&quot;</span><span class="p">,</span>
+    <span class="mi">40101015</span><span class="p">:</span> <span class="s2">&quot;Regional Banks&quot;</span><span class="p">,</span>
+    <span class="mi">40102010</span><span class="p">:</span> <span class="s2">&quot;Thrifts &amp; Mortgage Finance (discontinued 2023)&quot;</span><span class="p">,</span>
+    <span class="mi">40201020</span><span class="p">:</span> <span class="s2">&quot;Diversified Financial Services&quot;</span><span class="p">,</span>
+    <span class="mi">40201030</span><span class="p">:</span> <span class="s2">&quot;Multi-Sector Holdings&quot;</span><span class="p">,</span>
+    <span class="mi">40201040</span><span class="p">:</span> <span class="s2">&quot;Specialized Finance&quot;</span><span class="p">,</span>
+    <span class="mi">40201050</span><span class="p">:</span> <span class="s2">&quot;Commercial &amp; Residential Mortgage Finance&quot;</span><span class="p">,</span>
+    <span class="mi">40201060</span><span class="p">:</span> <span class="s2">&quot;Transaction &amp; Payment Processing Services&quot;</span><span class="p">,</span>
+    <span class="mi">40202010</span><span class="p">:</span> <span class="s2">&quot;Consumer Finance&quot;</span><span class="p">,</span>
+    <span class="mi">40203010</span><span class="p">:</span> <span class="s2">&quot;Asset Management &amp; Custody Banks&quot;</span><span class="p">,</span>
+    <span class="mi">40203020</span><span class="p">:</span> <span class="s2">&quot;Investment Banking &amp; Brokerage&quot;</span><span class="p">,</span>
+    <span class="mi">40203030</span><span class="p">:</span> <span class="s2">&quot;Diversified Capital Markets&quot;</span><span class="p">,</span>
+    <span class="mi">40203040</span><span class="p">:</span> <span class="s2">&quot;Financial Exchanges &amp; Data&quot;</span><span class="p">,</span>
+    <span class="mi">40204010</span><span class="p">:</span> <span class="s2">&quot;Mortgage REITs&quot;</span><span class="p">,</span>
+    <span class="mi">40301010</span><span class="p">:</span> <span class="s2">&quot;Insurance Brokers&quot;</span><span class="p">,</span>
+    <span class="mi">40301020</span><span class="p">:</span> <span class="s2">&quot;Life &amp; Health Insurance&quot;</span><span class="p">,</span>
+    <span class="mi">40301030</span><span class="p">:</span> <span class="s2">&quot;Multi-line Insurance&quot;</span><span class="p">,</span>
+    <span class="mi">40301040</span><span class="p">:</span> <span class="s2">&quot;Property &amp; Casualty Insurance&quot;</span><span class="p">,</span>
+    <span class="mi">40301050</span><span class="p">:</span> <span class="s2">&quot;Reinsurance&quot;</span><span class="p">,</span>
+    <span class="mi">40401010</span><span class="p">:</span> <span class="s2">&quot;Real Estate Investment Trusts (discontinued 2006)&quot;</span><span class="p">,</span>
+    <span class="mi">40401020</span><span class="p">:</span> <span class="s2">&quot;Real Estate Management &amp; Development (discontinued 2006)&quot;</span><span class="p">,</span>
+    <span class="mi">40402010</span><span class="p">:</span> <span class="s2">&quot;Diversified REITs (discontinued 2016)&quot;</span><span class="p">,</span>
+    <span class="mi">40402030</span><span class="p">:</span> <span class="s2">&quot;Mortgage REITs (discontinued 2016)&quot;</span><span class="p">,</span>
+    <span class="mi">40402035</span><span class="p">:</span> <span class="s2">&quot;Hotel &amp; Resort REITs (discontinued 2016)&quot;</span><span class="p">,</span>
+    <span class="mi">40402040</span><span class="p">:</span> <span class="s2">&quot;Office REITs (discontinued 2016)&quot;</span><span class="p">,</span>
+    <span class="mi">40402045</span><span class="p">:</span> <span class="s2">&quot;Health Care REITs (discontinued 2016)&quot;</span><span class="p">,</span>
+    <span class="mi">40402050</span><span class="p">:</span> <span class="s2">&quot;Residential REITs (discontinued 2016)&quot;</span><span class="p">,</span>
+    <span class="mi">40402060</span><span class="p">:</span> <span class="s2">&quot;Retail REITs (discontinued 2016)&quot;</span><span class="p">,</span>
+    <span class="mi">40402070</span><span class="p">:</span> <span class="s2">&quot;Specialized REITs (discontinued 2016)&quot;</span><span class="p">,</span>
+    <span class="mi">40403010</span><span class="p">:</span> <span class="s2">&quot;Diversified Real Estate Activities (discontinued 2016)&quot;</span><span class="p">,</span>
+    <span class="mi">40403020</span><span class="p">:</span> <span class="s2">&quot;Real Estate Operating Companies (discontinued 2016)&quot;</span><span class="p">,</span>
+    <span class="mi">40403030</span><span class="p">:</span> <span class="s2">&quot;Real Estate Development (discontinued 2016)&quot;</span><span class="p">,</span>
+    <span class="mi">40403040</span><span class="p">:</span> <span class="s2">&quot;Real Estate Services (discontinued 2016)&quot;</span><span class="p">,</span>
+    <span class="mi">45101010</span><span class="p">:</span> <span class="s2">&quot;Internet Software &amp; Services (discontinued 2018)&quot;</span><span class="p">,</span>
+    <span class="mi">45102010</span><span class="p">:</span> <span class="s2">&quot;IT Consulting &amp; Other Services&quot;</span><span class="p">,</span>
+    <span class="mi">45102020</span><span class="p">:</span> <span class="s2">&quot;Data Processing &amp; Outsourced Services (discontinued 2023)&quot;</span><span class="p">,</span>
+    <span class="mi">45102030</span><span class="p">:</span> <span class="s2">&quot;Internet Services &amp; Infrastructure&quot;</span><span class="p">,</span>
+    <span class="mi">45103010</span><span class="p">:</span> <span class="s2">&quot;Application Software&quot;</span><span class="p">,</span>
+    <span class="mi">45103020</span><span class="p">:</span> <span class="s2">&quot;Systems Software&quot;</span><span class="p">,</span>
+    <span class="mi">45103030</span><span class="p">:</span> <span class="s2">&quot;Home Entertainment Software (discontinued 2018)&quot;</span><span class="p">,</span>
+    <span class="mi">45201020</span><span class="p">:</span> <span class="s2">&quot;Communications Equipment&quot;</span><span class="p">,</span>
+    <span class="mi">45202010</span><span class="p">:</span> <span class="s2">&quot;Computer Hardware (discontinued 2014)&quot;</span><span class="p">,</span>
+    <span class="mi">45202020</span><span class="p">:</span> <span class="s2">&quot;Computer Storage &amp; Peripherals (discontinued 2014)&quot;</span><span class="p">,</span>
+    <span class="mi">45202030</span><span class="p">:</span> <span class="s2">&quot;Technology Hardware, Storage &amp; Peripherals&quot;</span><span class="p">,</span>
+    <span class="mi">45203010</span><span class="p">:</span> <span class="s2">&quot;Electronic Equipment &amp; Instruments&quot;</span><span class="p">,</span>
+    <span class="mi">45203015</span><span class="p">:</span> <span class="s2">&quot;Electronic Components&quot;</span><span class="p">,</span>
+    <span class="mi">45203020</span><span class="p">:</span> <span class="s2">&quot;Electronic Manufacturing Services&quot;</span><span class="p">,</span>
+    <span class="mi">45203030</span><span class="p">:</span> <span class="s2">&quot;Technology Distributors&quot;</span><span class="p">,</span>
+    <span class="mi">45205010</span><span class="p">:</span> <span class="s2">&quot;Semiconductor Equipment (discontinued 2002)&quot;</span><span class="p">,</span>
+    <span class="mi">45301010</span><span class="p">:</span> <span class="s2">&quot;Semiconductor Materials &amp; Equipment&quot;</span><span class="p">,</span>
+    <span class="mi">45301020</span><span class="p">:</span> <span class="s2">&quot;Semiconductors&quot;</span><span class="p">,</span>
+    <span class="mi">50101010</span><span class="p">:</span> <span class="s2">&quot;Alternative Carriers&quot;</span><span class="p">,</span>
+    <span class="mi">50101020</span><span class="p">:</span> <span class="s2">&quot;Integrated Telecommunication Services&quot;</span><span class="p">,</span>
+    <span class="mi">50102010</span><span class="p">:</span> <span class="s2">&quot;Wireless Telecommunication Services&quot;</span><span class="p">,</span>
+    <span class="mi">50201010</span><span class="p">:</span> <span class="s2">&quot;Advertising&quot;</span><span class="p">,</span>
+    <span class="mi">50201020</span><span class="p">:</span> <span class="s2">&quot;Broadcasting&quot;</span><span class="p">,</span>
+    <span class="mi">50201030</span><span class="p">:</span> <span class="s2">&quot;Cable &amp; Satellite&quot;</span><span class="p">,</span>
+    <span class="mi">50201040</span><span class="p">:</span> <span class="s2">&quot;Publishing&quot;</span><span class="p">,</span>
+    <span class="mi">50202010</span><span class="p">:</span> <span class="s2">&quot;Movies &amp; Entertainment&quot;</span><span class="p">,</span>
+    <span class="mi">50202020</span><span class="p">:</span> <span class="s2">&quot;Interactive Home Entertainment&quot;</span><span class="p">,</span>
+    <span class="mi">50203010</span><span class="p">:</span> <span class="s2">&quot;Interactive Media &amp; Services&quot;</span><span class="p">,</span>
+    <span class="mi">55101010</span><span class="p">:</span> <span class="s2">&quot;Electric Utilities&quot;</span><span class="p">,</span>
+    <span class="mi">55102010</span><span class="p">:</span> <span class="s2">&quot;Gas Utilities&quot;</span><span class="p">,</span>
+    <span class="mi">55103010</span><span class="p">:</span> <span class="s2">&quot;Multi-Utilities&quot;</span><span class="p">,</span>
+    <span class="mi">55104010</span><span class="p">:</span> <span class="s2">&quot;Water Utilities&quot;</span><span class="p">,</span>
+    <span class="mi">55105010</span><span class="p">:</span> <span class="s2">&quot;Independent Power Producers &amp; Energy Traders&quot;</span><span class="p">,</span>
+    <span class="mi">55105020</span><span class="p">:</span> <span class="s2">&quot;Renewable Electricity&quot;</span><span class="p">,</span>
+    <span class="mi">60101010</span><span class="p">:</span> <span class="s2">&quot;Diversified REITs&quot;</span><span class="p">,</span>
+    <span class="mi">60101020</span><span class="p">:</span> <span class="s2">&quot;Industrial REITs (2016-2023 code)&quot;</span><span class="p">,</span>
+    <span class="mi">60101030</span><span class="p">:</span> <span class="s2">&quot;Hotel &amp; Resort REITs (2016-2023 code)&quot;</span><span class="p">,</span>
+    <span class="mi">60101040</span><span class="p">:</span> <span class="s2">&quot;Office REITs (2016-2023 code)&quot;</span><span class="p">,</span>
+    <span class="mi">60101050</span><span class="p">:</span> <span class="s2">&quot;Health Care REITs (2016-2023 code)&quot;</span><span class="p">,</span>
+    <span class="mi">60101060</span><span class="p">:</span> <span class="s2">&quot;Residential REITs (2016-2023 code)&quot;</span><span class="p">,</span>
+    <span class="mi">60101070</span><span class="p">:</span> <span class="s2">&quot;Retail REITs (2016-2023 code)&quot;</span><span class="p">,</span>
+    <span class="mi">60101080</span><span class="p">:</span> <span class="s2">&quot;Specialized REITs (2016-2023 code)&quot;</span><span class="p">,</span>
+    <span class="mi">60102020</span><span class="p">:</span> <span class="s2">&quot;Real Estate Operating Companies (2016-2023 code)&quot;</span><span class="p">,</span>
+    <span class="mi">60102040</span><span class="p">:</span> <span class="s2">&quot;Real Estate Services (2016-2023 code)&quot;</span><span class="p">,</span>
+    <span class="mi">60102510</span><span class="p">:</span> <span class="s2">&quot;Industrial REITs&quot;</span><span class="p">,</span>
+    <span class="mi">60103010</span><span class="p">:</span> <span class="s2">&quot;Hotel &amp; Resort REITs&quot;</span><span class="p">,</span>
+    <span class="mi">60104010</span><span class="p">:</span> <span class="s2">&quot;Office REITs&quot;</span><span class="p">,</span>
+    <span class="mi">60105010</span><span class="p">:</span> <span class="s2">&quot;Health Care REITs&quot;</span><span class="p">,</span>
+    <span class="mi">60106010</span><span class="p">:</span> <span class="s2">&quot;Multi-Family Residential REITs&quot;</span><span class="p">,</span>
+    <span class="mi">60106020</span><span class="p">:</span> <span class="s2">&quot;Single-Family Residential REITs&quot;</span><span class="p">,</span>
+    <span class="mi">60107010</span><span class="p">:</span> <span class="s2">&quot;Retail REITs&quot;</span><span class="p">,</span>
+    <span class="mi">60108010</span><span class="p">:</span> <span class="s2">&quot;Other Specialized REITs&quot;</span><span class="p">,</span>
+    <span class="mi">60108020</span><span class="p">:</span> <span class="s2">&quot;Self-Storage REITs&quot;</span><span class="p">,</span>
+    <span class="mi">60108030</span><span class="p">:</span> <span class="s2">&quot;Telecom Tower REITs&quot;</span><span class="p">,</span>
+    <span class="mi">60108040</span><span class="p">:</span> <span class="s2">&quot;Timber REITs&quot;</span><span class="p">,</span>
+    <span class="mi">60108050</span><span class="p">:</span> <span class="s2">&quot;Data Center REITs&quot;</span><span class="p">,</span>
+    <span class="mi">60201010</span><span class="p">:</span> <span class="s2">&quot;Diversified Real Estate Activities&quot;</span><span class="p">,</span>
+    <span class="mi">60201020</span><span class="p">:</span> <span class="s2">&quot;Real Estate Operating Companies&quot;</span><span class="p">,</span>
+    <span class="mi">60201030</span><span class="p">:</span> <span class="s2">&quot;Real Estate Development&quot;</span><span class="p">,</span>
+    <span class="mi">60201040</span><span class="p">:</span> <span class="s2">&quot;Real Estate Services&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="src.wrds_gics.GICS_LEVELS" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">GICS_LEVELS</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">GICS_LEVELS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;sector&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;Sector&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">GICS_SECTORS</span><span class="p">),</span>
+    <span class="s2">&quot;industry_group&quot;</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">&quot;Industry group&quot;</span><span class="p">,</span>
+        <span class="mi">4</span><span class="p">,</span>
+        <span class="n">GICS_INDUSTRY_GROUPS</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="s2">&quot;industry&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;Industry&quot;</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="n">GICS_INDUSTRIES</span><span class="p">),</span>
+    <span class="s2">&quot;sub_industry&quot;</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">&quot;Sub-industry&quot;</span><span class="p">,</span>
+        <span class="mi">8</span><span class="p">,</span>
+        <span class="n">GICS_SUB_INDUSTRIES</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">}</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="src.wrds_gics.GICS_NAME_COLUMNS" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">GICS_NAME_COLUMNS</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">GICS_NAME_COLUMNS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;sector&quot;</span><span class="p">:</span> <span class="s2">&quot;gsector_name&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;industry_group&quot;</span><span class="p">:</span> <span class="s2">&quot;ggroup_name&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;industry&quot;</span><span class="p">:</span> <span class="s2">&quot;gind_name&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;sub_industry&quot;</span><span class="p">:</span> <span class="s2">&quot;gsubind_name&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="src.wrds_gics.level_label" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">level_label</span>
+
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">level_label</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/wrds_gics.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">184</span>
+<span class="normal">185</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">level_label</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">GICS_LEVELS</span><span class="p">[</span><span class="n">level</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="src.wrds_gics.level_names" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">level_names</span>
+
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">level_names</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>code -&gt; name of one level.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/wrds_gics.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">level_names</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;code -&gt; name of one level.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">GICS_LEVELS</span><span class="p">[</span><span class="n">level</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="src.wrds_gics.parent_code" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">parent_code</span>
+
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">parent_code</span><span class="p">(</span><span class="n">code</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>A code's code at the same or a wider level, e.g. 45103010 -&gt; 45 or 451030 -&gt; 4510 for
+'industry_group' (GICS codes never start with 0, so their length is their level).</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/wrds_gics.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">parent_code</span><span class="p">(</span><span class="n">code</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A code&#39;s code at the same or a wider level, e.g. 45103010 -&gt; 45 or 451030 -&gt; 4510 for</span>
+<span class="sd">    &#39;industry_group&#39; (GICS codes never start with 0, so their length is their level).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">code</span><span class="p">)</span> <span class="o">//</span> <span class="mi">10</span> <span class="o">**</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">code</span><span class="p">)))</span> <span class="o">-</span> <span class="n">GICS_LEVELS</span><span class="p">[</span><span class="n">level</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="src.wrds_gics.codes_under" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">codes_under</span>
+
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">codes_under</span><span class="p">(</span>
+    <span class="n">level</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">parents</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">parent_level</span><span class="p">:</span> <span class="nb">str</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The level's codes inside the parent level's codes, sorted.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/wrds_gics.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">codes_under</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">parents</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">parent_level</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The level&#39;s codes inside the parent level&#39;s codes, sorted.&quot;&quot;&quot;</span>
+    <span class="n">wanted</span> <span class="o">=</span> <span class="p">{</span><span class="nb">int</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">parents</span><span class="p">}</span>
+    <span class="n">shift</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">**</span> <span class="p">(</span><span class="n">GICS_LEVELS</span><span class="p">[</span><span class="n">level</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">GICS_LEVELS</span><span class="p">[</span><span class="n">parent_level</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">level_names</span><span class="p">(</span><span class="n">level</span><span class="p">)</span> <span class="k">if</span> <span class="n">c</span> <span class="o">//</span> <span class="n">shift</span> <span class="ow">in</span> <span class="n">wanted</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="src.wrds_gics.names_to_codes" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">names_to_codes</span>
+
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">names_to_codes</span><span class="p">(</span>
+    <span class="n">level</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">names</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The codes of a level's names, sorted. Raises ValueError for an unknown name.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/wrds_gics.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">names_to_codes</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">names</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The codes of a level&#39;s names, sorted. Raises ValueError for an unknown name.&quot;&quot;&quot;</span>
+    <span class="n">by_name</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">code</span> <span class="k">for</span> <span class="n">code</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">level_names</span><span class="p">(</span><span class="n">level</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+    <span class="n">names</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">names</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">bad</span> <span class="o">:=</span> <span class="p">[</span><span class="n">n</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">names</span> <span class="k">if</span> <span class="n">n</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">by_name</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown GICS </span><span class="si">{</span><span class="n">level_label</span><span class="p">(</span><span class="n">level</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="si">}</span><span class="s2"> names: </span><span class="si">{</span><span class="n">bad</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">by_name</span><span class="p">[</span><span class="n">n</span><span class="p">]</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">names</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="src.wrds_gics.sector_codes" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">sector_codes</span>
+
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">sector_codes</span><span class="p">(</span><span class="n">sector_names</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The sector codes of sector names (an older job's selected_sectors), sorted.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/wrds_gics.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sector_codes</span><span class="p">(</span><span class="n">sector_names</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The sector codes of sector names (an older job&#39;s selected_sectors), sorted.&quot;&quot;&quot;</span>
+    <span class="n">by_name</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">code</span> <span class="k">for</span> <span class="n">code</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">GICS_SECTORS</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+    <span class="n">sector_names</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">sector_names</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">bad</span> <span class="o">:=</span> <span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">sector_names</span> <span class="k">if</span> <span class="n">s</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">by_name</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown GICS sectors: </span><span class="si">{</span><span class="n">bad</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">by_name</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">sector_names</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="src.wrds_gics.validate_gics_filter" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">validate_gics_filter</span>
+
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">validate_gics_filter</span><span class="p">(</span><span class="n">gics_filter</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Raises ValueError with a readable message unless gics_filter is a valid GICS filter.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/wrds_gics.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">validate_gics_filter</span><span class="p">(</span><span class="n">gics_filter</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Raises ValueError with a readable message unless gics_filter is a valid GICS filter.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">gics_filter</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">set</span><span class="p">(</span><span class="n">gics_filter</span><span class="p">)</span> <span class="o">!=</span> <span class="p">{</span><span class="s1">&#39;level&#39;</span><span class="p">,</span> <span class="s1">&#39;codes&#39;</span><span class="p">}:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;gics_filter must be an object with level and codes.&quot;</span><span class="p">)</span>
+    <span class="n">level</span><span class="p">,</span> <span class="n">codes</span> <span class="o">=</span> <span class="n">gics_filter</span><span class="p">[</span><span class="s1">&#39;level&#39;</span><span class="p">],</span> <span class="n">gics_filter</span><span class="p">[</span><span class="s1">&#39;codes&#39;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">level</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">GICS_LEVELS</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;gics_filter level must be one of </span><span class="si">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">GICS_LEVELS</span><span class="p">)</span><span class="si">}</span><span class="s2">, not &#39;</span><span class="si">{</span><span class="n">level</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">codes</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">codes</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;gics_filter codes must be a list of at least one GICS code.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">codes</span><span class="p">)</span> <span class="ow">or</span> <span class="n">codes</span> <span class="o">!=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">codes</span><span class="p">)):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;gics_filter codes must be whole numbers, sorted, without repeats.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">bad</span> <span class="o">:=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">codes</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">level_names</span><span class="p">(</span><span class="n">level</span><span class="p">)]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown GICS </span><span class="si">{</span><span class="n">level_label</span><span class="p">(</span><span class="n">level</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="si">}</span><span class="s2"> codes: </span><span class="si">{</span><span class="n">bad</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="src.wrds_gics.make_gics_filter" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">make_gics_filter</span>
+
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">make_gics_filter</span><span class="p">(</span>
+    <span class="n">level</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">codes</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>A validated GICS filter (codes sorted, without repeats), or None when there are no codes.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/wrds_gics.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">make_gics_filter</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">codes</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A validated GICS filter (codes sorted, without repeats), or None when there are no codes.&quot;&quot;&quot;</span>
+    <span class="n">codes</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">({</span><span class="nb">int</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">codes</span><span class="p">})</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">codes</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">gics_filter</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;level&#39;</span><span class="p">:</span> <span class="n">level</span><span class="p">,</span> <span class="s1">&#39;codes&#39;</span><span class="p">:</span> <span class="n">codes</span><span class="p">}</span>
+    <span class="n">validate_gics_filter</span><span class="p">(</span><span class="n">gics_filter</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">gics_filter</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="src.wrds_gics.job_gics_filter" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">job_gics_filter</span>
+
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">job_gics_filter</span><span class="p">(</span>
+    <span class="n">gics_filter</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span>
+    <span class="n">selected_sectors</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The GICS filter a job applies: its gics_filter, or for an older job its
+selected_sectors as a sector filter. None when it has neither.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/wrds_gics.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">job_gics_filter</span><span class="p">(</span><span class="n">gics_filter</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span>
+                    <span class="n">selected_sectors</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The GICS filter a job applies: its gics_filter, or for an older job its</span>
+<span class="sd">    selected_sectors as a sector filter. None when it has neither.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">sectors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">selected_sectors</span> <span class="ow">or</span> <span class="p">[])</span>
+    <span class="k">if</span> <span class="n">gics_filter</span> <span class="ow">and</span> <span class="n">sectors</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;A job has either gics_filter or selected_sectors, not both.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">gics_filter</span><span class="p">:</span>
+        <span class="n">validate_gics_filter</span><span class="p">(</span><span class="n">gics_filter</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">gics_filter</span>
+    <span class="k">return</span> <span class="n">make_gics_filter</span><span class="p">(</span><span class="s1">&#39;sector&#39;</span><span class="p">,</span> <span class="n">sector_codes</span><span class="p">(</span><span class="n">sectors</span><span class="p">))</span> <span class="k">if</span> <span class="n">sectors</span> <span class="k">else</span> <span class="kc">None</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="src.wrds_gics.gics_mask" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">gics_mask</span>
+
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">gics_mask</span><span class="p">(</span>
+    <span class="n">panel</span><span class="p">:</span> <span class="n">DataFrame</span><span class="p">,</span> <span class="n">gics_filter</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The panel rows the GICS filter keeps, as a boolean array (all of them without a
+filter). The sector level reads sector_name, the others gsubind (see the module docstring).</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/wrds_gics.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span>
+<span class="normal">278</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">gics_mask</span><span class="p">(</span><span class="n">panel</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">gics_filter</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The panel rows the GICS filter keeps, as a boolean array (all of them without a</span>
+<span class="sd">    filter). The sector level reads sector_name, the others gsubind (see the module docstring).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">gics_filter</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">panel</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
+    <span class="n">level</span><span class="p">,</span> <span class="n">codes</span> <span class="o">=</span> <span class="n">gics_filter</span><span class="p">[</span><span class="s1">&#39;level&#39;</span><span class="p">],</span> <span class="n">gics_filter</span><span class="p">[</span><span class="s1">&#39;codes&#39;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">&#39;sector&#39;</span><span class="p">:</span>
+        <span class="n">names</span> <span class="o">=</span> <span class="p">[</span><span class="n">GICS_SECTORS</span><span class="p">[</span><span class="n">c</span><span class="p">]</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">codes</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">panel</span><span class="p">[</span><span class="s1">&#39;sector_name&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">names</span><span class="p">)</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
+    <span class="n">prefix</span> <span class="o">=</span> <span class="n">panel</span><span class="p">[</span><span class="s1">&#39;gsubind&#39;</span><span class="p">]</span> <span class="o">//</span> <span class="mi">10</span> <span class="o">**</span> <span class="p">(</span><span class="mi">8</span> <span class="o">-</span> <span class="n">GICS_LEVELS</span><span class="p">[</span><span class="n">level</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">prefix</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">codes</span><span class="p">)</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">,</span> <span class="n">na_value</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="src.wrds_gics.describe_gics_filter" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">describe_gics_filter</span>
+
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">describe_gics_filter</span><span class="p">(</span>
+    <span class="n">gics_filter</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span>
+    <span class="n">limit</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The filter for captions: the names in alphabetical order, as the sector filter always
+showed them ('Energy, Financials'), and below the sector level after the level
+('Industry: Banks, Insurance'). With limit, at most limit names ('... and 3 more').
+'All sectors' without a filter.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/wrds_gics.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">describe_gics_filter</span><span class="p">(</span><span class="n">gics_filter</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span> <span class="n">limit</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The filter for captions: the names in alphabetical order, as the sector filter always</span>
+<span class="sd">    showed them (&#39;Energy, Financials&#39;), and below the sector level after the level</span>
+<span class="sd">    (&#39;Industry: Banks, Insurance&#39;). With limit, at most limit names (&#39;... and 3 more&#39;).</span>
+<span class="sd">    &#39;All sectors&#39; without a filter.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">gics_filter</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s1">&#39;All sectors&#39;</span>
+    <span class="n">level</span> <span class="o">=</span> <span class="n">gics_filter</span><span class="p">[</span><span class="s1">&#39;level&#39;</span><span class="p">]</span>
+    <span class="n">names</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">level_names</span><span class="p">(</span><span class="n">level</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">c</span><span class="p">))</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">gics_filter</span><span class="p">[</span><span class="s1">&#39;codes&#39;</span><span class="p">])</span>
+    <span class="n">shown</span> <span class="o">=</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">names</span><span class="p">[:</span><span class="n">limit</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">limit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">names</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">limit</span><span class="p">:</span>
+        <span class="n">shown</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot; and </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">names</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">limit</span><span class="si">}</span><span class="s2"> more&quot;</span>
+    <span class="k">return</span> <span class="n">shown</span> <span class="k">if</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">&#39;sector&#39;</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">level_label</span><span class="p">(</span><span class="n">level</span><span class="p">)</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">shown</span><span class="si">}</span><span class="s2">&quot;</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
