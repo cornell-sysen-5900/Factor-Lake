@@ -22,6 +22,7 @@ from app.holdings_table import (
     holdings_table_to_csv,
 )
 from app.saved_runs import remove_saved_run
+from app.share_links import render_copy_share_link
 from app.streamlit_config import MAX_SAVED_RUNS
 from app.streamlit_utils import (
     describe_compute,
@@ -460,15 +461,17 @@ COMPARE_FULL_KEY = "compare_full_from_results"
 
 def _render_analysis_id(compute: Optional[Dict[str, Any]]) -> None:
     """
-    The run's analysis ID, with a copy button (st.code's), to reopen or share it, and an
-    Add to comparison button beside it (runs computed in the app have no ID, so neither).
+    The saved ID, copy-share-link and comparison actions. Locally computed runs
+    have no saved ID and therefore no share link.
     """
     analysis_id = (compute or {}).get('hash')
     if analysis_id:
-        st.caption("**Analysis ID:** copy it (button on the right) to open this analysis again "
-                   "or share it, under Open a saved analysis.")
-        id_col, button_col = st.columns([5, 1], vertical_alignment="center")
+        st.caption("**Analysis ID:** use Copy share link to open this saved result directly, "
+                   "or copy the ID to use Open a saved analysis.")
+        id_col, share_col, button_col = st.columns([5, 2, 2], vertical_alignment="center")
         id_col.code(analysis_id, language=None)
+        with share_col:
+            render_copy_share_link(analysis_id)
         with button_col:
             _render_add_to_comparison(analysis_id)
         if st.session_state.get(COMPARE_FULL_KEY) == analysis_id:

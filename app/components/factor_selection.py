@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Tuple
 import streamlit as st
 
 import streamlit_config as config
+from app.wrds_factor_review import factor_tooltip, legacy_names
 
 HIGHER = "Higher is better"
 LOWER = "Lower is better"
@@ -78,6 +79,10 @@ def render_factor_selection(data_mode: str = 'legacy') -> Tuple[List[str], Dict[
     st.write("Click the factors you want to add, then choose which direction the portfolio should favor.")
     st.caption(":material/lightbulb: Tip: hover over a factor to see its full description.")
 
+    if data_mode == 'wrds':
+        st.caption("Colored cards with a link icon match a documented Legacy factor definition. "
+                   "Hover for the match and default rationale; source values and coverage can differ.")
+
     _render_add_factors(selected, data_mode)
 
     if not selected:
@@ -126,8 +131,10 @@ def _render_add_factors(selected: Dict[str, str], data_mode: str) -> None:
                     meta = metadata[name]
                     st.button(
                         name,
-                        icon=":material/add:",
-                        help=meta['tooltip'],
+                        icon=":material/link:" if data_mode == 'wrds' and legacy_names(meta['column'])
+                             else ":material/add:",
+                        type="primary" if data_mode == 'wrds' and legacy_names(meta['column']) else "secondary",
+                        help=factor_tooltip(name) if data_mode == 'wrds' else meta['tooltip'],
                         key=f"factor_add_{meta['key']}",
                         on_click=_add_factor,
                         args=(name, data_mode),
@@ -157,7 +164,7 @@ def _render_factor_row(name: str, selected: Dict[str, str], data_mode: str) -> N
 
     name_col, dir_col, remove_col = st.columns([3, 3, 1], vertical_alignment="center")
     with name_col:
-        st.markdown(f"**{name}**", help=meta['tooltip'])
+        st.markdown(f"**{name}**", help=factor_tooltip(name) if data_mode == 'wrds' else meta['tooltip'])
         st.caption(meta['group'])
     with dir_col:
         st.segmented_control(
