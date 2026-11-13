@@ -126,6 +126,33 @@ CSS_STYLE = """
 </style>
 """
 
+# Streamlit's default primaryColor, used when .streamlit/config.toml does not set one
+_DEFAULT_PRIMARY = "#ff4b4b"
+
+
+def legacy_match_css(keys) -> str:
+    """
+    Factor Selection (WRDS): a subtle tint for the "add factor" buttons whose
+    definition matches a Legacy factor, targeted through Streamlit's
+    st-key-factor_add_<key> class. The background and border are the theme's
+    primary color at low opacity over whatever is behind them, and the text keeps
+    the theme's color, so the cards read well in light and dark themes and stay
+    distinct from solid primary action buttons such as Run Portfolio Analysis.
+    """
+    if not keys:
+        return ""
+    primary = st.get_option("theme.primaryColor") or _DEFAULT_PRIMARY
+    selector = ", ".join(f".st-key-factor_add_{key} button" for key in keys)
+    return f"""
+<style>
+    {selector} {{
+        background-color: color-mix(in srgb, {primary} 10%, transparent);
+        border-color: color-mix(in srgb, {primary} 40%, transparent);
+    }}
+</style>
+"""
+
+
 def inject_styles() -> None:
     """
     Renders custom CSS definitions into the application's frontend.

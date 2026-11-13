@@ -52,8 +52,12 @@ from components.factor_selection import render_factor_selection
 render_factor_selection('wrds')
 ''').run()
     assert not at.exception
-    assert at.button(key='factor_add_w_roa').proto.type == 'primary'
+    # Matches are tinted through CSS, not type="primary" (which looks like Run Portfolio Analysis)
+    assert at.button(key='factor_add_w_roa').proto.type == 'secondary'
     assert at.button(key='factor_add_w_mom_12_1').proto.type == 'secondary'
+    tint = ''.join(h.proto.body for h in at.get('html'))
+    assert '.st-key-factor_add_w_roa button' in tint
+    assert 'factor_add_w_mom_12_1' not in tint
     assert 'ROA %' in at.button(key='factor_add_w_roa').help
     assert any('Colored cards' in c.value for c in at.caption)
     at.button(key='factor_add_w_roa').click().run()

@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Tuple
 import streamlit as st
 
 import streamlit_config as config
+import streamlit_css as css
 from app.wrds_factor_review import factor_tooltip, legacy_names
 
 HIGHER = "Higher is better"
@@ -114,6 +115,9 @@ def _render_add_factors(selected: Dict[str, str], data_mode: str) -> None:
     with its default direction.
     """
     metadata, groups = _catalog(data_mode)
+    if data_mode == 'wrds':
+        st.html(css.legacy_match_css(
+            [meta['key'] for meta in metadata.values() if legacy_names(meta['column'])]))
     group_names = [
         (group, [name for name, meta in metadata.items() if meta['group'] == group])
         for group in groups
@@ -133,7 +137,7 @@ def _render_add_factors(selected: Dict[str, str], data_mode: str) -> None:
                         name,
                         icon=":material/link:" if data_mode == 'wrds' and legacy_names(meta['column'])
                              else ":material/add:",
-                        type="primary" if data_mode == 'wrds' and legacy_names(meta['column']) else "secondary",
+                        type="secondary",
                         help=factor_tooltip(name) if data_mode == 'wrds' else meta['tooltip'],
                         key=f"factor_add_{meta['key']}",
                         on_click=_add_factor,
