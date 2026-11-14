@@ -27,7 +27,6 @@ from src.wrds_data import PANEL_FILE, RETURNS_FILE, wrds_dir  # noqa: E402
 from src.wrds_factor_evidence import (  # noqa: E402
     CONSISTENT_SHARE,
     END_YEAR,
-    RECENT_MONTHS,
     START_YEAR,
     choose_default,
     monthly_spreads,
@@ -45,9 +44,9 @@ For Higher defaults: long high, short low. For Lower defaults: long low, short h
 Reported spread is 12 times the arithmetic mean of monthly long-minus-short returns, in percentage points
 per year; it is NOT a difference of CAGRs and is NOT a compounded trading strategy.
 Years default wins counts calendar return years whose summed monthly spread is above zero; partial first and
-last years count as years. The recent spread annualizes the latest {RECENT_MONTHS} monthly spreads.
+last years count as years.
 Default rule: a direction that wins in at least {CONSISTENT_SHARE:.0%} of years is the default (consistent);
-otherwise the direction with a positive recent spread (mixed). The script reports the rule; it never edits defaults.
+otherwise the theory default stands (theory). The script reports the rule; it never edits defaults.
 Each leg has $1 notional (gross exposure $2); borrowing fees, financing, transaction costs and taxes are excluded.
 Missing individual returns retain their weight and are filled with 0% as in the app, with a count and coverage flag.
 Months with fewer than two finite signals, a constant signal, or no next-month return-file coverage are skipped
@@ -97,7 +96,7 @@ def render_report(summaries=None, *, source='No data loaded', start_year=START_Y
     rows = []
     for row in factor_rows():
         evidence = (summaries or {}).get(row['column'])
-        spread = recent = rule = 'pending'
+        spread = rule = 'pending'
         years = 'pending'
         coverage = 'not computed'
         status = 'pending data'
@@ -107,8 +106,6 @@ def render_report(summaries=None, *, source='No data loaded', start_year=START_Y
             share = evidence['share_years_positive']
             years = ('n/a' if share is None else
                      f"{evidence['positive_years']}/{evidence['years']} ({100 * share:.0f}%)")
-            recent = ('n/a' if evidence['recent_spread'] is None else
-                      f"{100 * evidence['recent_spread']:+.3f} pp/year ({evidence['recent_months']} months)")
             higher = row['default_direction'] == 'Higher'
             chosen = choose_default(evidence, higher)
             rule = 'n/a' if chosen is None else f"{'Higher' if chosen[0] else 'Lower'} ({chosen[1]})"
@@ -119,9 +116,9 @@ def render_report(summaries=None, *, source='No data loaded', start_year=START_Y
             if chosen is not None and chosen[0] != higher:
                 status += '; default differs from rule'
         rows.append([row['factor'], f"`{row['column']}`", row['replaces'], row['default_direction'],
-                     row['reason'], spread, years, recent, rule, coverage, status])
+                     row['reason'], spread, years, rule, coverage, status])
     lines += [_table(['WRDS factor', 'Column', 'Replaces Legacy', 'Default', 'Reason', 'Long–short spread',
-                      'Years default wins', 'Recent spread', 'Rule', 'Coverage', 'Review'], rows), '',
+                      'Years default wins', 'Rule', 'Coverage', 'Review'], rows), '',
               '## Every Legacy factor', '',
               _table(['Legacy factor', 'WRDS replacement', 'Level', 'Difference'],
                      [[r['legacy_factor'], r['wrds_factor'], r['level'], r['difference']]
@@ -154,18 +151,19 @@ def render_catalog():
                [[r['legacy_factor'], r['wrds_factor'], r['level'], f"{r['legacy_default']} → {r['wrds_default']}",
                  r['difference']] for r in legacy_rows()]), '',
         '## Default directions', '',
-        f'Each default comes from the factor\'s long-short spread in each calendar year, {START_YEAR}–{END_YEAR}. '
+        f'Each default is checked against the factor\'s long-short spread in each calendar year, '
+        f'{START_YEAR}–{END_YEAR}. '
         f'A direction that wins in at least {CONSISTENT_SHARE:.0%} of years is the default (Consistent); otherwise '
-        f'the default follows the spread over the last {RECENT_MONTHS} months (Mixed history). '
+        'the theory default stands (Theory default; data mixed). '
         'Saved analyses and strategy files keep the directions they were saved with.', '',
         _table(['WRDS factor', 'Default', 'Basis', 'Reason'],
-               [[r['factor'], r['default_direction'], r['basis'].split(':')[0], r['reason']]
+               [[r['factor'], r['default_direction'], r['basis'].split(':')[0].split(';')[0], r['reason']]
                 for r in factor_rows()]), '',
         '## Private report', '',
         'The spreads stay private. From the repository root:', '',
         '```bash', PRIVATE_COMMAND, '```', '',
         'Use `--s3` instead of `--data-dir` to read the data from S3. The output must be outside this repository. '
-        'It lists each factor\'s spread, the share of years its default wins and the recent spread, and flags '
+        'It lists each factor\'s spread and the share of years its default wins, and flags '
         'defaults that differ from the rule. `--catalog-only --output DOCS/WRDS_FACTOR_REVIEW.md` regenerates '
         'this page.', ''])
 

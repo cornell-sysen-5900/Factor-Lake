@@ -320,7 +320,7 @@ def test_a_wrds_run_looks_like_legacys_results(new_session, legacy):
     assert "**Delisting Strategy:** CRSP delisting returns included, then the risk-free rate until the next " \
            "rebalance" in shown['caption']
     assert "**Risk-free months filled from the 3-month T-bill / 12:** 2011-02" in shown['caption']
-    assert "**Factors:** 12-1 Mo Momentum (Higher is better), ROE (Higher is better), Market Cap (Higher is better)" \
+    assert "**Factors:** 12-1 Mo Momentum (Higher is better), ROE (Higher is better), Market Cap (Lower is better)" \
         in shown['caption']
 
     # Tables: holdings, then Legacy's Year-by-Year and Win/Loss headers with the period and the ETFs
