@@ -1,60 +1,52 @@
-"""Definition-based Legacy crosswalk and theory rationale, without empirical sign fitting.
+"""Legacy-to-WRDS replacements and the theory rationale for each WRDS default direction.
 
-A match means the documented formula and lookback agree, not identical vendor values.
-Unknown Legacy conventions remain related candidates; they do not get match styling.
-The app's existing WRDS_FACTOR_METADATA remains the source of default directions.
+Every Legacy factor maps to its closest WRDS factor: "Same" when the documented definition
+agrees (units may differ, which does not change ranks), "Similar" when the idea is the same
+but the lookback, return convention or orientation differs. Mappings are definition-based,
+not fitted to data; WRDS_FACTOR_METADATA remains the source of default directions.
 """
 from dataclasses import dataclass
 
 from app.streamlit_config import FACTOR_METADATA, WRDS_FACTOR_METADATA
 
+SAME, SIMILAR = 'Same', 'Similar'
+
 
 @dataclass(frozen=True)
-class LegacyMatch:
-    column: str
+class Replacement:
+    legacy_column: str
     wrds_column: str
-    status: str
-    note: str
+    level: str
+    difference: str
 
 
-LEGACY_MATCHES = (
-    LegacyMatch('12-Mo_Momentum', 'mom_12m', 'related',
-                'Legacy excludes dividends; WRDS compounds CRSP returns over 252 trading days. '
-                'Return convention and calendar lookback differ.'),
-    LegacyMatch('6-Mo_Momentum', 'mom_6m', 'related',
-                'Legacy excludes dividends; WRDS compounds CRSP returns over 126 trading days.'),
-    LegacyMatch('1-Mo_Momentum', 'mom_1m', 'related',
-                'Legacy excludes dividends; WRDS uses 21 trading-day CRSP returns. '
-                'WRDS also defaults to reversal (Lower), while Legacy defaults to Higher.'),
-    LegacyMatch('Price_to_Book_Using_9-30_Data', 'f_book_to_price', 'related',
-                'Price/book is the reciprocal of book/price, not the same factor definition. '
-                'No reciprocal or automatic direction conversion is performed.'),
-    LegacyMatch('Book-Price', 'f_book_to_price', 'related',
-                'Legacy says latest-quarter book/price; its price date is not specified. '
-                'WRDS uses company market cap at the panel date. Verify Legacy price timing first.'),
-    LegacyMatch('Next_FY_Earns-P', 'f_forward_ep_fy2', 'related',
-                'FY2 is the next fiscal year candidate, not FY1. Legacy requires 3+ analysts; '
-                'that coverage rule is not part of this WRDS factor. No exact match confirmed.'),
-    LegacyMatch('ROE_using_9-30_Data', 'f_roe', 'related',
-                'Legacy does not specify the income lookback or equity adjustments. '
-                'WRDS uses TTM income and positive Fama-French-style book equity.'),
-    LegacyMatch('ROA_using_9-30_Data', 'f_roa', 'related',
-                'The Legacy 9/30 snapshot does not specify the income lookback; WRDS explicitly uses TTM income.'),
-    LegacyMatch('ROA', 'f_roa', 'match',
-                'Both documented definitions are trailing-12-month net income divided by total assets. '
-                'Legacy percent and WRDS decimal units differ; vendor values and observation dates may differ.'),
-    LegacyMatch('Accruals-Assets', 'f_accruals_to_assets', 'related',
-                'Both use income minus operating cash flow over assets, but the Legacy income/cash-flow '
-                'lookback is unspecified. WRDS uses TTM flows.'),
-    LegacyMatch('1-Yr_Price_Vol', 'vol_close_12m', 'related',
-                'Both describe annualized daily volatility; WRDS uses log CRSP returns, 252 observations '
-                'and an 80% coverage rule. Legacy return convention and minimum coverage are unspecified.'),
-    LegacyMatch('1-Yr_Asset_Growth', 'f_asset_growth_1yr', 'match',
-                'Both measure the percentage change in total assets over one year (four fiscal quarters). '
-                'Percent/decimal units and point-in-time observation dates differ.'),
-    LegacyMatch('1-Yr_CapEX_Growth', 'f_capex_growth_1yr', 'match',
-                'Both compare 12-month capex with the preceding year. WRDS additionally excludes a '
-                'prior-year denominator below $1M; this coverage difference is retained, not rebuilt.'),
+REPLACEMENTS = (
+    Replacement('12-Mo_Momentum', 'mom_12m', SIMILAR,
+                'Legacy uses price returns; WRDS compounds 252 trading days of CRSP total returns.'),
+    Replacement('6-Mo_Momentum', 'mom_6m', SIMILAR,
+                'Legacy uses price returns; WRDS compounds 126 trading days of CRSP total returns.'),
+    Replacement('1-Mo_Momentum', 'mom_1m', SIMILAR,
+                'WRDS uses 21 trading days of CRSP total returns; Legacy defaults Higher, WRDS Lower (reversal).'),
+    Replacement('Price_to_Book_Using_9-30_Data', 'f_book_to_price', SIMILAR,
+                'Reciprocal, so the direction flips: Lower P/B in Legacy is Higher Book/Price in WRDS.'),
+    Replacement('Book-Price', 'f_book_to_price', SIMILAR,
+                "WRDS prices book equity at the panel date's market cap; Legacy's price date is unspecified."),
+    Replacement('Next_FY_Earns-P', 'f_forward_ep_fy2', SIMILAR,
+                'WRDS uses the FY2 (next fiscal year) consensus without the Legacy 3+ analyst minimum.'),
+    Replacement('ROE_using_9-30_Data', 'f_roe', SIMILAR,
+                'WRDS uses TTM income over positive Fama-French book equity; Legacy does not specify either.'),
+    Replacement('ROA_using_9-30_Data', 'f_roa', SIMILAR,
+                'WRDS uses TTM income; the Legacy 9/30 snapshot does not specify the income lookback.'),
+    Replacement('ROA', 'f_roa', SAME,
+                'Same TTM net income over total assets; Legacy is in percent, WRDS in decimals.'),
+    Replacement('Accruals-Assets', 'f_accruals_to_assets', SIMILAR,
+                'WRDS uses TTM income and operating cash flow; the Legacy lookback is unspecified.'),
+    Replacement('1-Yr_Price_Vol', 'vol_close_12m', SIMILAR,
+                'WRDS annualizes 252 daily log CRSP returns with 80% coverage; Legacy specifies neither rule.'),
+    Replacement('1-Yr_Asset_Growth', 'f_asset_growth_1yr', SAME,
+                'Same four-quarter change in total assets; Legacy is in percent, WRDS in decimals.'),
+    Replacement('1-Yr_CapEX_Growth', 'f_capex_growth_1yr', SAME,
+                'Same 12-month capex versus the prior year; WRDS skips prior-year capex below $1M.'),
 )
 
 # Each reason is a theory-based rationale for the existing default, not a promise of
@@ -110,42 +102,45 @@ REASONS = {
 }
 
 
-def matches_for(column: str, *, confirmed_only: bool = True):
-    return tuple(m for m in LEGACY_MATCHES if m.wrds_column == column
-                 and (not confirmed_only or m.status == 'match'))
+_LEGACY_NAMES = {meta['column']: name for name, meta in FACTOR_METADATA.items()}
+_WRDS_NAMES = {meta['column']: name for name, meta in WRDS_FACTOR_METADATA.items()}
+
+
+def _direction(meta) -> str:
+    return 'Higher' if meta['higher_is_better'] else 'Lower'
+
+
+def replaces(column: str):
+    """The Legacy factors a WRDS column replaces, as (Legacy name, Replacement) pairs."""
+    return tuple((_LEGACY_NAMES[r.legacy_column], r) for r in REPLACEMENTS if r.wrds_column == column)
 
 
 def legacy_names(column: str):
-    names = {meta['column']: name for name, meta in FACTOR_METADATA.items()}
-    return tuple(names[m.column] for m in matches_for(column))
+    return tuple(name for name, _ in replaces(column))
 
 
 def factor_tooltip(name: str) -> str:
     meta = WRDS_FACTOR_METADATA[name]
-    column = meta['column']
-    names = legacy_names(column)
-    match_note = 'Legacy definition match: ' + ', '.join(names) if names else 'No confirmed Legacy definition match.'
-    details = ' '.join(m.note for m in matches_for(column, confirmed_only=False))
-    return f"{meta['tooltip']}\n\n{match_note}\n{details}\n\nDefault rationale: {REASONS[column]}"
+    lines = [f"Replaces Legacy {legacy} ({r.level}): {r.difference}" for legacy, r in replaces(meta['column'])]
+    return '\n\n'.join([meta['tooltip'], *lines, f"Default rationale: {REASONS[meta['column']]}"])
 
 
 def factor_rows():
-    """All WRDS factors, including those without a Legacy match, in picker order."""
-    return [{'factor': name, 'column': m['column'], 'legacy_match': '; '.join(legacy_names(m['column'])) or 'none',
-             'default_direction': 'Higher' if m['higher_is_better'] else 'Lower',
-             'reason': REASONS[m['column']]}
+    """All WRDS factors, including those that replace no Legacy factor, in picker order."""
+    return [{'factor': name, 'column': m['column'], 'replaces': '; '.join(legacy_names(m['column'])) or '—',
+             'default_direction': _direction(m), 'reason': REASONS[m['column']]}
             for name, m in WRDS_FACTOR_METADATA.items()]
 
 
 def legacy_rows():
-    """Every Legacy factor exactly once; related candidates never become matches."""
-    names = {m['column']: name for name, m in WRDS_FACTOR_METADATA.items()}
-    crosswalk = {m.column: m for m in LEGACY_MATCHES}
+    """Every Legacy factor exactly once, with its WRDS replacement."""
+    by_legacy = {r.legacy_column: r for r in REPLACEMENTS}
     rows = []
     for name, meta in FACTOR_METADATA.items():
-        m = crosswalk[meta['column']]
-        rows.append({'legacy_factor': name, 'legacy_column': m.column,
-                     'wrds_match': names[m.wrds_column] if m.status == 'match' else 'none',
-                     'related_candidate': names[m.wrds_column] if m.status == 'related' else '',
-                     'status': m.status, 'note': m.note})
+        r = by_legacy[meta['column']]
+        wrds = _WRDS_NAMES[r.wrds_column]
+        rows.append({'legacy_factor': name, 'legacy_column': r.legacy_column, 'wrds_factor': wrds,
+                     'wrds_column': r.wrds_column, 'level': r.level, 'difference': r.difference,
+                     'legacy_default': _direction(meta),
+                     'wrds_default': _direction(WRDS_FACTOR_METADATA[wrds])})
     return rows

@@ -95,12 +95,12 @@ def render_report(summaries=None, *, source='No data loaded', start_year=2002, e
                         f"{evidence['months']} months; {evidence['skipped_months']} skipped; "
                         f"{evidence['missing_returns']} missing stock returns")
             status = f"{evidence['evidence_status']}; {evidence['coverage_status']}"
-        rows.append([row['factor'], f"`{row['column']}`", row['legacy_match'], row['default_direction'],
+        rows.append([row['factor'], f"`{row['column']}`", row['replaces'], row['default_direction'],
                      row['reason'], spread, coverage, status])
-    lines += [_table(['WRDS factor', 'Column', 'Legacy match', 'Default', 'Reason', 'Long–short spread',
+    lines += [_table(['WRDS factor', 'Column', 'Replaces Legacy', 'Default', 'Reason', 'Long–short spread',
                       'Coverage', 'Review'], rows), '', '## Every Legacy factor', '',
-              _table(['Legacy factor', 'Confirmed WRDS match', 'Related candidate only', 'Definition / limitation'],
-                     [[r['legacy_factor'], r['wrds_match'], r['related_candidate'] or '—', r['note']]
+              _table(['Legacy factor', 'WRDS replacement', 'Level', 'Difference'],
+                     [[r['legacy_factor'], r['wrds_factor'], r['level'], r['difference']]
                       for r in legacy_rows()]), '', '## Evidence methodology', '', METHODOLOGY,
               '## Sources and interpretation', '', REFERENCES,
               '## Generate the private evidence report', '',

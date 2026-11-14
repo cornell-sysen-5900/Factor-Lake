@@ -9,7 +9,7 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 from app.streamlit_config import FACTOR_METADATA, WRDS_FACTOR_METADATA
-from app.wrds_factor_review import REASONS, factor_rows, legacy_rows, matches_for
+from app.wrds_factor_review import REASONS, factor_rows, legacy_rows, replaces
 from scripts.wrds_factor_report import main, render_report
 from src.wrds_data import PANEL_FILE, RETURNS_FILE
 from src.wrds_factor_evidence import monthly_spreads
@@ -34,14 +34,22 @@ def test_catalog_covers_every_wrds_and_legacy_factor_once():
     assert all(r['reason'] and r['default_direction'] in ('Higher', 'Lower') for r in factor_rows())
 
 
-def test_related_is_never_misrepresented_as_a_definition_match():
-    assert [m.column for m in matches_for('f_roa')] == ['ROA']
-    assert not matches_for('mom_12_1')             # skip-month momentum is not 12-month momentum
-    assert not matches_for('mom_12m')             # CRSP total returns vs Legacy price returns
-    assert not matches_for('f_book_to_price')     # inverse P/B and unspecified B/P price date
-    assert not matches_for('f_forward_ep')        # FY1 is not next fiscal year
-    assert not matches_for('f_forward_ep_fy2')    # Legacy 3-analyst coverage is not guaranteed
-    assert all(r['wrds_match'] == 'none' for r in legacy_rows() if r['status'] == 'related')
+def test_every_legacy_factor_has_one_replacement_with_a_level_and_one_line_difference():
+    rows = {r['legacy_factor']: r for r in legacy_rows()}
+    assert set(rows) == set(FACTOR_METADATA)
+    assert all(r['level'] in ('Same', 'Similar') and r['difference'] and '\n' not in r['difference']
+               for r in rows.values())
+    assert {n for n, r in rows.items() if r['level'] == 'Same'} == {
+        'ROA %', '1-Yr Asset Growth %', '1-Yr CapEX Growth %'}
+    # Reciprocal: the direction flips
+    pb = rows['Price to Book Using 9/30 Data']
+    assert (pb['wrds_factor'], pb['level'], pb['legacy_default'], pb['wrds_default']) == (
+        'Book/Price', 'Similar', 'Lower', 'Higher')
+    mo = rows['1-Mo Momentum %']
+    assert (mo['wrds_factor'], mo['level']) == ('1-Month Return (Reversal)', 'Similar')
+    assert 'Legacy defaults Higher, WRDS Lower' in mo['difference']
+    assert [n for n, _ in replaces('f_roa')] == ['ROA using 9/30 Data', 'ROA %']
+    assert not replaces('mom_12_1')               # skip-month momentum replaces no Legacy factor
 
 
 def test_picker_highlights_matches_and_preserves_user_direction(monkeypatch):
