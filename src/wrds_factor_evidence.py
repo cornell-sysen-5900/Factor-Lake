@@ -15,7 +15,9 @@ from .wrds_engine import eligible_universe
 # The default-direction rule. These are the only copies of its parameters.
 START_YEAR, END_YEAR = 2002, 2026
 CONSISTENT_SHARE = 0.70   # a direction that wins at least this share of calendar years is the default
-CONSISTENT, THEORY = 'consistent', 'theory'   # otherwise the theory default stands
+MAJORITY_SHARE = 0.50     # otherwise the theory default stands, labelled by whether it won this share
+# Basis of a default: the data, the theory with mixed data, or the theory although it lost more years
+CONSISTENT, THEORY, THEORY_LOST = 'consistent', 'theory', 'theory_lost'
 
 
 def monthly_spreads(panel, returns, directions, *, start_year=START_YEAR, end_year=END_YEAR, tail_pct=10.0):
@@ -115,18 +117,26 @@ def monthly_spreads(panel, returns, directions, *, start_year=START_YEAR, end_ye
     return summaries, monthly_rows
 
 
-def choose_default(summary, higher):
-    """(higher_is_better, CONSISTENT | THEORY) from a summary computed with the theory default
-    `higher`, or None without data.
+def choose_default(summary, meta):
+    """(higher_is_better, CONSISTENT | THEORY | THEORY_LOST) for one factor, or None without data.
+
+    summary: this module's summary, computed with the factor's current default
+    meta['higher_is_better']. The theory default is read from meta['theory_higher_is_better'],
+    which a refresh never changes, so the fallback survives a default flipped by the data.
 
     1. A direction that wins (positive summed spread) in at least CONSISTENT_SHARE of the calendar
        years is the default: "consistent".
-    2. Otherwise the theory default stands: "theory".
+    2. Otherwise the theory default stands: "theory" if it won at least MAJORITY_SHARE of the
+       years, "theory_lost" if it won fewer.
     """
     if summary['annualized_spread'] is None or not summary['years']:
         return None
-    if summary['positive_years'] / summary['years'] >= CONSISTENT_SHARE:
-        return higher, CONSISTENT
-    if summary['negative_years'] / summary['years'] >= CONSISTENT_SHARE:
-        return not higher, CONSISTENT
-    return higher, THEORY
+    theory = meta['theory_higher_is_better']
+    same = theory == meta['higher_is_better']
+    theory_wins = summary['positive_years' if same else 'negative_years'] / summary['years']
+    other_wins = summary['negative_years' if same else 'positive_years'] / summary['years']
+    if theory_wins >= CONSISTENT_SHARE:
+        return theory, CONSISTENT
+    if other_wins >= CONSISTENT_SHARE:
+        return not theory, CONSISTENT
+    return theory, THEORY if theory_wins >= MAJORITY_SHARE else THEORY_LOST

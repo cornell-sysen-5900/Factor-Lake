@@ -13,7 +13,7 @@ from app.streamlit_config import FACTOR_METADATA, WRDS_FACTOR_METADATA
 from app.wrds_factor_review import REASONS, factor_rows, legacy_rows, replaces
 from scripts.wrds_factor_report import main, render_report
 from src.wrds_data import PANEL_FILE, RETURNS_FILE
-from src.wrds_factor_evidence import CONSISTENT, THEORY, choose_default, monthly_spreads
+from src.wrds_factor_evidence import CONSISTENT, THEORY, THEORY_LOST, choose_default, monthly_spreads
 from src.wrds_factors import WRDS_FACTOR_COLUMNS
 from tests.unit.test_backtest_lambda import APP_DIR
 from tests.unit.test_wrds_mode_switch import LEGACY_DEFAULT_SETTINGS
@@ -53,9 +53,12 @@ def test_every_legacy_factor_has_one_replacement_with_a_level_and_one_line_diffe
     assert (mo['legacy_default'], mo['wrds_default']) == ('Higher', 'Lower')
     # Data mixed: no flip from the theory defaults. Consistent ones agree with theory in-sample.
     basis = {m['column']: m['default_basis'] for m in WRDS_FACTOR_METADATA.values()}
-    assert set(basis.values()) == {CONSISTENT, THEORY}
+    assert set(basis.values()) == {CONSISTENT, THEORY, THEORY_LOST}
     assert {c for c, b in basis.items() if b == CONSISTENT} == {
         'f_fcf_yield', 'f_sales_to_ev', 'f_forward_sales_to_ev', 'f_net_share_issuance', 'f_eps_dispersion'}
+    assert {c for c, b in basis.items() if b == THEORY_LOST} == {
+        'f_dividend_yield', 'f_sales_growth_1yr', 'beta_252d', 'beta_60m', 'f_ltg'}
+    assert all(m['higher_is_better'] == m['theory_higher_is_better'] for m in WRDS_FACTOR_METADATA.values())
     assert [n for n, _ in replaces('f_roa')] == ['ROA using 9/30 Data', 'ROA %']
     assert not replaces('mom_12_1')               # skip-month momentum replaces no Legacy factor
 
@@ -128,17 +131,37 @@ def _summary(positive, negative, years):
     return {'annualized_spread': 0.01, 'positive_years': positive, 'negative_years': negative, 'years': years}
 
 
+def _meta(theory, current=None):
+    return {'theory_higher_is_better': theory, 'higher_is_better': theory if current is None else current}
+
+
 @pytest.mark.parametrize('summary,higher,expected', [
     (_summary(7, 3, 10), True, (True, CONSISTENT)),     # exactly 70% of years: consistent
     (_summary(7, 3, 10), False, (False, CONSISTENT)),
     (_summary(3, 7, 10), True, (False, CONSISTENT)),    # the other direction wins 70%: flip
     (_summary(6, 4, 10), True, (True, THEORY)),         # below 70%: the theory default stands
-    (_summary(4, 6, 10), False, (False, THEORY)),
-    (_summary(5, 4, 10), True, (True, THEORY)),         # a zero-spread year counts for neither side
+    (_summary(5, 5, 10), False, (False, THEORY)),       # exactly half: still "data mixed"
+    (_summary(4, 6, 10), True, (True, THEORY_LOST)),    # under half: it stands, labelled as such
+    (_summary(4, 5, 10), True, (True, THEORY_LOST)),    # a zero-spread year counts for neither side
 ])
 def test_default_rule(summary, higher, expected):
-    assert choose_default(summary, higher) == expected
-    assert choose_default(dict(summary, annualized_spread=None), higher) is None
+    assert choose_default(summary, _meta(higher)) == expected
+    assert choose_default(dict(summary, annualized_spread=None), _meta(higher)) is None
+
+
+def test_rule_falls_back_to_the_stored_theory_default_not_the_current_one():
+    # A refresh flipped this factor to Lower; its theory default is still Higher. The summary is
+    # oriented by the current default, so Lower won 6 of 10 years and Higher won 4.
+    flipped = _meta(True, current=False)
+    assert choose_default(_summary(6, 4, 10), flipped) == (True, THEORY_LOST)
+    # Higher wins 6 of 10 years: mixed data, back to the theory default Higher
+    assert choose_default(_summary(4, 6, 10), flipped) == (True, THEORY)
+    # Lower still wins 7 of 10: the data keeps it Lower
+    assert choose_default(_summary(7, 3, 10), flipped) == (False, CONSISTENT)
+
+
+def test_every_wrds_factor_stores_its_theory_default():
+    assert all(type(m['theory_higher_is_better']) is bool for m in WRDS_FACTOR_METADATA.values())
 
 
 def test_saved_strategy_keeps_its_direction_when_the_default_differs():

@@ -27,6 +27,7 @@ from src.wrds_data import PANEL_FILE, RETURNS_FILE, wrds_dir  # noqa: E402
 from src.wrds_factor_evidence import (  # noqa: E402
     CONSISTENT_SHARE,
     END_YEAR,
+    MAJORITY_SHARE,
     START_YEAR,
     choose_default,
     monthly_spreads,
@@ -46,7 +47,8 @@ per year; it is NOT a difference of CAGRs and is NOT a compounded trading strate
 Years default wins counts calendar return years whose summed monthly spread is above zero; partial first and
 last years count as years.
 Default rule: a direction that wins in at least {CONSISTENT_SHARE:.0%} of years is the default (consistent);
-otherwise the theory default stands (theory). The script reports the rule; it never edits defaults.
+otherwise the theory default stands: "theory" if it won at least {MAJORITY_SHARE:.0%} of years, "theory_lost" if
+fewer. The theory default is theory_higher_is_better in app/streamlit_config.py. The script never edits defaults.
 Each leg has $1 notional (gross exposure $2); borrowing fees, financing, transaction costs and taxes are excluded.
 Missing individual returns retain their weight and are filled with 0% as in the app, with a count and coverage flag.
 Months with fewer than two finite signals, a constant signal, or no next-month return-file coverage are skipped
@@ -107,7 +109,7 @@ def render_report(summaries=None, *, source='No data loaded', start_year=START_Y
             years = ('n/a' if share is None else
                      f"{evidence['positive_years']}/{evidence['years']} ({100 * share:.0f}%)")
             higher = row['default_direction'] == 'Higher'
-            chosen = choose_default(evidence, higher)
+            chosen = choose_default(evidence, WRDS_FACTOR_METADATA[row['factor']])
             rule = 'n/a' if chosen is None else f"{'Higher' if chosen[0] else 'Lower'} ({chosen[1]})"
             coverage = (f"{evidence['first_return_month'] or 'n/a'} to {evidence['last_return_month'] or 'n/a'}; "
                         f"{evidence['months']} months; {evidence['skipped_months']} skipped; "
@@ -153,11 +155,11 @@ def render_catalog():
         '## Default directions', '',
         f'Each default is checked against the factor\'s long-short spread in each calendar year, '
         f'{START_YEAR}–{END_YEAR}. '
-        f'A direction that wins in at least {CONSISTENT_SHARE:.0%} of years is the default (Consistent); otherwise '
-        'the theory default stands (Theory default; data mixed). '
+        f'A direction that wins in at least {CONSISTENT_SHARE:.0%} of years is the default; otherwise the theory '
+        f'default stands, and the basis says whether it won at least {MAJORITY_SHARE:.0%} of years. '
         'Saved analyses and strategy files keep the directions they were saved with.', '',
         _table(['WRDS factor', 'Default', 'Basis', 'Reason'],
-               [[r['factor'], r['default_direction'], r['basis'].split(':')[0].split(';')[0], r['reason']]
+               [[r['factor'], r['default_direction'], r['basis'], r['reason']]
                 for r in factor_rows()]), '',
         '## Private report', '',
         'The spreads stay private. From the repository root:', '',

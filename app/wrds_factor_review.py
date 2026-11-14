@@ -10,7 +10,7 @@ a one-line reason for each.
 from dataclasses import dataclass
 
 from app.streamlit_config import FACTOR_METADATA, WRDS_FACTOR_METADATA
-from src.wrds_factor_evidence import CONSISTENT, START_YEAR, THEORY
+from src.wrds_factor_evidence import CONSISTENT, START_YEAR, THEORY, THEORY_LOST
 
 SAME, SIMILAR = 'Same', 'Similar'
 
@@ -18,6 +18,7 @@ SAME, SIMILAR = 'Same', 'Similar'
 BASIS_LABELS = {
     CONSISTENT: f'Consistent: favored in most years since {START_YEAR}',
     THEORY: 'Theory default; data mixed',
+    THEORY_LOST: f'Theory default; the other direction won more years since {START_YEAR}',
 }
 
 
