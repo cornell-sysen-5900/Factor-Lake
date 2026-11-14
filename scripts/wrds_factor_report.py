@@ -1,4 +1,4 @@
-"""Build the WRDS crosswalk/default report, optionally with private empirical evidence.
+"""Build the public WRDS factor review page, or the private report with each factor's spreads.
 
 uv run python scripts/wrds_factor_report.py --catalog-only --output DOCS/WRDS_FACTOR_REVIEW.md
 uv run python scripts/wrds_factor_report.py --s3 --output ../private_reports/wrds_factor_review.md
@@ -137,6 +137,39 @@ def render_report(summaries=None, *, source='No data loaded', start_year=START_Y
     return '\n'.join(lines)
 
 
+PRIVATE_COMMAND = ('uv run python scripts/wrds_factor_report.py --data-dir "/path/to/processed/final" '
+                   '--output ../private_reports/wrds_factor_review.md')
+
+
+def render_catalog():
+    """The public DOCS/WRDS_FACTOR_REVIEW.md: definitions, defaults and reasons, no statistics."""
+    return '\n'.join([
+        '# WRDS factor review', '',
+        'Which WRDS factor replaces each Legacy factor, and why each WRDS factor defaults to Higher or Lower. '
+        'In the factor picker, tinted cards with a link icon replace a Legacy factor.', '',
+        '## Legacy to WRDS', '',
+        '**Same**: same definition (units may differ, which does not change the ranking). '
+        '**Similar**: same idea, with the difference listed.', '',
+        _table(['Legacy factor', 'WRDS replacement', 'Level', 'Default (Legacy → WRDS)', 'Difference'],
+               [[r['legacy_factor'], r['wrds_factor'], r['level'], f"{r['legacy_default']} → {r['wrds_default']}",
+                 r['difference']] for r in legacy_rows()]), '',
+        '## Default directions', '',
+        f'Each default comes from the factor\'s long-short spread in each calendar year, {START_YEAR}–{END_YEAR}. '
+        f'A direction that wins in at least {CONSISTENT_SHARE:.0%} of years is the default (Consistent); otherwise '
+        f'the default follows the spread over the last {RECENT_MONTHS} months (Mixed history). '
+        'Saved analyses and strategy files keep the directions they were saved with.', '',
+        _table(['WRDS factor', 'Default', 'Basis', 'Reason'],
+               [[r['factor'], r['default_direction'], r['basis'].split(':')[0], r['reason']]
+                for r in factor_rows()]), '',
+        '## Private report', '',
+        'The spreads stay private. From the repository root:', '',
+        '```bash', PRIVATE_COMMAND, '```', '',
+        'Use `--s3` instead of `--data-dir` to read the data from S3. The output must be outside this repository. '
+        'It lists each factor\'s spread, the share of years its default wins and the recent spread, and flags '
+        'defaults that differ from the rule. `--catalog-only --output DOCS/WRDS_FACTOR_REVIEW.md` regenerates '
+        'this page.', ''])
+
+
 def _load_aws_settings():
     # Standard AWS environment/profile wins. Also support the app's existing local secrets file.
     from dotenv import load_dotenv
@@ -162,8 +195,8 @@ def main(argv=None):
     mode.add_argument('--data-dir', type=Path)
     mode.add_argument('--s3', action='store_true')
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--start-year', type=int, default=2002)
-    parser.add_argument('--end-year', type=int, default=2026)
+    parser.add_argument('--start-year', type=int, default=START_YEAR)
+    parser.add_argument('--end-year', type=int, default=END_YEAR)
     parser.add_argument('--tail-pct', type=float, default=10.0)
     args = parser.parse_args(argv)
     output = args.output.resolve()
@@ -197,8 +230,9 @@ def main(argv=None):
         summaries, monthly = monthly_spreads(*frames, directions, start_year=args.start_year,
                                             end_year=args.end_year, tail_pct=args.tail_pct)
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(render_report(summaries, source=source, start_year=args.start_year,
-                                    end_year=args.end_year, tail_pct=args.tail_pct), encoding='utf-8')
+    text = render_catalog() if args.catalog_only else render_report(
+        summaries, source=source, start_year=args.start_year, end_year=args.end_year, tail_pct=args.tail_pct)
+    output.write_text(text, encoding='utf-8')
     if summaries is not None:
         payload = {'generated_at': datetime.now(timezone.utc).isoformat(), 'source': source,
                    'inputs': provenance, 'requested_years': [args.start_year, args.end_year],

@@ -229,14 +229,19 @@ def test_report_flags_disagreement_without_changing_defaults():
     report = render_report(evidence, source='Synthetic test data')
     assert 'team review' in report and '-108.000 pp/year' in report
     assert WRDS_FACTOR_METADATA == defaults
-    assert 'Empirical spreads pending' in render_report()
     assert all(f'`{column}`' in render_report() for column in WRDS_FACTOR_COLUMNS)
 
 
-def test_catalog_cli_and_real_data_output_guard(tmp_path):
+def test_catalog_cli_writes_the_public_doc_and_guards_real_data_output(tmp_path):
     output = tmp_path / 'catalog.md'
     assert main(['--catalog-only', '--output', str(output)]) == 0
-    assert 'Empirical spreads pending' in output.read_text(encoding='utf-8')
+    text = output.read_text(encoding='utf-8')
+    # DOCS/WRDS_FACTOR_REVIEW.md is this page: regenerate it when the mapping or defaults change
+    assert text == (APP_DIR.parent / 'DOCS' / 'WRDS_FACTOR_REVIEW.md').read_text(encoding='utf-8')
+    assert all(f'| {name} |' in text for name in FACTOR_METADATA)
+    assert all(f'| {name} | {"Higher" if m["higher_is_better"] else "Lower"} |' in text
+               for name, m in WRDS_FACTOR_METADATA.items())
+    assert 'pending' not in text and 'pp/year' not in text            # no statistics in public docs
     with pytest.raises(SystemExit):
         main(['--s3', '--output', 'DOCS/never_write_licensed_results.md'])
 
