@@ -175,7 +175,7 @@ def test_report_flags_disagreement_without_changing_defaults():
 def test_catalog_cli_and_real_data_output_guard(tmp_path):
     output = tmp_path / 'catalog.md'
     assert main(['--catalog-only', '--output', str(output)]) == 0
-    assert 'Empirical spreads pending' in output.read_text()
+    assert 'Empirical spreads pending' in output.read_text(encoding='utf-8')
     with pytest.raises(SystemExit):
         main(['--s3', '--output', 'DOCS/never_write_licensed_results.md'])
 
@@ -190,7 +190,7 @@ def test_private_report_cli_reads_parquet_and_writes_traceable_evidence(tmp_path
                        for name in (PANEL_FILE, RETURNS_FILE)}
     output = tmp_path / 'review.md'
     assert main(['--data-dir', str(tmp_path), '--output', str(output)]) == 0
-    payload = json.loads(output.with_suffix('.json').read_text())
+    payload = json.loads(output.with_suffix('.json').read_text(encoding='utf-8'))
     assert set(payload['factors']) == set(WRDS_FACTOR_COLUMNS)
     assert payload['factors']['f_roa']['annualized_spread'] == pytest.approx(1.08)
     assert payload['factors']['f_asset_growth_1yr']['annualized_spread'] == pytest.approx(-1.08)
@@ -199,5 +199,5 @@ def test_private_report_cli_reads_parquet_and_writes_traceable_evidence(tmp_path
         assert payload['inputs'][name]['sha256'] == digest
         assert hashlib.sha256((tmp_path / name).read_bytes()).hexdigest() == digest
     assert len(pd.read_csv(output.with_suffix('.csv'))) == len(WRDS_FACTOR_COLUMNS)
-    assert 'pending data' not in output.read_text()
+    assert 'pending data' not in output.read_text(encoding='utf-8')
     assert payload['requested_years'] == [2002, 2026]
