@@ -231,26 +231,26 @@ def test_wrds_factor_list_grouped_with_names_tooltips_and_defaults(lambda_at):
     add_keys = [b.key for b in at.button if (b.key or '').startswith('factor_add_')]
     assert add_keys and all(k.startswith('factor_add_w_') for k in add_keys)   # no Legacy factors
 
-    _add(at, WRDS_FACTOR_METADATA, 'Book/Price', '1-Month Return (Reversal)', 'Market Cap')
+    names = ('Book/Price', '1-Month Return (Reversal)', 'Net Share Issuance')
+    _add(at, WRDS_FACTOR_METADATA, *names)
     _assert_clean(at)
-    directions = {n: at.button_group(key=f"factor_dir_{WRDS_FACTOR_METADATA[n]['key']}").value
-                  for n in ('Book/Price', '1-Month Return (Reversal)', 'Market Cap')}
-    assert directions == {'Book/Price': HIGHER, '1-Month Return (Reversal)': LOWER, 'Market Cap': LOWER}
+    directions = {n: at.button_group(key=f"factor_dir_{WRDS_FACTOR_METADATA[n]['key']}").value for n in names}
+    assert directions == {'Book/Price': HIGHER, '1-Month Return (Reversal)': HIGHER, 'Net Share Issuance': LOWER}
 
 
 def test_wrds_run_sends_a_wrds_job_built_from_the_sidebar(lambda_at):
     at = lambda_at
     _switch(at, 'WRDS')
     assert _button(at, 'Run Portfolio Analysis').disabled          # no factor yet
-    _add(at, WRDS_FACTOR_METADATA, 'Book/Price', 'Market Cap')
+    _add(at, WRDS_FACTOR_METADATA, 'Book/Price', 'Net Share Issuance')
     _button(at, 'Run Portfolio Analysis').click().run()
 
     (job,) = at.fake_lambda.jobs
     assert job['kind'] == 'backtest' and job['data_mode'] == 'wrds'
     assert (job['frequency'], job['start_year'], job['end_year'], job['top_pct']) == ('quarterly', 2002, 2026, 10.0)
-    assert job['factors'] == ['f_book_to_price', 'mkt_cap_musd']
-    assert job['factor_directions'] == {'f_book_to_price': 'top', 'mkt_cap_musd': 'bottom'}
-    assert job['factor_labels'] == {'f_book_to_price': 'Book/Price', 'mkt_cap_musd': 'Market Cap'}
+    assert job['factors'] == ['f_book_to_price', 'f_net_share_issuance']
+    assert job['factor_directions'] == {'f_book_to_price': 'top', 'f_net_share_issuance': 'bottom'}
+    assert job['factor_labels'] == {'f_book_to_price': 'Book/Price', 'f_net_share_issuance': 'Net Share Issuance'}
     # This fake refuses WRDS jobs: the error is shown and nothing is saved
     assert any('WRDS jobs are not run by this fake' in e.value for e in at.error)
     assert at.session_state['saved_runs'] == []

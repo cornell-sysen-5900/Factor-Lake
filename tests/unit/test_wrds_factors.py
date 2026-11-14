@@ -3,6 +3,7 @@ Tests for the WRDS factor list: the app's WRDS_FACTOR_METADATA (names, groups,
 default directions, tooltips) and the Lambda's allowlist (src/wrds_factors.py).
 """
 from app.streamlit_config import FACTOR_METADATA, WRDS_FACTOR_GROUPS, WRDS_FACTOR_METADATA, WRDS_FACTOR_OPTIONS
+from src.wrds_factor_evidence import CONSISTENT, MIXED
 from src.wrds_factors import UNCLASSIFIED_SECTOR, WRDS_FACTOR_COLUMNS, WRDS_SECTORS
 
 # Columns about the month after t: never a factor (look-ahead)
@@ -34,9 +35,12 @@ def test_every_lower_default_says_why_and_higher_ones_do_not_claim_lower():
 
 
 def test_decided_defaults_and_names():
+    # Defaults follow the data rule (src/wrds_factor_evidence.choose_default), 2002-2026
     lower = {n for n, m in WRDS_FACTOR_METADATA.items() if not m['higher_is_better']}
-    assert {'1-Month Return (Reversal)', 'Long-Term Growth Forecast', 'Market Cap',
-            'Beta (1-Yr Daily)', 'Beta (5-Yr Monthly)'} <= lower
+    assert {'Net Share Issuance', 'Analyst Disagreement', 'R&D/Sales', 'Analyst EPS Surprise'} <= lower
+    assert not {'1-Month Return (Reversal)', 'Long-Term Growth Forecast', 'Market Cap', 'Accruals/Assets',
+                'Beta (1-Yr Daily)', 'Beta (5-Yr Monthly)'} & lower
+    assert all(m['default_basis'] in (CONSISTENT, MIXED) for m in WRDS_FACTOR_METADATA.values())
     assert WRDS_FACTOR_METADATA['1-Month Return (Reversal)']['column'] == 'mom_1m'
 
 

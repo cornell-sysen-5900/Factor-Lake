@@ -1,8 +1,9 @@
-"""Read-only single-factor long/short diagnostics; never chooses or changes defaults.
+"""Read-only single-factor long/short diagnostics and the rule for WRDS default directions.
 
 At month end t, sort eligible stocks by the known factor, form disjoint equal-weight
 upper/lower tails, and observe their CRSP return in t+1 (including delistings).
-This is a raw-factor diagnostic, not an app multi-factor strategy or a fitted signal.
+This is a raw-factor diagnostic, not an app multi-factor strategy. It never edits the
+app: choose_default() recommends a direction, and the team sets it in streamlit_config.
 """
 import math
 
@@ -11,8 +12,14 @@ import pandas as pd
 
 from .wrds_engine import eligible_universe
 
+# The default-direction rule. These are the only copies of its parameters.
+START_YEAR, END_YEAR = 2002, 2026
+CONSISTENT_SHARE = 0.70   # a direction that wins at least this share of calendar years is the default
+RECENT_MONTHS = 60        # otherwise, the direction whose spread is positive over the latest months
+CONSISTENT, MIXED = 'consistent', 'mixed'
 
-def monthly_spreads(panel, returns, directions, *, start_year=2002, end_year=2026, tail_pct=10.0):
+
+def monthly_spreads(panel, returns, directions, *, start_year=START_YEAR, end_year=END_YEAR, tail_pct=10.0):
     """Return diagnostics and monthly series, without mutating either input.
 
     directions: {allowlisted factor column: True for Higher, False for Lower}.
@@ -87,13 +94,43 @@ def monthly_spreads(panel, returns, directions, *, start_year=2002, end_year=202
         annualized = mean * 12 if mean is not None else None
         status = ('insufficient data' if mean is None else 'team review' if mean < 0
                   else 'agrees in sample' if mean > 0 else 'neutral in sample')
+        # Calendar years of realized returns (partial first/last years included), each the
+        # sum of its monthly spreads, consistent with the arithmetic annualized spread.
+        yearly = {}
+        for row in rows:
+            year = row['return_month'][:4]
+            yearly[year] = yearly.get(year, 0.0) + row['spread']
+        positive_years = sum(value > 0 for value in yearly.values())
+        recent = [row['spread'] for row in rows[-RECENT_MONTHS:]]
         summaries[column] = {
             'months': observed, 'skipped_months': skipped, 'missing_returns': missing,
             'first_return_month': rows[0]['return_month'] if rows else None,
             'last_return_month': rows[-1]['return_month'] if rows else None,
             'mean_monthly_spread': mean, 'annualized_spread': annualized,
+            'years': len(yearly), 'positive_years': positive_years,
+            'negative_years': sum(value < 0 for value in yearly.values()),
+            'share_years_positive': positive_years / len(yearly) if yearly and mean is not None else None,
+            'recent_months': len(recent),
+            'recent_spread': float(np.mean(recent)) * 12 if recent and mean is not None else None,
             'evidence_status': status,
             'coverage_status': ('review coverage' if not observed or missing or skipped
                                 else 'complete for available panel months'),
         }
     return summaries, monthly_rows
+
+
+def choose_default(summary, higher):
+    """(higher_is_better, CONSISTENT | MIXED) from a summary computed with direction `higher`, or None.
+
+    1. A direction that wins (positive summed spread) in at least CONSISTENT_SHARE of the calendar
+       years is the default: "consistent".
+    2. Otherwise the direction with a positive spread over the latest RECENT_MONTHS: "mixed".
+       A recent spread of exactly zero keeps the current direction.
+    """
+    if summary['annualized_spread'] is None or not summary['years']:
+        return None
+    if summary['positive_years'] / summary['years'] >= CONSISTENT_SHARE:
+        return higher, CONSISTENT
+    if summary['negative_years'] / summary['years'] >= CONSISTENT_SHARE:
+        return not higher, CONSISTENT
+    return (higher if summary['recent_spread'] >= 0 else not higher), MIXED

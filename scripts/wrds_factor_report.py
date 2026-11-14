@@ -24,25 +24,36 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from app.streamlit_config import WRDS_FACTOR_METADATA  # noqa: E402
 from app.wrds_factor_review import factor_rows, legacy_rows  # noqa: E402
 from src.wrds_data import PANEL_FILE, RETURNS_FILE, wrds_dir  # noqa: E402
-from src.wrds_factor_evidence import monthly_spreads  # noqa: E402
+from src.wrds_factor_evidence import (  # noqa: E402
+    CONSISTENT_SHARE,
+    END_YEAR,
+    RECENT_MONTHS,
+    START_YEAR,
+    choose_default,
+    monthly_spreads,
+)
 from src.wrds_factors import WRDS_FACTOR_COLUMNS  # noqa: E402
 
 PANEL_COLUMNS = tuple(dict.fromkeys(('date', 'permno', 'prc', 'mkt_cap_musd') + WRDS_FACTOR_COLUMNS))
 RETURNS_COLUMNS = ('month_end', 'permno', 'ret_m')
 
-METHODOLOGY = '''Monthly equal-weight tails, 10% by default, with at least one stock per leg and no overlap.
+METHODOLOGY = f'''Monthly equal-weight tails, 10% by default, with at least one stock per leg and no overlap.
 Sort finite raw factor values at month end t; use returns in the next calendar month (t+1), including
 CRSP delisting returns. Break ties by PERMNO. Use the existing buyability filter (positive price and market cap),
 without a sector or fossil-fuel restriction. No forward-return column is used in selection.
 For Higher defaults: long high, short low. For Lower defaults: long low, short high.
 Reported spread is 12 times the arithmetic mean of monthly long-minus-short returns, in percentage points
 per year; it is NOT a difference of CAGRs and is NOT a compounded trading strategy.
+Years default wins counts calendar return years whose summed monthly spread is above zero; partial first and
+last years count as years. The recent spread annualizes the latest {RECENT_MONTHS} monthly spreads.
+Default rule: a direction that wins in at least {CONSISTENT_SHARE:.0%} of years is the default (consistent);
+otherwise the direction with a positive recent spread (mixed). The script reports the rule; it never edits defaults.
 Each leg has $1 notional (gross exposure $2); borrowing fees, financing, transaction costs and taxes are excluded.
 Missing individual returns retain their weight and are filled with 0% as in the app, with a count and coverage flag.
 Months with fewer than two finite signals, a constant signal, or no next-month return-file coverage are skipped
 and counted. Actual factor coverage is shown; partial 2002 and 2026 years are not presented as full years.
 This diagnostic uses raw single-factor ranks, not the app's winsorized multi-factor scoring.
-Negative default-oriented spreads are marked for team review; no default is flipped automatically.
+Negative default-oriented spreads are marked for team review, and defaults that differ from the rule are flagged.
 Positive spreads are descriptive evidence, not proof of significance or out-of-sample performance.
 '''
 REFERENCES = '''- Internal definitions: `app/streamlit_config.py`, `src/factor_registry.py`,
@@ -70,7 +81,8 @@ def _table(headers, rows):
                      ['| ' + ' | '.join(_cell(value) for value in row) + ' |' for row in rows])
 
 
-def render_report(summaries=None, *, source='No data loaded', start_year=2002, end_year=2026, tail_pct=10):
+def render_report(summaries=None, *, source='No data loaded', start_year=START_YEAR, end_year=END_YEAR,
+                  tail_pct=10):
     lines = ['# WRDS factor matching and default directions', '',
              '## Review status', '',
              ('Empirical evidence computed from the source identified below. Team review is still required for '
@@ -85,20 +97,32 @@ def render_report(summaries=None, *, source='No data loaded', start_year=2002, e
     rows = []
     for row in factor_rows():
         evidence = (summaries or {}).get(row['column'])
-        spread = 'pending'
+        spread = recent = rule = 'pending'
+        years = 'pending'
         coverage = 'not computed'
         status = 'pending data'
         if evidence is not None:
             value = evidence['annualized_spread']
             spread = 'n/a' if value is None else f'{100 * value:+.3f} pp/year'
+            share = evidence['share_years_positive']
+            years = ('n/a' if share is None else
+                     f"{evidence['positive_years']}/{evidence['years']} ({100 * share:.0f}%)")
+            recent = ('n/a' if evidence['recent_spread'] is None else
+                      f"{100 * evidence['recent_spread']:+.3f} pp/year ({evidence['recent_months']} months)")
+            higher = row['default_direction'] == 'Higher'
+            chosen = choose_default(evidence, higher)
+            rule = 'n/a' if chosen is None else f"{'Higher' if chosen[0] else 'Lower'} ({chosen[1]})"
             coverage = (f"{evidence['first_return_month'] or 'n/a'} to {evidence['last_return_month'] or 'n/a'}; "
                         f"{evidence['months']} months; {evidence['skipped_months']} skipped; "
                         f"{evidence['missing_returns']} missing stock returns")
             status = f"{evidence['evidence_status']}; {evidence['coverage_status']}"
+            if chosen is not None and chosen[0] != higher:
+                status += '; default differs from rule'
         rows.append([row['factor'], f"`{row['column']}`", row['replaces'], row['default_direction'],
-                     row['reason'], spread, coverage, status])
+                     row['reason'], spread, years, recent, rule, coverage, status])
     lines += [_table(['WRDS factor', 'Column', 'Replaces Legacy', 'Default', 'Reason', 'Long–short spread',
-                      'Coverage', 'Review'], rows), '', '## Every Legacy factor', '',
+                      'Years default wins', 'Recent spread', 'Rule', 'Coverage', 'Review'], rows), '',
+              '## Every Legacy factor', '',
               _table(['Legacy factor', 'WRDS replacement', 'Level', 'Difference'],
                      [[r['legacy_factor'], r['wrds_factor'], r['level'], r['difference']]
                       for r in legacy_rows()]), '', '## Evidence methodology', '', METHODOLOGY,

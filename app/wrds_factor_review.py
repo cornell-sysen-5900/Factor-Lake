@@ -2,14 +2,22 @@
 
 Every Legacy factor maps to its closest WRDS factor: "Same" when the documented definition
 agrees (units may differ, which does not change ranks), "Similar" when the idea is the same
-but the lookback, return convention or orientation differs. Mappings are definition-based,
-not fitted to data; WRDS_FACTOR_METADATA remains the source of default directions.
+but the lookback, return convention or orientation differs. Mappings are definition-based.
+Default directions (WRDS_FACTOR_METADATA) follow the data rule in
+src/wrds_factor_evidence.choose_default; REASONS gives a one-line reason for each.
 """
 from dataclasses import dataclass
 
 from app.streamlit_config import FACTOR_METADATA, WRDS_FACTOR_METADATA
+from src.wrds_factor_evidence import CONSISTENT, MIXED, RECENT_MONTHS, START_YEAR
 
 SAME, SIMILAR = 'Same', 'Similar'
+
+# Which branch of the default rule chose a factor's direction (its 'default_basis')
+BASIS_LABELS = {
+    CONSISTENT: f'Consistent: favored in most years since {START_YEAR}',
+    MIXED: f'Mixed history: follows the last {RECENT_MONTHS // 12} years',
+}
 
 
 @dataclass(frozen=True)
@@ -18,7 +26,7 @@ class Replacement:
     wrds_column: str
     level: str
     difference: str
-    flip: str = ''   # why the default direction differs from Legacy's, if it does
+    flip: str = ''   # why the orientation differs from Legacy's, if it does (e.g. a reciprocal)
 
 
 REPLACEMENTS = (
@@ -27,8 +35,7 @@ REPLACEMENTS = (
     Replacement('6-Mo_Momentum', 'mom_6m', SIMILAR,
                 'Legacy uses price returns; WRDS compounds 126 trading days of CRSP total returns.'),
     Replacement('1-Mo_Momentum', 'mom_1m', SIMILAR,
-                'WRDS uses 21 trading days of CRSP total returns; Legacy defaults Higher, WRDS Lower (reversal).',
-                'reversal'),
+                'Legacy uses price returns; WRDS uses 21 trading days of CRSP total returns.'),
     Replacement('Price_to_Book_Using_9-30_Data', 'f_book_to_price', SIMILAR,
                 'Reciprocal, so the direction flips: Lower P/B in Legacy is Higher Book/Price in WRDS.',
                 'reciprocal'),
@@ -52,13 +59,14 @@ REPLACEMENTS = (
                 'Same 12-month capex versus the prior year; WRDS skips prior-year capex below $1M.'),
 )
 
-# Each reason is a theory-based rationale for the existing default, not a promise of
-# outperformance. Mixed or context-dependent cases are explicitly described as conventions.
+# One line on why each default direction makes sense, not a promise of outperformance.
+# Where the data rule chose the side theory does not, the reason names the theory's side.
 REASONS = {
     'mom_12_1': 'Intermediate-horizon return continuation; skipping the latest month reduces reversal exposure.',
     'mom_12m': 'Intermediate-horizon return continuation; including the latest month can add reversal exposure.',
     'mom_6m': 'Intermediate-horizon return continuation motivates favoring higher six-month returns.',
-    'mom_1m': 'Short-term reversal motivates favoring last month\'s losers; this is not a momentum default.',
+    'mom_1m': 'Short-term continuation: recent winners have kept rising; the classic one-month reversal '
+        'would favor Lower.',
     'f_book_to_price': 'More book equity per dollar paid provides a value tilt; use Higher for B/P, not Lower for P/B.',
     'f_earnings_to_price': 'More earnings per dollar paid provides a value tilt; E/P is the inverse '
         'orientation of P/E.',
@@ -76,8 +84,8 @@ REASONS = {
     'f_roe': 'Higher income relative to equity indicates profitability; leverage can also raise ROE.',
     'f_roa': 'Higher income relative to assets indicates more productive use of the asset base.',
     'f_gross_profitability': 'Higher gross profit relative to assets is a profitability signal.',
-    'f_accruals_to_assets': 'Lower accruals favor earnings backed by operating cash flow rather than '
-        'accounting accruals.',
+    'f_accruals_to_assets': 'Higher accruals often accompany growing working capital; the classic accrual '
+        'effect, favoring Lower, has faded.',
     'f_leverage': 'Lower debt relative to assets favors balance-sheet safety; the return relation is '
         'context-dependent.',
     'f_current_ratio': 'Higher short-term liquidity supports a safety tilt; very high ratios can imply idle assets.',
@@ -87,21 +95,23 @@ REASONS = {
     'f_sales_growth_1yr': 'Revenue growth supports operating strength; this project convention is valuation-dependent.',
     'f_capex_growth_1yr': 'The investment effect motivates lower investment growth; productive capex '
         'can still add value.',
-    'f_rd_to_sales': 'R&D intensity can proxy intangible investment; this project convention is sector-dependent.',
+    'f_rd_to_sales': 'Lower R&D intensity favors current profits over long-dated intangible bets; '
+        'this is sector-dependent.',
     'vol_close_12m': 'A defensive tilt favors lower realized volatility; it does not guarantee higher raw returns.',
     'vol_close_6m': 'A defensive tilt favors lower medium-horizon realized volatility.',
     'vol_close_3m': 'A defensive tilt favors lower recent realized volatility; shorter estimates are noisier.',
     'vol_gk_1m': 'A defensive tilt favors lower intramonth range volatility; this short-horizon proxy is noisy.',
-    'beta_252d': 'Leverage constraints motivate a low-beta tilt; this unlevered sort does not replicate '
-        'the BAB factor.',
-    'beta_60m': 'Leverage constraints motivate a low-beta tilt; a five-year beta reacts slowly to changing exposures.',
+    'beta_252d': 'Higher beta adds market exposure, which pays in rising markets; leverage-constraint '
+        'theory favors Lower.',
+    'beta_60m': 'Higher beta adds market exposure, which pays in rising markets; a five-year beta reacts slowly.',
     'f_sue': 'Underreaction to positive earnings news motivates favoring larger standardized earnings increases.',
-    'f_analyst_surprise': 'Underreaction to earnings announcements motivates favoring positive consensus surprises.',
+    'f_analyst_surprise': 'Large beats may already be priced in by the time they are observed; underreaction '
+        'theory would favor Higher.',
     'f_eps_revision': 'Upward analyst revisions indicate improving earnings expectations; favor net upward revisions.',
     'f_eps_dispersion': 'Lower disagreement limits optimistic pricing under short-sale constraints; evidence is mixed.',
-    'f_ltg': 'Lower long-term forecasts avoid excessive extrapolation of optimistic growth '
-        'expectations; evidence is mixed.',
-    'mkt_cap_musd': 'A size tilt favors smaller firms; the premium is unstable and trading costs can be higher.',
+    'f_ltg': 'Higher long-term forecasts favor expected growth; the over-extrapolation argument '
+        'would favor Lower.',
+    'mkt_cap_musd': 'Larger firms have led in recent years; the classic size premium for small firms is unstable.',
 }
 
 
@@ -123,19 +133,23 @@ def legacy_names(column: str):
 
 
 def factor_tooltip(name: str) -> str:
-    """Direction flips first, then the description, the Legacy factors replaced, and the default's rationale."""
+    """Direction flips first, then the description, the Legacy factors replaced, the default's
+    reason and, under it, which branch of the data rule chose the default."""
     meta = WRDS_FACTOR_METADATA[name]
     pairs = replaces(meta['column'])
     flips = [f"Legacy {legacy} defaults {_direction(FACTOR_METADATA[legacy])}; "
-             f"this WRDS factor defaults {_direction(meta)} ({r.flip})." for legacy, r in pairs if r.flip]
+             f"this WRDS factor defaults {_direction(meta)}{f' ({r.flip})' if r.flip else ''}."
+             for legacy, r in pairs if FACTOR_METADATA[legacy]['higher_is_better'] != meta['higher_is_better']]
     lines = [f"Replaces Legacy {legacy} ({r.level}): {r.difference}" for legacy, r in pairs]
-    return '\n\n'.join([*flips, meta['tooltip'], *lines, f"Default rationale: {REASONS[meta['column']]}"])
+    return '\n\n'.join([*flips, meta['tooltip'], *lines, f"Default rationale: {REASONS[meta['column']]}",
+                        BASIS_LABELS[meta['default_basis']]])
 
 
 def factor_rows():
     """All WRDS factors, including those that replace no Legacy factor, in picker order."""
     return [{'factor': name, 'column': m['column'], 'replaces': '; '.join(legacy_names(m['column'])) or '—',
-             'default_direction': _direction(m), 'reason': REASONS[m['column']]}
+             'default_direction': _direction(m), 'reason': REASONS[m['column']],
+             'basis': BASIS_LABELS[m['default_basis']]}
             for name, m in WRDS_FACTOR_METADATA.items()]
 
 

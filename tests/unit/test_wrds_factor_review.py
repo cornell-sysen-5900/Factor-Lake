@@ -8,13 +8,15 @@ import pandas as pd
 import pytest
 from streamlit.testing.v1 import AppTest
 
+from app import strategy_config as cfg
 from app.streamlit_config import FACTOR_METADATA, WRDS_FACTOR_METADATA
 from app.wrds_factor_review import REASONS, factor_rows, legacy_rows, replaces
 from scripts.wrds_factor_report import main, render_report
 from src.wrds_data import PANEL_FILE, RETURNS_FILE
-from src.wrds_factor_evidence import monthly_spreads
+from src.wrds_factor_evidence import CONSISTENT, MIXED, choose_default, monthly_spreads
 from src.wrds_factors import WRDS_FACTOR_COLUMNS
 from tests.unit.test_backtest_lambda import APP_DIR
+from tests.unit.test_wrds_mode_switch import LEGACY_DEFAULT_SETTINGS
 
 
 def frames():
@@ -47,7 +49,7 @@ def test_every_legacy_factor_has_one_replacement_with_a_level_and_one_line_diffe
         'Book/Price', 'Similar', 'Lower', 'Higher')
     mo = rows['1-Mo Momentum %']
     assert (mo['wrds_factor'], mo['level']) == ('1-Month Return (Reversal)', 'Similar')
-    assert 'Legacy defaults Higher, WRDS Lower' in mo['difference']
+    assert (mo['legacy_default'], mo['wrds_default']) == ('Higher', 'Higher')   # the data rule chose Higher
     assert [n for n, _ in replaces('f_roa')] == ['ROA using 9/30 Data', 'ROA %']
     assert not replaces('mom_12_1')               # skip-month momentum replaces no Legacy factor
 
@@ -68,11 +70,16 @@ render_factor_selection('wrds')
     assert all(f'.st-key-factor_add_{key} button' in tint for key in replacing)
     assert 'factor_add_w_mom_12_1' not in tint
     assert 'Replaces Legacy ROA % (Same)' in at.button(key='factor_add_w_roa').help
-    # A direction flip leads the tooltip
-    assert at.button(key='factor_add_w_mom_1m').help.startswith(
-        'Legacy 1-Mo Momentum % defaults Higher; this WRDS factor defaults Lower (reversal).')
+    # A direction flip leads the tooltip; no flip, no flip line
+    assert at.button(key='factor_add_w_accruals').help.startswith(
+        'Legacy Accruals/Assets defaults Lower; this WRDS factor defaults Higher.')
     assert at.button(key='factor_add_w_btp').help.startswith(
         'Legacy Price to Book Using 9/30 Data defaults Lower; this WRDS factor defaults Higher (reciprocal).')
+    assert at.button(key='factor_add_w_mom_1m').help.startswith('Return over the past 21 trading days.')
+    # The rule's label sits under the direction reason
+    assert at.button(key='factor_add_w_fcf').help.endswith(
+        f"Default rationale: {REASONS['f_fcf_yield']}\n\nConsistent: favored in most years since 2002")
+    assert at.button(key='factor_add_w_roa').help.endswith('\n\nMixed history: follows the last 5 years')
     assert any(c.value.startswith(':material/link: Tinted cards replace a Legacy factor') for c in at.caption)
     at.button(key='factor_add_w_roa').click().run()
     assert at.session_state['factor_builder_selected']['ROA'] == 'top'
@@ -92,8 +99,62 @@ def test_hand_calculated_forward_returns_and_lower_direction():
     assert top['f_roa']['annualized_spread'] == pytest.approx(12 * .09)
     assert bottom['f_roa']['annualized_spread'] == pytest.approx(-12 * .09)
     assert bottom['f_roa']['evidence_status'] == 'team review'
+    assert (top['f_roa']['positive_years'], top['f_roa']['years'], top['f_roa']['share_years_positive']) == (1, 1, 1)
+    assert bottom['f_roa']['share_years_positive'] == 0
     pd.testing.assert_frame_equal(panel, before_panel)
     pd.testing.assert_frame_equal(returns, before_returns)
+
+
+def test_share_of_years_positive_sums_each_calendar_year():
+    panel, returns = frames()
+    # 2020: +9% in February. 2021: a January signal with reversed February returns, -9%.
+    panel = pd.concat([panel, panel.assign(date=pd.Timestamp('2021-01-29'))])
+    reversed_feb = returns.assign(month_end=pd.Timestamp('2021-02-26'), ret_m=returns['ret_m'][::-1].values)
+    returns = pd.concat([returns, reversed_feb])
+    summary, _ = monthly_spreads(panel, returns, {'f_roa': True})
+    assert summary['f_roa']['annualized_spread'] == pytest.approx(0)
+    assert (summary['f_roa']['positive_years'], summary['f_roa']['years']) == (1, 2)
+    assert summary['f_roa']['share_years_positive'] == pytest.approx(.5)
+    # Both months are within the latest RECENT_MONTHS
+    assert summary['f_roa']['recent_months'] == 2 and summary['f_roa']['recent_spread'] == pytest.approx(0)
+
+
+def test_recent_spread_uses_only_the_latest_months(monkeypatch):
+    panel, returns = frames()
+    panel = pd.concat([panel, panel.assign(date=pd.Timestamp('2021-01-29'))])
+    reversed_feb = returns.assign(month_end=pd.Timestamp('2021-02-26'), ret_m=returns['ret_m'][::-1].values)
+    monkeypatch.setattr('src.wrds_factor_evidence.RECENT_MONTHS', 1)
+    summary, _ = monthly_spreads(panel, pd.concat([returns, reversed_feb]), {'f_roa': True})
+    assert summary['f_roa']['recent_months'] == 1
+    assert summary['f_roa']['recent_spread'] == pytest.approx(-12 * .09)
+
+
+def _summary(positive, negative, years, recent):
+    return {'annualized_spread': 0.01, 'positive_years': positive, 'negative_years': negative,
+            'years': years, 'recent_spread': recent}
+
+
+@pytest.mark.parametrize('summary,higher,expected', [
+    (_summary(7, 3, 10, -1), True, (True, CONSISTENT)),     # exactly 70% of years: consistent
+    (_summary(7, 3, 10, 1), False, (False, CONSISTENT)),
+    (_summary(3, 7, 10, 1), True, (False, CONSISTENT)),      # the other direction wins 70%: flip
+    (_summary(6, 4, 10, -1), True, (False, MIXED)),          # below 70%: the recent spread decides
+    (_summary(6, 4, 10, 1), False, (False, MIXED)),
+    (_summary(5, 5, 10, 0), True, (True, MIXED)),            # zero recent spread keeps the direction
+])
+def test_default_rule(summary, higher, expected):
+    assert choose_default(summary, higher) == expected
+    assert choose_default(dict(summary, annualized_spread=None), higher) is None
+
+
+def test_saved_strategy_keeps_its_direction_when_the_default_differs():
+    # Opposite of every current default: an import restores what was saved, not the default
+    saved = {m['column']: 'bottom' if m['higher_is_better'] else 'top' for m in WRDS_FACTOR_METADATA.values()}
+    settings = {k: v for k, v in LEGACY_DEFAULT_SETTINGS.items() if k != 'delisting_strategy'}
+    settings.update(data_mode='wrds', frequency='monthly', start_year=2010, end_year=2025)
+    values = cfg.widget_values(cfg.loads(cfg.dumps(cfg.build(settings, list(saved), saved, mode='wrds')).encode()))
+    by_column = {m['column']: name for name, m in WRDS_FACTOR_METADATA.items()}
+    assert values['factor_builder_selected'] == {by_column[c]: d for c, d in saved.items()}
 
 
 def test_current_month_and_far_future_returns_do_not_enter_next_month_spread():
