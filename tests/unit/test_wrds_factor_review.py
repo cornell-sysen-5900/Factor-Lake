@@ -52,7 +52,7 @@ def test_every_legacy_factor_has_one_replacement_with_a_level_and_one_line_diffe
     assert not replaces('mom_12_1')               # skip-month momentum replaces no Legacy factor
 
 
-def test_picker_highlights_matches_and_preserves_user_direction(monkeypatch):
+def test_picker_tints_replacements_and_preserves_user_direction(monkeypatch):
     monkeypatch.syspath_prepend(str(APP_DIR))
     at = AppTest.from_string('''
 import streamlit as st
@@ -60,10 +60,20 @@ from components.factor_selection import render_factor_selection
 render_factor_selection('wrds')
 ''').run()
     assert not at.exception
-    assert at.button(key='factor_add_w_roa').proto.type == 'primary'
-    assert at.button(key='factor_add_w_mom_12_1').proto.type == 'secondary'
-    assert 'ROA %' in at.button(key='factor_add_w_roa').help
-    assert any('Colored cards' in c.value for c in at.caption)
+    # Replacements are tinted through CSS, not type="primary" (which looks like Run Portfolio Analysis)
+    assert all(b.proto.type == 'secondary' for b in at.button if b.key.startswith('factor_add_'))
+    tint = ''.join(h.proto.body for h in at.get('html'))
+    replacing = {m['key'] for m in WRDS_FACTOR_METADATA.values() if replaces(m['column'])}
+    assert len(replacing) == 11
+    assert all(f'.st-key-factor_add_{key} button' in tint for key in replacing)
+    assert 'factor_add_w_mom_12_1' not in tint
+    assert 'Replaces Legacy ROA % (Same)' in at.button(key='factor_add_w_roa').help
+    # A direction flip leads the tooltip
+    assert at.button(key='factor_add_w_mom_1m').help.startswith(
+        'Legacy 1-Mo Momentum % defaults Higher; this WRDS factor defaults Lower (reversal).')
+    assert at.button(key='factor_add_w_btp').help.startswith(
+        'Legacy Price to Book Using 9/30 Data defaults Lower; this WRDS factor defaults Higher (reciprocal).')
+    assert any(c.value.startswith(':material/link: Tinted cards replace a Legacy factor') for c in at.caption)
     at.button(key='factor_add_w_roa').click().run()
     assert at.session_state['factor_builder_selected']['ROA'] == 'top'
     at.button_group(key='factor_dir_w_roa').set_value('Lower is better').run()

@@ -18,6 +18,7 @@ class Replacement:
     wrds_column: str
     level: str
     difference: str
+    flip: str = ''   # why the default direction differs from Legacy's, if it does
 
 
 REPLACEMENTS = (
@@ -26,9 +27,11 @@ REPLACEMENTS = (
     Replacement('6-Mo_Momentum', 'mom_6m', SIMILAR,
                 'Legacy uses price returns; WRDS compounds 126 trading days of CRSP total returns.'),
     Replacement('1-Mo_Momentum', 'mom_1m', SIMILAR,
-                'WRDS uses 21 trading days of CRSP total returns; Legacy defaults Higher, WRDS Lower (reversal).'),
+                'WRDS uses 21 trading days of CRSP total returns; Legacy defaults Higher, WRDS Lower (reversal).',
+                'reversal'),
     Replacement('Price_to_Book_Using_9-30_Data', 'f_book_to_price', SIMILAR,
-                'Reciprocal, so the direction flips: Lower P/B in Legacy is Higher Book/Price in WRDS.'),
+                'Reciprocal, so the direction flips: Lower P/B in Legacy is Higher Book/Price in WRDS.',
+                'reciprocal'),
     Replacement('Book-Price', 'f_book_to_price', SIMILAR,
                 "WRDS prices book equity at the panel date's market cap; Legacy's price date is unspecified."),
     Replacement('Next_FY_Earns-P', 'f_forward_ep_fy2', SIMILAR,
@@ -120,9 +123,13 @@ def legacy_names(column: str):
 
 
 def factor_tooltip(name: str) -> str:
+    """Direction flips first, then the description, the Legacy factors replaced, and the default's rationale."""
     meta = WRDS_FACTOR_METADATA[name]
-    lines = [f"Replaces Legacy {legacy} ({r.level}): {r.difference}" for legacy, r in replaces(meta['column'])]
-    return '\n\n'.join([meta['tooltip'], *lines, f"Default rationale: {REASONS[meta['column']]}"])
+    pairs = replaces(meta['column'])
+    flips = [f"Legacy {legacy} defaults {_direction(FACTOR_METADATA[legacy])}; "
+             f"this WRDS factor defaults {_direction(meta)} ({r.flip})." for legacy, r in pairs if r.flip]
+    lines = [f"Replaces Legacy {legacy} ({r.level}): {r.difference}" for legacy, r in pairs]
+    return '\n\n'.join([*flips, meta['tooltip'], *lines, f"Default rationale: {REASONS[meta['column']]}"])
 
 
 def factor_rows():

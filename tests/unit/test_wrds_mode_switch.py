@@ -227,7 +227,7 @@ def test_wrds_factor_list_grouped_with_names_tooltips_and_defaults(lambda_at):
     for name, meta in WRDS_FACTOR_METADATA.items():
         button = at.button(key=f"factor_add_{meta['key']}")
         assert button.label == name and button.help == factor_tooltip(name)
-        assert button.help.startswith(meta['tooltip'])
+        assert meta['tooltip'] in button.help          # after a direction-flip line, if any
     add_keys = [b.key for b in at.button if (b.key or '').startswith('factor_add_')]
     assert add_keys and all(k.startswith('factor_add_w_') for k in add_keys)   # no Legacy factors
 
