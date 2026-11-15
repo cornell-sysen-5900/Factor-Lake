@@ -1,5 +1,9 @@
-"""Live, data-independent explanations of the strategy used by the backtest."""
-from typing import Any, Dict, List
+"""Live, data-independent explanations of the strategy used by the Legacy backtest.
+
+The formula describes the Legacy engine only (annual rebalance on Next-Years_Return, its
+delisting options and FactSet industry exclusions), so it is never shown for WRDS runs.
+"""
+from typing import Any, Dict, List, Optional
 
 
 def build_calculation_preview(settings: Dict[str, Any], factors: List[str],
@@ -88,8 +92,10 @@ def build_calculation_preview(settings: Dict[str, Any], factors: List[str],
     return {"formula": "\n".join(lines), "steps": steps}
 
 
-def preview_for_run(run: Dict[str, Any]) -> Dict[str, Any]:
-    """Use saved inputs for older/opened analyses, never the current sidebar."""
+def preview_for_run(run: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Use saved inputs for older/opened analyses, never the current sidebar. None for a WRDS run."""
+    if run.get("data_mode") == "wrds":
+        return None
     if run.get("calculation_preview"):
         return run["calculation_preview"]
     settings = dict(run["settings"])

@@ -431,6 +431,22 @@ def test_the_data_viewer_says_it_shows_legacy_data_in_wrds_mode(new_session):
     assert not any('The Data Viewer shows the Legacy data' in c.value for c in at.main.caption)
 
 
+def test_a_wrds_run_shows_no_legacy_calculation(new_session):
+    # The calculation preview describes the Legacy engine (annual rebalance on Next-Years_Return,
+    # its delisting options, FactSet industries), so neither WRDS Results nor Analysis shows it
+    from app.calculation_preview import preview_for_run
+    at = new_session()
+    run = _run_wrds(at, 'w_roe')
+    subheaders = [s.value for s in at.main.subheader]
+    assert 'Performance Summary' in subheaders                      # the WRDS run's Results are open
+    assert 'Calculation Used in This Run' not in subheaders
+    assert 'calculation_preview' not in run and preview_for_run(run) is None
+    _click_main_tab(at, 'Analysis')
+    assert 'Calculation Preview' not in [s.value for s in at.main.subheader]
+    assert not any('U = market data' in c.value for c in at.main.code)
+    _assert_clean(at)
+
+
 # ---------------------------------------------------------------------------
 # Legacy's Results tab is exactly as on main
 # ---------------------------------------------------------------------------

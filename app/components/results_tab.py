@@ -142,7 +142,9 @@ def render_results_tab(run: Dict[str, Any]) -> None:
 
     # 1. Header Information
     _render_header_captions(run)
-    render_calculation_preview(preview_for_run(run), saved=True)
+    preview = preview_for_run(run)          # Legacy runs only: the formula is the Legacy engine's
+    if preview is not None:
+        render_calculation_preview(preview, saved=True)
 
     # 2. Performance Summary
     st.subheader("Performance Summary")
