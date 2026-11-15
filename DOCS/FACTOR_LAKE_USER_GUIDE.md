@@ -47,9 +47,9 @@ The steps below are for the default **Legacy** data source. For WRDS data with s
 
 ### Check the calculation preview
 
-The **Calculation Preview** below Factor Selection shows the strategy as a formula before you load any data. It updates as you change the factors, directions, combination method, weighting, delisting strategy, ESG filter, sectors, years, initial investment or trading cost, and needs no market data or cloud credentials. With no factors it shows a placeholder. Expand **Step-by-step calculation** for normalization, selection, allocation, delisting and compounding.
+Expand **Calculation preview** below Factor Selection to see the strategy as a formula before you load any data. It is collapsed, so Load Market Data and Run stay next to the factors. It updates as you change the factors, directions, combination method, weighting, delisting strategy, ESG filter, sectors, years, initial investment or trading cost, and needs no market data or cloud credentials. With no factors it shows a placeholder. Inside it, expand **Step-by-step calculation** for normalization, selection, allocation, delisting and compounding.
 
-After a run, its tab in Results shows **Calculation Used in This Run**: the formula that run used. Later sidebar changes do not change it, and opened saved analyses rebuild it from their stored inputs. If you change the sectors, ESG filter or years after Load Market Data, a run in the app applies them to the cached data, so the run matches the preview.
+After a run, its tab in Results has **Calculation used in this run**, collapsed below Performance Summary: the formula that run used. Later sidebar changes do not change it, and opened saved analyses rebuild it from their stored inputs. If you change the sectors, ESG filter or years after Load Market Data, a run in the app applies them to the cached data, so the run matches the preview.
 
 This formula is Legacy's annual backtest. WRDS mode shows the WRDS engine's own: see **Check the calculation preview** in [15. Use WRDS mode](#15-use-wrds-mode).
 
@@ -176,7 +176,7 @@ WRDS mode is a second data source next to Legacy. It backtests on point-in-time 
 
 ### Check the calculation preview
 
-In WRDS mode the **Calculation Preview** on the Analysis tab shows the WRDS engine's calculation for the backtest the Run button would send: the rebalance dates of your frequency and years, the month-end Russell 2000 universe after the GICS and fossil fuel filters, the z-scores (winsorized at 1% and 99% per date), the top 10% with ties broken by PERMNO, the weights, buy-and-hold periods on CRSP total returns with delisting returns included, the trading cost when set, and the IWM benchmark (IWO and IWN shown too). Each WRDS run's tab in Results keeps **Calculation Used in This Run**, and a saved WRDS analysis you open shows the one from its stored settings. It never shows Legacy's formula.
+In WRDS mode, **Calculation preview** on the Analysis tab (collapsed, below Factor Selection) shows the WRDS engine's calculation for the backtest the Run button would send: the rebalance dates of your frequency and years, the month-end Russell 2000 universe after the GICS and fossil fuel filters, the z-scores (winsorized at 1% and 99% per date), the top 10% with ties broken by PERMNO, the weights, buy-and-hold periods on CRSP total returns with delisting returns included, the trading cost when set, and the IWM benchmark (IWO and IWN shown too). Each WRDS run's tab in Results keeps **Calculation used in this run** below Performance Summary, and a saved WRDS analysis you open shows the one from its stored settings. It never shows Legacy's formula.
 
 ### Filter by GICS industry
 

@@ -142,8 +142,6 @@ def render_results_tab(run: Dict[str, Any]) -> None:
 
     # 1. Header Information
     _render_header_captions(run)
-    # A Legacy run's calculation (WRDS runs returned above and show the WRDS engine's)
-    render_calculation_preview(preview_for_run(run), saved=True)
 
     # 2. Performance Summary
     st.subheader("Performance Summary")
@@ -151,6 +149,8 @@ def render_results_tab(run: Dict[str, Any]) -> None:
     total_delisted = results.get('total_delisted_positions', 0)
     if total_delisted > 0:
         st.caption(f"**Delisted positions encountered:** {total_delisted}")
+    # The run's calculation, collapsed below the results (WRDS runs returned above and show the WRDS engine's)
+    render_calculation_preview(preview_for_run(run), saved=True)
     st.divider()
 
     # 3. Holdings the backtest bought each year

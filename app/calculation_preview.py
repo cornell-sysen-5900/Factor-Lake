@@ -285,18 +285,25 @@ def preview_for_run(run: Dict[str, Any]) -> Dict[str, Any]:
     return build_calculation_preview(settings, labels, directions)
 
 
+# The collapsed expanders that hold a preview: in Analysis, and a run's in Results
+PREVIEW_LABEL, SAVED_LABEL = "Calculation preview", "Calculation used in this run"
+STEPS_LABEL = "Step-by-step calculation"
+
+
 def render_calculation_preview(preview: Dict[str, Any], *, saved: bool = False) -> None:
-    """Render the formula without loading data; steps are expandable."""
+    """
+    The formula and its steps in one expander, collapsed so it does not compete with the
+    factors (Analysis) or the results (Results); the steps are a nested expander.
+    """
     import streamlit as st
-    with st.container(border=True):
-        st.subheader("Calculation Used in This Run" if saved else "Calculation Preview")
+    with st.expander(SAVED_LABEL if saved else PREVIEW_LABEL, expanded=False):
         st.caption("Saved run inputs; changing current selections does not change this formula." if saved else
                    "Updates with your selections. Data is not required; "
                    "numerical scores are computed when you run the analysis.")
         st.code(preview["formula"], language="text", wrap_lines=True)
         if not preview["steps"]:
             return
-        with st.expander("Step-by-step calculation", expanded=False):
+        with st.expander(STEPS_LABEL, expanded=False):
             for number, (title, description) in enumerate(preview["steps"], 1):
                 st.markdown(f"**{number}. {title}**")
                 st.write(description)

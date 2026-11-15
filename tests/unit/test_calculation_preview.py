@@ -4,7 +4,13 @@ import re
 
 import pytest
 
-from app.calculation_preview import build_calculation_preview, preview_for_run
+from app.calculation_preview import (
+    PREVIEW_LABEL,
+    SAVED_LABEL,
+    STEPS_LABEL,
+    build_calculation_preview,
+    preview_for_run,
+)
 from app.streamlit_config import FACTOR_METADATA
 from tests.unit.test_local_run_filters import state  # noqa: F401 (fixture)
 from tests.unit.test_saved_runs import (
@@ -24,6 +30,43 @@ def formula(at):
 
 def control(elements, label):
     return next(e for e in elements if e.label == label)
+
+
+def outline(at):
+    """The main area's headers, subheaders, expanders and buttons, in document order."""
+    out = []
+    for node in at.main:
+        if type(node).__name__ == "Expander" or node.type == "button":
+            out.append(node.label)
+        elif node.type in ("header", "subheader"):
+            out.append(node.value)
+    return out
+
+
+def preview_box(at, label):
+    """The preview's expander: collapsed, with the formula and the steps in a nested, collapsed expander."""
+    box = next(e for e in at.main.expander if e.label == label)
+    assert box.proto.expanded is False
+    [steps] = [e for e in box.expander if e.label == STEPS_LABEL]
+    assert steps.proto.expanded is False
+    assert len(box.code) == 1 and any(m.value.startswith("**1. ") for m in steps.markdown)
+    return box
+
+
+def test_preview_is_one_collapsed_expander_that_does_not_compete(at):
+    # Analysis: below Factor Selection, collapsed, with Load Market Data and Run right after it
+    _add_factor(at, "ROA %")
+    preview_box(at, PREVIEW_LABEL)
+    shown = outline(at)
+    assert shown.index("Factor Selection") < shown.index(PREVIEW_LABEL) < shown.index("Load Market Data")
+    # Results: the results first, the run's calculation collapsed below Performance Summary
+    _click(at, "Load Market Data")
+    _click(at, "Run Portfolio Analysis")
+    _assert_clean(at)
+    box = preview_box(at, SAVED_LABEL)
+    assert box.code[0].value == at.session_state["saved_runs"][0]["calculation_preview"]["formula"]
+    shown = outline(at)
+    assert shown.index("Performance Summary") < shown.index(SAVED_LABEL) < shown.index("Holdings and Ranks")
 
 
 def test_preview_before_loading_and_live_factor_terms(at):

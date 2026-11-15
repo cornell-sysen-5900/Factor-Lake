@@ -66,8 +66,6 @@ def render_wrds_results(run: Dict[str, Any]) -> None:
                     f"({len(dates)} rebalances, {dates[0]} to {dates[-1]})",
         delisting=WRDS_DELISTING,
     )
-    # The WRDS engine's calculation for this run's job (saved with it; opened runs: their stored job)
-    render_calculation_preview(preview_for_run(run), saved=True)
 
     # 2. Performance Summary
     st.subheader("Performance Summary")
@@ -78,6 +76,9 @@ def render_wrds_results(run: Dict[str, Any]) -> None:
         st.caption(f"**Delisted positions encountered:** {total_delisted}")
     for note in result_notes(results):
         st.caption(note)
+    # The WRDS engine's calculation for this run's job, collapsed below the results (saved with the
+    # run; opened runs: their stored job)
+    render_calculation_preview(preview_for_run(run), saved=True)
     st.divider()
 
     # 3. Holdings bought at each rebalance date

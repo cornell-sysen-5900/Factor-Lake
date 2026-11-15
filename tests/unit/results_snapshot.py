@@ -21,6 +21,7 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
+from app.calculation_preview import SAVED_LABEL, STEPS_LABEL
 from tests.unit.test_saved_runs import (
     _assert_clean,
     _click_main_tab,
@@ -110,14 +111,14 @@ def main_area(at) -> dict:
 
 def without_calculation(render: dict, preview: dict) -> dict:
     """
-    render without one run's "Calculation Used in This Run" box (its subheader, caption,
-    formula, Step-by-step expander and steps), for comparing with renders made before it
-    existed. Raises ValueError when any part of the box is missing.
+    render without one run's "Calculation used in this run" expander (its caption, formula,
+    nested Step-by-step expander and steps), for comparing with renders made before it
+    existed. Raises ValueError when any part of it is missing.
     """
     out = {kind: list(values) if isinstance(values, list) else values for kind, values in render.items()}
     caption = next(c for c in out['caption'] if c.startswith('Saved run inputs;'))
-    parts = [('subheader', 'Calculation Used in This Run'), ('caption', caption), ('code', preview['formula']),
-             ('expander', 'Step-by-step calculation')]
+    parts = [('expander', SAVED_LABEL), ('caption', caption), ('code', preview['formula']),
+             ('expander', STEPS_LABEL)]
     for number, (title, description) in enumerate(preview['steps'], 1):
         parts += [('markdown', f"**{number}. {title}**"), ('markdown', description)]
     for kind, value in parts:

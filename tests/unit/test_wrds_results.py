@@ -446,7 +446,8 @@ def _formulas(at):
 def test_wrds_shows_the_wrds_calculation_never_the_legacy_one(new_session):
     # The Legacy formula describes the Legacy engine (annual rebalance on Next-Years_Return, its
     # delisting options, FactSet industries); WRDS mode, its runs and opened WRDS runs show the WRDS one
-    from app.calculation_preview import build_calculation_preview, preview_for_run
+    from app.calculation_preview import PREVIEW_LABEL, SAVED_LABEL, build_calculation_preview, preview_for_run
+    from tests.unit.test_calculation_preview import outline, preview_box
     at = new_session()
     at.sidebar.radio(key='data_mode_input').set_value('WRDS').run()
     at.sidebar.number_input(key='wrds_start_year_input').set_value(2010).run()
@@ -456,9 +457,10 @@ def test_wrds_shows_the_wrds_calculation_never_the_legacy_one(new_session):
     assert empty.startswith(WRDS_FORMULA) and '[select at least one factor]' in empty
     at.button(key='factor_add_w_roe').click().run()
     run = _run_wrds(at)
-    subheaders = [s.value for s in at.main.subheader]
-    assert 'Performance Summary' in subheaders                      # the WRDS run's Results are open
-    assert 'Calculation Used in This Run' in subheaders
+    # Results: the results first, then the run's calculation, collapsed
+    shown = outline(at)
+    assert shown.index('Performance Summary') < shown.index(SAVED_LABEL) < shown.index('Holdings and Ranks')
+    preview_box(at, SAVED_LABEL)
     saved = run['calculation_preview']['formula']
     # (AppTest also keeps the Analysis tab's elements of the run that st.rerun() interrupted)
     assert set(_formulas(at)) == {saved} and saved.startswith(WRDS_FORMULA)
@@ -468,7 +470,7 @@ def test_wrds_shows_the_wrds_calculation_never_the_legacy_one(new_session):
     assert preview_for_run({**run, 'calculation_preview': legacy})['formula'] == saved
     assert preview_for_run({k: v for k, v in run.items() if k != 'calculation_preview'})['formula'] == saved
     _click_main_tab(at, 'Analysis')
-    assert 'Calculation Preview' in [s.value for s in at.main.subheader]
+    preview_box(at, PREVIEW_LABEL)
     assert set(_formulas(at)) == {saved}                            # the same selections, the same calculation
     # Opened in another session from its ID: the calculation of its stored job
     theirs = new_session()
