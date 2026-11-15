@@ -215,6 +215,8 @@ One sub-industry job, Regional Banks (GICS 40101015), Book/Price (higher is bett
 | Top 100%, no factors | 146 to 270 (the whole filter) | 6.38% | 0.7 s | 56 KB |
 | Top 20 stocks | 20 | 4.82% | 0.7 s | 56 KB |
 
+Top N in Mixing holds N stocks in total (the factors take turns). The same Regional Banks job with two factors, Book/Price then 12-1 Mo Momentum, at Top 20 (computed fresh, 5.0 s as the first job after the deploy, CAGR 3.55%) held exactly 20 stocks at all 92 rebalances, 10 picked by each factor. Each date's picks, and the factor that picked each stock, match the turn rule recomputed separately from the S3 panel's z-scores. The two factors' top 20s shared stocks on 39 of the 92 dates (up to 4).
+
 ### Admin: confirm the 90-day rule
 
 Saved results and WRDS holdings both live under `factor-lake-data/backtest-results/`, so one lifecycle rule on that prefix expires both. The class keys cannot read the bucket's lifecycle rules, so **an AWS admin must confirm** that the rule `factor-lake-expire-backtest-results` (prefix `factor-lake-data/backtest-results/`, expire after 90 days) is enabled on `sysen-5900-factor-lake`.
