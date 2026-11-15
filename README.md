@@ -55,6 +55,7 @@ Then open http://localhost:8501
 - Benchmark comparison vs Russell 2000, Growth, and Value
 - Performance metrics: CAGR, yearly returns, drawdown, Sharpe, Information Ratio, win rate
 - Ranked-stock table and top-vs-bottom cohort analysis
+- Calculation preview (Legacy): the strategy as a formula on the Analysis tab, live and without loading data, and the formula each run used in Results; see [Check the calculation preview](DOCS/FACTOR_LAKE_USER_GUIDE.md#check-the-calculation-preview)
 - Saved runs: each backtest run is kept as its own tab in Results (newest first, last 5; cleared when the page is refreshed), shows the settings that produced it, and can be removed
 - Strategy files and names: export/import Legacy or WRDS settings as JSON, name backtests and add notes, and edit annotations in Results without changing calculations. See [Save, import and name backtests](DOCS/STRATEGY_SETTINGS.md).
 - Clear and rerun: on the Analysis tab, click **Clear Parameters** to remove selected factors and restore the analysis settings to their defaults. Choose new inputs, then **Run Portfolio Analysis**. For local backtests, click **Load Market Data** first to apply the new filters using the cached source data. Saved runs, analysis history, the Lambda execution preference and the data source (Legacy or WRDS) are kept; in WRDS mode the frequency and years return to Quarterly, 2008-2026. No page refresh or app restart is needed.
@@ -94,22 +95,6 @@ Factor-Lake/
 ├── uv.lock                 # Pinned dependency lockfile
 └── README.md
 ```
-
-## Live Calculation Preview
-
-The Analysis tab shows a **Calculation Preview** directly below Factor Selection, before
-Load Market Data. It updates immediately when factors, directions, combination method,
-weighting, delisting strategy, ESG, sectors, years or initial investment change. No market
-data or cloud credentials are needed to preview the strategy. With no factors, a placeholder
-is shown. Expand **Step-by-step calculation** for normalization, selection, allocation,
-delisting and compounding details.
-
-After running, **Calculation Used in This Run** in Results preserves the formula from that
-run. Current sidebar changes do not change historical formulas. Opened saved analyses use
-their stored inputs. For local runs, changing universe filters or years after loading data
-reapplies those selections to the cached raw data before execution.
-
-Run the acceptance tests with `uv run pytest tests/unit/test_calculation_preview.py`.
 
 ## Import Conventions
 

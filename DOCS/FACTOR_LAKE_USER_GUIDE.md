@@ -45,6 +45,14 @@ The steps below are for the default **Legacy** data source. For WRDS data with s
 4. Keep the direction consistent with the financial meaning of the factor.
 5. If you are unsure, start with one factor and add more later.
 
+### Check the calculation preview
+
+The **Calculation Preview** below Factor Selection shows the strategy as a formula before you load any data. It updates as you change the factors, directions, combination method, weighting, delisting strategy, ESG filter, sectors, years, initial investment or trading cost, and needs no market data or cloud credentials. With no factors it shows a placeholder. Expand **Step-by-step calculation** for normalization, selection, allocation, delisting and compounding.
+
+After a run, its tab in Results shows **Calculation Used in This Run**: the formula that run used. Later sidebar changes do not change it, and opened saved analyses rebuild it from their stored inputs. If you change the sectors, ESG filter or years after Load Market Data, a run in the app applies them to the cached data, so the run matches the preview.
+
+The preview describes Legacy's annual backtest only, so WRDS mode and WRDS runs do not show it.
+
 ## 6. Load the market data
 
 1. Click Load Market Data.
