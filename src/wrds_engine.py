@@ -17,9 +17,9 @@ See DOCS/WRDS_MODE_DESIGN.md, sections 3, 4 and 7. At each rebalance date t:
    n stocks with a score, by score, ties broken by permno. In Mixing, top_pct applies
    to each sleeve; top_n is top_n different stocks in total, the sleeves taking turns in
    factor order, each adding its next-best stock and skipping stocks already picked.
-   At top_pct 100, or on a date where top_n is at least the number of stocks in the
-   filter, every stock in the filter is held, with or without a score (a run without
-   factors holds the whole filter, so it needs top_pct 100). Equal or market cap
+   top_n only ever holds stocks with a score (all of them when there are at most top_n).
+   At top_pct 100 every stock in the filter is held, with or without a score (a run
+   without factors holds the whole filter, so it needs top_pct 100). Equal or market cap
    (mkt_cap_musd at t) weighted: within each sleeve, or for Mixing with top_n across
    all the picked stocks.
 4. Holding period (t, t']: buy and hold, so weights drift with each stock's compounded
@@ -160,8 +160,9 @@ def _top_ranked(universe: pd.DataFrame, scores: pd.Series, top_pct: Optional[flo
     """
     On each date, the top top_pct% (at least one) or the top top_n of the stocks with a
     score, best first with ties broken by permno, and each one's weight within the
-    selection. At top_pct 100, or where top_n is at least the stocks in the filter that
-    day, every stock in universe is picked, those without a score ranked last by permno.
+    selection. top_n holds only stocks with a score, all of them when there are at most
+    top_n. At top_pct 100 every stock in universe is picked, those without a score ranked
+    last by permno.
     """
     ranked = pd.DataFrame({'date': universe['date'], 'permno': universe['permno'], 'score': scores,
                            'cap': universe['mkt_cap_musd']})
@@ -171,8 +172,7 @@ def _top_ranked(universe: pd.DataFrame, scores: pd.Series, top_pct: Optional[flo
     ranked['rank'] = by_date.cumcount() + 1
     scored = ranked['score'].notna()
     if top_n is not None:
-        limit = top_n
-        whole = top_n >= by_date['permno'].transform('size')
+        limit, whole = top_n, False
     else:
         limit = np.maximum(1, np.floor(scored.groupby(ranked['date']).transform('sum') * (top_pct / 100.0)))
         whole = top_pct >= 100.0
@@ -221,13 +221,10 @@ def _take_turns(universe: pd.DataFrame, sleeve_scores: List[pd.Series], top_n: i
     Mixing with top_n: on each date, top_n different stocks in total. The sleeves take turns
     in factor order, each adding its next-best stock by its own score (ties by permno) and
     skipping stocks already picked, until top_n are picked or every sleeve runs out (then
-    every stock with a score is held). Each position has the sleeve that picked it, its rank
-    and score in that sleeve, and a weight across all the picked stocks (equal or market cap),
-    not a sleeve's share.
-
-    On a date where top_n is at least the stocks in the filter, every stock is held: the
-    turns pick the scored ones, and the others get sleeve len(sleeve_scores), meaning held
-    because the run holds the whole filter, ranked by permno.
+    every stock with a score is held). A stock without a score in any sleeve is never held,
+    even when top_n is at least the stocks in the filter. Each position has the sleeve that
+    picked it, its rank and score in that sleeve, and a weight across all the picked stocks
+    (equal or market cap), not a sleeve's share.
     """
     k = len(sleeve_scores)
     queues = {}
@@ -240,15 +237,13 @@ def _take_turns(universe: pd.DataFrame, sleeve_scores: List[pd.Series], top_n: i
             queues[date, i] = (rows['permno'].to_numpy(), rows['score'].to_numpy())
 
     picks = []                        # (date, sleeve, permno, rank, score)
-    for date, members in universe.groupby('date', sort=True)['permno']:
-        whole = top_n >= len(members)
-        limit = len(members) if whole else top_n
+    for date in universe['date'].drop_duplicates().sort_values():
         lists = [queues.get((date, i), (np.array([], dtype=np.int64), np.array([]))) for i in range(k)]
         next_up, picked = [0] * k, set()
-        while len(picked) < limit:
+        while len(picked) < top_n:
             added = False
             for i, (permnos, scores) in enumerate(lists):
-                if len(picked) >= limit:
+                if len(picked) >= top_n:
                     break
                 j = next_up[i]
                 while j < len(permnos) and permnos[j] in picked:
@@ -259,11 +254,8 @@ def _take_turns(universe: pd.DataFrame, sleeve_scores: List[pd.Series], top_n: i
                     added = True
                     j += 1
                 next_up[i] = j
-            if not added:             # every sleeve ran out
+            if not added:             # every sleeve ran out: every scored stock is held
                 break
-        if whole:
-            rest = sorted(set(members.to_numpy()) - picked)
-            picks += [(date, k, permno, rank, np.nan) for rank, permno in enumerate(rest, 1)]
 
     positions = pd.DataFrame(picks, columns=['date', 'sleeve', 'permno', 'rank', 'score'])
     positions['permno'] = positions['permno'].astype(universe['permno'].dtype)
@@ -534,9 +526,8 @@ def _holdings_table(positions: pd.DataFrame, growth: pd.DataFrame, panel: pd.Dat
     if factor_combination == 'mixing':
         # Each stock's sleeves as a bitmask (a sleeve buys a stock at most once; at most 40
         # factors exist, so it fits an int64), then one label per distinct mask
-        # Sleeve len(factors): held because the run holds the whole filter (no factors, or a
-        # Top N date covering the filter; see _take_turns)
-        names = [factor_labels.get(f, f) for f in factors] + [WHOLE_FILTER_LABEL]
+        # A run without factors (Top 100%) has one sleeve, holding the whole filter
+        names = [factor_labels.get(f, f) for f in factors] or [WHOLE_FILTER_LABEL]
         masks = positions.assign(mask=np.left_shift(1, positions['sleeve'].to_numpy(dtype=np.int64)))
         picked = masks.groupby(['date', 'permno'], as_index=False)['mask'].sum()
         labels = {m: ', '.join(n for i, n in enumerate(names) if m >> i & 1) for m in picked['mask'].unique()}

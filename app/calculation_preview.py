@@ -170,7 +170,7 @@ def build_wrds_calculation_preview(job: Dict[str, Any]) -> Dict[str, Any]:
     # c. Selection and weights: the top X% or the top N, or at 100% the whole filter
     if top_n is not None:
         top = f"min({top_n}, n)"
-        whole_date = f"; on a date where {top_n} >= |U(t)|, every stock in U(t)"
+        whole_date = "; stocks without a score are never held"
     else:
         top, whole_date = f"max(1, floor(n * {pct:g} / 100))", ""
     integrating = job["factor_combination"] == "integrating"
@@ -275,7 +275,8 @@ def _selection_step(pct: Optional[float], top_n: Optional[int], integrating: boo
                 "its next-best stock by its own z-score (ties broken by lower permno) and skipping stocks already "
                 f"picked, until {_stocks(top_n)} {'is' if top_n == 1 else 'are'} picked or every sleeve runs out "
                 "(then every stock with a score is held). The weights apply across the picked stocks, not per "
-                f"sleeve. On a date with at most {_stocks(top_n)} in the filter, every one of them is held.")
+                "sleeve. Stocks without a score are never held, even when the filter has no more than "
+                f"{_stocks(top_n)}.")
     top = f"the top {top_n} stocks" if top_n is not None else f"the top {pct:g}%"
     text = (f"Average the z-scores of the stocks that have every factor and buy {top} by that score in one "
             "portfolio." if integrating else
@@ -283,7 +284,8 @@ def _selection_step(pct: Optional[float], top_n: Optional[int], integrating: boo
             "picked by several sleeves is held in each.")
     if top_n is not None:
         text += (f" Each selection is min({top_n}, n) of the n stocks with a score, best first, ties broken by "
-                 f"lower permno. On a date with at most {_stocks(top_n)} in the filter, every one of them is held.")
+                 "lower permno. Stocks without a score are never held, even when the filter has no more than "
+                 f"{_stocks(top_n)}.")
     else:
         text += (f" Each selection is max(1, floor(n × {pct:g} / 100)) of the n stocks with a score, best first, "
                  "ties broken by lower permno.")

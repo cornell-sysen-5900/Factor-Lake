@@ -276,7 +276,8 @@ def test_wrds_preview_frequency_top_pct_and_trading_cost_match_the_wrds_engine(n
     else:
         assert len(counts) >= 3 and set(counts) == {float(engine["top_n"])} and not percents
         assert engine["top_pct"] is None and engine["top_n"] == hold[1]
-        assert _numbers(r"where (\d+) >= \|U\(t\)\|", formula) == [engine["top_n"]]
+        # Top N holds only scored stocks, even when N covers the filter (only Top 100% holds the whole filter)
+        assert "stocks without a score are never held" in formula and "every stock in U(t)" not in formula
         if engine["factor_combination"] == "mixing":       # N different stocks in total, the sleeves taking turns
             assert f"the sleeves take turns in factor order ({', '.join(run['factor_labels'])})" in formula
             assert "each sleeve gets V(t)" not in formula and "Across the picked stocks" in text

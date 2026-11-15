@@ -363,8 +363,9 @@ def _render_wrds_hold() -> Dict[str, Any]:
             format="%d",
             key=TOP_N_KEY,
             help="N different stocks at each rebalance, weighted across all of them. In Mixing the factors take "
-                 "turns in order, each adding its next-best stock not yet picked. A date with fewer stocks in the "
-                 "filter holds all of them. The filter's size changes by date, so a factor is still needed."
+                 "turns in order, each adding its next-best stock not yet picked. Only stocks with a score are held: "
+                 "if fewer than N have one, all of those. The filter's size changes by date, so a factor is still "
+                 "needed."
         )
         return {'top_n': int(top_n)}
     top_pct = st.number_input(

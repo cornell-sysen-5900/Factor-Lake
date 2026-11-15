@@ -1,8 +1,9 @@
 """
-How many stocks a WRDS backtest holds (src/wrds_engine.hold_rule): the top X% or the top N
-of the stocks with a score at each rebalance (in Mixing, of each sleeve), every stock in the
-filter at 100% or when N is at least the filter, and the job fields (src/wrds_jobs.py) that
-carry the choice without changing the cache key of a job at the default 10%.
+How many stocks a WRDS backtest holds (src/wrds_engine.hold_rule): the top X% of the stocks
+with a score at each rebalance (in Mixing, of each sleeve), the top N (in Mixing, N in total,
+the sleeves taking turns; only scored stocks, even when N covers the filter), every stock in
+the filter at 100%, and the job fields (src/wrds_jobs.py) that carry the choice without
+changing the cache key of a job at the default 10%.
 """
 import json
 import math
@@ -223,41 +224,47 @@ def _held_any(positions):
     return {date: set(rows['permno']) for date, rows in positions.groupby('date')}
 
 
+def _scored(universe, combination, factors=FACTORS):
+    """date -> the permnos a Top N run can hold: a score in some sleeve (Mixing) or the composite (Integrating)."""
+    z = pd.concat([factor_zscores(universe, f, DIRECTIONS[f] == 'top') for f in factors], axis=1)
+    has = z.notna().any(axis=1) if combination == 'mixing' else z.notna().all(axis=1)
+    rows = universe[has.to_numpy()]
+    return {date: set(group['permno']) for date, group in rows.groupby('date')}
+
+
 @pytest.mark.parametrize('combination', ['mixing', 'integrating'])
 @pytest.mark.parametrize('cap_weight', [False, True])
-def test_a_count_above_the_filter_holds_every_stock_in_it(universe, combination, cap_weight):
+def test_a_count_above_the_filter_holds_every_scored_stock_and_no_other(universe, combination, cap_weight):
     universe = universe.copy()
-    universe.loc[universe.index[::17], FACTORS] = np.nan    # some stocks have no score, and are held too
+    universe.loc[universe.index[::17], FACTORS] = np.nan     # stocks with no score at all
     positions = select_positions(universe, FACTORS, DIRECTIONS, combination, top_n=10_000,
                                  use_market_cap_weight=cap_weight)
-    assert _held_any(positions) == _whole_filter(universe)
-    if combination == 'mixing':
-        # The turns pick every scored stock; the stocks with neither factor are held as the whole filter
-        z = _sleeve_scores(universe, 'mixing')
-        unscored = universe.loc[z[0].isna() & z[1].isna(), ['date', 'permno']]
-        rest = positions[positions['sleeve'] == len(FACTORS)]
-        assert set(zip(rest['date'], rest['permno'])) == set(zip(unscored['date'], unscored['permno']))
-        assert len(unscored) > 0
+    held, scored = _held_any(positions), _scored(universe, combination)
+    assert held == scored
+    for date, permnos in _whole_filter(universe).items():
+        assert held[date] < permnos                           # never the whole filter, unlike Top 100%
+    assert set(positions['sleeve']) <= set(range(len(FACTORS)))     # every stock picked by a factor
     weights = positions.groupby(['date', 'permno'])['weight'].sum()
     caps = universe.set_index(['date', 'permno'])['mkt_cap_musd'].reindex(weights.index)
     raw = caps if cap_weight else pd.Series(1.0, index=weights.index)
     np.testing.assert_allclose(weights, raw / raw.groupby(level='date').transform('sum'), rtol=1e-12)
 
 
+@pytest.mark.parametrize('combination', ['mixing', 'integrating'])
 @pytest.mark.parametrize('factors', [['f_roe'], FACTORS])
-def test_a_count_holds_the_whole_filter_only_on_the_dates_it_covers(universe, factors):
+def test_a_count_holds_min_n_and_the_scored_stocks_on_every_date(universe, combination, factors):
     sizes = universe.groupby('date').size()
-    top_n = int(sizes.median())
-    positions = select_positions(universe, factors, DIRECTIONS, top_n=top_n)
-    held, whole = _held_any(positions), _whole_filter(universe)
-    z = pd.concat([factor_zscores(universe, f, DIRECTIONS[f] == 'top') for f in factors], axis=1)
-    scored = z.notna().any(axis=1).groupby(universe['date']).sum()       # stocks with at least one score
-    for date, size in sizes.items():
-        if top_n >= size:
-            assert held[date] == whole[date]
-        else:
-            assert len(held[date]) == min(top_n, scored[date])
+    top_n = int(sizes.median())                               # at least the filter on some dates
     assert (sizes <= top_n).any() and (sizes > top_n).any()
+    positions = select_positions(universe, factors, DIRECTIONS, combination, top_n=top_n)
+    held, scored = _held_any(positions), _scored(universe, combination, factors)
+    for date in sizes.index:
+        assert len(held[date]) == min(top_n, len(scored[date])) and held[date] <= scored[date]
+
+
+def test_a_count_run_shows_no_whole_filter_holdings(data):
+    _, holdings = run_wrds_backtest(data, FACTORS, DIRECTIONS, **RUN, top_n=10_000, factor_labels=LABELS)
+    assert WHOLE_FILTER_LABEL not in set(holdings['picked_by']) and holdings['score'].notna().all()
 
 
 @pytest.mark.parametrize('combination', ['mixing', 'integrating'])
