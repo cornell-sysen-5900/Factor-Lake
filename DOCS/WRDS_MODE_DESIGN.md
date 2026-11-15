@@ -35,7 +35,7 @@ Decided in the stage 1 review:
 | 8 | Missing return without a delisting | 0% for that month; the result reports how many stock-months that was | 3.3 |
 | 9 | ETF total-return benchmarks | Accepted, labelled for example "IWM (ETF, total return)" | 4.1 |
 | 10 | Missing risk-free month | Filled with `tbill_3m / 12`, and the filled months are flagged in the result | 4.1 |
-| 11 | Top % | Fixed at 10%, as in Legacy | 5.1 |
+| 11 | Top % | Fixed at 10%, as in Legacy. *Superseded: the sidebar's Hold choice sets a top % (1-100, default 10) or a top N stocks (section 7, step 3).* | 5.1 |
 | - | Legacy invariant (correction) | Legacy **results** must not change; its code version and cache keys may. Routing WRDS jobs may edit a file in `ENGINE_SOURCES` (for example `backtest_jobs.py`) | 1.2 |
 
 ---
@@ -252,7 +252,8 @@ A WRDS job is plain JSON like a Legacy job, built by `build_wrds_job` and checke
 | `frequency` | `semiannual`, `quarterly`, `monthly` | |
 | `start_year`, `end_year` | 2008-2026 | section 3.2 |
 | `initial_aum` | > 0 | |
-| `top_pct` | 10.0 | fixed, as in Legacy (decision 11) |
+| `top_pct` | 0 < x <= 100, default 10.0; null when `top_n` is set | a job at 10% has the shape and key it had before |
+| `top_n` | whole number >= 1 | only when the run holds a number of stocks instead of a percent; cohort jobs never have it (they hold `cohort_pct`) |
 | `use_market_cap_weight` | bool | |
 | `factor_combination` | `mixing`, `integrating` | |
 | `restrict_fossil_fuels` | bool | section 2.3 |
@@ -393,7 +394,7 @@ The package is 61.7 MB zipped and 199 MB unzipped (Lambda allows 250 MB). The ho
 
 1. **Rebalance rows.** The panel rows at the rebalance dates that are buyable and pass the sector and fossil fuel filters.
 2. **Scores**, for each factor and date, as `normalize_series` computes them: values to numbers with inf as NaN, winsorized at the 1% and 99% quantiles (`groupby('date')[col].transform('quantile', q)`, the same linear interpolation as `Series.quantile`), negated for Lower, then z-scored with the date's mean and `std(ddof=1)`, with the same `sigma > 1e-12` guard.
-3. **Selection.** Integrating: the mean of the factors' z-scores for stocks that have every factor. Mixing: each factor's own z-score in its own sleeve. Within each date (and sleeve), stocks are sorted by score, highest first, with **ties broken by `permno`**, so every machine picks the same stocks. The top `max(1, floor(n * top_pct / 100))` are kept, where n is the number of stocks with a score.
+3. **Selection.** Integrating: the mean of the factors' z-scores for stocks that have every factor. Mixing: each factor's own z-score in its own sleeve. Within each date (and sleeve), stocks are sorted by score, highest first, with **ties broken by `permno`**, so every machine picks the same stocks. The top `max(1, floor(n * top_pct / 100))` are kept, or with `top_n` the top `min(top_n, n)`, where n is the number of stocks with a score. At `top_pct` 100, or on a date where `top_n` is at least the number of stocks in the filter, every stock in the filter is held, with or without a score, so a run at 100% may have no factors.
 4. **Weights.** Equal, or `mkt_cap_musd` share, within the portfolio (Integrating) or within each sleeve, with each sleeve given `1 / number of factors` of the money (Mixing).
 5. **Returns.** Each position's growth is the product of (1 + monthly return) over the period's months (section 3.3), with delisted money earning rf after the delisting month. The period return is `sum(weight * growth) - 1`: buy and hold within the period, rebalanced at each rebalance date.
 6. **Outputs.** Period returns, values, holdings rows (merged per stock as in Legacy), counts of delisted positions and missing-return months, and the metrics (section 4).
