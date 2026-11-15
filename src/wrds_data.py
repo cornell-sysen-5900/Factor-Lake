@@ -12,7 +12,8 @@ then decoded with only the needed columns, the same way from a local folder and 
   delisted_next_month) are never read.
 - returns_monthly.parquet: every stock's monthly return (delisting return included)
   and its delisting month, also after it leaves the index.
-- market_monthly.parquet: IWM, IWN and IWO total returns and the risk-free rate.
+- market_monthly.parquet: IWM, IWN and IWO total returns, the risk-free rate, and the
+  Fama-French five factors and momentum (for src/factor_risk.py).
 """
 
 import io
@@ -44,7 +45,8 @@ PANEL_CATEGORY_COLUMNS = ('ticker', 'security_name', 'sector_name', 'gsector_nam
                           'gsubind_name')
 PANEL_COLUMNS = tuple(dict.fromkeys(PANEL_KEY_COLUMNS + WRDS_FACTOR_COLUMNS))
 RETURNS_COLUMNS = ('month_end', 'permno', 'ret_m', 'delisted_in_month')
-MARKET_COLUMNS = ('month_end', 'iwm_total_ret', 'iwn_total_ret', 'iwo_total_ret', 'rf', 'tbill_3m')
+MARKET_COLUMNS = ('month_end', 'iwm_total_ret', 'iwn_total_ret', 'iwo_total_ret', 'rf', 'tbill_3m',
+                  'mktrf', 'smb', 'hml', 'rmw', 'cma', 'umd')
 
 
 def wrds_dir() -> str:

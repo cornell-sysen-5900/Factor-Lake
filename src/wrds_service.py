@@ -10,7 +10,8 @@ src/backtest_service.py sends every job with data_mode 'wrds' here. For each job
    files the engine reads) and the WRDS code version.
 2. Returns the saved result for that hash when one exists. A saved backtest whose
    holdings file is missing is computed again, never shown without its holdings.
-3. Otherwise runs the job and saves it: a backtest's holdings first, as
+3. Otherwise runs the job and saves it (a backtest with its factor regression,
+   src/factor_risk.py, in the result's factor_risk): a backtest's holdings first, as
    backtest-results/<hash>.holdings.parquet (one row group per rebalance date), then
    the result JSON (backtest-results/<hash>.json), which lists the holdings' dates.
    The result JSON therefore only exists once its holdings do. Its S3 metadata has the
@@ -28,6 +29,7 @@ import pandas as pd
 from .analysis_scores import score_metadata
 from .backtest_jobs import encode_saved, job_hash
 from .backtest_service import RESULTS_DIR, _error_code, _is_missing, result_file, summarize_job
+from .factor_risk import wrds_factor_risk
 from .s3_client import S3DataManager
 from .wrds_calendar import FREQUENCY_LABELS
 from .wrds_data import WRDS_FILES, WrdsData, read_s3_wrds_data, wrds_dir
@@ -83,7 +85,9 @@ class WrdsBacktestRunner:
         Runs a WRDS job (src/wrds_jobs.py) on the WRDS data.
 
         Returns:
-            backtest: (run_wrds_backtest results, holdings DataFrame).
+            backtest: (run_wrds_backtest results, holdings DataFrame). The results also have
+                factor_risk: the factor regression of the monthly returns
+                (src/factor_risk.wrds_factor_risk), None when the run has too few months.
             cohort: ({'top', 'bottom': portfolio values, 'years', 'cohort_pct', 'top_cagr',
                 'bottom_cagr'}, None), the strategy at cohort_pct and its exact opposite.
             ranked: ({'rebalance_date', 'columns', 'rows'}, None), every stock on that date
@@ -93,7 +97,9 @@ class WrdsBacktestRunner:
         data = self.data(version)
         factors, directions, options = engine_arguments(job)
         if job['kind'] == 'backtest':
-            return run_wrds_backtest(data, factors, directions, **options)
+            results, holdings = run_wrds_backtest(data, factors, directions, **options)
+            results['factor_risk'] = wrds_factor_risk(results, data.market)
+            return results, holdings
         if job['kind'] == 'cohort':
             options['top_pct'] = job['cohort_pct']
             top, _ = run_wrds_backtest(data, factors, directions, **options)
