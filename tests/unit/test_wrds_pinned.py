@@ -5,7 +5,9 @@ and holdings they gave on main before trading costs were added, when run at 0 bp
 The fixture (tests/fixtures/wrds_pinned_results.json) was captured with main's code
 (faeca5c) by running this file there: it only uses functions main has. Numbers must agree
 to a relative 1e-9, as in tests/unit/test_legacy_pinned.py; everything else exactly.
-The holdings' four GICS name columns were added later, so they are left out of the comparison.
+The holdings' four GICS name columns and the results' monthly_dates and monthly_returns
+were added later, so they are left out of the comparison (tests/unit/test_wrds_monthly_returns.py
+checks that the months compound to the pinned period returns).
 Regenerate it only when a change to WRDS results is intended:
 
     uv run python -m tests.unit.test_wrds_pinned
@@ -23,6 +25,8 @@ from tests.unit.wrds_fixtures import synthetic_frames
 
 FIXTURE_PATH = Path(__file__).resolve().parents[1] / 'fixtures' / 'wrds_pinned_results.json'
 FIRST, LAST = '2009-11', '2013-02'
+# Result keys added after the fixture was captured
+ADDED_RESULT_KEYS = ('monthly_dates', 'monthly_returns')
 
 # name -> (factors, directions, keyword arguments of run_wrds_backtest)
 JOBS = {
@@ -87,7 +91,7 @@ def test_wrds_backtest_at_0_bps_gives_the_results_it_gave_on_main(pinned, data, 
     results, holdings = run_pinned(name, data, trading_cost_bps=0)
     gics = list(HOLDINGS_GICS_COLUMNS.values())
     assert set(gics) <= set(holdings.columns)
-    got = as_json(results, holdings.drop(columns=gics))
+    got = as_json({k: v for k, v in results.items() if k not in ADDED_RESULT_KEYS}, holdings.drop(columns=gics))
     difference, where = max_difference(got, pinned[name])
     assert difference <= TOLERANCE, f"{where} differs from main by {difference:.2e} (relative)"
 

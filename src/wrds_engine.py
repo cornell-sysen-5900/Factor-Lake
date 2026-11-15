@@ -23,6 +23,9 @@ See DOCS/WRDS_MODE_DESIGN.md, sections 3, 4 and 7. At each rebalance date t:
    (target weights vs the weights after drift; the delisted stocks' cash counts as no
    stock) is charged at the rebalance, before the period's return. A date with nothing
    to buy sells everything into cash; the cash period costs nothing.
+6. Monthly returns: within each holding period, the buy-and-hold portfolio's value at
+   each month end gives its month-by-month return, the rebalance's cost charged in the
+   period's first month. Compounded over a period they equal its return after costs.
 
 Stocks are keyed on permno (two securities can share a ticker on one date).
 """
@@ -220,14 +223,15 @@ def _month_range(data: WrdsData, start: pd.Timestamp, end: pd.Timestamp) -> slic
     return slice(data.months.get_loc(start) + 1, data.months.get_loc(end) + 1)
 
 
-def holding_period_growth(data: WrdsData, permnos: np.ndarray, start: pd.Timestamp,
-                          end: pd.Timestamp, rf_monthly: np.ndarray) -> pd.DataFrame:
+def monthly_growth(data: WrdsData, permnos: np.ndarray, start: pd.Timestamp, end: pd.Timestamp,
+                   rf_monthly: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    Buy-and-hold growth of each stock over (start, end]: the product of (1 + monthly
-    return), and after its delisting month (1 + risk-free) instead. A month without a
-    return before any delisting counts as 0%.
+    Each stock's month-by-month growth over (start, end]: 1 + its monthly return, and
+    after its delisting month 1 + risk-free instead. A month without a return before any
+    delisting counts as 0%.
 
-    Returns one row per permno: growth, delisted (in the period), missing_return_months.
+    Returns (growth: months x stocks, delisted in the period, missing return months), the
+    last two per stock.
     """
     months = _month_range(data, start, end)
     cols = data.permnos.get_indexer(permnos)
@@ -238,8 +242,28 @@ def holding_period_growth(data: WrdsData, permnos: np.ndarray, start: pd.Timesta
     missing = np.isnan(returns) & ~after_delisting
     monthly = np.where(after_delisting, 1.0 + rf_monthly[months][:, None],
                        np.where(missing, 1.0, 1.0 + np.nan_to_num(returns)))
+    return monthly, delisted.any(axis=0), missing.sum(axis=0)
+
+
+def _growth_frame(permnos: np.ndarray, monthly: np.ndarray, delisted: np.ndarray,
+                  missing: np.ndarray) -> pd.DataFrame:
+    """One row per permno: growth over the period (the product of its months), delisted, missing_return_months."""
     return pd.DataFrame({'permno': permnos, 'growth': monthly.prod(axis=0),
-                         'delisted': delisted.any(axis=0), 'missing_return_months': missing.sum(axis=0)})
+                         'delisted': delisted, 'missing_return_months': missing})
+
+
+def portfolio_monthly_returns(weights: np.ndarray, monthly: np.ndarray) -> np.ndarray:
+    """
+    A buy-and-hold portfolio's return in each month of a holding period, before costs.
+
+    weights: each stock's weight at the start (summing to 1); monthly: the stocks'
+    monthly growth (months x stocks, see monthly_growth). The portfolio is worth
+    weights @ (compounded growth) at each month end, starting at 1, so the months
+    compound to the period's return. After the value reaches 0 the returns are 0.
+    """
+    value = np.concatenate(([1.0], weights @ np.cumprod(monthly, axis=0).T))
+    previous = value[:-1]
+    return np.divide(value[1:], previous, out=np.ones_like(previous), where=previous != 0) - 1.0
 
 
 def run_periods(data: WrdsData, dates: List[pd.Timestamp], factors: List[str],
@@ -275,6 +299,8 @@ def run_periods(data: WrdsData, dates: List[pd.Timestamp], factors: List[str],
     rf_monthly, rf_filled = _risk_free(data)
     by_date = dict(tuple(positions.groupby('date')))
     period_returns, rf_period, growth_rows = [], [], []
+    # Each month's return after costs (decimals) and its month end
+    month_returns, month_ends = [], []
     benchmarks = {role: [] for role in BENCHMARK_COLUMNS}
     used_months = np.zeros(len(data.months), dtype=bool)
     # Trading costs: the weights after drift at the end of the last period (empty = all
@@ -296,16 +322,23 @@ def run_periods(data: WrdsData, dates: List[pd.Timestamp], factors: List[str],
         if held is None:          # nothing to buy (e.g. a narrow GICS filter): the money earns rf
             gross = rf_period[-1]
             target = end_weights = pd.Series(dtype=float)     # sold into cash, held as cash
+            gross_months = rf_monthly[months]
         else:
-            growth = holding_period_growth(data, held['permno'].unique(), start, end, rf_monthly)
+            permnos = held['permno'].unique()
+            monthly, delisted, missing = monthly_growth(data, permnos, start, end, rf_monthly)
+            growth = _growth_frame(permnos, monthly, delisted, missing)
             growth_rows.append(growth.assign(date=start))
             g = held['permno'].map(growth.set_index('permno')['growth'])
             gross = float((held['weight'] * g).sum() - 1.0)
             by_permno = growth.set_index('permno')
             target = held.groupby('permno')['weight'].sum()   # Mixing sleeves netted: one position per stock
             end_weights = drifted_weights(target, by_permno['growth'], by_permno['delisted'])
+            gross_months = portfolio_monthly_returns(target.reindex(permnos).to_numpy(), monthly)
         period_turnover, traded = turnover(target, drifted)
         cost = cost_fraction(trading_cost_bps, period_turnover)
+        # The rebalance's cost is paid in the period's first month
+        month_returns.extend([net_return(float(gross_months[0]), cost)] + [float(r) for r in gross_months[1:]])
+        month_ends.extend(data.months[months])
         if held is not None:
             traded_rows.append(pd.DataFrame({'date': start, 'permno': target.index,
                                              'traded': traded.reindex(target.index).to_numpy()}))
@@ -346,6 +379,8 @@ def run_periods(data: WrdsData, dates: List[pd.Timestamp], factors: List[str],
         total_delisted_positions=int(growth['delisted'].sum()),
         missing_return_stock_months=int(growth['missing_return_months'].sum()),
         empty_rebalance_dates=[d.strftime('%Y-%m-%d') for d in rebalance_dates if d not in by_date],
+        monthly_dates=[d.strftime('%Y-%m-%d') for d in month_ends],
+        monthly_returns=(np.array(month_returns) * 100).tolist(),
     )
     traded = None     # holdings get a 'traded' column only with trading costs
     if trading_cost_bps > 0:
@@ -446,8 +481,10 @@ def run_wrds_backtest(data: WrdsData, factors: List[str], factor_directions: Dic
         per-period returns (in percent, under the Legacy key names such as yearly_returns),
         metrics annualized by frequency, 'years' as the period boundary dates, plus
         rebalance_dates, period_end_dates, cagr, benchmark_labels, rf_returns,
-        rf_filled_months, total_delisted_positions, missing_return_stock_months and
-        empty_rebalance_dates, and above 0 bps the fields of
+        rf_filled_months, total_delisted_positions, missing_return_stock_months,
+        empty_rebalance_dates, monthly_dates (every month end of the holding periods) and
+        monthly_returns (each month's return after costs, in percent; a period's months
+        compound to its return), and above 0 bps the fields of
         src/trading_costs.cost_results. holdings is one row per stock held per rebalance
         date (see _holdings_table), with a 'traded' column above 0 bps. At 0 bps both are
         exactly what they are without trading costs.
