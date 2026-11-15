@@ -195,6 +195,15 @@ Lambda's own durations (from the invocation log tail), 3008 MB function, course 
 - **Memory**: at most about 1.15 GB of the function's 3008 MB, with the Legacy and WRDS data both loaded.
 - **Package**: 61.7 MB zipped, 199 MB unzipped (Lambda allows 250 MB).
 
+### Factor risk on the dev function (2026-11-14)
+
+Two WRDS backtests, 2003-2025, Mixing, equal weight, 10 bps, computed (no cache) on the dev function. Each result's `factor_risk` was recomputed with statsmodels (OLS, HAC with the same lag) from its returned monthly returns and `market_monthly.parquet`: coefficients agree to 1e-15 and t-stats to 5e-14. The monthly returns compound to the period returns to 1e-13 percentage points. The lines are the ones the app builds from those saved numbers (Size is left out of them).
+
+| Job | Months | Alpha / yr (t) | R² | Exposures (t): Mkt, SMB, HML, RMW, CMA, UMD | Line | Compute | Result JSON |
+|---|---|---|---|---|---|---|---|
+| Monthly: Book/Price + 12-1 Mo Momentum | 276 (lag 5) | -0.19% (-0.14) | 0.94 | 1.20 (31.0), 1.08 (20.3), 0.17 (3.4), -0.27 (-3.7), 0.07 (0.8), -0.18 (-3.1) | Mostly a low-profitability and value tilt; alpha not significant. | 8.7 s | 144 KB |
+| Quarterly: ROE + Earnings/Price | 276 (lag 5) | -0.82% (-0.81) | 0.96 | 1.05 (30.6), 0.90 (22.8), 0.26 (6.2), 0.28 (4.9), -0.11 (-2.0), -0.18 (-5.2) | Mostly a value and anti-momentum tilt; alpha not significant. | 1.2 s | 56 KB |
+
 ### Admin: confirm the 90-day rule
 
 Saved results and WRDS holdings both live under `factor-lake-data/backtest-results/`, so one lifecycle rule on that prefix expires both. The class keys cannot read the bucket's lifecycle rules, so **an AWS admin must confirm** that the rule `factor-lake-expire-backtest-results` (prefix `factor-lake-data/backtest-results/`, expire after 90 days) is enabled on `sysen-5900-factor-lake`.

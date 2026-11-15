@@ -12,7 +12,9 @@ import pytest
 from aws_lambda import backtest_handler
 from src.backtest_jobs import decode_saved, job_hash
 from src.backtest_service import RESULTS_DIR, BacktestService, result_file
+from src.factor_risk import FACTOR_COLUMNS, MIN_MONTHS, wrds_factor_risk
 from src.s3_client import S3DataManager
+from src.saved_analyses import load_saved_analysis
 from src.wrds_data import DEFAULT_WRDS_DIR, MARKET_FILE, read_local_wrds_data, read_s3_wrds_data, wrds_dir
 from src.wrds_engine import run_wrds_backtest
 from src.wrds_holdings import holdings_file, holdings_parquet, read_holdings_date
@@ -81,7 +83,9 @@ def test_local_and_s3_give_the_same_data_with_only_the_needed_columns(local, man
     np.testing.assert_array_equal(a.returns, b.returns)
     np.testing.assert_array_equal(a.delisted, b.delisted)
     assert not {'ret_next_1m', 'delisted_next_month', 'security_extra'} & set(a.panel.columns)
-    assert list(a.market.columns) == ['iwm_total_ret', 'iwn_total_ret', 'iwo_total_ret', 'rf', 'tbill_3m']
+    assert list(a.market.columns) == ['iwm_total_ret', 'iwn_total_ret', 'iwo_total_ret', 'rf', 'tbill_3m',
+                                      'mktrf', 'smb', 'hml', 'rmw', 'cma', 'umd']
+    assert 'market_extra' not in a.market.columns
 
 
 def test_return_matrices_cover_every_month_of_either_file(frames, tmp_path):
@@ -106,7 +110,10 @@ def test_runner_gives_what_the_engine_gives_on_the_same_files(manager, local):
     job = wrds_job(use_market_cap_weight=True, restrict_fossil_fuels=True)
     results, holdings = WrdsBacktestRunner(manager).run(job)
     factors, directions, options = engine_arguments(job)
-    expected, expected_holdings = run_wrds_backtest(read_local_wrds_data(local), factors, directions, **options)
+    data = read_local_wrds_data(local)
+    expected, expected_holdings = run_wrds_backtest(data, factors, directions, **options)
+    # The runner adds the factor regression of the monthly returns
+    assert results.pop('factor_risk') == wrds_factor_risk(expected, data.market)
     assert results == expected
     pd.testing.assert_frame_equal(holdings, expected_holdings)
     assert set(holdings['picked_by']) <= {'ROE', '12-1 Mo Momentum', 'ROE, 12-1 Mo Momentum'}
@@ -149,6 +156,23 @@ def test_backtest_saves_its_holdings_before_the_result_and_the_result_lists_the_
     assert response['size_bytes'] < 100_000                    # the result JSON stays small
     saved_job, _ = decode_saved(s3.objects[f'{PREFIX}/{result_file(key)}'][0])
     assert saved_job == job                                   # the ID alone reopens it
+
+
+def test_a_backtest_saves_its_factor_regression_and_reopens_with_the_same_numbers(service, manager):
+    job = wrds_job(frequency='monthly')
+    risk = service.handle_event(job)['result']['factor_risk']
+    assert risk['months'] == 36 >= MIN_MONTHS and [f['factor'] for f in risk['factors']] == list(FACTOR_COLUMNS)
+    assert (risk['first_month'], risk['last_month']) == ('2010-01', '2012-12')
+    # From the cache, and opened by its ID (Results and Compare read the saved result)
+    cached = service.handle_event(json.loads(json.dumps(job)))
+    assert cached['cached'] is True and cached['result']['factor_risk'] == risk
+    assert load_saved_analysis(cached['hash'], manager)['result']['factor_risk'] == risk
+
+
+def test_a_backtest_too_short_for_the_regression_saves_none(service):
+    result = service.handle_event(wrds_job(start_year=2011, end_year=2012))['result']
+    assert len(result['monthly_returns']) == 24 < MIN_MONTHS
+    assert result['factor_risk'] is None
 
 
 def test_the_same_job_again_comes_from_the_cache(service, s3):

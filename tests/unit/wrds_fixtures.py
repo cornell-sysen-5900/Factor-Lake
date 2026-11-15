@@ -63,7 +63,7 @@ def wrds_file_bytes(frames: 'Frames') -> dict:
     """The three WRDS files as Parquet bytes, with extra columns the loader must not read."""
     panel = frames.panel.assign(ret_next_1m=0.5, delisted_next_month=False, security_extra='x')
     returns = frames.returns.assign(ticker='T', prc=1.0)
-    market = frames.market.assign(month=frames.market['month_end'].dt.strftime('%Y-%m'), smb=0.0)
+    market = frames.market.assign(month=frames.market['month_end'].dt.strftime('%Y-%m'), market_extra=0.0)
     out = {}
     for name, df in ((PANEL_FILE, panel), (RETURNS_FILE, returns), (MARKET_FILE, market)):
         buffer = io.BytesIO()
@@ -144,5 +144,7 @@ def synthetic_frames(first: str = '2009-11', last: str = '2013-02', n_stocks: in
                            'iwn_total_ret': rng.normal(0.007, 0.05, len(months)),
                            'iwo_total_ret': rng.normal(0.009, 0.06, len(months)),
                            'rf': rng.uniform(0.0, 0.004, len(months)),
-                           'tbill_3m': rng.uniform(0.0, 0.05, len(months))})[list(MARKET_COLUMNS)]
+                           'tbill_3m': rng.uniform(0.0, 0.05, len(months)),
+                           **{f: rng.normal(0.004, 0.03, len(months))
+                              for f in ('mktrf', 'smb', 'hml', 'rmw', 'cma', 'umd')}})[list(MARKET_COLUMNS)]
     return Frames(panel, returns, market)
