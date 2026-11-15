@@ -143,8 +143,10 @@ def _render_wrds_run(user_settings, selected_factor_names, factor_directions) ->
     """WRDS runs only in AWS Lambda, which reads the WRDS data from S3, so there is nothing to load."""
     st.caption("WRDS backtests run in AWS Lambda on the WRDS data in S3. "
                "No market data is loaded in the app.")
+    # Holding 100% of the filter needs no factor
+    needs_factor = not utils.wrds_holds_whole_filter(user_settings)
     if st.button("Run Portfolio Analysis", type="primary", width="stretch",
-                 disabled=not selected_factor_names, key="run_wrds_analysis"):
+                 disabled=needs_factor and not selected_factor_names, key="run_wrds_analysis"):
         with st.spinner("Running the WRDS backtest in AWS Lambda..."):
             run = utils.run_wrds_backtest_logic(user_settings, selected_factor_names, factor_directions)
         if run is not None:

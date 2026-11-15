@@ -103,16 +103,18 @@ def render_wrds_results(run: Dict[str, Any]) -> None:
     _render_period_table(run, frequency)
     st.divider()
 
-    # 6. Top vs Bottom Cohort Analysis, at the run's frequency on its dates
-    initial = float(settings['initial_aum'])
-    _render_cohort_analysis_section(
-        run,
-        n_years=len(results['yearly_returns']) / int(results['periods_per_year']),
-        chart=dict(benchmark_returns=_build_wealth_series(results['benchmark_returns'], initial),
-                   benchmark_label=names['benchmark'], growth_label=names['growth'],
-                   value_label=names['value'], dates=True),
-    )
-    st.divider()
+    # 6. Top vs Bottom Cohort Analysis, at the run's frequency on its dates (a run without
+    # factors holds the whole filter: there is nothing to rank into cohorts)
+    if run['factors']:
+        initial = float(settings['initial_aum'])
+        _render_cohort_analysis_section(
+            run,
+            n_years=len(results['yearly_returns']) / int(results['periods_per_year']),
+            chart=dict(benchmark_returns=_build_wealth_series(results['benchmark_returns'], initial),
+                       benchmark_label=names['benchmark'], growth_label=names['growth'],
+                       value_label=names['value'], dates=True),
+        )
+        st.divider()
 
     # 7. Advanced Backtest Statistics
     st.header("Advanced Backtest Statistics")
@@ -182,6 +184,8 @@ def _render_holdings(run: Dict[str, Any]) -> None:
             _render_holdings_dataframe(run, table, table_number_formats(table, run['factors'], labels),
                                        f"holdings_{date}.csv")
 
+    if not run['factors']:          # every stock in the filter is held, unranked
+        return
     with st.expander("All ranked stocks on this date", expanded=False, key=f"wrds_ranked_expander_{run['id']}"):
         st.caption("Every stock the strategy could buy on this date, ranked by the composite score "
                    "(the mean of the factors' z-scores). Computed in AWS Lambda.")

@@ -78,14 +78,24 @@ PARAMETER_DEFAULTS = {
     'initial_aum_input': 1000.0,
     TRADING_COST_KEY: 0,
 }
-# WRDS mode's inputs: the shared ones, with its frequency and years in place of Legacy's
-# delisting strategy and years
+# WRDS Hold choice: how many of the filtered stocks each selection holds, a percent or a
+# number of stocks (src/wrds_engine.hold_rule), with each one's number input and default
+HOLD_KEY = "wrds_hold_input"
+HOLD_PCT, HOLD_COUNT = "Top X%", "Top N stocks"
+TOP_PCT_KEY, TOP_N_KEY = "wrds_top_pct_input", "wrds_top_n_input"
+DEFAULT_TOP_PCT, DEFAULT_TOP_N = 10, 50
+WHOLE_FILTER_CAPTION = "Holds every stock in the filter, so factors are not used: you can run without any."
+# WRDS mode's inputs: the shared ones, with its frequency, years and Hold choice in place of
+# Legacy's delisting strategy and years
 WRDS_PARAMETER_DEFAULTS = {
     **{k: v for k, v in PARAMETER_DEFAULTS.items()
        if k not in ('delisting_strategy_input', 'start_year_input', 'end_year_input')},
     'wrds_frequency_input': config.WRDS_DEFAULT_FREQUENCY,
     'wrds_start_year_input': WRDS_FIRST_YEAR,
     'wrds_end_year_input': WRDS_LAST_YEAR,
+    HOLD_KEY: HOLD_PCT,
+    TOP_PCT_KEY: DEFAULT_TOP_PCT,
+    TOP_N_KEY: DEFAULT_TOP_N,
 }
 
 
@@ -130,7 +140,8 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
     Returns:
         Dict[str, Any]: Standardized dictionary of user-defined parameters. Legacy
             settings are exactly as before WRDS mode (no data_mode key); WRDS settings
-            have data_mode 'wrds' and frequency, and no delisting strategy. Both have
+            have data_mode 'wrds' and frequency, and no delisting strategy, and top_pct
+            or top_n only when the Hold choice is not the top 10%. Both have
             trading_cost_bps only when it is above 0, so settings at 0 bps are as before.
     """
     with st.sidebar:
@@ -184,6 +195,7 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
 
         if use_market_cap_weight:
             st.info("Portfolio will be weighted by market capitalization, aligning with the Russell 2000 methodology.")
+        hold = _render_wrds_hold() if wrds else {}
 
         st.divider()
 
@@ -309,6 +321,7 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
             "end_year": end_year,
             "initial_aum": initial_aum,
             "use_lambda": use_lambda,
+            **hold,
             **costs
         }
     return {
@@ -324,6 +337,49 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
         "use_lambda": use_lambda,
         **costs
     }
+
+
+def _render_wrds_hold() -> Dict[str, Any]:
+    """
+    WRDS's Hold choice: the top X% (1-100) or the top N stocks of the filter, with one number
+    input that changes with it. Returns the settings it adds: {'top_pct': x} unless it is 10%,
+    {'top_n': n}, or nothing at the default 10%, so default settings are as before.
+    """
+    choice = st.radio(
+        "Hold",
+        options=[HOLD_PCT, HOLD_COUNT],
+        index=0,
+        horizontal=True,
+        key=HOLD_KEY,
+        help="How many of the filtered stocks the portfolio holds at each rebalance, best scores first. "
+             "In Mixing, each factor's sleeve holds this many."
+    )
+    if choice == HOLD_COUNT:
+        top_n = st.number_input(
+            "Number of stocks",
+            min_value=1,
+            value=DEFAULT_TOP_N,
+            step=1,
+            format="%d",
+            key=TOP_N_KEY,
+            help="The N best-scoring stocks at each rebalance. A date with fewer stocks in the filter holds "
+                 "all of them. The filter's size changes by date, so a factor is still needed."
+        )
+        return {'top_n': int(top_n)}
+    top_pct = st.number_input(
+        "Percent of stocks",
+        min_value=1,
+        max_value=100,
+        value=DEFAULT_TOP_PCT,
+        step=1,
+        format="%d",
+        key=TOP_PCT_KEY,
+        help="The best-scoring X% of the stocks at each rebalance (at least one). 100% holds every stock "
+             "in the filter."
+    )
+    if top_pct >= 100:
+        st.caption(WHOLE_FILTER_CAPTION)
+    return {} if top_pct == DEFAULT_TOP_PCT else {'top_pct': float(top_pct)}
 
 
 def _render_wrds_gics_filter() -> Optional[Dict[str, Any]]:

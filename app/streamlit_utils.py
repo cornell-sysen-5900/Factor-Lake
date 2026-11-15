@@ -436,6 +436,15 @@ def wrds_job_for_inputs(user_settings: Dict[str, Any], factor_names: List[str],
                           user_settings, factor_labels=dict(zip(columns, labels)))
 
 
+def wrds_holds_whole_filter(settings: Dict[str, Any]) -> bool:
+    """True when WRDS settings hold every stock in the filter (Top 100%), so a run needs no factor."""
+    from src.wrds_engine import holds_whole_filter
+    try:
+        return holds_whole_filter(settings.get('top_pct'), settings.get('top_n'))
+    except ValueError:
+        return False
+
+
 def wrds_run_job(run: Dict[str, Any]) -> Dict[str, Any]:
     """The backtest job of a saved WRDS run, rebuilt from its saved factors and settings."""
     from src.wrds_jobs import build_wrds_job
@@ -457,7 +466,7 @@ def run_wrds_backtest_logic(user_settings: Dict[str, Any], factor_names: List[st
     from app.streamlit_config import MAX_SAVED_RUNS, WRDS_FACTOR_METADATA
 
     factor_labels = [f for f in factor_names if f in WRDS_FACTOR_METADATA]
-    if not factor_labels:
+    if not factor_labels and not wrds_holds_whole_filter(user_settings):
         st.warning("Select at least one factor before running the analysis.")
         return None
     if float(user_settings['initial_aum']) <= 0:
