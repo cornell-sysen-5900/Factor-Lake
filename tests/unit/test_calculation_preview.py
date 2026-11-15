@@ -1,10 +1,12 @@
 """Acceptance tests for live strategy formulas and historical run snapshots."""
 import copy
+import re
 
 import pytest
 
 from app.calculation_preview import build_calculation_preview, preview_for_run
 from app.streamlit_config import FACTOR_METADATA
+from tests.unit.test_local_run_filters import state  # noqa: F401 (fixture)
 from tests.unit.test_saved_runs import (
     _add_factor,
     _assert_clean,
@@ -115,3 +117,66 @@ def test_preview_includes_new_trading_cost_setting():
     assert "Trading cost = 25 bps" in preview["formula"]
     assert "R_net(t)" in preview["formula"]
     assert preview["steps"][-1][0] == "Apply trading costs"
+
+
+# ---------------------------------------------------------------------------
+# The preview's numbers are the engine's: it must not drift from what it describes
+# ---------------------------------------------------------------------------
+
+def _engine_spy(monkeypatch):
+    """Records the keyword arguments of every rebalance_portfolio call, local or in a Lambda job."""
+    import src.backtest_engine as engine
+    import src.backtest_jobs as jobs
+    calls, real = [], engine.rebalance_portfolio
+
+    def spy(*args, **kwargs):
+        calls.append(kwargs)
+        return real(*args, **kwargs)
+    monkeypatch.setattr(engine, "rebalance_portfolio", spy)
+    monkeypatch.setattr(jobs, "rebalance_portfolio", spy)
+    return calls
+
+
+def _numbers(pattern, text):
+    return [float(value) for value in re.findall(pattern, text)]
+
+
+@pytest.mark.parametrize("path", ["local", "lambda"])
+@pytest.mark.parametrize("chosen", [
+    {},                                                                  # the defaults: 10%, no cost
+    {"top_pct": 5.0, "trading_cost_bps": 25.0, "factor_combination": "integrating"},
+    {"top_pct": 12.5, "trading_cost_bps": 7.5},
+    {"top_pct": 33.3, "trading_cost_bps": 0.0, "factor_combination": "integrating"},
+])
+def test_preview_top_pct_and_trading_cost_match_the_engine(state, monkeypatch, path, chosen):
+    import app.streamlit_utils as utils
+    from src.backtest_jobs import run_job
+    calls = _engine_spy(monkeypatch)
+    settings = {"start_year": 2002, "end_year": 2006, "initial_aum": 1000.0, "selected_sectors": [],
+                "restrict_fossil_fuels": False, "use_lambda": path == "lambda", **chosen}
+    if path == "lambda":
+        class Client:
+            def run(self, job):
+                return run_job(state.raw_data, job), {"function_name": "test"}
+        monkeypatch.setenv(utils.BACKTEST_LAMBDA_ENV, "test")
+        monkeypatch.setattr(utils, "get_lambda_client", lambda name: Client())
+    else:
+        utils.load_and_process_data(settings)
+    run = utils.run_backtest_logic(settings, ["ROA %", "ROE using 9/30 Data"],
+                                   {"ROA %": "top", "ROE using 9/30 Data": "bottom"})
+    assert len(calls) == 1
+    engine = calls[0]
+    preview = run["calculation_preview"]
+    text = preview["formula"] + "\n" + "\n".join(f"{title}: {body}" for title, body in preview["steps"])
+    # Every "highest X%" in the formula and its steps is the engine's top_pct
+    shown = _numbers(r"highest ([\d.]+)%", text)
+    assert len(shown) >= 2 and set(shown) == {float(engine["top_pct"])}
+    # The trading cost lines show the engine's cost, and appear only when it charges one
+    cost = float(engine["trading_cost_bps"])
+    if cost > 0:
+        assert _numbers(r"Trading cost = ([\d.]+) bps", text) == [cost]
+        assert _numbers(r"c\(t\) = ([\d.]+) / 10000", text) == [cost]
+        assert preview["steps"][-1][0] == "Apply trading costs"
+    else:
+        assert "Trading cost" not in text and "R_net" not in text
+        assert "Apply trading costs" not in [title for title, _ in preview["steps"]]

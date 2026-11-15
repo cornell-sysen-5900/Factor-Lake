@@ -16,11 +16,12 @@ class _State(dict):
 
 
 def _universe():
-    """Two sectors, 2002-2006, with the columns the loader and engine read."""
+    """Two sectors, 2002-2006, with the columns the loader and engine read (ROA and ROE factors)."""
     rng = np.random.RandomState(1)
     return pd.DataFrame([{
         'Ticker': f'{sector[0]}{i:02d}', 'Year': year, 'Ending_Price': rng.uniform(10, 100),
         'Next-Years_Return': rng.normal(8, 20), 'ROA': rng.normal(0.05, 0.03),
+        'ROE_using_9-30_Data': rng.normal(0.1, 0.05),
         'Market_Capitalization': rng.uniform(1e8, 5e9), 'Scotts_Sector_5': sector, 'FactSet_Industry': 'Software',
     } for year in range(2002, 2007) for sector in ('Technology', 'Health') for i in range(10)])
 
