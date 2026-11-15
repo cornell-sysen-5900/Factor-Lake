@@ -35,7 +35,14 @@ from .wrds_calendar import FREQUENCY_LABELS
 from .wrds_data import WRDS_FILES, WrdsData, read_s3_wrds_data, wrds_dir
 from .wrds_engine import rank_stocks, run_wrds_backtest
 from .wrds_holdings import holdings_file, holdings_parquet
-from .wrds_jobs import describe_wrds_job, engine_arguments, validate_wrds_job, wrds_code_version
+from .wrds_jobs import (
+    WRDS_TOP_PCT,
+    describe_hold,
+    describe_wrds_job,
+    engine_arguments,
+    validate_wrds_job,
+    wrds_code_version,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +51,16 @@ def summarize_wrds_job(job: Dict[str, Any]) -> str:
     """
     A short description of a WRDS job for listings: the data source and frequency, then
     Legacy's summary, e.g. "WRDS, Quarterly | ROE (higher), ROA (higher) | Mixing |
-    2002-2026 | $1,000". Stored as S3 metadata, so it is kept ASCII and short.
+    2002-2026 | $1,000", then how many stocks it holds when that is not the top 10%
+    ("| Top 20 stocks"). Stored as S3 metadata, so it is kept ASCII and short.
     """
     frequency = FREQUENCY_LABELS.get(job['frequency'], job['frequency'])
-    return f"WRDS, {frequency} | {summarize_job(job)}".encode('ascii', 'replace').decode()[:500]
+    text = summarize_job(job)
+    if not job['factors']:                 # a run holding the whole filter
+        text = 'No factors' + text
+    if job.get('top_n') is not None or job['top_pct'] != WRDS_TOP_PCT:
+        text += f" | {describe_hold(job)}"
+    return f"WRDS, {frequency} | {text}".encode('ascii', 'replace').decode()[:500]
 
 
 class WrdsBacktestRunner:
@@ -101,7 +114,7 @@ class WrdsBacktestRunner:
             results['factor_risk'] = wrds_factor_risk(results, data.market)
             return results, holdings
         if job['kind'] == 'cohort':
-            options['top_pct'] = job['cohort_pct']
+            options.update(top_pct=job['cohort_pct'], top_n=None)
             top, _ = run_wrds_backtest(data, factors, directions, **options)
             inverse = {f: 'bottom' if d == 'top' else 'top' for f, d in directions.items()}
             bottom, _ = run_wrds_backtest(data, factors, inverse, **options)
@@ -110,7 +123,7 @@ class WrdsBacktestRunner:
         date = data.month_date(job['rebalance_date'])
         table = rank_stocks(data, date, factors, directions, job['factor_combination'], job['top_pct'],
                             job['use_market_cap_weight'], job['restrict_fossil_fuels'], job['selected_sectors'],
-                            job.get('gics_filter'))
+                            job.get('gics_filter'), job.get('top_n'))
         return {'rebalance_date': date.strftime('%Y-%m-%d'), 'columns': list(table.columns),
                 'rows': table.to_dict('records')}, None
 

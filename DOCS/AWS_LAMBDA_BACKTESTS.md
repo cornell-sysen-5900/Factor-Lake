@@ -204,6 +204,19 @@ Two WRDS backtests, 2003-2025, Mixing, equal weight, 10 bps, computed (no cache)
 | Monthly: Book/Price + 12-1 Mo Momentum | 276 (lag 5) | -0.19% (-0.14) | 0.94 | 1.20 (31.0), 1.08 (20.3), 0.17 (3.4), -0.27 (-3.7), 0.07 (0.8), -0.18 (-3.1) | Mostly a low-profitability and value tilt; alpha not significant. | 8.7 s | 144 KB |
 | Quarterly: ROE + Earnings/Price | 276 (lag 5) | -0.82% (-0.81) | 0.96 | 1.05 (30.6), 0.90 (22.8), 0.26 (6.2), 0.28 (4.9), -0.11 (-2.0), -0.18 (-5.2) | Mostly a value and anti-momentum tilt; alpha not significant. | 1.2 s | 56 KB |
 
+### Hold size on the dev function (2026-11-15)
+
+One sub-industry job, Regional Banks (GICS 40101015), Book/Price (higher is better), quarterly 2003-2025 (92 rebalances), Mixing, equal weight, 10 bps, at four Hold choices, each computed (no cache) on the dev function. The holdings counts were read from each run's holdings file in S3 and checked against the filter computed separately from `factor_panel_monthly.parquet` (members with a positive price and market cap in the sub-industry): 10% is `max(1, floor(0.1 n))` and Top 20 is `min(20, n)` at every date (n = stocks with a Book/Price), and 100%, with or without the factor, is every stock in the filter, including the few without a Book/Price (for example 223 held, 220 scored, on 2003-06-30). The two 100% runs have identical returns.
+
+| Hold | Stocks held per rebalance | CAGR | Compute | Result JSON |
+|---|---|---|---|---|
+| Top 10% (default) | 14 to 27 | 3.77% | 4.7 s (the container's first job, with the WRDS data load) | 56 KB |
+| Top 100% | 146 to 270 (the whole filter) | 6.38% | 0.8 s | 56 KB |
+| Top 100%, no factors | 146 to 270 (the whole filter) | 6.38% | 0.7 s | 56 KB |
+| Top 20 stocks | 20 | 4.82% | 0.7 s | 56 KB |
+
+Top N in Mixing holds N stocks in total (the factors take turns). The same Regional Banks job with two factors, Book/Price then 12-1 Mo Momentum, at Top 20 (computed fresh, 5.0 s as the first job after the deploy, CAGR 3.55%) held exactly 20 stocks at all 92 rebalances, 10 picked by each factor. Each date's picks, and the factor that picked each stock, match the turn rule recomputed separately from the S3 panel's z-scores. The two factors' top 20s shared stocks on 39 of the 92 dates (up to 4).
+
 ### Admin: confirm the 90-day rule
 
 Saved results and WRDS holdings both live under `factor-lake-data/backtest-results/`, so one lifecycle rule on that prefix expires both. The class keys cannot read the bucket's lifecycle rules, so **an AWS admin must confirm** that the rule `factor-lake-expire-backtest-results` (prefix `factor-lake-data/backtest-results/`, expire after 90 days) is enabled on `sysen-5900-factor-lake`.

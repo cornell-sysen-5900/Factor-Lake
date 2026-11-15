@@ -436,6 +436,15 @@ def wrds_job_for_inputs(user_settings: Dict[str, Any], factor_names: List[str],
                           user_settings, factor_labels=dict(zip(columns, labels)))
 
 
+def wrds_holds_whole_filter(settings: Dict[str, Any]) -> bool:
+    """True when WRDS settings hold every stock in the filter (Top 100%), so a run needs no factor."""
+    from src.wrds_engine import holds_whole_filter
+    try:
+        return holds_whole_filter(settings.get('top_pct'), settings.get('top_n'))
+    except ValueError:
+        return False
+
+
 def wrds_run_job(run: Dict[str, Any]) -> Dict[str, Any]:
     """The backtest job of a saved WRDS run, rebuilt from its saved factors and settings."""
     from src.wrds_jobs import build_wrds_job
@@ -457,7 +466,7 @@ def run_wrds_backtest_logic(user_settings: Dict[str, Any], factor_names: List[st
     from app.streamlit_config import MAX_SAVED_RUNS, WRDS_FACTOR_METADATA
 
     factor_labels = [f for f in factor_names if f in WRDS_FACTOR_METADATA]
-    if not factor_labels:
+    if not factor_labels and not wrds_holds_whole_filter(user_settings):
         st.warning("Select at least one factor before running the analysis.")
         return None
     if float(user_settings['initial_aum']) <= 0:
@@ -539,6 +548,9 @@ def open_saved_analysis(text: str) -> Dict[str, Any]:
     costs = {'trading_cost_bps': job['trading_cost_bps']} if job.get('trading_cost_bps') else {}
     # WRDS jobs saved before the GICS filter have selected_sectors only
     gics = {'gics_filter': job['gics_filter']} if job.get('gics_filter') else {}
+    # The WRDS Hold choice, in the settings only when it is not the top 10% (as the sidebar gives it)
+    hold = ({'top_n': job['top_n']} if job.get('top_n') is not None else
+            {'top_pct': job['top_pct']} if job.get('top_pct', 10.0) != 10.0 else {})
     factor_labels = [job['factor_labels'].get(f, f) for f in job['factors']]
     run_id = st.session_state.next_run_id
     compute = {'hash': saved['id'], 'opened': True, 'cached': True,
@@ -554,7 +566,7 @@ def open_saved_analysis(text: str) -> Dict[str, Any]:
             'factor_directions': dict(job['factor_directions']),
             'settings': {'data_mode': 'wrds', **{k: job[k] for k in (
                 'frequency', 'start_year', 'end_year', 'initial_aum', 'use_market_cap_weight',
-                'factor_combination', 'restrict_fossil_fuels', 'selected_sectors')}, **gics, **costs},
+                'factor_combination', 'restrict_fossil_fuels', 'selected_sectors')}, **gics, **hold, **costs},
             'universe': {'restrict_fossil_fuels': job['restrict_fossil_fuels'],
                          'selected_sectors': list(job['selected_sectors']), **gics},
             'calculation_preview': wrds_preview(job),

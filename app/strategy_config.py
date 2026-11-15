@@ -4,6 +4,10 @@ Versioned, inputs-only strategy files. Validation never mutates application stat
 WRDS settings may also have gics_filter ({'level', 'codes'}, src/wrds_gics.py), the GICS
 filter of the sidebar's Filter level; with it, selected_sectors is []. Files without it
 (older ones, with selected_sectors) open at the Sector level.
+
+WRDS settings have the sidebar's Hold choice only when it is not the top 10%: top_pct (a
+whole percent, 1 to 100) or top_n (a whole number of stocks from 1), never both. Files
+without them (older ones too) hold the top 10%. At top_pct 100 a file may have no factors.
 """
 import json
 import math
@@ -20,7 +24,12 @@ COMMON = {'start_year', 'end_year', 'initial_aum', 'restrict_fossil_fuels',
           'use_market_cap_weight', 'factor_combination', 'selected_sectors',
           'sector_filter_enabled', 'trading_cost_bps'}
 # WRDS settings that are there only when set
-WRDS_OPTIONAL = {'gics_filter'}
+WRDS_OPTIONAL = {'gics_filter', 'top_pct', 'top_n'}
+# The WRDS Hold choice's sidebar widgets (app/components/sidebar.py): the choice, and the
+# number input of each option, with their defaults
+HOLD_INPUT, TOP_PCT_INPUT, TOP_N_INPUT = 'wrds_hold_input', 'wrds_top_pct_input', 'wrds_top_n_input'
+HOLD_PCT, HOLD_COUNT = 'Top X%', 'Top N stocks'
+DEFAULT_TOP_PCT, DEFAULT_TOP_N = 10, 50
 # Sidebar widgets of the WRDS GICS filter (app/components/sidebar.py): the level picker and
 # each level's list
 GICS_LEVEL_INPUT = 'wrds_gics_level_input'
@@ -88,9 +97,19 @@ def validate(document):
             raise ValueError(f'Invalid GICS filter: {exc}') from exc
         require(s['sector_filter_enabled'] and sectors == [],
                 'A GICS filter needs sector filtering on and an empty selected_sectors.')
+    whole_number = lambda v: type(v) in (int, float) and math.isfinite(v) and v == int(v)  # noqa: E731
+    if 'top_pct' in s:
+        require(whole_number(s['top_pct']) and 1 <= s['top_pct'] <= 100,
+                'top_pct must be a whole percent from 1 to 100.')
+    if 'top_n' in s:
+        require(whole_number(s['top_n']) and s['top_n'] >= 1, 'top_n must be a whole number of at least 1.')
+        require('top_pct' not in s, 'Settings hold either top_pct or top_n, not both.')
     factors = document['factors']
     columns = {m['column'] for m in catalog(mode).values()}
-    require(isinstance(factors, list) and 0 < len(factors) <= len(columns), 'Select at least one supported factor.')
+    # Holding every stock in the filter (WRDS at 100%) needs no factor
+    least = 0 if mode == 'wrds' and s.get('top_pct') == 100 else 1
+    require(isinstance(factors, list) and least <= len(factors) <= len(columns),
+            'Select at least one supported factor.')
     seen = set()
     for f in factors:
         require(isinstance(f, dict) and set(f) == {'column', 'direction'}, 'Each factor needs column and direction.')
@@ -119,14 +138,20 @@ def loads(raw):
 
 def build(settings, factors, directions, name='', note='', mode=None):
     mode = mode or settings.get('data_mode', 'legacy')
-    # Refuse to silently discard engine settings that the current controls cannot restore.
-    if settings.get('top_pct', 10.0) != 10.0 or settings.get('benchmark_index', 1) != 1:
+    # Refuse to silently discard engine settings that the current controls cannot restore
+    # (only WRDS mode has the Hold choice).
+    custom_pct = mode != 'wrds' and (settings.get('top_pct', 10.0) != 10.0 or 'top_n' in settings)
+    if custom_pct or settings.get('benchmark_index', 1) != 1:
         raise ValueError('This run uses a custom portfolio percentage or benchmark '
                          'not supported by the current controls.')
     fields = COMMON | ({'frequency'} if mode == 'wrds' else {'delisting_strategy'})
     s = {k: deepcopy(settings[k]) for k in fields if k in settings}
     if mode == 'wrds' and settings.get('gics_filter'):
         s['gics_filter'] = deepcopy(settings['gics_filter'])
+    if mode == 'wrds' and settings.get('top_n') is not None:
+        s['top_n'] = int(settings['top_n'])
+    elif mode == 'wrds' and settings.get('top_pct', 10.0) not in (None, 10.0):
+        s['top_pct'] = int(settings['top_pct']) if float(settings['top_pct']).is_integer() else settings['top_pct']
     s.setdefault('trading_cost_bps', 0)
     s.setdefault('sector_filter_enabled', bool(s.get('selected_sectors')))
     if not s['sector_filter_enabled']:
@@ -177,6 +202,10 @@ def widget_values(document):
     if mode == 'wrds':
         values['wrds_frequency_input'] = next(k for k, v in config.WRDS_FREQUENCY_OPTIONS.items()
                                               if v == s['frequency'])
+        # The Hold choice: a file without one (older files too) holds the top 10%
+        values[HOLD_INPUT] = HOLD_COUNT if 'top_n' in s else HOLD_PCT
+        values[TOP_PCT_INPUT] = int(s.get('top_pct', DEFAULT_TOP_PCT))
+        values[TOP_N_INPUT] = int(s.get('top_n', DEFAULT_TOP_N))
     else:
         values['delisting_strategy_input'] = {
             'zero_return': 'Zero Return', 'hold_cash': 'Hold Cash', 'reinvest': 'Reinvest',

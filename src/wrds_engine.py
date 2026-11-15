@@ -13,8 +13,15 @@ See DOCS/WRDS_MODE_DESIGN.md, sections 3, 4 and 7. At each rebalance date t:
    (winsorize at 1% / 99%, negate for 'bottom', z-score with ddof=1).
    Integrating ranks the mean z-score of stocks that have every factor; Mixing ranks
    each factor in its own sleeve with an equal share of the money.
-3. Selection: the top max(1, floor(n * top_pct / 100)) by score, ties broken by permno,
-   equal or market cap (mkt_cap_musd at t) weighted.
+3. Selection: the top max(1, floor(n * top_pct / 100)), or the top min(top_n, n), of the
+   n stocks with a score, by score, ties broken by permno. In Mixing, top_pct applies
+   to each sleeve; top_n is top_n different stocks in total, the sleeves taking turns in
+   factor order, each adding its next-best stock and skipping stocks already picked.
+   top_n only ever holds stocks with a score (all of them when there are at most top_n).
+   At top_pct 100 every stock in the filter is held, with or without a score (a run
+   without factors holds the whole filter, so it needs top_pct 100). Equal or market cap
+   (mkt_cap_musd at t) weighted: within each sleeve, or for Mixing with top_n across
+   all the picked stocks.
 4. Holding period (t, t']: buy and hold, so weights drift with each stock's compounded
    monthly returns (delisting returns included). After a stock's delisting month its
    money earns the risk-free rate until t'. A month without a return, before any
@@ -43,6 +50,10 @@ from .wrds_factors import WRDS_FACTOR_COLUMNS
 from .wrds_gics import gics_mask, job_gics_filter
 
 FACTOR_COMBINATIONS = ('mixing', 'integrating')
+# Share of the stocks each selection holds when no top_pct or top_n is given
+DEFAULT_TOP_PCT = 10.0
+# picked_by of the holdings of a run without factors (it holds the whole filter)
+WHOLE_FILTER_LABEL = 'Every stock in the filter'
 # Tail share capped at both ends before z-scoring (Legacy's normalize_series default)
 WINSORIZE_PCT = 0.01
 # Fossil fuel companies, matching Legacy's five FactSet industries (design 2.3):
@@ -61,23 +72,48 @@ HOLDINGS_GICS_COLUMNS = {'gsector_name': 'gics_sector', 'ggroup_name': 'gics_ind
                          'gind_name': 'gics_industry', 'gsubind_name': 'gics_sub_industry'}
 
 
+def hold_rule(top_pct: Optional[float] = None, top_n: Optional[int] = None) -> Tuple[Optional[float], Optional[int]]:
+    """
+    How many stocks each selection holds, as (top_pct, None) or (None, top_n): the top
+    top_pct% (above 0, at most 100) or the top top_n stocks (a whole number from 1). Only
+    one of the two can be given; neither is the default, the top 10%.
+    """
+    if top_n is not None:
+        if top_pct is not None:
+            raise ValueError("Hold either a top_pct or a top_n of the stocks, not both.")
+        if not isinstance(top_n, (int, np.integer)) or isinstance(top_n, bool) or top_n < 1:
+            raise ValueError("top_n must be a whole number of at least 1.")
+        return None, int(top_n)
+    top_pct = DEFAULT_TOP_PCT if top_pct is None else top_pct
+    if not 0 < top_pct <= 100:
+        raise ValueError("top_pct must be above 0 and at most 100.")
+    return float(top_pct), None
+
+
+def holds_whole_filter(top_pct: Optional[float] = None, top_n: Optional[int] = None) -> bool:
+    """True when every date holds every stock in the filter whatever the scores (top_pct 100)."""
+    return hold_rule(top_pct, top_n) == (100.0, None)
+
+
 def validate_inputs(factors: List[str], factor_directions: Dict[str, str], factor_combination: str,
-                    top_pct: float, selected_sectors: Optional[Iterable[str]],
-                    gics_filter: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+                    top_pct: Optional[float], selected_sectors: Optional[Iterable[str]],
+                    gics_filter: Optional[Dict[str, Any]] = None,
+                    top_n: Optional[int] = None) -> Optional[Dict[str, Any]]:
     """
     Raises ValueError for inputs a WRDS backtest cannot run. Returns the GICS filter to
     apply (src/wrds_gics.job_gics_filter): gics_filter, or selected_sectors as a sector filter.
+    A run without factors is allowed only at top_pct 100, which holds every stock in the filter.
     """
-    if not factors:
-        raise ValueError("A backtest needs at least one factor.")
+    hold_rule(top_pct, top_n)
+    if not factors and not holds_whole_filter(top_pct, top_n):
+        raise ValueError("A backtest needs at least one factor, unless it holds every stock in the filter "
+                         "(top_pct 100).")
     if bad := [f for f in factors if f not in WRDS_FACTOR_COLUMNS]:
         raise ValueError(f"Not WRDS factors: {bad}. Factors must be columns known at the rebalance date.")
     if bad := [d for d in (factor_directions.get(f, 'top') for f in factors) if d not in ('top', 'bottom')]:
         raise ValueError(f"Factor directions must be 'top' or 'bottom', not {bad}.")
     if factor_combination not in FACTOR_COMBINATIONS:
         raise ValueError(f"factor_combination must be one of {FACTOR_COMBINATIONS}, not '{factor_combination}'.")
-    if not 0 < top_pct <= 100:
-        raise ValueError("top_pct must be above 0 and at most 100.")
     return job_gics_filter(gics_filter, selected_sectors)
 
 
@@ -119,47 +155,118 @@ def factor_zscores(universe: pd.DataFrame, column: str, higher_is_better: bool) 
     return pd.Series(np.where(sigma > 1e-12, centered / sigma, centered), index=s.index)
 
 
-def _top_ranked(universe: pd.DataFrame, scores: pd.Series, top_pct: float,
+def _top_ranked(universe: pd.DataFrame, scores: pd.Series, top_pct: Optional[float], top_n: Optional[int],
                 use_market_cap_weight: bool) -> pd.DataFrame:
     """
-    The top top_pct% by score on each date (at least one), best first with ties broken
-    by permno, and each one's weight within the selection.
+    On each date, the top top_pct% (at least one) or the top top_n of the stocks with a
+    score, best first with ties broken by permno, and each one's weight within the
+    selection. top_n holds only stocks with a score, all of them when there are at most
+    top_n. At top_pct 100 every stock in universe is picked, those without a score ranked
+    last by permno.
     """
     ranked = pd.DataFrame({'date': universe['date'], 'permno': universe['permno'], 'score': scores,
                            'cap': universe['mkt_cap_musd']})
-    ranked = ranked[ranked['score'].notna()].sort_values(
-        ['date', 'score', 'permno'], ascending=[True, False, True], kind='mergesort')
+    ranked = ranked.sort_values(['date', 'score', 'permno'], ascending=[True, False, True],
+                                na_position='last', kind='mergesort')
     by_date = ranked.groupby('date', sort=False)
     ranked['rank'] = by_date.cumcount() + 1
-    n = by_date['permno'].transform('size')
-    picked = ranked[ranked['rank'] <= np.maximum(1, np.floor(n * (top_pct / 100.0)))].copy()
+    scored = ranked['score'].notna()
+    if top_n is not None:
+        limit, whole = top_n, False
+    else:
+        limit = np.maximum(1, np.floor(scored.groupby(ranked['date']).transform('sum') * (top_pct / 100.0)))
+        whole = top_pct >= 100.0
+    picked = ranked[whole | (scored & (ranked['rank'] <= limit))].copy()
     raw = picked['cap'] if use_market_cap_weight else pd.Series(1.0, index=picked.index)
     picked['weight'] = raw / raw.groupby(picked['date']).transform('sum')
     return picked.drop(columns='cap')
 
 
 def select_positions(universe: pd.DataFrame, factors: List[str], factor_directions: Dict[str, str],
-                     factor_combination: str = 'mixing', top_pct: float = 10.0,
-                     use_market_cap_weight: bool = False) -> pd.DataFrame:
+                     factor_combination: str = 'mixing', top_pct: Optional[float] = None,
+                     use_market_cap_weight: bool = False, top_n: Optional[int] = None) -> pd.DataFrame:
     """
     The positions bought at every date in universe: date, sleeve, permno, rank (within
     the sleeve), score, and weight (share of the whole portfolio; each date sums to 1).
 
     Integrating is one sleeve ranked by the mean z-score of the stocks that have every
-    factor. Mixing is one sleeve per factor, each with 1 / len(factors) of the money.
+    factor. Mixing with top_pct is one sleeve per factor, each with 1 / len(factors) of
+    the money and its own top_pct%. Mixing with top_n holds top_n different stocks in
+    total, the sleeves taking turns (see _take_turns), weighted across them. Without
+    factors (top_pct 100 only), one sleeve holds every stock, ranked by permno.
     """
+    top_pct, top_n = hold_rule(top_pct, top_n)
     zscores = {f: factor_zscores(universe, f, factor_directions.get(f, 'top') == 'top') for f in factors}
-    if factor_combination == 'integrating':
+    if not factors:
+        unscored = pd.Series(np.nan, index=universe.index)
+        sleeves = [_top_ranked(universe, unscored, top_pct, top_n, use_market_cap_weight).assign(sleeve=0)]
+    elif factor_combination == 'integrating':
         composite = pd.concat(zscores.values(), axis=1)
         composite = composite.mean(axis=1).where(composite.notna().all(axis=1))
-        sleeves = [_top_ranked(universe, composite, top_pct, use_market_cap_weight).assign(sleeve=0)]
+        sleeves = [_top_ranked(universe, composite, top_pct, top_n, use_market_cap_weight).assign(sleeve=0)]
+    elif top_n is not None:
+        sleeves = [_take_turns(universe, [zscores[f] for f in factors], top_n, use_market_cap_weight)]
     else:
         sleeves = []
         for i, f in enumerate(factors):
-            sleeve = _top_ranked(universe, zscores[f], top_pct, use_market_cap_weight)
+            sleeve = _top_ranked(universe, zscores[f], top_pct, top_n, use_market_cap_weight)
             sleeves.append(sleeve.assign(sleeve=i, weight=sleeve['weight'] / len(factors)))
     positions = pd.concat(sleeves, ignore_index=True)
     return positions[['date', 'sleeve', 'permno', 'rank', 'score', 'weight']]
+
+
+def _take_turns(universe: pd.DataFrame, sleeve_scores: List[pd.Series], top_n: int,
+                use_market_cap_weight: bool) -> pd.DataFrame:
+    """
+    Mixing with top_n: on each date, top_n different stocks in total. The sleeves take turns
+    in factor order, each adding its next-best stock by its own score (ties by permno) and
+    skipping stocks already picked, until top_n are picked or every sleeve runs out (then
+    every stock with a score is held). A stock without a score in any sleeve is never held,
+    even when top_n is at least the stocks in the filter. Each position has the sleeve that
+    picked it, its rank and score in that sleeve, and a weight across all the picked stocks
+    (equal or market cap), not a sleeve's share.
+    """
+    k = len(sleeve_scores)
+    queues = {}
+    for i, scores in enumerate(sleeve_scores):
+        ranked = pd.DataFrame({'date': universe['date'].to_numpy(), 'permno': universe['permno'].to_numpy(),
+                               'score': scores.to_numpy()})
+        ranked = ranked[ranked['score'].notna()].sort_values(
+            ['date', 'score', 'permno'], ascending=[True, False, True], kind='mergesort')
+        for date, rows in ranked.groupby('date', sort=False):
+            queues[date, i] = (rows['permno'].to_numpy(), rows['score'].to_numpy())
+
+    picks = []                        # (date, sleeve, permno, rank, score)
+    for date in universe['date'].drop_duplicates().sort_values():
+        lists = [queues.get((date, i), (np.array([], dtype=np.int64), np.array([]))) for i in range(k)]
+        next_up, picked = [0] * k, set()
+        while len(picked) < top_n:
+            added = False
+            for i, (permnos, scores) in enumerate(lists):
+                if len(picked) >= top_n:
+                    break
+                j = next_up[i]
+                while j < len(permnos) and permnos[j] in picked:
+                    j += 1
+                if j < len(permnos):
+                    picked.add(permnos[j])
+                    picks.append((date, i, permnos[j], j + 1, scores[j]))
+                    added = True
+                    j += 1
+                next_up[i] = j
+            if not added:             # every sleeve ran out: every scored stock is held
+                break
+
+    positions = pd.DataFrame(picks, columns=['date', 'sleeve', 'permno', 'rank', 'score'])
+    positions['permno'] = positions['permno'].astype(universe['permno'].dtype)
+    if use_market_cap_weight:
+        caps = universe.set_index(['date', 'permno'])['mkt_cap_musd']
+        raw = pd.Series(caps.reindex(pd.MultiIndex.from_frame(positions[['date', 'permno']])).to_numpy(),
+                        index=positions.index)
+    else:
+        raw = pd.Series(1.0, index=positions.index)
+    positions['weight'] = raw / raw.groupby(positions['date']).transform('sum')
+    return positions
 
 
 def _ranks(scores: pd.Series, permnos: pd.Series) -> pd.Series:
@@ -170,18 +277,19 @@ def _ranks(scores: pd.Series, permnos: pd.Series) -> pd.Series:
 
 
 def rank_stocks(data: WrdsData, date: pd.Timestamp, factors: List[str], factor_directions: Dict[str, str],
-                factor_combination: str = 'mixing', top_pct: float = 10.0, use_market_cap_weight: bool = False,
-                restrict_fossil_fuels: bool = False,
+                factor_combination: str = 'mixing', top_pct: Optional[float] = None,
+                use_market_cap_weight: bool = False, restrict_fossil_fuels: bool = False,
                 selected_sectors: Optional[Iterable[str]] = None,
-                gics_filter: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
+                gics_filter: Optional[Dict[str, Any]] = None, top_n: Optional[int] = None) -> pd.DataFrame:
     """
     Every stock a backtest could buy on one rebalance date, ranked: its raw factor
     values and z-scores (z_<column>), the composite score (mean z-score, only for stocks
     with every factor) with its rank, each factor's own rank (rank_<column>, the Mixing
-    sleeves), and whether the strategy holds it and with what weight.
+    sleeves), and whether the strategy holds it and with what weight. Without factors
+    there is no score or rank, and every stock is held.
     """
     gics_filter = validate_inputs(factors, factor_directions, factor_combination, top_pct, selected_sectors,
-                                  gics_filter)
+                                  gics_filter, top_n)
     columns = list(dict.fromkeys(UNIVERSE_COLUMNS + list(factors)))
     panel = data.panel.loc[(data.panel['date'] == date).to_numpy(), columns]
     if panel.empty:
@@ -194,15 +302,18 @@ def rank_stocks(data: WrdsData, date: pd.Timestamp, factors: List[str], factor_d
         zscores[f] = factor_zscores(universe, f, factor_directions.get(f, 'top') == 'top')
         table[f] = universe[f]
         table[f'z_{f}'] = zscores[f]
-    z = pd.concat(zscores.values(), axis=1)
-    table['score'] = z.mean(axis=1).where(z.notna().all(axis=1))
+    if factors:
+        z = pd.concat(zscores.values(), axis=1)
+        table['score'] = z.mean(axis=1).where(z.notna().all(axis=1))
+    else:
+        table['score'] = np.nan
     table['rank'] = _ranks(table['score'], table['permno'])
     if factor_combination == 'mixing':
         for f in factors:
             table[f'rank_{f}'] = _ranks(zscores[f], table['permno'])
 
     held = select_positions(universe, factors, factor_directions, factor_combination, top_pct,
-                            use_market_cap_weight).groupby('permno')['weight'].sum()
+                            use_market_cap_weight, top_n).groupby('permno')['weight'].sum()
     table['held'] = table['permno'].isin(held.index)
     table['weight'] = table['permno'].map(held).fillna(0.0)
     table = table.rename(columns={'security_name': 'name', 'sector_name': 'sector', 'prc': 'price'})
@@ -268,18 +379,19 @@ def portfolio_monthly_returns(weights: np.ndarray, monthly: np.ndarray) -> np.nd
 
 def run_periods(data: WrdsData, dates: List[pd.Timestamp], factors: List[str],
                 factor_directions: Dict[str, str], initial_aum: float, periods_per_year: int,
-                frequency: Optional[str] = None, top_pct: float = 10.0,
+                frequency: Optional[str] = None, top_pct: Optional[float] = None,
                 use_market_cap_weight: bool = False, factor_combination: str = 'mixing',
                 restrict_fossil_fuels: bool = False, selected_sectors: Optional[Iterable[str]] = None,
                 factor_labels: Optional[Dict[str, str]] = None,
                 trading_cost_bps: float = 0.0,
-                gics_filter: Optional[Dict[str, Any]] = None) -> Tuple[Dict[str, Any], pd.DataFrame]:
+                gics_filter: Optional[Dict[str, Any]] = None,
+                top_n: Optional[int] = None) -> Tuple[Dict[str, Any], pd.DataFrame]:
     """
     Backtests the holding periods between consecutive dates (rebalancing at every date
     but the last). See run_wrds_backtest for the arguments and the results.
     """
     gics_filter = validate_inputs(factors, factor_directions, factor_combination, top_pct, selected_sectors,
-                                  gics_filter)
+                                  gics_filter, top_n)
     trading_cost_bps = validate_trading_cost_bps(trading_cost_bps)
     if len(dates) < 2:
         raise ValueError("A backtest needs at least one holding period.")
@@ -294,7 +406,7 @@ def run_periods(data: WrdsData, dates: List[pd.Timestamp], factors: List[str],
     panel = data.panel.loc[data.panel['date'].isin(rebalance_dates).to_numpy(), columns]
     universe = eligible_universe(panel, restrict_fossil_fuels, gics_filter=gics_filter)
     positions = select_positions(universe, factors, factor_directions, factor_combination,
-                                 top_pct, use_market_cap_weight)
+                                 top_pct, use_market_cap_weight, top_n)
 
     rf_monthly, rf_filled = _risk_free(data)
     by_date = dict(tuple(positions.groupby('date')))
@@ -414,7 +526,8 @@ def _holdings_table(positions: pd.DataFrame, growth: pd.DataFrame, panel: pd.Dat
     if factor_combination == 'mixing':
         # Each stock's sleeves as a bitmask (a sleeve buys a stock at most once; at most 40
         # factors exist, so it fits an int64), then one label per distinct mask
-        names = [factor_labels.get(f, f) for f in factors]
+        # A run without factors (Top 100%) has one sleeve, holding the whole filter
+        names = [factor_labels.get(f, f) for f in factors] or [WHOLE_FILTER_LABEL]
         masks = positions.assign(mask=np.left_shift(1, positions['sleeve'].to_numpy(dtype=np.int64)))
         picked = masks.groupby(['date', 'permno'], as_index=False)['mask'].sum()
         labels = {m: ', '.join(n for i, n in enumerate(names) if m >> i & 1) for m in picked['mask'].unique()}
@@ -450,22 +563,26 @@ def _holdings_table(positions: pd.DataFrame, growth: pd.DataFrame, panel: pd.Dat
 
 def run_wrds_backtest(data: WrdsData, factors: List[str], factor_directions: Dict[str, str],
                       frequency: str, start_year: int, end_year: int, initial_aum: float,
-                      top_pct: float = 10.0, use_market_cap_weight: bool = False,
+                      top_pct: Optional[float] = None, use_market_cap_weight: bool = False,
                       factor_combination: str = 'mixing', restrict_fossil_fuels: bool = False,
                       selected_sectors: Optional[Iterable[str]] = None,
                       factor_labels: Optional[Dict[str, str]] = None,
                       first_month: str = FIRST_MONTH,
                       last_month: str = LAST_MONTH,
                       trading_cost_bps: float = 0.0,
-                      gics_filter: Optional[Dict[str, Any]] = None) -> Tuple[Dict[str, Any], pd.DataFrame]:
+                      gics_filter: Optional[Dict[str, Any]] = None,
+                      top_n: Optional[int] = None) -> Tuple[Dict[str, Any], pd.DataFrame]:
     """
     Backtests factor portfolios on the WRDS data, rebalanced at the frequency's month
     ends over the calendar years start_year to end_year (src/wrds_calendar.py).
 
     Args:
-        factors: allowlisted panel columns (src/wrds_factors.WRDS_FACTOR_COLUMNS).
+        factors: allowlisted panel columns (src/wrds_factors.WRDS_FACTOR_COLUMNS); none
+            only at top_pct 100.
         factor_directions: column -> 'top' (higher is better) or 'bottom'.
         frequency: 'semiannual', 'quarterly' or 'monthly'.
+        top_pct, top_n: how many stocks each selection holds, the top top_pct% or the top
+            top_n (one or neither, see hold_rule; neither is the top 10%).
         factor_labels: column -> display name, for picked_by in the holdings.
         first_month: the data's first month, 'YYYY-MM' (tests use shorter data).
         last_month: the data's last month with returns, 'YYYY-MM'.
@@ -495,4 +612,4 @@ def run_wrds_backtest(data: WrdsData, factors: List[str], factor_directions: Dic
                        frequency=frequency, top_pct=top_pct, use_market_cap_weight=use_market_cap_weight,
                        factor_combination=factor_combination, restrict_fossil_fuels=restrict_fossil_fuels,
                        selected_sectors=selected_sectors, factor_labels=factor_labels,
-                       trading_cost_bps=trading_cost_bps, gics_filter=gics_filter)
+                       trading_cost_bps=trading_cost_bps, gics_filter=gics_filter, top_n=top_n)

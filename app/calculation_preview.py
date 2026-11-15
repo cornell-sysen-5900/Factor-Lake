@@ -6,7 +6,7 @@ exclusions); build_wrds_calculation_preview describes the WRDS engine (src/wrds_
 from the WRDS job it receives. A WRDS run never shows the Legacy formula.
 """
 import calendar
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 def build_calculation_preview(settings: Dict[str, Any], factors: List[str],
@@ -104,7 +104,14 @@ def build_wrds_calculation_preview(job: Dict[str, Any]) -> Dict[str, Any]:
     """
     from src.trading_costs import BPS, job_trading_cost
     from src.wrds_calendar import FIRST_MONTH, FREQUENCY_LABELS, LAST_MONTH, REBALANCE_MONTHS, period_boundaries
-    from src.wrds_engine import BENCHMARK_LABELS, FOSSIL_GSUBIND, FOSSIL_SIC, RISK_FREE_SOURCE, WINSORIZE_PCT
+    from src.wrds_engine import (
+        BENCHMARK_LABELS,
+        FOSSIL_GSUBIND,
+        FOSSIL_SIC,
+        RISK_FREE_SOURCE,
+        WINSORIZE_PCT,
+        hold_rule,
+    )
     from src.wrds_gics import describe_gics_filter, job_gics_filter, level_label, level_names
 
     frequency, start, end = job["frequency"], int(job["start_year"]), int(job["end_year"])
@@ -114,7 +121,9 @@ def build_wrds_calculation_preview(job: Dict[str, Any]) -> Dict[str, Any]:
                    ", ".join(calendar.month_abbr[m] for m in REBALANCE_MONTHS[frequency]))
     count = len(months) - 1
     rebalances = f"{count} rebalance{'s' if count != 1 else ''}"
-    pct, low = float(job["top_pct"]), WINSORIZE_PCT * 100
+    pct, top_n = hold_rule(job["top_pct"], job.get("top_n"))
+    whole = pct == 100                      # every stock in the filter; the factors do not matter
+    low = WINSORIZE_PCT * 100
     factors = list(job["factors"])
     k = len(factors)
     aum = float(job["initial_aum"])
@@ -158,25 +167,41 @@ def build_wrds_calculation_preview(job: Dict[str, Any]) -> Dict[str, Any]:
                      f"({name}(i,t)))  [{'Higher' if higher else 'Lower'} is better; within date t]")
         terms.append(f"z{index}")
     combined = ", ".join(terms) if terms else "[select at least one factor]"
-    # c. Selection and weights
-    top = f"max(1, floor(n * {pct:g} / 100))"
+    # c. Selection and weights: the top X% or the top N, or at 100% the whole filter
+    if top_n is not None:
+        top = f"min({top_n}, n)"
+        whole_date = "; stocks without a score are never held"
+    else:
+        top, whole_date = f"max(1, floor(n * {pct:g} / 100))", ""
     integrating = job["factor_combination"] == "integrating"
-    if integrating:
+    if whole:
+        lines += ["Top 100%: H(t) = U(t), every stock in the filter, with or without a score  "
+                  "[the factors do not change the holdings]",
+                  "W_i(t) = w_i  [one portfolio with all of V(t)]"]
+    elif top_n is not None and not integrating:
+        order = ", ".join(job["factor_labels"].get(c, c) for c in factors) or "[select at least one factor]"
+        lines += [f"Mixing, Top {top_n}: H(t) = {_stocks(top_n, 'different ')}; the sleeves take turns in factor order "
+                  f"({order}), each adding its next-best stock by its own z_k (ties by lower permno) and skipping "
+                  f"stocks already picked; if they run out first, every stock with a score{whole_date}",
+                  "W_i(t) = w_i  [one portfolio of the picked stocks with all of V(t)]"]
+    elif integrating:
         lines += [f"Integrating: Score(i,t) = mean({combined}) over stocks with all {k or 'K'} factors",
-                  f"H(t) = top {top} of the n stocks with a Score, by Score; ties by lower permno",
+                  f"H(t) = top {top} of the n stocks with a Score, by Score; ties by lower permno{whole_date}",
                   "W_i(t) = w_i  [one portfolio with all of V(t)]"]
     else:
         sleeves = " + ".join(f"Sleeve[{job['factor_labels'].get(c, c)}]" for c in factors)
         lines += [f"Mixing: Portfolio(t) = ({sleeves or '[select at least one factor]'}); "
                   f"each sleeve gets V(t) / {k or 'K'}",
-                  f"H_k(t) = top {top} of the n stocks with a z_k, by z_k; ties by lower permno",
+                  f"H_k(t) = top {top} of the n stocks with a z_k, by z_k; ties by lower permno{whole_date}",
                   f"W_i(t) = sum over the sleeves k holding i of w_ik / {k or 'K'}"]
+    # Mixing with Top N weights across all the picked stocks, not within each sleeve
+    within = "Across the picked stocks" if top_n is not None and not integrating else "Within each selection"
     if job["use_market_cap_weight"]:
         lines.append("Market Cap Weight: w_i = mkt_cap_musd_i(t) / sum(mkt_cap_musd_j(t) for j in H)")
-        weight_step = "Within each selection, weight by market capitalization at t (mkt_cap_musd)."
+        weight_step = f"{within}, weight by market capitalization at t (mkt_cap_musd)."
     else:
         lines.append("Equal Weight: w_i = 1 / |H|")
-        weight_step = "Within each selection, give every stock the same weight."
+        weight_step = f"{within}, give every stock the same weight."
     # d. Holding periods, e. trading costs, f. benchmarks
     lines += ["g_i = prod over months m in (t, t'] of (1 + r_i,m)  "
               "[CRSP monthly total return, delisting return included]",
@@ -208,13 +233,7 @@ def build_wrds_calculation_preview(job: Dict[str, Any]) -> Dict[str, Any]:
          f"Within each date: non-numbers become missing; cap the values at the {low:g}% and {100 - low:g}% "
          "quantiles; negate when lower is better; subtract the mean and divide by the standard deviation "
          "(ddof=1). A date whose values do not vary is only centered."),
-        ("Select stocks and combine factors",
-         (f"Average the z-scores of the stocks that have every factor and buy the top {pct:g}% by that score "
-          "in one portfolio." if integrating else
-          f"One sleeve per factor, each with an equal share of the money, buying the top {pct:g}% by its "
-          "z-score. A stock picked by several sleeves is held in each.") +
-         f" Each selection is max(1, floor(n × {pct:g} / 100)) of the n stocks with a score, best first, "
-         "ties broken by lower permno."),
+        _selection_step(pct, top_n, integrating),
         ("Allocate capital", weight_step),
         ("Hold to the next rebalance",
          "Buy and hold over (t, t']: weights drift with each stock's compounded CRSP monthly total returns, "
@@ -223,6 +242,8 @@ def build_wrds_calculation_preview(job: Dict[str, Any]) -> Dict[str, Any]:
          "any delisting counts as 0% and is counted in the results. A date with nothing to buy holds cash "
          "at the risk-free rate."),
     ]
+    if whole and not factors:          # a run holding the whole filter without factors scores nothing
+        steps = [s for s in steps if s[0] != "Normalize each selected factor"]
     if cost_bps > 0:
         steps.append(("Apply trading costs",
                       f"At each rebalance, charge {cost_bps:g} bps on the turnover: the sum of |target weight − "
@@ -235,6 +256,40 @@ def build_wrds_calculation_preview(job: Dict[str, Any]) -> Dict[str, Any]:
                   f"over the same periods (outperformance is against it); {BENCHMARK_LABELS['growth']} and "
                   f"{BENCHMARK_LABELS['value']} are shown too."))
     return {"mode": "wrds", "formula": "\n".join(lines), "steps": steps}
+
+
+def _stocks(n: int, kind: str = '') -> str:
+    """'1 stock', '20 stocks', or with kind: '1 different stock'."""
+    return f"{n} {kind}stock{'' if n == 1 else 's'}"
+
+
+def _selection_step(pct: Optional[float], top_n: Optional[int], integrating: bool) -> Tuple[str, str]:
+    """The WRDS preview's selection step for the top pct% or the top top_n (src/wrds_engine.hold_rule)."""
+    if pct == 100:
+        return ("Select stocks",
+                "Hold every stock in the filtered universe at each date (Top 100%), with or without a score: "
+                "the factors do not change which stocks are held or their weights.")
+    if top_n is not None and not integrating:
+        return ("Select stocks and combine factors",
+                f"Hold {_stocks(top_n, 'different ')} in total. The sleeves take turns in factor order, each adding "
+                "its next-best stock by its own z-score (ties broken by lower permno) and skipping stocks already "
+                f"picked, until {_stocks(top_n)} {'is' if top_n == 1 else 'are'} picked or every sleeve runs out "
+                "(then every stock with a score is held). The weights apply across the picked stocks, not per "
+                "sleeve. Stocks without a score are never held, even when the filter has no more than "
+                f"{_stocks(top_n)}.")
+    top = f"the top {top_n} stocks" if top_n is not None else f"the top {pct:g}%"
+    text = (f"Average the z-scores of the stocks that have every factor and buy {top} by that score in one "
+            "portfolio." if integrating else
+            f"One sleeve per factor, each with an equal share of the money, buying {top} by its z-score. A stock "
+            "picked by several sleeves is held in each.")
+    if top_n is not None:
+        text += (f" Each selection is min({top_n}, n) of the n stocks with a score, best first, ties broken by "
+                 "lower permno. Stocks without a score are never held, even when the filter has no more than "
+                 f"{_stocks(top_n)}.")
+    else:
+        text += (f" Each selection is max(1, floor(n × {pct:g} / 100)) of the n stocks with a score, best first, "
+                 "ties broken by lower permno.")
+    return "Select stocks and combine factors", text
 
 
 def wrds_preview(job: Dict[str, Any]) -> Dict[str, Any]:
@@ -252,10 +307,10 @@ def wrds_analysis_preview(settings: Dict[str, Any], factor_names: List[str],
     Before any factor is added, the same job without factors.
     """
     from app.streamlit_config import WRDS_FACTOR_METADATA
-    from app.streamlit_utils import wrds_job_for_inputs
+    from app.streamlit_utils import wrds_holds_whole_filter, wrds_job_for_inputs
     names = [f for f in factor_names if f in WRDS_FACTOR_METADATA]
     try:
-        if names:
+        if names or wrds_holds_whole_filter(settings):      # at 100% the job needs no factor
             return build_wrds_calculation_preview(wrds_job_for_inputs(settings, names, directions))
         job = wrds_job_for_inputs(settings, [next(iter(WRDS_FACTOR_METADATA))], {})
         return build_wrds_calculation_preview({**job, "factors": [], "factor_directions": {}, "factor_labels": {}})

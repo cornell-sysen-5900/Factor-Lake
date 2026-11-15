@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from .backtest_jobs import add_trading_cost, code_version
 from .trading_costs import describe_trading_cost, job_trading_cost, validate_trading_cost_bps
 from .wrds_calendar import FREQUENCIES, period_boundaries
-from .wrds_engine import FACTOR_COMBINATIONS
+from .wrds_engine import DEFAULT_TOP_PCT, FACTOR_COMBINATIONS, hold_rule, holds_whole_filter
 from .wrds_factors import WRDS_FACTOR_COLUMNS
 from .wrds_gics import describe_gics_filter, job_gics_filter, sector_codes, validate_gics_filter
 
@@ -30,10 +30,12 @@ WRDS_JOB_FIELDS = ('kind', 'data_mode', 'wrds_job_version', 'factors', 'factor_d
 # above 0 bps (see src/backtest_jobs.OPTIONAL_JOB_FIELDS), and gics_filter, the GICS filter
 # {'level', 'codes'} (src/wrds_gics.py). Jobs without them keep the shape and cache key
 # they had before. Older jobs filter by sector with selected_sectors (GICS sector names);
-# a job has selected_sectors or gics_filter, not both.
-WRDS_OPTIONAL_JOB_FIELDS = ('trading_cost_bps', 'gics_filter')
-# Top % of every WRDS backtest (fixed, as in Legacy)
-WRDS_TOP_PCT = 10.0
+# a job has selected_sectors or gics_filter, not both. top_n, the number of stocks each
+# selection holds, is there only when it is chosen instead of top_pct; top_pct is then None.
+WRDS_OPTIONAL_JOB_FIELDS = ('trading_cost_bps', 'gics_filter', 'top_n')
+# Top % of a WRDS backtest unless another is chosen (settings' top_pct or top_n), and always of
+# a cohort comparison's job (it holds cohort_pct, so its key does not depend on the choice)
+WRDS_TOP_PCT = DEFAULT_TOP_PCT
 
 # Source files whose code decides a WRDS result: part of its cache key. Legacy's
 # ENGINE_SOURCES are kept separate, so changing WRDS code never recomputes Legacy results.
@@ -67,9 +69,14 @@ def build_wrds_job(kind: str, factors: List[str], factor_directions: Dict[str, s
     settings['trading_cost_bps'] is added to backtests and cohorts only when it is not 0;
     ranked lists have no returns, so they never have it (and keep their cache keys).
     settings['gics_filter'] ({'level', 'codes'}) is added when it is set.
+    How many stocks it holds: settings['top_n'] when set (the job's top_pct is then None),
+    else settings['top_pct'] (default 10), so a job at the default 10% is exactly as before.
+    A cohort job always has top_pct 10, since it holds cohort_pct instead.
     """
     labels = factor_labels or {}
     factors = list(factors)
+    top_n = settings.get('top_n') if kind != 'cohort' else None
+    top_pct = settings.get('top_pct', WRDS_TOP_PCT) if kind != 'cohort' else WRDS_TOP_PCT
     job = {
         'kind': kind,
         'data_mode': 'wrds',
@@ -81,7 +88,7 @@ def build_wrds_job(kind: str, factors: List[str], factor_directions: Dict[str, s
         'start_year': int(settings['start_year']),
         'end_year': int(settings['end_year']),
         'initial_aum': float(settings['initial_aum']),
-        'top_pct': WRDS_TOP_PCT,
+        'top_pct': None if top_n is not None else float(top_pct) if _is_number(top_pct) else top_pct,
         'use_market_cap_weight': bool(settings.get('use_market_cap_weight', False)),
         'factor_combination': settings.get('factor_combination', 'mixing'),
         'restrict_fossil_fuels': bool(settings.get('restrict_fossil_fuels', False)),
@@ -92,6 +99,9 @@ def build_wrds_job(kind: str, factors: List[str], factor_directions: Dict[str, s
     if settings.get('gics_filter'):
         job['gics_filter'] = {'level': settings['gics_filter']['level'],
                               'codes': sorted(settings['gics_filter']['codes'])}
+    if top_n is not None:
+        whole = _is_number(top_n) and float(top_n).is_integer()
+        job['top_n'] = int(top_n) if whole else top_n
     if kind != 'ranked':
         add_trading_cost(job, settings)
     validate_wrds_job(job)
@@ -113,9 +123,19 @@ def validate_wrds_job(job: Dict[str, Any]) -> None:
     if job['kind'] not in WRDS_JOB_KINDS:
         raise ValueError(f"kind must be one of {WRDS_JOB_KINDS}, not '{job['kind']}'.")
 
+    if 'top_n' in job:
+        if job['top_pct'] is not None:
+            raise ValueError("A job holds either top_pct or top_n of the stocks, not both (top_pct must be null).")
+        if not isinstance(job['top_n'], int) or isinstance(job['top_n'], bool) or job['top_n'] < 1:
+            raise ValueError("top_n must be a whole number of at least 1.")
+    elif not _is_number(job['top_pct']) or not 0 < job['top_pct'] <= 100:
+        raise ValueError("top_pct must be above 0 and at most 100.")
     factors = job['factors']
-    if not isinstance(factors, list) or not factors:
-        raise ValueError("A backtest needs at least one factor.")
+    if not isinstance(factors, list):
+        raise ValueError("factors must be a list.")
+    if not factors and (job['kind'] == 'cohort' or not holds_whole_filter(job['top_pct'], job.get('top_n'))):
+        raise ValueError("A backtest needs at least one factor, unless it holds every stock in the filter "
+                         "(top_pct 100).")
     if len(set(factors)) != len(factors):
         raise ValueError("Each factor can be chosen only once.")
     if bad := [f for f in factors if f not in WRDS_FACTOR_COLUMNS]:
@@ -135,8 +155,6 @@ def validate_wrds_job(job: Dict[str, Any]) -> None:
     months = period_boundaries(job['frequency'], job['start_year'], job['end_year'])   # readable ValueError
     if not _is_number(job['initial_aum']) or job['initial_aum'] <= 0:
         raise ValueError("Initial AUM must be greater than $0.")
-    if not _is_number(job['top_pct']) or not 0 < job['top_pct'] <= 100:
-        raise ValueError("top_pct must be above 0 and at most 100.")
     for key in ('use_market_cap_weight', 'restrict_fossil_fuels'):
         if not isinstance(job[key], bool):
             raise ValueError(f"{key} must be true or false.")
@@ -182,7 +200,19 @@ def engine_arguments(job: Dict[str, Any]) -> Tuple[List[str], Dict[str, str], Di
                                    'selected_sectors', 'factor_labels')}
     options['trading_cost_bps'] = job_trading_cost(job)
     options['gics_filter'] = job.get('gics_filter')
+    options['top_n'] = job.get('top_n')
     return list(job['factors']), dict(job['factor_directions']), options
+
+
+def describe_hold(settings: Dict[str, Any]) -> str:
+    """
+    How many stocks a job or settings hold: 'Top 10%', 'Top 20 stocks', or 'Every stock in
+    the filter (100%)'. Without top_pct or top_n (older settings), the top 10%.
+    """
+    top_pct, top_n = hold_rule(settings.get('top_pct'), settings.get('top_n'))
+    if top_n is not None:
+        return f"Top {top_n} stock{'s' if top_n != 1 else ''}"
+    return "Every stock in the filter (100%)" if top_pct >= 100 else f"Top {top_pct:g}%"
 
 
 def describe_wrds_job(job: Dict[str, Any]) -> str:
@@ -194,5 +224,7 @@ def describe_wrds_job(job: Dict[str, Any]) -> str:
         extra += f", {describe_trading_cost(job_trading_cost(job))}"
     if gics := job_gics_filter(job.get('gics_filter'), job['selected_sectors']):
         extra += f", {describe_gics_filter(gics)}"
+    if job['kind'] != 'cohort' and (job.get('top_n') is not None or job['top_pct'] != WRDS_TOP_PCT):
+        extra += f", {describe_hold(job).lower()}"
     return (f"wrds {job['kind']} {job['frequency']} {job['start_year']}-{job['end_year']} "
             f"{job['factor_combination']}: {factors}{extra}")

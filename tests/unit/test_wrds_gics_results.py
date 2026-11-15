@@ -136,7 +136,7 @@ def test_a_run_with_a_gics_filter_shows_and_saves_it(new_session):
 
     run = at.session_state['saved_runs'][0]
     assert run['settings']['gics_filter'] == {'level': 'industry', 'codes': [451030]}
-    assert '**Universe:** Industry: Software | Fossil fuels included' in _universe_captions(at)
+    assert '**Universe:** Industry: Software | Fossil fuels included | Holds: Top 10%' in _universe_captions(at)
     holdings = next(d.value for d in at.dataframe if 'GICS Industry' in d.value.columns)
     assert set(holdings['GICS Industry']) == {'Software'}
     exported = cfg.build(run['settings'], run['factors'], run['factor_directions'], mode='wrds')
@@ -151,7 +151,7 @@ def test_a_run_with_a_gics_filter_shows_and_saves_it(new_session):
     opened = theirs.session_state['saved_runs'][0]
     assert opened['settings']['gics_filter'] == run['settings']['gics_filter']
     _open_tab(theirs, opened['label'])
-    assert '**Universe:** Industry: Software | Fossil fuels included' in _universe_captions(theirs)
+    assert '**Universe:** Industry: Software | Fossil fuels included | Holds: Top 10%' in _universe_captions(theirs)
 
 
 def test_an_older_wrds_analysis_with_selected_sectors_still_opens(new_session, manager):
@@ -170,7 +170,7 @@ def test_an_older_wrds_analysis_with_selected_sectors_still_opens(new_session, m
     opened = at.session_state['saved_runs'][0]
     assert 'gics_filter' not in opened['settings'] and opened['settings']['selected_sectors'] == ['Energy']
     _open_tab(at, opened['label'])
-    assert '**Universe:** Energy | Fossil fuels included' in _universe_captions(at)
+    assert '**Universe:** Energy | Fossil fuels included | Holds: Top 10%' in _universe_captions(at)
     # Its settings still export as an older file would, and import at the Sector level
     doc = cfg.build(opened['settings'], opened['factors'], opened['factor_directions'], mode='wrds')
     assert cfg.widget_values(doc)['wrds_sectors_input'] == ['Energy']
