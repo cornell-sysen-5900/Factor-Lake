@@ -20,6 +20,8 @@ from app.wrds_tables import (
     benchmark_label,
     calendar_year_results,
     factor_header,
+    factor_risk_caption,
+    factor_risk_table,
     frequency_caption,
     holdings_display_table,
     period_by_period_columns,
@@ -29,6 +31,7 @@ from app.wrds_tables import (
     win_loss_columns,
 )
 from scripts.check_backtest_lambda import TOLERANCE, max_difference
+from src.factor_risk import FACTOR_COLUMNS, describe_factor_risk
 from src.wrds_engine import rank_stocks, run_wrds_backtest
 from tests.unit.results_snapshot import comparable, legacy_results_snapshot, main_area, without_calculation
 from tests.unit.test_backtest_lambda import DELISTING_FILE, UNIVERSE_FILE, _delisting, _parquet, _raw_universe
@@ -284,6 +287,25 @@ def _header(csv_text):
     return csv_text.splitlines()[0].split(',')
 
 
+def _factor_risk_parts(risk):
+    """Every element the Factor Risk section shows for a saved factor_risk, by kind."""
+    return {'header': ['Factor Risk'], 'caption': [factor_risk_caption(risk)],
+            'metric': [['Alpha (annualized)', f"{risk['alpha_annual']:+.2%}", ''],
+                       ['Alpha t-stat', f"{risk['alpha_t']:.2f}", ''],
+                       ['R²', f"{risk['r_squared']:.2f}", ''], ['Months', f"{risk['months']}", '']],
+            'dataframe': [factor_risk_table(risk).to_csv(index=False)],
+            'markdown': [f"**{describe_factor_risk(risk)}**"]}
+
+
+def without_factor_risk(render, risk):
+    """render without the Factor Risk section (WRDS only, so not in Legacy's snapshot); each part must be there."""
+    out = {kind: list(values) if isinstance(values, list) else values for kind, values in render.items()}
+    for kind, values in _factor_risk_parts(risk).items():
+        for value in values:
+            out[kind].remove(value)
+    return out
+
+
 def test_a_wrds_run_looks_like_legacys_results(new_session, legacy):
     at = new_session()
     run = _run_wrds(at, 'w_roe', 'w_mom_12_1', 'w_mcap')
@@ -291,6 +313,9 @@ def test_a_wrds_run_looks_like_legacys_results(new_session, legacy):
     _assert_clean(at)
     # main's Legacy snapshot predates the calculation box: check it is the WRDS one, then compare the rest
     results, shown = run['results'], without_calculation(main_area(at), run['calculation_preview'])
+    # Factor Risk is WRDS only: after Advanced Backtest Statistics, before the Win/Loss Summary
+    assert shown['header'][-3:] == ['Advanced Backtest Statistics', 'Factor Risk', 'Quarterly Win/Loss Summary']
+    shown = without_factor_risk(shown, results['factor_risk'])
     assert run['calculation_preview']['formula'].startswith(WRDS_FORMULA)
     assert run['label'] == 'Run 1: WRDS, Quarterly'
     # The Saved analyses panel beside the runs shows the boxes Legacy's snapshot has above them
@@ -336,7 +361,7 @@ def test_a_wrds_run_looks_like_legacys_results(new_session, legacy):
     assert len(_header(legacy['dataframe'][2])) == len(win_loss)
     period_rows = at.main.dataframe[1].value
     assert list(period_rows['Period'])[0] == f"{results['rebalance_dates'][0]} to {results['period_end_dates'][0]}"
-    assert list(at.main.dataframe[2].value['Period']) == list(period_rows['Period'])
+    assert list(at.main.dataframe[-1].value['Period']) == list(period_rows['Period'])        # win/loss, last
     assert shown['table'][0].splitlines()[0] == legacy['table'][0].splitlines()[0]          # cohort stats
     assert [r.split(',')[0] for r in shown['table'][0].splitlines()] == \
         [r.split(',')[0] for r in legacy['table'][0].splitlines()]
@@ -517,3 +542,62 @@ def test_legacy_results_tab_renders_exactly_as_on_main(monkeypatch):
     # (main's snapshot was rendered on Windows, CI renders on Linux)
     difference, where = max_difference(comparable(actual), comparable(expected))
     assert difference <= TOLERANCE, f"{where} differs from main's rendering (relative difference {difference:.2e})"
+
+
+# ---------------------------------------------------------------------------
+# Factor Risk
+# ---------------------------------------------------------------------------
+
+def test_factor_risk_table_and_caption():
+    risk = {'months': 40, 'newey_west_lag': 3, 'first_month': '2010-01', 'last_month': '2013-04',
+            'factors': [{'factor': f, 'exposure': 0.1234 * i, 't_stat': -1.987 * i}
+                        for i, f in enumerate(FACTOR_COLUMNS)]}
+    table = factor_risk_table(risk)
+    assert list(table.columns) == ['Factor', 'Exposure', 't-stat']
+    assert list(table['Factor']) == ['Market', 'Size (SMB)', 'Value (HML)', 'Profitability (RMW)', 'Investment (CMA)',
+                                     'Momentum (UMD)']
+    assert list(table['Exposure'])[:3] == [0.0, 0.12, 0.25] and list(table['t-stat'])[:3] == [0.0, -1.99, -3.97]
+    assert factor_risk_caption(risk).startswith('Monthly returns after costs minus the risk-free rate, regressed on '
+                                                'the Fama-French five factors and momentum, 2010-01 to 2013-04 '
+                                                '(40 months). t-stats use Newey-West standard errors (3 lags)')
+
+
+def _factor_risk_shown(at):
+    """The Factor Risk section's elements as shown, or {} when it is hidden."""
+    render = main_area(at)
+    if 'Factor Risk' not in render['header']:
+        return {}
+    return {'metric': [m for m in render['metric'] if m[0] in ('Alpha (annualized)', 'Alpha t-stat', 'R²', 'Months')],
+            'dataframe': [d for d in render['dataframe'] if d.startswith('Factor,Exposure,t-stat')],
+            'markdown': [m for m in render['markdown'] if m.startswith('**') and 'alpha' in m]}
+
+
+def test_factor_risk_shows_the_saved_numbers_and_opens_the_same_in_a_new_session(new_session):
+    mine = new_session()
+    run = _run_wrds(mine, 'w_roe', 'w_btp')
+    risk = run['results']['factor_risk']
+    assert risk['months'] == 36 and risk['first_month'] == '2010-01'
+    expected = {k: v for k, v in _factor_risk_parts(risk).items() if k in ('metric', 'dataframe', 'markdown')}
+    assert _factor_risk_shown(mine) == expected
+
+    theirs = new_session()
+    _click_main_tab(theirs, 'Results')
+    theirs.text_input(key='open_analysis_id').set_value(run['compute']['hash']).run()
+    theirs.button(key='open_analysis_btn').click().run()
+    _open_tab(theirs, theirs.session_state['saved_runs'][0]['label'])
+    _assert_clean(theirs)
+    assert theirs.session_state['saved_runs'][0]['results']['factor_risk'] == risk
+    assert _factor_risk_shown(theirs) == expected
+
+
+@pytest.mark.parametrize('saved', ['too_short', 'saved_before_factor_risk'])
+def test_factor_risk_is_hidden_without_a_regression(new_session, saved):
+    at = new_session()
+    run = _run_wrds(at, 'w_roe')
+    if saved == 'too_short':
+        run['results']['factor_risk'] = None
+    else:
+        del run['results']['factor_risk']
+    _click_main_tab(at, 'Results')
+    _assert_clean(at)
+    assert _factor_risk_shown(at) == {} and 'Advanced Backtest Statistics' in main_area(at)['header']

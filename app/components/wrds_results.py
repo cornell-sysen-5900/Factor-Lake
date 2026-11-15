@@ -4,7 +4,7 @@ MODULE: app/components/wrds_results.py
 PURPOSE: Results of a WRDS run, shown like Legacy's: the same sections, order, titles, widgets,
          tables and charts, drawn by Legacy's own render functions (results_tab.py) with the
          WRDS result passed in the shape they expect. WRDS adds the period returns chart,
-         the calendar-year view and the ranked stocks of a rebalance date.
+         the calendar-year view, the ranked stocks of a rebalance date and Factor Risk.
 VERSION: 3.0.0
 
 Everything comes from the run's snapshot (and, for holdings, the run's holdings file in
@@ -22,6 +22,8 @@ from app.wrds_tables import (
     FREQUENCY_LABELS,
     benchmark_label,
     calendar_year_results,
+    factor_risk_caption,
+    factor_risk_table,
     frequency_caption,
     holdings_display_table,
     period_by_period_columns,
@@ -45,6 +47,7 @@ from components.results_tab import (
     _render_win_loss_ledger,
     _render_year_by_year_table,
 )
+from src.factor_risk import describe_factor_risk
 from Visualizations.wrds_plots import plot_wrds_period_returns
 
 WRDS_DELISTING = "CRSP delisting returns included, then the risk-free rate until the next rebalance"
@@ -117,11 +120,33 @@ def render_wrds_results(run: Dict[str, Any]) -> None:
                                 rf_label=RISK_FREE_LABEL)
     st.divider()
 
-    # 8. Win/Loss Summary, one row per period
+    # 8. Factor Risk: only for results that have it (not too short, not saved before it existed)
+    if results.get('factor_risk'):
+        _render_factor_risk(results['factor_risk'])
+        st.divider()
+
+    # 9. Win/Loss Summary, one row per period
     st.header(f"{frequency} Win/Loss Summary")
     _render_win_loss_ledger(results, columns=win_loss_columns(results),
                             period=lambda c: period_label(c['period_start'], c['period_end']))
     st.divider()
+
+
+def _render_factor_risk(risk: Dict[str, Any]) -> None:
+    """Alpha and R-squared, each factor's exposure and t-stat, and a plain-language line (src/factor_risk.py)."""
+    st.header("Factor Risk")
+    st.caption(factor_risk_caption(risk))
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Alpha (annualized)", f"{risk['alpha_annual']:+.2%}",
+              help="The regression's intercept: the monthly return the factors do not explain, x 12.")
+    c2.metric("Alpha t-stat", f"{risk['alpha_t']:.2f}")
+    c3.metric("R²", f"{risk['r_squared']:.2f}",
+              help="The share of the monthly excess return's variance the factors explain.")
+    c4.metric("Months", f"{risk['months']}")
+    st.dataframe(factor_risk_table(risk), width="stretch", hide_index=True,
+                 column_config={'Exposure': st.column_config.NumberColumn(format="%.2f"),
+                                't-stat': st.column_config.NumberColumn(format="%.2f")})
+    st.markdown(f"**{describe_factor_risk(risk)}**")
 
 
 def _labels(run: Dict[str, Any]) -> Dict[str, str]:

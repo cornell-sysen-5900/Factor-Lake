@@ -15,6 +15,7 @@ import pandas as pd
 
 from app.holdings_table import holdings_number_formats
 from app.streamlit_config import WRDS_MILLIONS_FACTORS, WRDS_PERCENT_FACTORS
+from src.factor_risk import FACTOR_LABELS
 from src.trading_costs import has_trading_costs
 from src.wrds_calendar import FREQUENCY_LABELS  # noqa: F401 (the app's frequency names)
 
@@ -198,3 +199,17 @@ def result_notes(results: Dict[str, Any]) -> List[str]:
         notes.append(f"**Rebalance dates with nothing to buy (the money earned the risk-free rate):** "
                      f"{', '.join(results['empty_rebalance_dates'])}")
     return notes
+
+
+def factor_risk_table(risk: Dict[str, Any]) -> pd.DataFrame:
+    """The Factor Risk table: Factor, Exposure and t-stat (2 decimals), in the regression's order."""
+    return pd.DataFrame({'Factor': [FACTOR_LABELS.get(f['factor'], f['factor']) for f in risk['factors']],
+                         'Exposure': [round(f['exposure'], 2) for f in risk['factors']],
+                         't-stat': [round(f['t_stat'], 2) for f in risk['factors']]})
+
+
+def factor_risk_caption(risk: Dict[str, Any]) -> str:
+    """What the Factor Risk section regresses, over which months, and its standard errors."""
+    return (f"Monthly returns after costs minus the risk-free rate, regressed on the Fama-French five factors "
+            f"and momentum, {risk['first_month']} to {risk['last_month']} ({risk['months']} months). "
+            f"t-stats use Newey-West standard errors ({risk['newey_west_lag']} lags); |t| ≥ 2 is significant.")

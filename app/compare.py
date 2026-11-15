@@ -35,6 +35,7 @@ RESULT_KEYS = (
     'periods_per_year', 'rebalance_dates', 'period_end_dates', 'benchmark_labels',
     'vol_raw_portfolio', 'sharpe_portfolio', 'max_drawdown_portfolio', 'portfolio_beta', 'information_ratio',
     'trading_cost_bps', 'cagr_before_costs', 'average_turnover_pct', 'total_trading_cost', 'cost_drag',
+    'factor_risk',
 )
 COMBINATION_LABELS = {'mixing': 'Mixing', 'integrating': 'Integrating'}
 LEGACY_DELISTING = {'zero_return': 'Zero Return', 'hold_cash': 'Hold Cash (risk-free rate)',
@@ -138,6 +139,11 @@ def worst_period(a: Dict[str, Any]) -> Optional[Tuple[float, str]]:
 
 def _result(key: str) -> Callable[[Dict[str, Any]], Optional[float]]:
     return lambda a: a['result'].get(key)
+
+
+def _factor_risk(key: str) -> Callable[[Dict[str, Any]], Optional[float]]:
+    """A number of the WRDS factor regression (src/factor_risk.py); None (n/a) for Legacy and older results."""
+    return lambda a: (a['result'].get('factor_risk') or {}).get(key)
 
 
 def cagr_before_costs(a: Dict[str, Any]) -> Optional[float]:
@@ -252,6 +258,10 @@ ROWS: Tuple[Row, ...] = (
     Row('Risk', 'Max Drawdown', _result('max_drawdown_portfolio'), _pct, 'higher'),
     Row('Risk', 'Beta vs Benchmark', _result('portfolio_beta'), lambda v: f"{v:.3f}", None, 3),
     Row('Risk', 'Information Ratio', _result('information_ratio'), lambda v: f"{v:.4f}", 'higher'),
+    # WRDS runs' Factor Risk section: alpha after the six factors, its t-stat and R²
+    Row('Risk', 'Factor Alpha (annualized)', _factor_risk('alpha_annual'), _pct, 'higher'),
+    Row('Risk', 'Factor Alpha t-stat', _factor_risk('alpha_t'), lambda v: f"{v:.2f}", None, 2),
+    Row('Risk', 'Factor R²', _factor_risk('r_squared'), lambda v: f"{v:.2f}", None, 2),
     Row('Costs', 'CAGR Before Costs', cagr_before_costs, _pct, 'higher'),
     Row('Costs', 'Avg Turnover per Rebalance', average_turnover, lambda v: f"{v:.2f}%", 'lower', 2,
         per_period=True),

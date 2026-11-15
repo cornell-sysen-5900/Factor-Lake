@@ -427,3 +427,18 @@ def test_the_chart_draws_one_grey_dotted_line_per_benchmark_and_keeps_portfolio_
         assert ranked[4] == first                            # then benchmarks, by first use in that order
     assert fig.layout.xaxis.type == 'date' and fig.layout.yaxis.tickprefix == '$'
     assert len(COMPARE_COLORS) == MAX_COMPARED
+
+
+def test_factor_risk_rows_show_the_saved_regression_and_na_without_it():
+    risk = {'alpha_annual': 0.0312, 'alpha_t': 2.345, 'r_squared': 0.8765, 'months': 36, 'factors': []}
+    better = dict(risk, alpha_annual=0.05)
+    analyses = [_legacy(), _wrds(factor_risk=risk), _wrds('c' * 64), _wrds('d' * 64, factor_risk=better)]
+    # Kept when the analysis is loaded; Legacy and WRDS results saved before it (or too short) have none
+    assert analyses[1]['result']['factor_risk'] == risk and 'factor_risk' not in analyses[2]['result']
+    assert _row(analyses, 'Factor Alpha (annualized)')['values'] == [NA, '3.12%', NA, '5.00%']
+    assert _row(analyses, 'Factor Alpha t-stat')['values'] == [NA, '2.35', NA, '2.35']
+    assert _row(analyses, 'Factor R²')['values'] == [NA, '0.88', NA, '0.88']
+    # A higher alpha is better; its t-stat and R² have no better side
+    assert _row(analyses, 'Factor Alpha (annualized)')['best'] == [3]
+    assert _row(analyses, 'Factor R²')['best'] == [] and _row(analyses, 'Factor Alpha t-stat')['best'] == []
+    assert _row([_wrds(factor_risk=None), _legacy()], 'Factor R²')['values'] == [NA, NA]
