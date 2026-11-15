@@ -1,8 +1,9 @@
-"""Read-only single-factor long/short diagnostics; never chooses or changes defaults.
+"""Read-only single-factor long/short diagnostics and the rule for WRDS default directions.
 
 At month end t, sort eligible stocks by the known factor, form disjoint equal-weight
 upper/lower tails, and observe their CRSP return in t+1 (including delistings).
-This is a raw-factor diagnostic, not an app multi-factor strategy or a fitted signal.
+This is a raw-factor diagnostic, not an app multi-factor strategy. It never edits the
+app: choose_default() recommends a direction, and the team sets it in streamlit_config.
 """
 import math
 
@@ -11,8 +12,15 @@ import pandas as pd
 
 from .wrds_engine import eligible_universe
 
+# The default-direction rule. These are the only copies of its parameters.
+START_YEAR, END_YEAR = 2002, 2026
+CONSISTENT_SHARE = 0.70   # a direction that wins at least this share of calendar years is the default
+MAJORITY_SHARE = 0.50     # otherwise the theory default stands, labelled by whether it won this share
+# Basis of a default: the data, the theory with mixed data, or the theory although it lost more years
+CONSISTENT, THEORY, THEORY_LOST = 'consistent', 'theory', 'theory_lost'
 
-def monthly_spreads(panel, returns, directions, *, start_year=2002, end_year=2026, tail_pct=10.0):
+
+def monthly_spreads(panel, returns, directions, *, start_year=START_YEAR, end_year=END_YEAR, tail_pct=10.0):
     """Return diagnostics and monthly series, without mutating either input.
 
     directions: {allowlisted factor column: True for Higher, False for Lower}.
@@ -87,13 +95,48 @@ def monthly_spreads(panel, returns, directions, *, start_year=2002, end_year=202
         annualized = mean * 12 if mean is not None else None
         status = ('insufficient data' if mean is None else 'team review' if mean < 0
                   else 'agrees in sample' if mean > 0 else 'neutral in sample')
+        # Calendar years of realized returns (partial first/last years included), each the
+        # sum of its monthly spreads, consistent with the arithmetic annualized spread.
+        yearly = {}
+        for row in rows:
+            year = row['return_month'][:4]
+            yearly[year] = yearly.get(year, 0.0) + row['spread']
+        positive_years = sum(value > 0 for value in yearly.values())
         summaries[column] = {
             'months': observed, 'skipped_months': skipped, 'missing_returns': missing,
             'first_return_month': rows[0]['return_month'] if rows else None,
             'last_return_month': rows[-1]['return_month'] if rows else None,
             'mean_monthly_spread': mean, 'annualized_spread': annualized,
+            'years': len(yearly), 'positive_years': positive_years,
+            'negative_years': sum(value < 0 for value in yearly.values()),
+            'share_years_positive': positive_years / len(yearly) if yearly and mean is not None else None,
             'evidence_status': status,
             'coverage_status': ('review coverage' if not observed or missing or skipped
                                 else 'complete for available panel months'),
         }
     return summaries, monthly_rows
+
+
+def choose_default(summary, meta):
+    """(higher_is_better, CONSISTENT | THEORY | THEORY_LOST) for one factor, or None without data.
+
+    summary: this module's summary, computed with the factor's current default
+    meta['higher_is_better']. The theory default is read from meta['theory_higher_is_better'],
+    which a refresh never changes, so the fallback survives a default flipped by the data.
+
+    1. A direction that wins (positive summed spread) in at least CONSISTENT_SHARE of the calendar
+       years is the default: "consistent".
+    2. Otherwise the theory default stands: "theory" if it won at least MAJORITY_SHARE of the
+       years, "theory_lost" if it won fewer.
+    """
+    if summary['annualized_spread'] is None or not summary['years']:
+        return None
+    theory = meta['theory_higher_is_better']
+    same = theory == meta['higher_is_better']
+    theory_wins = summary['positive_years' if same else 'negative_years'] / summary['years']
+    other_wins = summary['negative_years' if same else 'positive_years'] / summary['years']
+    if theory_wins >= CONSISTENT_SHARE:
+        return theory, CONSISTENT
+    if other_wins >= CONSISTENT_SHARE:
+        return not theory, CONSISTENT
+    return theory, THEORY if theory_wins >= MAJORITY_SHARE else THEORY_LOST

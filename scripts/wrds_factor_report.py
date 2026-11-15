@@ -1,4 +1,4 @@
-"""Build the WRDS crosswalk/default report, optionally with private empirical evidence.
+"""Build the public WRDS factor review page, or the private report with each factor's spreads.
 
 uv run python scripts/wrds_factor_report.py --catalog-only --output DOCS/WRDS_FACTOR_REVIEW.md
 uv run python scripts/wrds_factor_report.py --s3 --output ../private_reports/wrds_factor_review.md
@@ -24,25 +24,37 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from app.streamlit_config import WRDS_FACTOR_METADATA  # noqa: E402
 from app.wrds_factor_review import factor_rows, legacy_rows  # noqa: E402
 from src.wrds_data import PANEL_FILE, RETURNS_FILE, wrds_dir  # noqa: E402
-from src.wrds_factor_evidence import monthly_spreads  # noqa: E402
+from src.wrds_factor_evidence import (  # noqa: E402
+    CONSISTENT_SHARE,
+    END_YEAR,
+    MAJORITY_SHARE,
+    START_YEAR,
+    choose_default,
+    monthly_spreads,
+)
 from src.wrds_factors import WRDS_FACTOR_COLUMNS  # noqa: E402
 
 PANEL_COLUMNS = tuple(dict.fromkeys(('date', 'permno', 'prc', 'mkt_cap_musd') + WRDS_FACTOR_COLUMNS))
 RETURNS_COLUMNS = ('month_end', 'permno', 'ret_m')
 
-METHODOLOGY = '''Monthly equal-weight tails, 10% by default, with at least one stock per leg and no overlap.
+METHODOLOGY = f'''Monthly equal-weight tails, 10% by default, with at least one stock per leg and no overlap.
 Sort finite raw factor values at month end t; use returns in the next calendar month (t+1), including
 CRSP delisting returns. Break ties by PERMNO. Use the existing buyability filter (positive price and market cap),
 without a sector or fossil-fuel restriction. No forward-return column is used in selection.
 For Higher defaults: long high, short low. For Lower defaults: long low, short high.
 Reported spread is 12 times the arithmetic mean of monthly long-minus-short returns, in percentage points
 per year; it is NOT a difference of CAGRs and is NOT a compounded trading strategy.
+Years default wins counts calendar return years whose summed monthly spread is above zero; partial first and
+last years count as years.
+Default rule: a direction that wins in at least {CONSISTENT_SHARE:.0%} of years is the default (consistent);
+otherwise the theory default stands: "theory" if it won at least {MAJORITY_SHARE:.0%} of years, "theory_lost" if
+fewer. The theory default is theory_higher_is_better in app/streamlit_config.py. The script never edits defaults.
 Each leg has $1 notional (gross exposure $2); borrowing fees, financing, transaction costs and taxes are excluded.
 Missing individual returns retain their weight and are filled with 0% as in the app, with a count and coverage flag.
 Months with fewer than two finite signals, a constant signal, or no next-month return-file coverage are skipped
 and counted. Actual factor coverage is shown; partial 2002 and 2026 years are not presented as full years.
 This diagnostic uses raw single-factor ranks, not the app's winsorized multi-factor scoring.
-Negative default-oriented spreads are marked for team review; no default is flipped automatically.
+Negative default-oriented spreads are marked for team review, and defaults that differ from the rule are flagged.
 Positive spreads are descriptive evidence, not proof of significance or out-of-sample performance.
 '''
 REFERENCES = '''- Internal definitions: `app/streamlit_config.py`, `src/factor_registry.py`,
@@ -70,7 +82,8 @@ def _table(headers, rows):
                      ['| ' + ' | '.join(_cell(value) for value in row) + ' |' for row in rows])
 
 
-def render_report(summaries=None, *, source='No data loaded', start_year=2002, end_year=2026, tail_pct=10):
+def render_report(summaries=None, *, source='No data loaded', start_year=START_YEAR, end_year=END_YEAR,
+                  tail_pct=10):
     lines = ['# WRDS factor matching and default directions', '',
              '## Review status', '',
              ('Empirical evidence computed from the source identified below. Team review is still required for '
@@ -85,22 +98,32 @@ def render_report(summaries=None, *, source='No data loaded', start_year=2002, e
     rows = []
     for row in factor_rows():
         evidence = (summaries or {}).get(row['column'])
-        spread = 'pending'
+        spread = rule = 'pending'
+        years = 'pending'
         coverage = 'not computed'
         status = 'pending data'
         if evidence is not None:
             value = evidence['annualized_spread']
             spread = 'n/a' if value is None else f'{100 * value:+.3f} pp/year'
+            share = evidence['share_years_positive']
+            years = ('n/a' if share is None else
+                     f"{evidence['positive_years']}/{evidence['years']} ({100 * share:.0f}%)")
+            higher = row['default_direction'] == 'Higher'
+            chosen = choose_default(evidence, WRDS_FACTOR_METADATA[row['factor']])
+            rule = 'n/a' if chosen is None else f"{'Higher' if chosen[0] else 'Lower'} ({chosen[1]})"
             coverage = (f"{evidence['first_return_month'] or 'n/a'} to {evidence['last_return_month'] or 'n/a'}; "
                         f"{evidence['months']} months; {evidence['skipped_months']} skipped; "
                         f"{evidence['missing_returns']} missing stock returns")
             status = f"{evidence['evidence_status']}; {evidence['coverage_status']}"
-        rows.append([row['factor'], f"`{row['column']}`", row['legacy_match'], row['default_direction'],
-                     row['reason'], spread, coverage, status])
-    lines += [_table(['WRDS factor', 'Column', 'Legacy match', 'Default', 'Reason', 'Long–short spread',
-                      'Coverage', 'Review'], rows), '', '## Every Legacy factor', '',
-              _table(['Legacy factor', 'Confirmed WRDS match', 'Related candidate only', 'Definition / limitation'],
-                     [[r['legacy_factor'], r['wrds_match'], r['related_candidate'] or '—', r['note']]
+            if chosen is not None and chosen[0] != higher:
+                status += '; default differs from rule'
+        rows.append([row['factor'], f"`{row['column']}`", row['replaces'], row['default_direction'],
+                     row['reason'], spread, years, rule, coverage, status])
+    lines += [_table(['WRDS factor', 'Column', 'Replaces Legacy', 'Default', 'Reason', 'Long–short spread',
+                      'Years default wins', 'Rule', 'Coverage', 'Review'], rows), '',
+              '## Every Legacy factor', '',
+              _table(['Legacy factor', 'WRDS replacement', 'Level', 'Difference'],
+                     [[r['legacy_factor'], r['wrds_factor'], r['level'], r['difference']]
                       for r in legacy_rows()]), '', '## Evidence methodology', '', METHODOLOGY,
               '## Sources and interpretation', '', REFERENCES,
               '## Generate the private evidence report', '',
@@ -111,6 +134,40 @@ def render_report(summaries=None, *, source='No data loaded', start_year=2002, e
               'monthly CSV and a JSON provenance/summary file beside the report. '
               'Keep all real-data outputs outside this public repository. No defaults or data files are modified.', '']
     return '\n'.join(lines)
+
+
+PRIVATE_COMMAND = ('uv run python scripts/wrds_factor_report.py --data-dir "/path/to/processed/final" '
+                   '--output ../private_reports/wrds_factor_review.md')
+
+
+def render_catalog():
+    """The public DOCS/WRDS_FACTOR_REVIEW.md: definitions, defaults and reasons, no statistics."""
+    return '\n'.join([
+        '# WRDS factor review', '',
+        'Which WRDS factor replaces each Legacy factor, and why each WRDS factor defaults to Higher or Lower. '
+        'In the factor picker, tinted cards with a link icon replace a Legacy factor.', '',
+        '## Legacy to WRDS', '',
+        '**Same**: same definition (units may differ, which does not change the ranking). '
+        '**Similar**: same idea, with the difference listed.', '',
+        _table(['Legacy factor', 'WRDS replacement', 'Level', 'Default (Legacy → WRDS)', 'Difference'],
+               [[r['legacy_factor'], r['wrds_factor'], r['level'], f"{r['legacy_default']} → {r['wrds_default']}",
+                 r['difference']] for r in legacy_rows()]), '',
+        '## Default directions', '',
+        f'Each default is checked against the factor\'s long-short spread in each calendar year, '
+        f'{START_YEAR}–{END_YEAR}. '
+        f'A direction that wins in at least {CONSISTENT_SHARE:.0%} of years is the default; otherwise the theory '
+        f'default stands, and the basis says whether it won at least {MAJORITY_SHARE:.0%} of years. '
+        'Saved analyses and strategy files keep the directions they were saved with.', '',
+        _table(['WRDS factor', 'Default', 'Basis', 'Reason'],
+               [[r['factor'], r['default_direction'], r['basis'], r['reason']]
+                for r in factor_rows()]), '',
+        '## Private report', '',
+        'The spreads stay private. From the repository root:', '',
+        '```bash', PRIVATE_COMMAND, '```', '',
+        'Use `--s3` instead of `--data-dir` to read the data from S3. The output must be outside this repository. '
+        'It lists each factor\'s spread and the share of years its default wins, and flags '
+        'defaults that differ from the rule. `--catalog-only --output DOCS/WRDS_FACTOR_REVIEW.md` regenerates '
+        'this page.', ''])
 
 
 def _load_aws_settings():
@@ -138,8 +195,8 @@ def main(argv=None):
     mode.add_argument('--data-dir', type=Path)
     mode.add_argument('--s3', action='store_true')
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--start-year', type=int, default=2002)
-    parser.add_argument('--end-year', type=int, default=2026)
+    parser.add_argument('--start-year', type=int, default=START_YEAR)
+    parser.add_argument('--end-year', type=int, default=END_YEAR)
     parser.add_argument('--tail-pct', type=float, default=10.0)
     args = parser.parse_args(argv)
     output = args.output.resolve()
@@ -173,8 +230,9 @@ def main(argv=None):
         summaries, monthly = monthly_spreads(*frames, directions, start_year=args.start_year,
                                             end_year=args.end_year, tail_pct=args.tail_pct)
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(render_report(summaries, source=source, start_year=args.start_year,
-                                    end_year=args.end_year, tail_pct=args.tail_pct), encoding='utf-8')
+    text = render_catalog() if args.catalog_only else render_report(
+        summaries, source=source, start_year=args.start_year, end_year=args.end_year, tail_pct=args.tail_pct)
+    output.write_text(text, encoding='utf-8')
     if summaries is not None:
         payload = {'generated_at': datetime.now(timezone.utc).isoformat(), 'source': source,
                    'inputs': provenance, 'requested_years': [args.start_year, args.end_year],

@@ -28,7 +28,7 @@ Decided in the stage 1 review:
 | 1 | Delisting during a quarter or half year | The money is held as cash earning the risk-free rate until the next rebalance | 3.3 |
 | 2 | Ranked stocks | A new `ranked` job that ranks every stock on one rebalance date at a time | 5.1, 8 |
 | 3 | Fossil fuel filter | Keep the Legacy mapping (the GICS and SIC codes in 2.3; Oil & Gas Storage & Transportation is not excluded) | 2.3 |
-| 4 | Default directions where research is mixed | Lower is better for all of them. The 1-month factor is named "1-Month Return (Reversal)". Every tooltip that defaults to Lower says why in one short sentence | 2.1 |
+| 4 | Default directions where research is mixed | Lower is better for all of them. The 1-month factor is named "1-Month Return (Reversal)". Every tooltip that defaults to Lower says why in one short sentence. *Superseded: defaults now follow the data rule in the [WRDS factor review](WRDS_FACTOR_REVIEW.md).* | 2.1 |
 | 5 | Unclassified stocks | Left out when the sector filter is on | 2.2 |
 | 6 | Today's GICS codes for the sector filter | Accepted, documented as a limitation | 2.2, R3 |
 | 7 | Defaults | Quarterly, 2008-2026 | 8 |
@@ -75,7 +75,7 @@ The invariant is that **Legacy results do not change**. Legacy's code version an
 
 ### 2.1 Factor list
 
-Every factor is a column of `factor_panel_monthly.parquet` whose value at month end t was public by t (data dictionary, "Point in time"). The display names describe the WRDS definition, so they are not Legacy's names (no "9/30 Data"). **Direction** is the default when the factor is added: Higher = buy the highest values (`'top'`), Lower = buy the lowest (`'bottom'`).
+Every factor is a column of `factor_panel_monthly.parquet` whose value at month end t was public by t (data dictionary, "Point in time"). The display names describe the WRDS definition, so they are not Legacy's names (no "9/30 Data"). **Direction** is the default when the factor is added: Higher = buy the highest values (`'top'`), Lower = buy the lowest (`'bottom'`). This table records the original design; the current defaults and their reasons are in the [WRDS factor review](WRDS_FACTOR_REVIEW.md).
 
 | Group | Column | Display name | Default | Tooltip |
 |---|---|---|---|---|
