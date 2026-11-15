@@ -422,6 +422,27 @@ def load_wrds_holdings(filename: str, row_group: int, date: str) -> pd.DataFrame
     return read_holdings_date(get_results_store(), filename, row_group, date)
 
 
+def wrds_job_for_inputs(user_settings: Dict[str, Any], factor_names: List[str],
+                        factor_dirs: Dict[str, str]) -> Dict[str, Any]:
+    """
+    The WRDS backtest job for the sidebar settings and the chosen WRDS factors (display
+    names), as the Run button sends it to the Lambda. Raises ValueError like build_wrds_job.
+    """
+    from app.streamlit_config import WRDS_FACTOR_METADATA
+    from src.wrds_jobs import build_wrds_job
+    labels = [f for f in factor_names if f in WRDS_FACTOR_METADATA]
+    columns = [WRDS_FACTOR_METADATA[f]['column'] for f in labels]
+    return build_wrds_job('backtest', columns, {c: factor_dirs.get(f, 'top') for f, c in zip(labels, columns)},
+                          user_settings, factor_labels=dict(zip(columns, labels)))
+
+
+def wrds_run_job(run: Dict[str, Any]) -> Dict[str, Any]:
+    """The backtest job of a saved WRDS run, rebuilt from its saved factors and settings."""
+    from src.wrds_jobs import build_wrds_job
+    return build_wrds_job('backtest', run['factors'], run['factor_directions'], run['settings'],
+                          factor_labels=dict(zip(run['factors'], run['factor_labels'])))
+
+
 def run_wrds_backtest_logic(user_settings: Dict[str, Any], factor_names: List[str],
                             factor_dirs: Dict[str, str]) -> Optional[Dict[str, Any]]:
     """
@@ -431,9 +452,9 @@ def run_wrds_backtest_logic(user_settings: Dict[str, Any], factor_names: List[st
     Returns:
         The saved run, or None if the run was rejected or failed (nothing is saved).
     """
+    from app.calculation_preview import build_wrds_calculation_preview
     from app.saved_runs import add_saved_run
     from app.streamlit_config import MAX_SAVED_RUNS, WRDS_FACTOR_METADATA
-    from src.wrds_jobs import build_wrds_job
 
     factor_labels = [f for f in factor_names if f in WRDS_FACTOR_METADATA]
     if not factor_labels:
@@ -443,11 +464,8 @@ def run_wrds_backtest_logic(user_settings: Dict[str, Any], factor_names: List[st
         st.warning("Initial AUM must be greater than $0.")
         return None
 
-    columns = [WRDS_FACTOR_METADATA[f]['column'] for f in factor_labels]
-    directions = {WRDS_FACTOR_METADATA[f]['column']: factor_dirs.get(f, 'top') for f in factor_labels}
     try:
-        job = build_wrds_job('backtest', columns, directions, user_settings,
-                             factor_labels={WRDS_FACTOR_METADATA[f]['column']: f for f in factor_labels})
+        job = wrds_job_for_inputs(user_settings, factor_labels, factor_dirs)
         results, compute = get_lambda_client(get_backtest_lambda_name()).run(job)
     except Exception as e:
         st.error(f"Backtest Execution Error: {str(e)}")
@@ -459,8 +477,10 @@ def run_wrds_backtest_logic(user_settings: Dict[str, Any], factor_names: List[st
         'label': _wrds_run_label(run_id, factor_labels, job['frequency'], job.get('trading_cost_bps', 0.0)),
         'data_mode': 'wrds',
         'factor_labels': factor_labels,
-        'factors': columns,
-        'factor_directions': directions,
+        'factors': job['factors'],
+        'factor_directions': job['factor_directions'],
+        # The WRDS engine's calculation for the job it received (never the Legacy formula)
+        'calculation_preview': build_wrds_calculation_preview(job),
         'settings': dict(user_settings),
         'universe': _universe_filters(user_settings),
         'data': None,
@@ -496,11 +516,8 @@ def add_to_history(run: Dict[str, Any]) -> None:
         'saved_at': now.strftime('%Y-%m-%dT%H:%M:%SZ'),
     }
     if run.get('data_mode') == 'wrds':
-        from src.wrds_jobs import build_wrds_job
         from src.wrds_service import summarize_wrds_job
-        entry['summary'] = summarize_wrds_job(build_wrds_job(
-            'backtest', run['factors'], run['factor_directions'], run['settings'],
-            factor_labels=dict(zip(run['factors'], run['factor_labels']))))
+        entry['summary'] = summarize_wrds_job(wrds_run_job(run))
     st.session_state.analysis_history = st.session_state.get('analysis_history', []) + [entry]
 
 def open_saved_analysis(text: str) -> Dict[str, Any]:
@@ -511,6 +528,7 @@ def open_saved_analysis(text: str) -> Dict[str, Any]:
     Raises:
         SavedAnalysisError: with a message for the user (not an ID, expired, ...).
     """
+    from app.calculation_preview import wrds_preview
     from app.saved_runs import add_saved_run, build_run_label
     from app.streamlit_config import MAX_SAVED_RUNS
     from src.saved_analyses import load_saved_analysis
@@ -539,6 +557,7 @@ def open_saved_analysis(text: str) -> Dict[str, Any]:
                 'factor_combination', 'restrict_fossil_fuels', 'selected_sectors')}, **gics, **costs},
             'universe': {'restrict_fossil_fuels': job['restrict_fossil_fuels'],
                          'selected_sectors': list(job['selected_sectors']), **gics},
+            'calculation_preview': wrds_preview(job),
             'data': None,
             'results': saved['result'],
             'compute': compute,

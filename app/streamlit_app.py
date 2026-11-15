@@ -30,7 +30,7 @@ import streamlit_config as config
 import streamlit_css as css
 import streamlit_utils as utils
 from analysis_history import BROWSER_ANALYSES_KEY, earlier_analyses, sync_browser_analyses
-from app.calculation_preview import build_calculation_preview, render_calculation_preview
+from app.calculation_preview import build_calculation_preview, render_calculation_preview, wrds_analysis_preview
 from app.share_links import consume_share_link
 from app.streamlit_utils import open_saved_analysis
 from compare_state import OPEN_COMPARE_KEY
@@ -229,9 +229,11 @@ def main():
             render_import_settings()
             render_next_run_name()
 
-            if data_mode == "legacy":
-                render_calculation_preview(build_calculation_preview(
-                    user_settings, selected_factor_names, factor_directions))
+            # The engine's calculation for the current selections: WRDS's in WRDS mode, Legacy's otherwise
+            render_calculation_preview(
+                wrds_analysis_preview(user_settings, selected_factor_names, factor_directions)
+                if data_mode == 'wrds' else
+                build_calculation_preview(user_settings, selected_factor_names, factor_directions))
 
             if data_mode == 'wrds':
                 _render_wrds_run(user_settings, selected_factor_names, factor_directions)

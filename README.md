@@ -55,7 +55,7 @@ Then open http://localhost:8501
 - Benchmark comparison vs Russell 2000, Growth, and Value
 - Performance metrics: CAGR, yearly returns, drawdown, Sharpe, Information Ratio, win rate
 - Ranked-stock table and top-vs-bottom cohort analysis
-- Calculation preview (Legacy): the strategy as a formula on the Analysis tab, live and without loading data, and the formula each run used in Results; see [Check the calculation preview](DOCS/FACTOR_LAKE_USER_GUIDE.md#check-the-calculation-preview)
+- Calculation preview (Legacy and WRDS): the engine's calculation as a formula on the Analysis tab, live and without loading data, and the one each run used in Results; see [Check the calculation preview](DOCS/FACTOR_LAKE_USER_GUIDE.md#check-the-calculation-preview)
 - Saved runs: each backtest run is kept as its own tab in Results (newest first, last 5; cleared when the page is refreshed), shows the settings that produced it, and can be removed
 - Strategy files and names: export/import Legacy or WRDS settings as JSON, name backtests and add notes, and edit annotations in Results without changing calculations. See [Save, import and name backtests](DOCS/STRATEGY_SETTINGS.md).
 - Clear and rerun: on the Analysis tab, click **Clear Parameters** to remove selected factors and restore the analysis settings to their defaults. Choose new inputs, then **Run Portfolio Analysis**. For local backtests, click **Load Market Data** first to apply the new filters using the cached source data. Saved runs, analysis history, the Lambda execution preference and the data source (Legacy or WRDS) are kept; in WRDS mode the frequency and years return to Quarterly, 2008-2026. No page refresh or app restart is needed.

@@ -14,6 +14,8 @@ from tests.unit.test_saved_runs import (
     _click_main_tab,
     at,
 )
+from tests.unit.test_wrds_results import s3  # noqa: F401 (fixture)
+from tests.unit.test_wrds_saved import manager, new_session  # noqa: F401 (fixtures)
 
 
 def formula(at):
@@ -177,6 +179,55 @@ def test_preview_top_pct_and_trading_cost_match_the_engine(state, monkeypatch, p
         assert _numbers(r"Trading cost = ([\d.]+) bps", text) == [cost]
         assert _numbers(r"c\(t\) = ([\d.]+) / 10000", text) == [cost]
         assert preview["steps"][-1][0] == "Apply trading costs"
+    else:
+        assert "Trading cost" not in text and "R_net" not in text
+        assert "Apply trading costs" not in [title for title, _ in preview["steps"]]
+
+
+@pytest.mark.parametrize("frequency, cost", [("Monthly", 0.0), ("Quarterly", 25.0), ("Semi-annual", 7.5)])
+def test_wrds_preview_frequency_top_pct_and_trading_cost_match_the_wrds_engine(new_session, monkeypatch,
+                                                                                 frequency, cost):
+    import src.wrds_service as service
+    from src.wrds_calendar import FREQUENCY_LABELS
+    calls, real = [], service.run_wrds_backtest
+
+    def spy(data, factors, directions, **options):
+        calls.append(options)
+        return real(data, factors, directions, **options)
+    monkeypatch.setattr(service, "run_wrds_backtest", spy)    # what the Lambda's WRDS engine receives
+    at = new_session()
+    at.sidebar.radio(key="data_mode_input").set_value("WRDS").run()
+    at.sidebar.number_input(key="wrds_start_year_input").set_value(2010).run()
+    at.sidebar.number_input(key="wrds_end_year_input").set_value(2012).run()
+    at.sidebar.radio(key="wrds_frequency_input").set_value(frequency).run()
+    at.sidebar.number_input(key="trading_cost_bps_input").set_value(cost).run()
+    for key in ("w_roe", "w_mom_12_1"):
+        at.button(key=f"factor_add_{key}").click().run()
+    _click_main_tab(at, "Analysis")
+    analysis = next(c.value for c in at.main.code if c.value.startswith("Rebalance at month ends"))
+    at.button(key="run_wrds_analysis").click().run()
+    _assert_clean(at)
+    run = at.session_state["saved_runs"][0]
+    preview = run["calculation_preview"]
+    assert preview["formula"] == analysis                    # Analysis showed the job the engine then received
+    engine = calls[0]
+    assert all({k: c[k] for k in ("frequency", "top_pct", "trading_cost_bps")} ==
+               {k: engine[k] for k in ("frequency", "top_pct", "trading_cost_bps")} for c in calls)
+    formula = preview["formula"]
+    text = formula + "\n" + "\n".join(f"{title}: {body}" for title, body in preview["steps"])
+    # Top %: every selection rule and "top X%" is the engine's top_pct
+    shown = _numbers(r"floor\(n [*×] ([\d.]+) / 100\)", text) + _numbers(r"top ([\d.]+)% by", text)
+    assert len(shown) >= 3 and set(shown) == {float(engine["top_pct"])}
+    # Frequency: its name, and as many rebalances as the engine made
+    assert re.match(r"Rebalance at month ends, ([\w-]+) \(", formula).group(1) == FREQUENCY_LABELS[engine["frequency"]]
+    assert preview["steps"][0][1].startswith(f"{FREQUENCY_LABELS[engine['frequency']]}: ")
+    assert _numbers(r"\[(\d+) rebalances?;", formula) == [len(run["results"]["rebalance_dates"])]
+    # Trading cost: the engine's, and its lines only when it charges one
+    charged = float(engine["trading_cost_bps"])
+    if charged > 0:
+        assert _numbers(r"Trading cost = ([\d.]+) bps", text) == [charged]
+        assert _numbers(r"c\(t\) = ([\d.]+) / 10,000", text) == [charged]
+        assert _numbers(r"charge ([\d.]+) bps", text) == [charged]
     else:
         assert "Trading cost" not in text and "R_net" not in text
         assert "Apply trading costs" not in [title for title, _ in preview["steps"]]

@@ -16,6 +16,7 @@ from typing import Any, Dict
 
 import streamlit as st
 
+from app.calculation_preview import preview_for_run, render_calculation_preview
 from app.streamlit_utils import describe_compute, load_wrds_holdings, run_wrds_ranked
 from app.wrds_tables import (
     FREQUENCY_LABELS,
@@ -65,6 +66,8 @@ def render_wrds_results(run: Dict[str, Any]) -> None:
                     f"({len(dates)} rebalances, {dates[0]} to {dates[-1]})",
         delisting=WRDS_DELISTING,
     )
+    # The WRDS engine's calculation for this run's job (saved with it; opened runs: their stored job)
+    render_calculation_preview(preview_for_run(run), saved=True)
 
     # 2. Performance Summary
     st.subheader("Performance Summary")

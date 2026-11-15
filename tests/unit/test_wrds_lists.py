@@ -89,7 +89,8 @@ def _shows_full_results_and_holdings(at, analysis_id):
     run = at.session_state['saved_runs'][0]
     assert run['data_mode'] == 'wrds' and run['compute']['hash'] == analysis_id
     assert run['label'] == 'Run 1: WRDS, Quarterly (opened)'
-    assert [s.value for s in at.main.subheader] == ['Performance Summary', 'Holdings and Ranks',
+    assert [s.value for s in at.main.subheader] == ['Calculation Used in This Run', 'Performance Summary',
+                                                     'Holdings and Ranks',
                                                      'Portfolio Growth Over Time', 'Period-by-Period Performance',
                                                      'Top vs Bottom Cohort Analysis']
     picker = at.selectbox(key=f"ranked_year_{run['id']}")

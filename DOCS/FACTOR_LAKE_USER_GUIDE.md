@@ -51,7 +51,7 @@ The **Calculation Preview** below Factor Selection shows the strategy as a formu
 
 After a run, its tab in Results shows **Calculation Used in This Run**: the formula that run used. Later sidebar changes do not change it, and opened saved analyses rebuild it from their stored inputs. If you change the sectors, ESG filter or years after Load Market Data, a run in the app applies them to the cached data, so the run matches the preview.
 
-The preview describes Legacy's annual backtest only, so WRDS mode and WRDS runs do not show it.
+This formula is Legacy's annual backtest. WRDS mode shows the WRDS engine's own: see **Check the calculation preview** in [15. Use WRDS mode](#15-use-wrds-mode).
 
 ## 6. Load the market data
 
@@ -173,6 +173,10 @@ WRDS mode is a second data source next to Legacy. It backtests on point-in-time 
 4. Weighting, factor combination, sector filter, fossil fuel filter and initial AUM work as in Legacy, and the sector filter can go finer (see **Filter by GICS industry** below). The portfolio buys the top 10%, as in Legacy. There is no delisting option (see below).
 5. Add factors on the Analysis tab, grouped as **Momentum, Value, Profitability, Quality, Growth, Risk, Analyst and Size**; tinted cards with a link icon replace a Legacy factor, and each tooltip gives the default direction and why. The [factor review](WRDS_FACTOR_REVIEW.md) maps every Legacy factor to its WRDS replacement and explains the defaults.
 6. Click **Run Portfolio Analysis**. There is no Load Market Data step: the backtest reads the WRDS data in AWS.
+
+### Check the calculation preview
+
+In WRDS mode the **Calculation Preview** on the Analysis tab shows the WRDS engine's calculation for the backtest the Run button would send: the rebalance dates of your frequency and years, the month-end Russell 2000 universe after the GICS and fossil fuel filters, the z-scores (winsorized at 1% and 99% per date), the top 10% with ties broken by PERMNO, the weights, buy-and-hold periods on CRSP total returns with delisting returns included, the trading cost when set, and the IWM benchmark (IWO and IWN shown too). Each WRDS run's tab in Results keeps **Calculation Used in This Run**, and a saved WRDS analysis you open shows the one from its stored settings. It never shows Legacy's formula.
 
 ### Filter by GICS industry
 

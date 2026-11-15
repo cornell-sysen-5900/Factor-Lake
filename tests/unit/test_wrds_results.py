@@ -30,7 +30,7 @@ from app.wrds_tables import (
 )
 from scripts.check_backtest_lambda import TOLERANCE, max_difference
 from src.wrds_engine import rank_stocks, run_wrds_backtest
-from tests.unit.results_snapshot import comparable, legacy_results_snapshot, main_area
+from tests.unit.results_snapshot import comparable, legacy_results_snapshot, main_area, without_calculation
 from tests.unit.test_backtest_lambda import DELISTING_FILE, UNIVERSE_FILE, _delisting, _parquet, _raw_universe
 from tests.unit.test_saved_runs import _assert_clean, _click_main_tab, _open_tab
 from tests.unit.test_wrds_saved import _run_wrds, manager, new_session  # noqa: F401 (fixtures)
@@ -289,7 +289,9 @@ def test_a_wrds_run_looks_like_legacys_results(new_session, legacy):
     run = _run_wrds(at, 'w_roe', 'w_mom_12_1', 'w_mcap')
     at.button(key=f"cohort_btn_{run['id']}").click().run()
     _assert_clean(at)
-    results, shown = run['results'], main_area(at)
+    # main's Legacy snapshot predates the calculation box: check it is the WRDS one, then compare the rest
+    results, shown = run['results'], without_calculation(main_area(at), run['calculation_preview'])
+    assert run['calculation_preview']['formula'].startswith(WRDS_FORMULA)
     assert run['label'] == 'Run 1: WRDS, Quarterly'
     # The Saved analyses panel beside the runs shows the boxes Legacy's snapshot has above them
     from tests.unit.results_snapshot import moved_to_panel
@@ -405,6 +407,7 @@ def test_holdings_ranked_stocks_and_csvs_of_another_date(new_session):
 def test_a_reopened_wrds_id_shows_every_view_in_a_new_session(new_session):
     mine = new_session()
     run = _run_wrds(mine, 'w_roe', 'w_btp')
+    _click_main_tab(mine, 'Results')      # drop the Analysis elements of the run st.rerun() interrupted
     theirs = new_session()
     _click_main_tab(theirs, 'Results')
     theirs.text_input(key='open_analysis_id').set_value(run['compute']['hash']).run()
@@ -431,20 +434,52 @@ def test_the_data_viewer_says_it_shows_legacy_data_in_wrds_mode(new_session):
     assert not any('The Data Viewer shows the Legacy data' in c.value for c in at.main.caption)
 
 
-def test_a_wrds_run_shows_no_legacy_calculation(new_session):
-    # The calculation preview describes the Legacy engine (annual rebalance on Next-Years_Return,
-    # its delisting options, FactSet industries), so neither WRDS Results nor Analysis shows it
-    from app.calculation_preview import preview_for_run
+# The Legacy formula's first line; the WRDS formula's first line
+LEGACY_FORMULA, WRDS_FORMULA = 'U = market data with Year in', 'Rebalance at month ends, '
+
+
+def _formulas(at):
+    """Every calculation formula on the page (the st.code blocks)."""
+    return [c.value for c in at.main.code if LEGACY_FORMULA in c.value or WRDS_FORMULA in c.value]
+
+
+def test_wrds_shows_the_wrds_calculation_never_the_legacy_one(new_session):
+    # The Legacy formula describes the Legacy engine (annual rebalance on Next-Years_Return, its
+    # delisting options, FactSet industries); WRDS mode, its runs and opened WRDS runs show the WRDS one
+    from app.calculation_preview import build_calculation_preview, preview_for_run
     at = new_session()
-    run = _run_wrds(at, 'w_roe')
+    at.sidebar.radio(key='data_mode_input').set_value('WRDS').run()
+    at.sidebar.number_input(key='wrds_start_year_input').set_value(2010).run()
+    at.sidebar.number_input(key='wrds_end_year_input').set_value(2012).run()
+    _click_main_tab(at, 'Analysis')
+    [empty] = _formulas(at)
+    assert empty.startswith(WRDS_FORMULA) and '[select at least one factor]' in empty
+    at.button(key='factor_add_w_roe').click().run()
+    run = _run_wrds(at)
     subheaders = [s.value for s in at.main.subheader]
     assert 'Performance Summary' in subheaders                      # the WRDS run's Results are open
-    assert 'Calculation Used in This Run' not in subheaders
-    assert 'calculation_preview' not in run and preview_for_run(run) is None
+    assert 'Calculation Used in This Run' in subheaders
+    saved = run['calculation_preview']['formula']
+    # (AppTest also keeps the Analysis tab's elements of the run that st.rerun() interrupted)
+    assert set(_formulas(at)) == {saved} and saved.startswith(WRDS_FORMULA)
+    assert 'Sleeve[ROE]' in saved and 'Quarterly (Mar, Jun, Sep, Dec)' in saved
+    # The guard: a WRDS run never gets the Legacy formula, even from a stored Legacy one
+    legacy = build_calculation_preview(run['settings'], run['factor_labels'], {})
+    assert preview_for_run({**run, 'calculation_preview': legacy})['formula'] == saved
+    assert preview_for_run({k: v for k, v in run.items() if k != 'calculation_preview'})['formula'] == saved
     _click_main_tab(at, 'Analysis')
-    assert 'Calculation Preview' not in [s.value for s in at.main.subheader]
-    assert not any('U = market data' in c.value for c in at.main.code)
-    _assert_clean(at)
+    assert 'Calculation Preview' in [s.value for s in at.main.subheader]
+    assert set(_formulas(at)) == {saved}                            # the same selections, the same calculation
+    # Opened in another session from its ID: the calculation of its stored job
+    theirs = new_session()
+    _click_main_tab(theirs, 'Results')
+    theirs.text_input(key='open_analysis_id').set_value(run['compute']['hash']).run()
+    theirs.button(key='open_analysis_btn').click().run()
+    _open_tab(theirs, theirs.session_state['saved_runs'][0]['label'])
+    assert set(_formulas(theirs)) == {saved}
+    for app in (at, theirs):
+        assert not any(LEGACY_FORMULA in c.value for c in app.main.code)
+        _assert_clean(app)
 
 
 # ---------------------------------------------------------------------------

@@ -108,6 +108,23 @@ def main_area(at) -> dict:
     return render
 
 
+def without_calculation(render: dict, preview: dict) -> dict:
+    """
+    render without one run's "Calculation Used in This Run" box (its subheader, caption,
+    formula, Step-by-step expander and steps), for comparing with renders made before it
+    existed. Raises ValueError when any part of the box is missing.
+    """
+    out = {kind: list(values) if isinstance(values, list) else values for kind, values in render.items()}
+    caption = next(c for c in out['caption'] if c.startswith('Saved run inputs;'))
+    parts = [('subheader', 'Calculation Used in This Run'), ('caption', caption), ('code', preview['formula']),
+             ('expander', 'Step-by-step calculation')]
+    for number, (title, description) in enumerate(preview['steps'], 1):
+        parts += [('markdown', f"**{number}. {title}**"), ('markdown', description)]
+    for kind, value in parts:
+        out[kind].remove(value)
+    return out
+
+
 def moved_to_panel(render: dict, panel: dict, strict: bool = True) -> dict:
     """
     main's rendering without what the Saved analyses panel now shows: main drew those boxes
