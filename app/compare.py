@@ -21,6 +21,7 @@ from app.saved_runs import trading_cost_suffix
 from app.wrds_tables import FREQUENCY_LABELS, period_label, short_benchmark
 from src.trading_costs import has_trading_costs, job_trading_cost
 from src.wrds_gics import describe_gics_filter
+from src.wrds_jobs import describe_hold
 
 MIN_COMPARED, MAX_COMPARED = 2, 4
 NA = 'n/a'
@@ -170,7 +171,7 @@ def _factors(a: Dict[str, Any]) -> str:
     job = a['job']
     return ', '.join(f"{job['factor_labels'].get(f, f)} "
                      f"({'higher' if job['factor_directions'][f] == 'top' else 'lower'})"
-                     for f in job['factors'])
+                     for f in job['factors']) or 'None'      # a WRDS run at 100% may have no factors
 
 
 def _period(a: Dict[str, Any]) -> str:
@@ -240,6 +241,8 @@ ROWS: Tuple[Row, ...] = (
         lambda a: COMBINATION_LABELS.get(a['job'].get('factor_combination'), 'Mixing')),
     Row('Settings', 'Weighting',
         lambda a: 'Market Cap Weighted' if a['job'].get('use_market_cap_weight') else 'Equal Weighted'),
+    # How many stocks each selection holds (Legacy and older WRDS jobs: the top 10%)
+    Row('Settings', 'Hold', lambda a: describe_hold(a['job'])),
     Row('Settings', 'Sectors', _sectors),
     Row('Settings', 'Fossil fuels', lambda a: 'Excluded' if a['job'].get('restrict_fossil_fuels') else 'Included'),
     Row('Settings', 'Delisting Strategy', _delisting),

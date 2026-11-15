@@ -103,6 +103,7 @@ def test_settings_rows_describe_each_analysis():
     assert rows['Factors'] == ['ROE using 9/30 Data (higher)', 'ROE (higher), 12-1 Momentum (lower)']
     assert rows['Factor Combination'] == ['Mixing', 'Integrating']
     assert rows['Weighting'] == ['Equal Weighted', 'Market Cap Weighted']
+    assert rows['Hold'] == ['Top 10%', 'Top 10%']
     assert rows['Sectors'] == ['All sectors', 'Energy']
     assert rows['Fossil fuels'] == ['Included', 'Excluded']
     assert rows['Delisting Strategy'] == ['Zero Return', 'CRSP delisting returns, then the risk-free rate']

@@ -36,6 +36,7 @@ from components.strategy_settings import render_run_actions
 from src.saved_analyses import SavedAnalysisError
 from src.trading_costs import has_trading_costs, job_trading_cost
 from src.wrds_gics import describe_gics_filter
+from src.wrds_jobs import describe_hold
 from Visualizations.portfolio_growth_plot import plot_portfolio_growth
 from Visualizations.top_bottom_portfolio_plot import plot_top_bottom_percent
 
@@ -425,7 +426,8 @@ def _render_header_captions(run: Dict[str, Any], data_source: Optional[str] = No
         settings.get('delisting_strategy', 'zero_return'), 'Zero Return'
     )
 
-    st.caption(f"**Factors:** {factors_str}")
+    # A WRDS run at 100% may have no factors: it holds every stock in the filter
+    st.caption(f"**Factors:** {factors_str or 'None (every stock in the filter is held)'}")
     st.caption(
         f"**Period:** {int(settings['start_year'])}-{int(settings['end_year'])} | "
         f"**Initial AUM:** ${settings['initial_aum']:,.0f}"
@@ -439,7 +441,9 @@ def _render_header_captions(run: Dict[str, Any], data_source: Optional[str] = No
         if universe.get('gics_filter'):          # WRDS runs with a GICS filter
             sectors_str = describe_gics_filter(universe['gics_filter'])
         fossil_str = "excluded" if universe.get('restrict_fossil_fuels') else "included"
-        st.caption(f"**Universe:** {sectors_str} | Fossil fuels {fossil_str}")
+        # WRDS runs also say how many of the filtered stocks they hold (older runs: the top 10%)
+        hold_str = f" | Holds: {describe_hold(settings)}" if run.get('data_mode') == 'wrds' else ""
+        st.caption(f"**Universe:** {sectors_str} | Fossil fuels {fossil_str}{hold_str}")
     combination = settings.get('factor_combination', 'mixing')
     combination_descriptions = {
         'mixing': "Mixing (one sleeve per factor)",

@@ -227,9 +227,13 @@ def test_preview_top_pct_and_trading_cost_match_the_engine(state, monkeypatch, p
         assert "Apply trading costs" not in [title for title, _ in preview["steps"]]
 
 
-@pytest.mark.parametrize("frequency, cost", [("Monthly", 0.0), ("Quarterly", 25.0), ("Semi-annual", 7.5)])
+@pytest.mark.parametrize("frequency, cost, hold", [
+    ("Monthly", 0.0, None), ("Quarterly", 25.0, None), ("Semi-annual", 7.5, None),
+    ("Quarterly", 0.0, ("Top X%", 25)), ("Monthly", 10.0, ("Top N stocks", 7)),
+    ("Quarterly", 5.0, ("Top N stocks", 1)),
+])
 def test_wrds_preview_frequency_top_pct_and_trading_cost_match_the_wrds_engine(new_session, monkeypatch,
-                                                                                 frequency, cost):
+                                                                                 frequency, cost, hold):
     import src.wrds_service as service
     from src.wrds_calendar import FREQUENCY_LABELS
     calls, real = [], service.run_wrds_backtest
@@ -244,6 +248,10 @@ def test_wrds_preview_frequency_top_pct_and_trading_cost_match_the_wrds_engine(n
     at.sidebar.number_input(key="wrds_end_year_input").set_value(2012).run()
     at.sidebar.radio(key="wrds_frequency_input").set_value(frequency).run()
     at.sidebar.number_input(key="trading_cost_bps_input").set_value(cost).run()
+    if hold:                                                  # the Hold choice: Top X% or Top N stocks
+        at.sidebar.radio(key="wrds_hold_input").set_value(hold[0]).run()
+        key = "wrds_top_pct_input" if hold[0] == "Top X%" else "wrds_top_n_input"
+        at.sidebar.number_input(key=key).set_value(hold[1]).run()
     for key in ("w_roe", "w_mom_12_1"):
         at.button(key=f"factor_add_{key}").click().run()
     _click_main_tab(at, "Analysis")
@@ -254,13 +262,20 @@ def test_wrds_preview_frequency_top_pct_and_trading_cost_match_the_wrds_engine(n
     preview = run["calculation_preview"]
     assert preview["formula"] == analysis                    # Analysis showed the job the engine then received
     engine = calls[0]
-    assert all({k: c[k] for k in ("frequency", "top_pct", "trading_cost_bps")} ==
-               {k: engine[k] for k in ("frequency", "top_pct", "trading_cost_bps")} for c in calls)
+    assert all({k: c[k] for k in ("frequency", "top_pct", "top_n", "trading_cost_bps")} ==
+               {k: engine[k] for k in ("frequency", "top_pct", "top_n", "trading_cost_bps")} for c in calls)
     formula = preview["formula"]
     text = formula + "\n" + "\n".join(f"{title}: {body}" for title, body in preview["steps"])
-    # Top %: every selection rule and "top X%" is the engine's top_pct
-    shown = _numbers(r"floor\(n [*×] ([\d.]+) / 100\)", text) + _numbers(r"top ([\d.]+)% by", text)
-    assert len(shown) >= 3 and set(shown) == {float(engine["top_pct"])}
+    # Top % or top N: every selection rule and "top X%" / "top N stocks" is the engine's, never the other
+    percents = _numbers(r"floor\(n [*×] ([\d.]+) / 100\)", text) + _numbers(r"top ([\d.]+)% by", text)
+    counts = _numbers(r"min\((\d+), n\)", text) + _numbers(r"top (\d+) stocks by", text)
+    if engine["top_n"] is None:
+        assert len(percents) >= 3 and set(percents) == {float(engine["top_pct"])} and not counts
+        assert hold is None or engine["top_pct"] == hold[1]
+    else:
+        assert len(counts) >= 3 and set(counts) == {float(engine["top_n"])} and not percents
+        assert engine["top_pct"] is None and engine["top_n"] == hold[1]
+        assert _numbers(r"where (\d+) >= \|U\(t\)\|", formula) == [engine["top_n"]]
     # Frequency: its name, and as many rebalances as the engine made
     assert re.match(r"Rebalance at month ends, ([\w-]+) \(", formula).group(1) == FREQUENCY_LABELS[engine["frequency"]]
     assert preview["steps"][0][1].startswith(f"{FREQUENCY_LABELS[engine['frequency']]}: ")
