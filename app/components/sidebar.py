@@ -352,7 +352,7 @@ def _render_wrds_hold() -> Dict[str, Any]:
         horizontal=True,
         key=HOLD_KEY,
         help="How many of the filtered stocks the portfolio holds at each rebalance, best scores first. "
-             "In Mixing, each factor's sleeve holds this many."
+             "In Mixing, Top X% applies to each factor's sleeve, and Top N stocks is N in total."
     )
     if choice == HOLD_COUNT:
         top_n = st.number_input(
@@ -362,8 +362,9 @@ def _render_wrds_hold() -> Dict[str, Any]:
             step=1,
             format="%d",
             key=TOP_N_KEY,
-            help="The N best-scoring stocks at each rebalance. A date with fewer stocks in the filter holds "
-                 "all of them. The filter's size changes by date, so a factor is still needed."
+            help="N different stocks at each rebalance, weighted across all of them. In Mixing the factors take "
+                 "turns in order, each adding its next-best stock not yet picked. A date with fewer stocks in the "
+                 "filter holds all of them. The filter's size changes by date, so a factor is still needed."
         )
         return {'top_n': int(top_n)}
     top_pct = st.number_input(

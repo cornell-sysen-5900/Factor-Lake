@@ -178,6 +178,12 @@ def build_wrds_calculation_preview(job: Dict[str, Any]) -> Dict[str, Any]:
         lines += ["Top 100%: H(t) = U(t), every stock in the filter, with or without a score  "
                   "[the factors do not change the holdings]",
                   "W_i(t) = w_i  [one portfolio with all of V(t)]"]
+    elif top_n is not None and not integrating:
+        order = ", ".join(job["factor_labels"].get(c, c) for c in factors) or "[select at least one factor]"
+        lines += [f"Mixing, Top {top_n}: H(t) = {_stocks(top_n, 'different ')}; the sleeves take turns in factor order "
+                  f"({order}), each adding its next-best stock by its own z_k (ties by lower permno) and skipping "
+                  f"stocks already picked; if they run out first, every stock with a score{whole_date}",
+                  "W_i(t) = w_i  [one portfolio of the picked stocks with all of V(t)]"]
     elif integrating:
         lines += [f"Integrating: Score(i,t) = mean({combined}) over stocks with all {k or 'K'} factors",
                   f"H(t) = top {top} of the n stocks with a Score, by Score; ties by lower permno{whole_date}",
@@ -188,12 +194,14 @@ def build_wrds_calculation_preview(job: Dict[str, Any]) -> Dict[str, Any]:
                   f"each sleeve gets V(t) / {k or 'K'}",
                   f"H_k(t) = top {top} of the n stocks with a z_k, by z_k; ties by lower permno{whole_date}",
                   f"W_i(t) = sum over the sleeves k holding i of w_ik / {k or 'K'}"]
+    # Mixing with Top N weights across all the picked stocks, not within each sleeve
+    within = "Across the picked stocks" if top_n is not None and not integrating else "Within each selection"
     if job["use_market_cap_weight"]:
         lines.append("Market Cap Weight: w_i = mkt_cap_musd_i(t) / sum(mkt_cap_musd_j(t) for j in H)")
-        weight_step = "Within each selection, weight by market capitalization at t (mkt_cap_musd)."
+        weight_step = f"{within}, weight by market capitalization at t (mkt_cap_musd)."
     else:
         lines.append("Equal Weight: w_i = 1 / |H|")
-        weight_step = "Within each selection, give every stock the same weight."
+        weight_step = f"{within}, give every stock the same weight."
     # d. Holding periods, e. trading costs, f. benchmarks
     lines += ["g_i = prod over months m in (t, t'] of (1 + r_i,m)  "
               "[CRSP monthly total return, delisting return included]",
@@ -250,12 +258,24 @@ def build_wrds_calculation_preview(job: Dict[str, Any]) -> Dict[str, Any]:
     return {"mode": "wrds", "formula": "\n".join(lines), "steps": steps}
 
 
+def _stocks(n: int, kind: str = '') -> str:
+    """'1 stock', '20 stocks', or with kind: '1 different stock'."""
+    return f"{n} {kind}stock{'' if n == 1 else 's'}"
+
+
 def _selection_step(pct: Optional[float], top_n: Optional[int], integrating: bool) -> Tuple[str, str]:
     """The WRDS preview's selection step for the top pct% or the top top_n (src/wrds_engine.hold_rule)."""
     if pct == 100:
         return ("Select stocks",
                 "Hold every stock in the filtered universe at each date (Top 100%), with or without a score: "
                 "the factors do not change which stocks are held or their weights.")
+    if top_n is not None and not integrating:
+        return ("Select stocks and combine factors",
+                f"Hold {_stocks(top_n, 'different ')} in total. The sleeves take turns in factor order, each adding "
+                "its next-best stock by its own z-score (ties broken by lower permno) and skipping stocks already "
+                f"picked, until {_stocks(top_n)} {'is' if top_n == 1 else 'are'} picked or every sleeve runs out "
+                "(then every stock with a score is held). The weights apply across the picked stocks, not per "
+                f"sleeve. On a date with at most {_stocks(top_n)} in the filter, every one of them is held.")
     top = f"the top {top_n} stocks" if top_n is not None else f"the top {pct:g}%"
     text = (f"Average the z-scores of the stocks that have every factor and buy {top} by that score in one "
             "portfolio." if integrating else
@@ -263,7 +283,7 @@ def _selection_step(pct: Optional[float], top_n: Optional[int], integrating: boo
             "picked by several sleeves is held in each.")
     if top_n is not None:
         text += (f" Each selection is min({top_n}, n) of the n stocks with a score, best first, ties broken by "
-                 f"lower permno. On a date with at most {top_n} stocks in the filter, every one of them is held.")
+                 f"lower permno. On a date with at most {_stocks(top_n)} in the filter, every one of them is held.")
     else:
         text += (f" Each selection is max(1, floor(n × {pct:g} / 100)) of the n stocks with a score, best first, "
                  "ties broken by lower permno.")

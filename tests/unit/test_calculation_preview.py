@@ -268,7 +268,8 @@ def test_wrds_preview_frequency_top_pct_and_trading_cost_match_the_wrds_engine(n
     text = formula + "\n" + "\n".join(f"{title}: {body}" for title, body in preview["steps"])
     # Top % or top N: every selection rule and "top X%" / "top N stocks" is the engine's, never the other
     percents = _numbers(r"floor\(n [*×] ([\d.]+) / 100\)", text) + _numbers(r"top ([\d.]+)% by", text)
-    counts = _numbers(r"min\((\d+), n\)", text) + _numbers(r"top (\d+) stocks by", text)
+    counts = (_numbers(r"min\((\d+), n\)", text) + _numbers(r"top (\d+) stocks by", text)
+              + _numbers(r"(\d+) different stocks?", text) + _numbers(r"Mixing, Top (\d+):", text))
     if engine["top_n"] is None:
         assert len(percents) >= 3 and set(percents) == {float(engine["top_pct"])} and not counts
         assert hold is None or engine["top_pct"] == hold[1]
@@ -276,6 +277,9 @@ def test_wrds_preview_frequency_top_pct_and_trading_cost_match_the_wrds_engine(n
         assert len(counts) >= 3 and set(counts) == {float(engine["top_n"])} and not percents
         assert engine["top_pct"] is None and engine["top_n"] == hold[1]
         assert _numbers(r"where (\d+) >= \|U\(t\)\|", formula) == [engine["top_n"]]
+        if engine["factor_combination"] == "mixing":       # N different stocks in total, the sleeves taking turns
+            assert f"the sleeves take turns in factor order ({', '.join(run['factor_labels'])})" in formula
+            assert "each sleeve gets V(t)" not in formula and "Across the picked stocks" in text
     # Frequency: its name, and as many rebalances as the engine made
     assert re.match(r"Rebalance at month ends, ([\w-]+) \(", formula).group(1) == FREQUENCY_LABELS[engine["frequency"]]
     assert preview["steps"][0][1].startswith(f"{FREQUENCY_LABELS[engine['frequency']]}: ")
