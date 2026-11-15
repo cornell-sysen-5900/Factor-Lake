@@ -208,6 +208,11 @@ def factor_risk_table(risk: Dict[str, Any]) -> pd.DataFrame:
                          't-stat': [round(f['t_stat'], 2) for f in risk['factors']]})
 
 
+# Under the Factor Risk table: why Size is always there (and not in the plain-language line)
+FACTOR_RISK_SIZE_NOTE = ("Exposures are measured against the whole US market, so Russell 2000 strategies always "
+                         "show a small-cap (positive Size) exposure.")
+
+
 def factor_risk_caption(risk: Dict[str, Any]) -> str:
     """What the Factor Risk section regresses, over which months, and its standard errors."""
     return (f"Monthly returns after costs minus the risk-free rate, regressed on the Fama-French five factors "

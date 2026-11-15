@@ -19,6 +19,7 @@ import streamlit as st
 from app.calculation_preview import preview_for_run, render_calculation_preview
 from app.streamlit_utils import describe_compute, load_wrds_holdings, run_wrds_ranked
 from app.wrds_tables import (
+    FACTOR_RISK_SIZE_NOTE,
     FREQUENCY_LABELS,
     benchmark_label,
     calendar_year_results,
@@ -146,6 +147,7 @@ def _render_factor_risk(risk: Dict[str, Any]) -> None:
     st.dataframe(factor_risk_table(risk), width="stretch", hide_index=True,
                  column_config={'Exposure': st.column_config.NumberColumn(format="%.2f"),
                                 't-stat': st.column_config.NumberColumn(format="%.2f")})
+    st.caption(FACTOR_RISK_SIZE_NOTE)
     st.markdown(f"**{describe_factor_risk(risk)}**")
 
 

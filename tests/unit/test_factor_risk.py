@@ -138,10 +138,11 @@ def _risk(r_squared=0.9, alpha=0.01, alpha_t=0.5, **t_stats):
 
 
 @pytest.mark.parametrize('risk, line', [
-    (_risk(smb=(0.6, 5.0), hml=(0.3, 2.5)), "Mostly a small-cap and value tilt; alpha not significant."),
-    # The two strongest only; the market never counts as a tilt
-    (_risk(0.5, mktrf=(1.0, 20.0), hml=(-0.3, -2.0), umd=(0.2, 4.0), smb=(-0.2, -3.0)),
-     "Partly a momentum and large-cap tilt; alpha not significant."),
+    (_risk(hml=(0.3, 2.5), umd=(0.2, 3.0)), "Mostly a momentum and value tilt; alpha not significant."),
+    # The two strongest only; the market and size never count as tilts, however strong
+    (_risk(0.5, mktrf=(1.0, 20.0), smb=(0.9, 22.0), hml=(-0.3, -2.0), umd=(0.2, 4.0), rmw=(-0.2, -3.0)),
+     "Partly a momentum and low-profitability tilt; alpha not significant."),
+    (_risk(smb=(-0.4, -6.0)), "Mostly market exposure; alpha not significant."),
     (_risk(cma=(-0.4, -2.2)), "Mostly an aggressive-investment tilt; alpha not significant."),
     (_risk(0.85, 0.031, 2.4), "Mostly market exposure; significant positive alpha of +3.1% a year."),
     (_risk(0.3, -0.025, -2.0, rmw=(0.5, 1.99)), "No clear factor tilt; significant negative alpha of -2.5% a year."),

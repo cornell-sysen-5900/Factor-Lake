@@ -16,6 +16,7 @@ import pandas as pd
 import pytest
 
 from app.wrds_tables import (
+    FACTOR_RISK_SIZE_NOTE,
     GICS_HEADERS,
     benchmark_label,
     calendar_year_results,
@@ -289,7 +290,7 @@ def _header(csv_text):
 
 def _factor_risk_parts(risk):
     """Every element the Factor Risk section shows for a saved factor_risk, by kind."""
-    return {'header': ['Factor Risk'], 'caption': [factor_risk_caption(risk)],
+    return {'header': ['Factor Risk'], 'caption': [factor_risk_caption(risk), FACTOR_RISK_SIZE_NOTE],
             'metric': [['Alpha (annualized)', f"{risk['alpha_annual']:+.2%}", ''],
                        ['Alpha t-stat', f"{risk['alpha_t']:.2f}", ''],
                        ['R²', f"{risk['r_squared']:.2f}", ''], ['Months', f"{risk['months']}", '']],
@@ -567,7 +568,9 @@ def _factor_risk_shown(at):
     render = main_area(at)
     if 'Factor Risk' not in render['header']:
         return {}
-    return {'metric': [m for m in render['metric'] if m[0] in ('Alpha (annualized)', 'Alpha t-stat', 'R²', 'Months')],
+    return {'caption': [c for c in render['caption']
+                        if c.startswith('Monthly returns after costs') or c == FACTOR_RISK_SIZE_NOTE],
+            'metric': [m for m in render['metric'] if m[0] in ('Alpha (annualized)', 'Alpha t-stat', 'R²', 'Months')],
             'dataframe': [d for d in render['dataframe'] if d.startswith('Factor,Exposure,t-stat')],
             'markdown': [m for m in render['markdown'] if m.startswith('**') and 'alpha' in m]}
 
@@ -577,7 +580,9 @@ def test_factor_risk_shows_the_saved_numbers_and_opens_the_same_in_a_new_session
     run = _run_wrds(mine, 'w_roe', 'w_btp')
     risk = run['results']['factor_risk']
     assert risk['months'] == 36 and risk['first_month'] == '2010-01'
-    expected = {k: v for k, v in _factor_risk_parts(risk).items() if k in ('metric', 'dataframe', 'markdown')}
+    expected = {k: v for k, v in _factor_risk_parts(risk).items() if k != 'header'}
+    # Size is in the table, with the note under it, but never in the plain-language line
+    assert 'Size (SMB)' in expected['dataframe'][0] and 'cap' not in expected['markdown'][0]
     assert _factor_risk_shown(mine) == expected
 
     theirs = new_session()
@@ -601,3 +606,4 @@ def test_factor_risk_is_hidden_without_a_regression(new_session, saved):
     _click_main_tab(at, 'Results')
     _assert_clean(at)
     assert _factor_risk_shown(at) == {} and 'Advanced Backtest Statistics' in main_area(at)['header']
+    assert FACTOR_RISK_SIZE_NOTE not in main_area(at)['caption']

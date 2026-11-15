@@ -39,8 +39,10 @@ MOSTLY_R_SQUARED = 0.8
 MONTHS_PER_YEAR = 12
 # The plain-language line names at most this many tilts, the strongest (it stays short)
 MAX_TILTS = 2
-# Each factor's tilt in words, by the sign of its exposure (the market is described by R-squared)
-TILT_WORDS = {'smb': ('small-cap', 'large-cap'), 'hml': ('value', 'growth'),
+# Each factor's tilt in words, by the sign of its exposure. The market is described by
+# R-squared. Size is left out: the factors are built on the whole US market, so every
+# Russell 2000 strategy has a positive size exposure and it would lead every line.
+TILT_WORDS = {'hml': ('value', 'growth'),
               'rmw': ('high-profitability', 'low-profitability'),
               'cma': ('conservative-investment', 'aggressive-investment'), 'umd': ('momentum', 'anti-momentum')}
 
@@ -130,11 +132,11 @@ def _join(words: List[str]) -> str:
 
 def describe_factor_risk(risk: Dict[str, Any]) -> str:
     """
-    One plain-language line from simple rules, e.g. "Mostly a small-cap and value tilt;
+    One plain-language line from simple rules, e.g. "Mostly a value and momentum tilt;
     alpha not significant.":
 
-    - Tilts: the non-market factors with |t| >= 2, the MAX_TILTS strongest (by |t|), by
-      the sign of the exposure (TILT_WORDS).
+    - Tilts: the factors other than market and size with |t| >= 2, the MAX_TILTS strongest
+      (by |t|), by the sign of the exposure (TILT_WORDS).
     - "Mostly" when R-squared >= 0.8 (the factors explain most of the monthly return),
       else "Partly". Without a tilt: "Mostly market exposure" or "No clear factor tilt".
     - Alpha: significant (|t| >= 2) with its annual size and sign, or "not significant".
