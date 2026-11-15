@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+from app.calculation_preview import preview_for_run, render_calculation_preview
 from app.compare_state import FULL_MESSAGE, OPEN_COMPARE_KEY, add_to_comparison, ids_in_comparison
 from app.holdings_table import (
     FACTOR_COMBINATION_LABELS,
@@ -148,6 +149,8 @@ def render_results_tab(run: Dict[str, Any]) -> None:
     total_delisted = results.get('total_delisted_positions', 0)
     if total_delisted > 0:
         st.caption(f"**Delisted positions encountered:** {total_delisted}")
+    # The run's calculation, collapsed below the results (WRDS runs returned above and show the WRDS engine's)
+    render_calculation_preview(preview_for_run(run), saved=True)
     st.divider()
 
     # 3. Holdings the backtest bought each year
