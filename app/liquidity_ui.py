@@ -10,6 +10,7 @@ The levels and their meaning are src/wrds_liquidity.py's; nothing here repeats a
 
 from typing import Any, Dict, List, Optional, Tuple
 
+import numpy as np
 import pandas as pd
 
 from src.wrds_liquidity import (
@@ -28,9 +29,9 @@ LIQUIDITY_HELP = (
     "The most a position may be, as a share of the stock's average daily dollar volume over the last 3 months, "
     "so the backtest only holds positions it could really "
     "trade. At each rebalance every position is sized at the portfolio's value on that date with the chosen "
-    "weighting; stocks over the limit are dropped and the rest reweighted, until every position fits. "
-    "A stock with no volume data is dropped. A held stock that no longer fits is sold at the next rebalance. "
-    "The bigger the Initial AUM, the more stocks a limit drops."
+    "weighting and cut to the limit if it is bigger. The money that cannot be placed, and the money of stocks "
+    "with no volume data, is held in cash until the next rebalance and earns the risk-free rate; the other "
+    "positions keep their weights. The bigger the Initial AUM, the more positions are capped."
 )
 
 
@@ -63,34 +64,33 @@ def results_tiles(summary: Optional[Dict[str, Any]]) -> List[Tuple[str, str, str
     (label, value, help) of the Results tab's liquidity tiles, from the result's
     liquidity_limit (src/wrds_liquidity.liquidity_summary). [] for a run without a limit.
     """
-    if not summary or 'dropped' not in summary:
+    if not summary or 'cash' not in summary:
         return []
-    most = (f"{summary['max_dropped']:,}" + (f" ({summary['max_dropped_date']})" if summary['max_dropped'] else ''))
+    most = f"{summary['max_cash']:.1%}" + (f" ({summary['max_cash_date']})" if summary['max_cash'] > 0 else '')
     return [
-        ("Avg Stocks Dropped", f"{summary['average_dropped']:,.1f}",
-         "Stocks the strategy picked but the limit dropped, per rebalance, averaged over the rebalances."),
-        ("Avg Share Dropped", f"{summary['average_dropped_pct']:.2f}%",
-         "Dropped stocks as a share of the stocks the strategy picked, averaged over the rebalances."),
-        ("Most Dropped", most, "The most stocks dropped at one rebalance, and its date."),
-        ("Total Without Volume Data", f"{sum(summary['dropped_without_volume']):,}",
-         "Stocks dropped, over all rebalances, because they had no daily dollar volume."),
+        ("Avg Cash Share", f"{summary['average_cash']:.1%}",
+         "The share of the portfolio held in cash because of the limit, averaged over the rebalances. "
+         "It earns the risk-free rate."),
+        ("Most Cash", most, "The largest cash share at one rebalance, and its date."),
+        ("Avg Positions Capped", f"{np.mean(summary['capped']) if summary['capped'] else 0:,.1f}",
+         "Positions cut to the limit at each rebalance, averaged over the rebalances."),
     ]
 
 
-def dropped_table(summary: Optional[Dict[str, Any]]) -> Optional[pd.DataFrame]:
+def capped_table(summary: Optional[Dict[str, Any]]) -> Optional[pd.DataFrame]:
     """
-    One row per rebalance date: the stocks the strategy picked, how many the limit dropped
-    (and of those, without volume data), and how many were held. None for a run without a limit.
+    One row per rebalance date: the stocks the strategy picked, how many positions the limit
+    capped, how many stocks had no volume data (no position), and the cash share. None for a
+    run without a limit.
     """
-    if not summary or 'dropped' not in summary:
+    if not summary or 'cash' not in summary:
         return None
-    picked, dropped = summary['candidates'], summary['dropped']
     return pd.DataFrame({
         'Rebalance Date': summary['rebalance_dates'],
-        'Picked': picked,
-        'Dropped': dropped,
-        'Without Volume Data': summary['dropped_without_volume'],
-        'Held': [p - d for p, d in zip(picked, dropped)],
+        'Picked': summary['positions'],
+        'Capped': summary['capped'],
+        'Without Volume Data': summary['without_volume'],
+        'Cash': [f"{c:.1%}" for c in summary['cash']],
     })
 
 

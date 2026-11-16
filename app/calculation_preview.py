@@ -158,19 +158,17 @@ def build_wrds_calculation_preview(job: Dict[str, Any]) -> Dict[str, Any]:
     limit = job_liquidity_limit(job.get("liquidity_limit"))
     if limit:
         liquidity_lines = [
-            f"Liquidity limit = {describe_liquidity_limit(limit)}: keep i only if W_i(t) * V(t) <= "
-            f"{limit:g}% * {LIQUIDITY_COLUMN}(i,t)  [average daily dollar volume, last 3 months; no volume = dropped]",
-            "Drop every i over the limit, reweight the rest with the same weighting, repeat until all fit  "
-            "[nothing left: cash at rf]"]
+            f"Liquidity limit = {describe_liquidity_limit(limit)}: P_i(t) = min(W_i(t) * V(t), "
+            f"{limit:g}% * {LIQUIDITY_COLUMN}(i,t))  [average daily dollar volume, last 3 months; no volume: P_i = 0]",
+            "Cash(t) = V(t) - sum_i P_i(t), held until the next rebalance at rf  [other weights unchanged]"]
         liquidity_step = ("Apply the liquidity limit",
                           f"{describe_liquidity_limit(limit)}. Size each position at the portfolio's value at t "
                           "(before the rebalance's trading cost) with the chosen weighting. A stock whose position "
-                          f"is over {limit:g}% of its average daily dollar volume over the last 3 months, or "
-                          "that has no volume data, is dropped; "
-                          "the rest are reweighted (in Mixing with Top X%, within each sleeve) and the check "
-                          "repeats until every position fits. It applies at every rebalance, so a held stock "
-                          "that no longer fits is sold. The Results show how many stocks were dropped at each "
-                          "rebalance.")
+                          f"is over {limit:g}% of its average daily dollar volume over the last 3 months is cut "
+                          "to that amount, and a stock with no volume data gets no position. The money that "
+                          "cannot be placed is held in cash until the next rebalance and earns the risk-free "
+                          "rate; nothing is redistributed, so the other positions keep their weights. The "
+                          "Results show the cash share and how many positions were capped at each rebalance.")
     else:
         liquidity_lines, liquidity_step = ["Liquidity limit = none"], None
 

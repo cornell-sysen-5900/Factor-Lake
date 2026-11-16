@@ -34,9 +34,10 @@ See DOCS/WRDS_MODE_DESIGN.md, sections 3, 4 and 7. At each rebalance date t:
    each month end gives its month-by-month return, the rebalance's cost charged in the
    period's first month. Compounded over a period they equal its return after costs.
 7. Liquidity limit (liquidity_limit, src/wrds_liquidity.py): with one, at each rebalance
-   the selected positions are sized at the portfolio's value at t; stocks whose position
-   is over the limit's share of their average daily dollar volume (or that have no
-   volume) are dropped and the rest reweighted, until every position fits.
+   each position is min(weight x the portfolio's value at t, the limit's share of the
+   stock's average daily dollar volume), and a stock without volume gets none. The money
+   that cannot be placed is held in cash for the period and earns rf; the other weights
+   are left as the strategy picked them.
 
 Stocks are keyed on permno (two securities can share a ticker on one date).
 """
@@ -55,6 +56,8 @@ from .wrds_gics import gics_mask, job_gics_filter
 from .wrds_liquidity import LIQUIDITY_COLUMN, add_volume, cap_positions, job_liquidity_limit, liquidity_summary
 
 FACTOR_COMBINATIONS = ('mixing', 'integrating')
+# Key of the liquidity limit's cash among a period's holdings (permnos are positive)
+CASH_KEY = -1
 # Share of the stocks each selection holds when no top_pct or top_n is given
 DEFAULT_TOP_PCT = 10.0
 # picked_by of the holdings of a run without factors (it holds the whole filter)
@@ -420,11 +423,10 @@ def run_periods(data: WrdsData, dates: List[pd.Timestamp], factors: List[str],
     rf_monthly, rf_filled = _risk_free(data)
     by_date = dict(tuple(positions.groupby('date')))
     # Liquidity limit: each date's dollar volumes, the positions bought (after the limit),
-    # and per date the stocks picked before it, dropped, and dropped for having no volume
+    # and per date the stocks picked, positions capped, stocks without volume and cash share
     volumes = (dict(tuple(universe.set_index('permno')[LIQUIDITY_COLUMN].groupby(universe['date'].to_numpy())))
                if liquidity_limit else {})
-    by_sleeve = factor_combination == 'mixing' and bool(factors) and hold_rule(top_pct, top_n)[1] is None
-    bought, candidates, dropped, dropped_no_volume, empty_dates = [], [], [], [], []
+    bought, picked, capped, without_volume, cash_shares, empty_dates = [], [], [], [], [], []
     value = float(initial_aum)          # the portfolio's value at each rebalance, before its cost
     period_returns, rf_period, growth_rows = [], [], []
     # Each month's return after costs (decimals) and its month end
@@ -447,14 +449,18 @@ def run_periods(data: WrdsData, dates: List[pd.Timestamp], factors: List[str],
             benchmarks[role].append(float(np.prod(1.0 + monthly) - 1.0))
 
         held = by_date.get(start)
+        cash = 0.0         # share of the value the liquidity limit leaves in cash (earning rf)
         if liquidity_limit:
-            candidates.append(0 if held is None else int(held['permno'].nunique()))
-            n_dropped = n_no_volume = 0
-            if held is not None:
-                held, n_dropped, n_no_volume = cap_positions(held, volumes.get(start, pd.Series(dtype=float)),
-                                                             value, liquidity_limit, by_sleeve)
-            dropped.append(n_dropped)
-            dropped_no_volume.append(n_no_volume)
+            picked.append(0 if held is None else int(held['permno'].nunique()))
+            n_capped = n_no_volume = 0
+            if held is None:
+                cash = 1.0
+            else:
+                held, n_capped, n_no_volume, cash = cap_positions(
+                    held, volumes.get(start, pd.Series(dtype=float)), value, liquidity_limit)
+            capped.append(n_capped)
+            without_volume.append(n_no_volume)
+            cash_shares.append(cash)
         if held is None:
             empty_dates.append(start)
         else:
@@ -469,11 +475,21 @@ def run_periods(data: WrdsData, dates: List[pd.Timestamp], factors: List[str],
             growth = _growth_frame(permnos, monthly, delisted, missing)
             growth_rows.append(growth.assign(date=start))
             g = held['permno'].map(growth.set_index('permno')['growth'])
-            gross = float((held['weight'] * g).sum() - 1.0)
             by_permno = growth.set_index('permno')
             target = held.groupby('permno')['weight'].sum()   # Mixing sleeves netted: one position per stock
-            end_weights = drifted_weights(target, by_permno['growth'], by_permno['delisted'])
-            gross_months = portfolio_monthly_returns(target.reindex(permnos).to_numpy(), monthly)
+            if cash > 0:      # the liquidity limit's cash: one more holding, growing at rf
+                cash_growth = 1.0 + rf_monthly[months]
+                gross = float((held['weight'] * g).sum() + cash * np.prod(cash_growth) - 1.0)
+                end_weights = drifted_weights(
+                    pd.concat([target, pd.Series({CASH_KEY: cash})]),
+                    pd.concat([by_permno['growth'], pd.Series({CASH_KEY: float(np.prod(cash_growth))})]),
+                    by_permno['delisted']).drop(CASH_KEY, errors='ignore')
+                gross_months = portfolio_monthly_returns(np.append(target.reindex(permnos).to_numpy(), cash),
+                                                         np.column_stack([monthly, cash_growth]))
+            else:
+                gross = float((held['weight'] * g).sum() - 1.0)
+                end_weights = drifted_weights(target, by_permno['growth'], by_permno['delisted'])
+                gross_months = portfolio_monthly_returns(target.reindex(permnos).to_numpy(), monthly)
         period_turnover, traded = turnover(target, drifted)
         cost = cost_fraction(trading_cost_bps, period_turnover)
         # The rebalance's cost is paid in the period's first month
@@ -527,8 +543,8 @@ def run_periods(data: WrdsData, dates: List[pd.Timestamp], factors: List[str],
         monthly_returns=(np.array(month_returns) * 100).tolist(),
     )
     if liquidity_limit:      # only with a limit, so results without one are as before
-        results['liquidity_limit'] = liquidity_summary(liquidity_limit, labels[:-1], candidates, dropped,
-                                                       dropped_no_volume)
+        results['liquidity_limit'] = liquidity_summary(liquidity_limit, labels[:-1], picked, capped,
+                                                       without_volume, cash_shares)
         positions = (pd.concat(bought, ignore_index=True) if bought
                      else positions.iloc[0:0])
     traded = None     # holdings get a 'traded' column only with trading costs

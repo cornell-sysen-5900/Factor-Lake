@@ -19,24 +19,26 @@ from src.wrds_liquidity import (
     LIQUIDITY_COLUMN,
     NO_VOLUME_MESSAGE,
     add_volume,
+    cap_positions,
     read_dollar_volume,
 )
 from tests.unit.test_wrds_service import FACTORS, PREFIX, wrds_job
 from tests.unit.wrds_fixtures import RangeS3, put_wrds_files, synthetic_frames
 
 
-def daily_prices(permnos, first='2009-06-01', last='2013-03-31', seed=0):
-    """Business-day prices and volumes, with missing values, a negative volume and a stock absent for a year."""
+def daily_prices(permnos, first='2009-06-01', last='2013-03-31', seed=0, gap=True):
+    """Business-day prices and volumes, and with gap missing values, a negative volume and a stock absent for a year."""
     rng = np.random.default_rng(seed)
     days = pd.bdate_range(first, last)
     frames = []
     for permno in permnos:
-        d = days[days.year != 2011] if permno == permnos[0] else days
+        d = days[days.year != 2011] if gap and permno == permnos[0] else days
         n = len(d)
         prc, vol = rng.uniform(5, 50, n), rng.uniform(1e4, 1e6, n)
-        prc[rng.random(n) < 0.05] = np.nan
-        vol[rng.random(n) < 0.05] = np.nan
-        vol[rng.random(n) < 0.01] = -99
+        if gap:          # missing and bad values too
+            prc[rng.random(n) < 0.05] = np.nan
+            vol[rng.random(n) < 0.05] = np.nan
+            vol[rng.random(n) < 0.01] = -99
         frames.append(pd.DataFrame({'date': d, 'permno': np.int32(permno), 'prc': prc, 'vol': vol,
                                     'ticker': 'X', 'ret': 0.0}))
     return pd.concat(frames).sort_values(['permno', 'date'], ignore_index=True)
@@ -100,7 +102,7 @@ def s3():
     frames = synthetic_frames()
     s3 = RangeS3()
     put_wrds_files(s3, frames)
-    px = daily_prices(sorted(frames.panel['permno'].unique()))
+    px = daily_prices(sorted(frames.panel['permno'].unique()), gap=False)    # every stock has volume at every date
     for name, body in daily_files(px).items():
         s3.objects[f'{PREFIX}/{DEFAULT_WRDS_DIR}/{name}'] = (body, {})
     return s3
@@ -132,9 +134,75 @@ def test_only_jobs_with_a_limit_read_the_daily_prices_once(s3):
     assert service.run(limited)['hash'] != key
 
 
-def test_positions_fit_the_limit_with_volume_from_the_daily_prices(s3):
-    runner = BacktestService(S3DataManager(bucket='test-bucket', prefix=PREFIX, client=s3)).wrds.runner
-    results, holdings = runner.run(wrds_job(liquidity_limit=10, initial_aum=2e6))
+# ---------------------------------------------------------------------------
+# The rule: min(target, limit x volume), the rest in cash
+# ---------------------------------------------------------------------------
+
+def _held():
+    """One date's Mixing positions: stock 1 in both sleeves, weights summing to 1."""
+    return pd.DataFrame({'sleeve': [0, 0, 1, 1], 'permno': [1, 2, 1, 3], 'weight': [0.25, 0.25, 0.25, 0.25]})
+
+
+def test_a_capped_position_equals_the_limit_and_the_rest_is_cash():
+    value = 1_000_000.0
+    volume = pd.Series({1: 2_000_000.0, 2: 1e12, 3: 1e12})       # stock 1: 10% of $2M = $200k < its $500k
+    positions, capped, no_volume, cash = cap_positions(_held(), volume, value, 10.0)
+    by_stock = positions.groupby('permno')['weight'].sum()
+    assert by_stock[1] * value == pytest.approx(0.10 * 2_000_000.0)     # exactly the limit
+    assert (by_stock[2], by_stock[3]) == (0.25, 0.25)                   # untouched, not reweighted
+    assert positions.loc[positions['permno'] == 1, 'weight'].tolist() == pytest.approx([0.1, 0.1])  # sleeves cut alike
+    assert (capped, no_volume) == (1, 0)
+    assert cash == pytest.approx(0.5 - 0.2)
+    assert cash + by_stock.sum() == pytest.approx(1.0)
+
+
+def test_a_stock_without_volume_has_no_position_and_its_money_is_cash():
+    volume = pd.Series({1: 1e12, 2: np.nan, 3: 0.0})
+    positions, capped, no_volume, cash = cap_positions(_held(), volume, 1_000_000.0, 10.0)
+    assert set(positions['permno']) == {1}
+    assert positions['weight'].sum() == 0.5
+    assert (capped, no_volume, cash) == (0, 2, 0.5)
+    positions, _, no_volume, cash = cap_positions(_held(), pd.Series(dtype=float), 1_000_000.0, 10.0)
+    assert positions is None and no_volume == 3 and cash == 1.0
+
+
+def test_nothing_capped_leaves_the_positions_and_no_cash():
+    positions, capped, no_volume, cash = cap_positions(_held(), pd.Series({1: 1e12, 2: 1e12, 3: 1e12}), 1e6, 5.0)
+    pd.testing.assert_frame_equal(positions, _held().astype({'weight': float}))
+    assert (capped, no_volume, cash) == (0, 0, 0.0)
+
+
+def _runner(s3):
+    return BacktestService(S3DataManager(bucket='test-bucket', prefix=PREFIX, client=s3)).wrds.runner
+
+
+def test_small_aum_is_unchanged_from_no_limit(s3):
+    runner = _runner(s3)
+    plain, plain_holdings = runner.run(wrds_job(initial_aum=1000.0))
+    limited, holdings = runner.run(wrds_job(initial_aum=1000.0, liquidity_limit=5))
+    summary = limited.pop('liquidity_limit')
+    assert summary['cash'] == [0.0] * len(summary['cash']) and sum(summary['capped']) == 0
+    limited.pop('factor_risk'), plain.pop('factor_risk')
+    assert limited == plain
+    pd.testing.assert_frame_equal(holdings.drop(columns=['dollar_volume', 'volume_share']), plain_holdings)
+
+
+def test_positions_fit_the_limit_and_the_cash_earns_rf(s3):
+    results, holdings = _runner(s3).run(wrds_job(liquidity_limit=10, initial_aum=5e7))
+    summary = results['liquidity_limit']
     assert holdings['volume_share'].max() <= 0.10 + 1e-9
-    assert sum(results['liquidity_limit']['dropped']) > 0
+    assert sum(summary['capped']) > 0 and summary['average_cash'] > 0
+    assert summary['max_cash'] == max(summary['cash'])
+    assert summary['max_cash_date'] == summary['rebalance_dates'][summary['cash'].index(summary['max_cash'])]
     assert set(FACTORS) <= set(holdings.columns)
+    # Each period: the stocks' weights x growth, plus the cash at rf (0 bps, so no cost)
+    values = results['portfolio_values']
+    for i, date in enumerate(summary['rebalance_dates']):
+        rows = holdings[holdings['rebalance_date'] == pd.Timestamp(date)]
+        assert rows['weight'].sum() + summary['cash'][i] == pytest.approx(1.0)
+        rf = results['rf_returns'][i] / 100
+        expected = (rows['weight'] * (1 + rows['period_return'])).sum() + summary['cash'][i] * (1 + rf) - 1
+        assert values[i + 1] / values[i] - 1 == pytest.approx(expected, rel=1e-9, abs=1e-12)
+    # Monthly returns compound to the period returns
+    monthly = np.array(results['monthly_returns']) / 100
+    assert np.prod(1 + monthly) == pytest.approx(values[-1] / values[0], rel=1e-9)

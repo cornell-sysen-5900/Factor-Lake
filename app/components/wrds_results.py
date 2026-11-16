@@ -82,14 +82,14 @@ def render_wrds_results(run: Dict[str, Any]) -> None:
         st.caption(f"**Delisted positions encountered:** {total_delisted}")
     for note in result_notes(results):
         st.caption(note)
-    # What the liquidity limit dropped (runs with one): tiles, then every rebalance's counts
+    # What the liquidity limit left in cash (runs with one): tiles, then every rebalance's counts
     if tiles := liquidity_ui.results_tiles(results.get('liquidity_limit')):
         st.write(liquidity_ui.results_title(results['liquidity_limit']))
-        for column, (label, value, help_text) in zip(st.columns(4), tiles):
+        for column, (label, value, help_text) in zip(st.columns(len(tiles)), tiles):
             column.metric(label, value, help=help_text)
-        with st.expander("Stocks dropped at each rebalance", expanded=False,
+        with st.expander("Positions capped at each rebalance", expanded=False,
                          key=f"wrds_liquidity_expander_{run['id']}"):
-            st.dataframe(liquidity_ui.dropped_table(results['liquidity_limit']), hide_index=True, width='stretch')
+            st.dataframe(liquidity_ui.capped_table(results['liquidity_limit']), hide_index=True, width='stretch')
     # The WRDS engine's calculation for this run's job, collapsed below the results (saved with the
     # run; opened runs: their stored job)
     render_calculation_preview(preview_for_run(run), saved=True)
