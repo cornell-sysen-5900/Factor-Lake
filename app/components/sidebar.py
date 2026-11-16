@@ -11,6 +11,7 @@ from typing import Any, Callable, Dict, List, Optional
 import streamlit as st
 
 import streamlit_config as config
+from app import liquidity_ui
 from src.trading_costs import MAX_TRADING_COST_BPS
 from src.wrds_calendar import FIRST_MONTH as WRDS_FIRST_MONTH
 from src.wrds_calendar import FIRST_YEAR as WRDS_FIRST_YEAR
@@ -96,6 +97,7 @@ WRDS_PARAMETER_DEFAULTS = {
     HOLD_KEY: HOLD_PCT,
     TOP_PCT_KEY: DEFAULT_TOP_PCT,
     TOP_N_KEY: DEFAULT_TOP_N,
+    liquidity_ui.LIQUIDITY_KEY: liquidity_ui.LIQUIDITY_DEFAULT,
 }
 
 
@@ -257,6 +259,7 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
             key=TRADING_COST_KEY,
             help=TRADING_COST_HELP
         )
+        liquidity_limit = _render_wrds_liquidity_limit() if wrds else None
 
         st.divider()
 
@@ -322,6 +325,7 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
             "initial_aum": initial_aum,
             "use_lambda": use_lambda,
             **hold,
+            **({'liquidity_limit': liquidity_limit} if liquidity_limit is not None else {}),
             **costs
         }
     return {
@@ -337,6 +341,27 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
         "use_lambda": use_lambda,
         **costs
     }
+
+
+def _render_wrds_liquidity_limit() -> Optional[float]:
+    """
+    The WRDS liquidity limit, under Trading Costs (both are about what can really be
+    traded): No limit or the most a position may be as a share of its stock's daily
+    volume, and a caption saying what can be held. Returns the limit in percent, or None.
+    """
+    st.divider()
+    st.subheader("Liquidity Limit")
+    choice = st.radio(
+        "Max position, as a share of daily volume:",
+        options=list(liquidity_ui.LIQUIDITY_OPTIONS),
+        index=0,
+        horizontal=True,
+        key=liquidity_ui.LIQUIDITY_KEY,
+        help=liquidity_ui.LIQUIDITY_HELP
+    )
+    limit = liquidity_ui.option_limit(choice)
+    st.caption(liquidity_ui.sidebar_caption(limit))
+    return limit
 
 
 def _render_wrds_hold() -> Dict[str, Any]:

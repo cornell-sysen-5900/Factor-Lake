@@ -14,6 +14,9 @@ then decoded with only the needed columns, the same way from a local folder and 
   and its delisting month, also after it leaves the index.
 - market_monthly.parquet: IWM, IWN and IWO total returns, the risk-free rate, and the
   Fama-French five factors and momentum (for src/factor_risk.py).
+
+Only for backtests with a liquidity limit, prices_daily/ gives each stock's month-end
+average daily dollar volume (read_s3_dollar_volume, src/wrds_liquidity.py).
 """
 
 import io
@@ -26,6 +29,7 @@ import numpy as np
 import pandas as pd
 
 from .wrds_factors import WRDS_FACTOR_COLUMNS
+from .wrds_liquidity import LIQUIDITY_COLUMN, daily_years, read_dollar_volume
 
 # Folder of the WRDS pull under the S3 data prefix (override with FACTOR_LAKE_WRDS_DIR)
 DEFAULT_WRDS_DIR = 'wrds_2026_11'
@@ -61,6 +65,8 @@ class WrdsData:
 
     returns and delisted are month x permno matrices (rows: months, the market data's
     month ends; columns: permnos), so a holding period's returns are one slice.
+    dollar_volume, set only once a job with a liquidity limit needs it, is each stock's
+    average daily dollar volume indexed by (date, permno) (src/wrds_liquidity.py).
     """
     panel: pd.DataFrame
     months: pd.DatetimeIndex
@@ -68,6 +74,7 @@ class WrdsData:
     returns: np.ndarray
     delisted: np.ndarray
     market: pd.DataFrame
+    dollar_volume: Optional[pd.Series] = None
     _month_dates: Dict[str, pd.Timestamp] = field(default_factory=dict, repr=False)
 
     @classmethod
@@ -125,3 +132,11 @@ def read_s3_wrds_data(manager, data_dir: Optional[str] = None) -> WrdsData:
     """Reads the WRDS files from S3, under <data prefix>/<data_dir>/ (src/s3_client.S3DataManager)."""
     data_dir = data_dir or wrds_dir()
     return read_wrds_data(lambda filename: manager.read_bytes(f'{data_dir}/{filename}'))
+
+
+def read_s3_dollar_volume(manager, data_dir: Optional[str] = None) -> pd.Series:
+    """Each stock's month-end average daily dollar volume from the S3 daily prices, indexed by (date, permno)."""
+    data_dir = data_dir or wrds_dir()
+    read_bytes = lambda filename: manager.read_bytes(f'{data_dir}/{filename}')  # noqa: E731
+    table = read_dollar_volume(read_bytes, daily_years(read_bytes))
+    return table.set_index(['date', 'permno'])[LIQUIDITY_COLUMN]

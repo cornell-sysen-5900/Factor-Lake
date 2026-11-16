@@ -18,6 +18,7 @@ from .wrds_calendar import FREQUENCIES, period_boundaries
 from .wrds_engine import DEFAULT_TOP_PCT, FACTOR_COMBINATIONS, hold_rule, holds_whole_filter
 from .wrds_factors import WRDS_FACTOR_COLUMNS
 from .wrds_gics import describe_gics_filter, job_gics_filter, sector_codes, validate_gics_filter
+from .wrds_liquidity import describe_liquidity_limit, job_liquidity_limit
 
 WRDS_JOB_KINDS = ('backtest', 'cohort', 'ranked')
 WRDS_JOB_VERSION = 1
@@ -32,7 +33,9 @@ WRDS_JOB_FIELDS = ('kind', 'data_mode', 'wrds_job_version', 'factors', 'factor_d
 # they had before. Older jobs filter by sector with selected_sectors (GICS sector names);
 # a job has selected_sectors or gics_filter, not both. top_n, the number of stocks each
 # selection holds, is there only when it is chosen instead of top_pct; top_pct is then None.
-WRDS_OPTIONAL_JOB_FIELDS = ('trading_cost_bps', 'gics_filter', 'top_n')
+# liquidity_limit (src/wrds_liquidity.LIQUIDITY_LIMITS, percent of daily volume) is there only
+# for backtests with a limit: a job with no limit has no such key.
+WRDS_OPTIONAL_JOB_FIELDS = ('trading_cost_bps', 'gics_filter', 'top_n', 'liquidity_limit')
 # Top % of a WRDS backtest unless another is chosen (settings' top_pct or top_n), and always of
 # a cohort comparison's job (it holds cohort_pct, so its key does not depend on the choice)
 WRDS_TOP_PCT = DEFAULT_TOP_PCT
@@ -42,7 +45,7 @@ WRDS_TOP_PCT = DEFAULT_TOP_PCT
 WRDS_ENGINE_SOURCES = (
     'backtest_jobs.py', 'factor_risk.py', 'performance_metrics.py', 's3_client.py', 'trading_costs.py',
     'wrds_calendar.py', 'wrds_data.py', 'wrds_engine.py', 'wrds_factors.py', 'wrds_gics.py', 'wrds_holdings.py',
-    'wrds_jobs.py', 'wrds_service.py',
+    'wrds_jobs.py', 'wrds_liquidity.py', 'wrds_service.py',
 )
 
 _MONTH = re.compile(r'^\d{4}-(0[1-9]|1[0-2])$')
@@ -72,6 +75,8 @@ def build_wrds_job(kind: str, factors: List[str], factor_directions: Dict[str, s
     How many stocks it holds: settings['top_n'] when set (the job's top_pct is then None),
     else settings['top_pct'] (default 10), so a job at the default 10% is exactly as before.
     A cohort job always has top_pct 10, since it holds cohort_pct instead.
+    settings['liquidity_limit'] is added to backtests only, when it is set (cohorts and
+    ranked lists do not size positions by the portfolio's value).
     """
     labels = factor_labels or {}
     factors = list(factors)
@@ -102,6 +107,9 @@ def build_wrds_job(kind: str, factors: List[str], factor_directions: Dict[str, s
     if top_n is not None:
         whole = _is_number(top_n) and float(top_n).is_integer()
         job['top_n'] = int(top_n) if whole else top_n
+    if kind == 'backtest' and settings.get('liquidity_limit') is not None:
+        limit = settings['liquidity_limit']
+        job['liquidity_limit'] = float(limit) if _is_number(limit) else limit
     if kind != 'ranked':
         add_trading_cost(job, settings)
     validate_wrds_job(job)
@@ -187,6 +195,11 @@ def validate_wrds_job(job: Dict[str, Any]) -> None:
         validate_trading_cost_bps(job['trading_cost_bps'])
         if job['kind'] == 'ranked':
             raise ValueError("trading_cost_bps is only for backtests and cohort comparisons.")
+    if 'liquidity_limit' in job:
+        if job_liquidity_limit(job['liquidity_limit']) is None:          # readable ValueError otherwise
+            raise ValueError("A job without a liquidity limit has no liquidity_limit field.")
+        if job['kind'] != 'backtest':
+            raise ValueError("liquidity_limit is only for backtests.")
 
 
 def _is_number(value: Any) -> bool:
@@ -201,6 +214,7 @@ def engine_arguments(job: Dict[str, Any]) -> Tuple[List[str], Dict[str, str], Di
     options['trading_cost_bps'] = job_trading_cost(job)
     options['gics_filter'] = job.get('gics_filter')
     options['top_n'] = job.get('top_n')
+    options['liquidity_limit'] = job.get('liquidity_limit')
     return list(job['factors']), dict(job['factor_directions']), options
 
 
@@ -226,5 +240,7 @@ def describe_wrds_job(job: Dict[str, Any]) -> str:
         extra += f", {describe_gics_filter(gics)}"
     if job['kind'] != 'cohort' and (job.get('top_n') is not None or job['top_pct'] != WRDS_TOP_PCT):
         extra += f", {describe_hold(job).lower()}"
+    if job.get('liquidity_limit') is not None:
+        extra += f", liquidity: {describe_liquidity_limit(job['liquidity_limit']).lower()}"
     return (f"wrds {job['kind']} {job['frequency']} {job['start_year']}-{job['end_year']} "
             f"{job['factor_combination']}: {factors}{extra}")

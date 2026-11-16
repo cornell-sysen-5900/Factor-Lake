@@ -22,6 +22,7 @@ from app.wrds_tables import FREQUENCY_LABELS, period_label, short_benchmark
 from src.trading_costs import has_trading_costs, job_trading_cost
 from src.wrds_gics import describe_gics_filter
 from src.wrds_jobs import describe_hold
+from src.wrds_liquidity import describe_liquidity_limit
 
 MIN_COMPARED, MAX_COMPARED = 2, 4
 NA = 'n/a'
@@ -189,6 +190,11 @@ def _sectors(a: Dict[str, Any]) -> str:
     return ', '.join(sectors) if sectors else 'All sectors'
 
 
+def _liquidity(a: Dict[str, Any]) -> str:
+    """A WRDS job's liquidity limit (No limit without one); Legacy has no liquidity limit."""
+    return describe_liquidity_limit(a['job'].get('liquidity_limit')) if a['mode'] == 'wrds' else NA
+
+
 def _benchmark(a: Dict[str, Any]) -> str:
     return short_benchmark(a['result'], 'benchmark') if a['mode'] == 'wrds' else LEGACY_BENCHMARK
 
@@ -248,6 +254,7 @@ ROWS: Tuple[Row, ...] = (
     Row('Settings', 'Delisting Strategy', _delisting),
     Row('Settings', 'Benchmark', _benchmark),
     Row('Settings', 'Trading Cost', lambda a: f"{job_trading_cost(a['job']):g} bps"),
+    Row('Settings', 'Liquidity Limit', _liquidity),
     Row('Performance', 'Final Portfolio Value', final_value, lambda v: f"${v:,.2f}", 'higher', 2,
         in_dollars=True),
     Row('Performance', 'Total Return', total_return, _pct, 'higher'),

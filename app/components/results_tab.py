@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+from app import liquidity_ui
 from app.calculation_preview import preview_for_run, render_calculation_preview
 from app.compare_state import FULL_MESSAGE, OPEN_COMPARE_KEY, add_to_comparison, ids_in_comparison
 from app.holdings_table import (
@@ -455,6 +456,8 @@ def _render_header_captions(run: Dict[str, Any], data_source: Optional[str] = No
     st.caption(f"**Delisting Strategy:** {delisting_str}")
     if job_trading_cost(settings) > 0:
         st.caption(f"**Trading Cost:** {job_trading_cost(settings):g} bps per trade")
+    if run.get('data_mode') == 'wrds':           # WRDS runs: the saved liquidity limit (No limit included)
+        st.caption(liquidity_ui.results_line(settings))
     compute = run.get('compute')
     if compute:
         how = describe_compute(compute)

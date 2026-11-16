@@ -113,6 +113,7 @@ def build_wrds_calculation_preview(job: Dict[str, Any]) -> Dict[str, Any]:
         hold_rule,
     )
     from src.wrds_gics import describe_gics_filter, job_gics_filter, level_label, level_names
+    from src.wrds_liquidity import LIQUIDITY_COLUMN, describe_liquidity_limit, job_liquidity_limit
 
     frequency, start, end = job["frequency"], int(job["start_year"]), int(job["end_year"])
     months = period_boundaries(frequency, start, end)
@@ -153,6 +154,25 @@ def build_wrds_calculation_preview(job: Dict[str, Any]) -> Dict[str, Any]:
                        f"GICS, SIC codes {sic}.")
     else:
         fossil_line, fossil_step = "Fossil fuel filter = off", "No fossil fuel filter."
+
+    limit = job_liquidity_limit(job.get("liquidity_limit"))
+    if limit:
+        liquidity_lines = [
+            f"Liquidity limit = {describe_liquidity_limit(limit)}: keep i only if W_i(t) * V(t) <= "
+            f"{limit:g}% * {LIQUIDITY_COLUMN}(i,t)  [average daily dollar volume, last 3 months; no volume = dropped]",
+            "Drop every i over the limit, reweight the rest with the same weighting, repeat until all fit  "
+            "[nothing left: cash at rf]"]
+        liquidity_step = ("Apply the liquidity limit",
+                          f"{describe_liquidity_limit(limit)}. Size each position at the portfolio's value at t "
+                          "(before the rebalance's trading cost) with the chosen weighting. A stock whose position "
+                          f"is over {limit:g}% of its average daily dollar volume over the last 3 months, or "
+                          "that has no volume data, is dropped; "
+                          "the rest are reweighted (in Mixing with Top X%, within each sleeve) and the check "
+                          "repeats until every position fits. It applies at every rebalance, so a held stock "
+                          "that no longer fits is sold. The Results show how many stocks were dropped at each "
+                          "rebalance.")
+    else:
+        liquidity_lines, liquidity_step = ["Liquidity limit = none"], None
 
     lines = [f"Rebalance at month ends, {label} ({month_names}): t = {months[0]}, ..., {months[-2]}  "
              f"[{rebalances}; the last period ends {months[-1]}]",
@@ -202,6 +222,7 @@ def build_wrds_calculation_preview(job: Dict[str, Any]) -> Dict[str, Any]:
     else:
         lines.append("Equal Weight: w_i = 1 / |H|")
         weight_step = f"{within}, give every stock the same weight."
+    lines += liquidity_lines
     # d. Holding periods, e. trading costs, f. benchmarks
     lines += ["g_i = prod over months m in (t, t'] of (1 + r_i,m)  "
               "[CRSP monthly total return, delisting return included]",
@@ -235,6 +256,7 @@ def build_wrds_calculation_preview(job: Dict[str, Any]) -> Dict[str, Any]:
          "(ddof=1). A date whose values do not vary is only centered."),
         _selection_step(pct, top_n, integrating),
         ("Allocate capital", weight_step),
+        *([liquidity_step] if liquidity_step else []),
         ("Hold to the next rebalance",
          "Buy and hold over (t, t']: weights drift with each stock's compounded CRSP monthly total returns, "
          "which include delisting returns, so there is no delisting option. After a stock's delisting month "

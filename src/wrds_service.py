@@ -32,7 +32,7 @@ from .backtest_service import RESULTS_DIR, _error_code, _is_missing, result_file
 from .factor_risk import wrds_factor_risk
 from .s3_client import S3DataManager
 from .wrds_calendar import FREQUENCY_LABELS
-from .wrds_data import WRDS_FILES, WrdsData, read_s3_wrds_data, wrds_dir
+from .wrds_data import WRDS_FILES, WrdsData, read_s3_dollar_volume, read_s3_wrds_data, wrds_dir
 from .wrds_engine import rank_stocks, run_wrds_backtest
 from .wrds_holdings import holdings_file, holdings_parquet
 from .wrds_jobs import (
@@ -43,6 +43,7 @@ from .wrds_jobs import (
     validate_wrds_job,
     wrds_code_version,
 )
+from .wrds_liquidity import DAILY_MANIFEST, describe_liquidity_limit
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,8 @@ def summarize_wrds_job(job: Dict[str, Any]) -> str:
     A short description of a WRDS job for listings: the data source and frequency, then
     Legacy's summary, e.g. "WRDS, Quarterly | ROE (higher), ROA (higher) | Mixing |
     2002-2026 | $1,000", then how many stocks it holds when that is not the top 10%
-    ("| Top 20 stocks"). Stored as S3 metadata, so it is kept ASCII and short.
+    ("| Top 20 stocks") and its liquidity limit when it has one ("| Liquidity: Max 10% of
+    daily volume"). Stored as S3 metadata, so it is kept ASCII and short.
     """
     frequency = FREQUENCY_LABELS.get(job['frequency'], job['frequency'])
     text = summarize_job(job)
@@ -60,6 +62,8 @@ def summarize_wrds_job(job: Dict[str, Any]) -> str:
         text = 'No factors' + text
     if job.get('top_n') is not None or job['top_pct'] != WRDS_TOP_PCT:
         text += f" | {describe_hold(job)}"
+    if job.get('liquidity_limit') is not None:
+        text += f" | Liquidity: {describe_liquidity_limit(job['liquidity_limit'])}"
     return f"WRDS, {frequency} | {text}".encode('ascii', 'replace').decode()[:500]
 
 
@@ -70,6 +74,7 @@ class WrdsBacktestRunner:
         self.manager = manager or S3DataManager()
         self.data_dir = data_dir or wrds_dir()
         self._data: Optional[Tuple[str, WrdsData]] = None   # (data version, data)
+        self._volume: Optional[Tuple[str, pd.Series]] = None    # (daily manifest's ETag, dollar volume)
 
     def data_version(self) -> str:
         """
@@ -78,10 +83,20 @@ class WrdsBacktestRunner:
         """
         parts = [self.data_dir]
         for filename in WRDS_FILES:
-            head = self.manager.client.head_object(Bucket=self.manager.bucket,
-                                                   Key=self.manager.object_key(f'{self.data_dir}/{filename}'))
-            parts.append(f"{filename}:{head['ETag'].strip(chr(34))}")
+            parts.append(f"{filename}:{self._etag(filename)}")
         return '|'.join(parts)
+
+    def volume_version(self) -> str:
+        """
+        Identifies the daily prices the liquidity limit reads: the S3 ETag of their
+        manifest, which is uploaded last whenever they are republished.
+        """
+        return f"{DAILY_MANIFEST}:{self._etag(DAILY_MANIFEST)}"
+
+    def _etag(self, filename: str) -> str:
+        head = self.manager.client.head_object(Bucket=self.manager.bucket,
+                                               Key=self.manager.object_key(f'{self.data_dir}/{filename}'))
+        return head['ETag'].strip(chr(34))
 
     def data(self, version: Optional[str] = None) -> WrdsData:
         """The WRDS data, reused while its version is unchanged."""
@@ -92,6 +107,17 @@ class WrdsBacktestRunner:
             self._data = (version, read_s3_wrds_data(self.manager, self.data_dir))
             logger.info(f"Loaded the WRDS data ({self.data_dir}) in {time.perf_counter() - started:.1f} s")
         return self._data[1]
+
+    def dollar_volume(self) -> pd.Series:
+        """The month-end dollar volume of the liquidity limit, reused while the daily prices are unchanged."""
+        version = self.volume_version()
+        if self._volume is None or self._volume[0] != version:
+            self._volume = None
+            started = time.perf_counter()
+            self._volume = (version, read_s3_dollar_volume(self.manager, self.data_dir))
+            logger.info(f"Loaded the dollar volume ({self.data_dir}/prices_daily, {len(self._volume[1]):,} rows) "
+                        f"in {time.perf_counter() - started:.1f} s")
+        return self._volume[1]
 
     def run(self, job: Dict[str, Any], version: Optional[str] = None) -> Tuple[Dict[str, Any], Optional[pd.DataFrame]]:
         """
@@ -108,6 +134,8 @@ class WrdsBacktestRunner:
         """
         validate_wrds_job(job)
         data = self.data(version)
+        if job.get('liquidity_limit') is not None:      # only these jobs read the daily prices
+            data.dollar_volume = self.dollar_volume()
         factors, directions, options = engine_arguments(job)
         if job['kind'] == 'backtest':
             results, holdings = run_wrds_backtest(data, factors, directions, **options)
@@ -143,7 +171,10 @@ class WrdsBacktestService:
     def run(self, job: Dict[str, Any]) -> Dict[str, Any]:
         """The job's result, from the cache when possible (see the module docstring)."""
         validate_wrds_job(job)
-        data_version = self.runner.data_version()
+        base_version = self.runner.data_version()
+        # A job with a liquidity limit also reads the daily prices; other jobs hash as before
+        data_version = (f"{base_version}|{self.runner.volume_version()}" if job.get('liquidity_limit') is not None
+                        else base_version)
         key = job_hash(job, data_version, self.code_version)
         filename = result_file(key)
 
@@ -156,7 +187,7 @@ class WrdsBacktestService:
             logger.info(f"Cache hit {key[:12]} for {describe_wrds_job(job)}")
         else:
             started = time.perf_counter()
-            result, holdings = self.runner.run(job, data_version)
+            result, holdings = self.runner.run(job, base_version)
             if holdings is not None:
                 result['holdings'] = self._save_holdings(key, holdings)
             info = {
