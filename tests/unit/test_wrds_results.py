@@ -343,7 +343,8 @@ def test_a_wrds_run_looks_like_legacys_results(new_session, legacy):
     labels = _bold_labels(shown['caption'])
     assert _is_subsequence(_bold_labels(legacy['caption']), labels)
     assert set(labels) - set(_bold_labels(legacy['caption'])) == {
-        'Data Source', 'Rebalancing', 'Computed', 'Analysis ID', 'Stock-months without a return (counted as 0%)',
+        'Data Source', 'Rebalancing', 'Liquidity Limit', 'Computed', 'Analysis ID',
+        'Stock-months without a return (counted as 0%)',
         'Risk-free months filled from the 3-month T-bill / 12'}
     assert "**Delisting Strategy:** CRSP delisting returns included, then the risk-free rate until the next " \
            "rebalance" in shown['caption']

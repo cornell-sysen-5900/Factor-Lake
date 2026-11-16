@@ -22,6 +22,9 @@ from src.wrds_calendar import FREQUENCY_LABELS  # noqa: F401 (the app's frequenc
 # The three benchmark roles of a WRDS result, its result keys, and the short role name
 BENCHMARKS = [('benchmark', 'benchmark_returns', ''), ('value', 'value_benchmark_returns', 'Value'),
               ('growth', 'growth_benchmark_returns', 'Growth')]
+# Headers of a stock's average daily dollar volume at the rebalance date and its position as a
+# share of it (runs with a liquidity limit)
+VOLUME_HEADER, VOLUME_SHARE_HEADER = 'Avg Daily $ Volume', '% of Daily Volume'
 # Legacy's tables list the benchmark, then growth, then value
 TABLE_ORDER = ('benchmark', 'growth', 'value')
 # The holdings' four GICS name columns (src/wrds_engine.HOLDINGS_GICS_COLUMNS) and their headers
@@ -113,7 +116,9 @@ def holdings_display_table(holdings: pd.DataFrame, factors: List[str], labels: D
     table: the same columns, order and units (weights, returns and contributions in percent),
     factor values under their display names, then the WRDS-only PERMNO and months without
     a return. After Sector come the four GICS names (empty for a stock without GICS), when
-    the holdings have them (holdings saved before them do not).
+    the holdings have them (holdings saved before them do not). After Dollar Value come
+    the stock's average daily dollar volume and the position as a percent of it, for runs
+    with a liquidity limit.
     """
     table = pd.DataFrame({'Rank': holdings['rank'].astype(int), 'Ticker': holdings['ticker'].astype(str),
                           'Name': holdings['name'].astype(str), 'Sector': holdings['sector'].astype(str)})
@@ -131,6 +136,9 @@ def holdings_display_table(holdings: pd.DataFrame, factors: List[str], labels: D
     table['Shares'] = holdings['shares']
     table['Buy Price'] = holdings['buy_price']
     table['Dollar Value'] = holdings['dollar_value']
+    if 'volume_share' in holdings:            # runs with a liquidity limit
+        table[VOLUME_HEADER] = pd.to_numeric(holdings['dollar_volume']).to_numpy()
+        table[VOLUME_SHARE_HEADER] = pd.to_numeric(holdings['volume_share']).to_numpy() * 100.0
     table['Period Return %'] = holdings['period_return'] * 100.0
     table['Contribution %'] = holdings['contribution'] * 100.0
     table['Delisted'] = holdings['delisted'].astype(bool)
@@ -166,7 +174,8 @@ def table_number_formats(table: pd.DataFrame, factors: List[str], labels: Dict[s
     """On-screen number formats: Legacy's holdings formats, plus the WRDS-only columns."""
     headers = [factor_header(f, labels.get(f, f)) for f in factors]
     formats = holdings_number_formats(headers, traded='Traded %' in table.columns)
-    formats.update({'PERMNO': '%d', 'Months Without Return': '%d', 'Price': 'dollar'})
+    formats.update({'PERMNO': '%d', 'Months Without Return': '%d', 'Price': 'dollar',
+                    VOLUME_HEADER: 'dollar', VOLUME_SHARE_HEADER: '%.2f'})
     formats.update({c: '%.4f' for c in table.columns if c.endswith(' Z-Score')})
     formats.update({c: '%d' for c in table.columns if c.startswith('Rank by ')})
     return {c: fmt for c, fmt in formats.items() if c in table.columns}

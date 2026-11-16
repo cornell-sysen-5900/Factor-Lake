@@ -46,6 +46,10 @@ WRDS settings with a GICS filter (the sidebar's Filter level) also have `gics_fi
 `sub_industry`) and an empty `selected_sectors`. Older WRDS files, with `selected_sectors`
 only, still import, at the Sector level.
 
+WRDS settings with a liquidity limit also have `liquidity_limit` (`20`, `10` or `5`: the most a
+position may be, in percent of the stock's daily dollar volume). Files without it, including older
+ones, import at No limit.
+
 This version supports the portfolio percentage and benchmark exposed by the current app
 (default 10% and benchmark index 1). Export and Use these settings are unavailable (with the
 reason on hover) for previously saved Legacy runs with other values, instead of silently

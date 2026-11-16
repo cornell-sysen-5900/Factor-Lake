@@ -150,6 +150,14 @@ Legacy excludes five FactSet industries. WRDS mode excludes the matching GICS su
 
 ---
 
+### 2.4 Liquidity limit
+
+`liquidity_limit` in a backtest job (`src/wrds_liquidity.py`) is the most a position may be, in percent of the stock's average daily dollar volume: 20, 10 or 5, the levels of one setting, `LIQUIDITY_LIMITS`. A job without the field has no limit, so jobs with no limit keep the shape and cache key they had before. Cohort and ranked jobs never have it.
+
+The volume, `dollar_vol_3m`, is not a panel column: it is the WRDS folder's `dollar_volume_monthly.parquet` (date, permno, dollar_vol_3m), the mean daily price x share volume over the stock's last 63 trading days to its last priced day of month t (80% needed), the rolling rule of pipeline s02. `scripts/build_dollar_volume.py` builds it from the folder's `prices_daily/` with `read_dollar_volume` (only date, permno, prc and vol, one year at a time with each stock's last 63 rows carried into the next year; about 0.5 GB peak) and uploads it; for wrds_2026_11 it is about 1.1 million rows. The Lambda reads that file the first time a job with a limit runs and keeps it while its ETag is unchanged; jobs with a limit add that ETag to their data version, so other jobs keep their cache keys. Without the file a job with a limit is refused with a message, and other jobs run. Early Nasdaq volume is not adjusted for double counting (the daily files have no exchange column), so before about 2004 Nasdaq volume can be overstated. It ends at t, so the limit reads nothing after t.
+
+The limit is applied in the engine's rebalance loop, after selection and weighting, because the position sizes depend on the portfolio's value at t (before the rebalance's cost): each stock's position is min(weight x value, limit x volume), Mixing sleeves netted and each sleeve's row cut in the same proportion, and a stock without a positive volume gets none. There is no loop and nothing is redistributed: the money that cannot be placed is a cash holding for the period that grows at the engine's monthly rf (in the period return, the monthly returns and the drift; trading costs count only the stocks). A date where nothing is placed is all cash. A run where nothing is capped and every stock has volume is the same as without a limit. With a limit, the result has `liquidity_limit` (the limit, and per rebalance date the stocks picked, positions capped, stocks without volume and cash share, with the average and largest cash share) and the holdings have `dollar_volume` and `volume_share`. The ranked list of a run with a limit takes Held and the weights from the run's holdings, since a ranked job does not know the portfolio's value.
+
 ## 3. Rebalance dates and look-ahead rules
 
 ### 3.1 Rebalance months
@@ -259,6 +267,7 @@ A WRDS job is plain JSON like a Legacy job, built by `build_wrds_job` and checke
 | `restrict_fossil_fuels` | bool | section 2.3 |
 | `selected_sectors` | sorted GICS sector names | older jobs' sector filter; `[]` when `gics_filter` is set |
 | `gics_filter` | `{'level': 'sector', 'industry_group', 'industry' or 'sub_industry', 'codes': sorted GICS codes}` | only when set, so jobs without it keep their shape (section 2.2) |
+| `liquidity_limit` | 20, 10 or 5 (percent of daily dollar volume) | backtests only, and only with a limit, so jobs without it keep their shape (section 2.4) |
 | `cohort_pct` | number for `cohort`, else null | |
 | `rebalance_date` | `YYYY-MM` for `ranked`, else null | must be one of the run's rebalance months |
 

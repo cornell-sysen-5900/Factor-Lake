@@ -120,6 +120,12 @@ uv run python scripts/upload_wrds.py "C:/path/to/WRDS FA26/processed_vN/final" -
 uv run python scripts/s3_inspect.py --prefix factor-lake-data/wrds_YYYY_MM/ --no-head      # look at it
 ```
 
+**The liquidity limit's file.** The app's liquidity limit needs `wrds_YYYY_MM/dollar_volume_monthly.parquet`; without
+it, backtests with a limit are refused (other jobs run). For wrds_2026_11 it was built after the upload by
+`scripts/build_dollar_volume.py`, from the folder's daily prices in S3 (it only adds that file). At the next refresh,
+s08 should export it directly with the other outputs, so the script can be retired; until then, run
+`uv run python scripts/build_dollar_volume.py --data-dir wrds_YYYY_MM --upload` after the upload.
+
 ## Step 7. Switch the app
 
 1. On a new branch, set `DEFAULT_WRDS_DIR = 'wrds_YYYY_MM'` in `src/wrds_data.py`. If the panel's first or last month

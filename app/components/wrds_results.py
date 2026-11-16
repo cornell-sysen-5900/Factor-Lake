@@ -14,8 +14,10 @@ section 8.
 
 from typing import Any, Dict
 
+import pandas as pd
 import streamlit as st
 
+from app import liquidity_ui
 from app.calculation_preview import preview_for_run, render_calculation_preview
 from app.streamlit_utils import describe_compute, load_wrds_holdings, run_wrds_ranked
 from app.wrds_tables import (
@@ -80,6 +82,14 @@ def render_wrds_results(run: Dict[str, Any]) -> None:
         st.caption(f"**Delisted positions encountered:** {total_delisted}")
     for note in result_notes(results):
         st.caption(note)
+    # What the liquidity limit left in cash (runs with one): tiles, then every rebalance's counts
+    if tiles := liquidity_ui.results_tiles(results.get('liquidity_limit')):
+        st.write(liquidity_ui.results_title(results['liquidity_limit']))
+        for column, (label, value, help_text) in zip(st.columns(len(tiles)), tiles):
+            column.metric(label, value, help=help_text)
+        with st.expander("Positions capped at each rebalance", expanded=False,
+                         key=f"wrds_liquidity_expander_{run['id']}"):
+            st.dataframe(liquidity_ui.capped_table(results['liquidity_limit']), hide_index=True, width='stretch')
     # The WRDS engine's calculation for this run's job, collapsed below the results (saved with the
     # run; opened runs: their stored job)
     render_calculation_preview(preview_for_run(run), saved=True)
@@ -169,6 +179,7 @@ def _render_holdings(run: Dict[str, Any]) -> None:
     i = dates.index(date)
     period, period_return = period_label(date, results['period_end_dates'][i]), results['yearly_returns'][i]
     holdings = results.get('holdings') or {}
+    raw = None
     if date not in holdings.get('dates', []):
         _render_holdings_caption(results, 0, period, period_return, index=i)
         st.info("The backtest held no stocks on this date; the money earned the risk-free rate.")
@@ -199,7 +210,12 @@ def _render_holdings(run: Dict[str, Any]) -> None:
                 st.error(f"Ranked List Error: {e}")
         ranked = st.session_state.get(ranked_key)
         if ranked and ranked['date'] == date:
-            table = ranked_display_table(ranked['rows'], run['factors'], labels, results['factor_combination'])
+            rows = ranked['rows']
+            if run['settings'].get('liquidity_limit') is not None:
+                # What is held depends on the portfolio's value, which only the run's holdings know
+                held = raw if raw is not None else pd.DataFrame({'permno': [], 'weight': []})
+                rows = liquidity_ui.ranked_with_holdings(rows, held)
+            table = ranked_display_table(rows, run['factors'], labels, results['factor_combination'])
             st.caption(f"**Ranked stocks:** {len(table)} | **Held:** {int(table['Held'].sum())} | "
                        f"Ranking {describe_compute(ranked['compute'])}.")
             _render_holdings_dataframe(run, table, table_number_formats(table, run['factors'], labels),

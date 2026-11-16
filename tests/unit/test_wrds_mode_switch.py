@@ -192,7 +192,7 @@ def test_wrds_controls(lambda_at):
     # The Hold choice after the weighting, frequency instead of the delisting option, and no
     # Lambda switch (WRDS always runs in Lambda)
     assert _sidebar_radio_labels(at) == ['Data source', 'Select weighting method:', 'Hold', 'Combine factors',
-                                         'Rebalancing frequency']
+                                         'Rebalancing frequency', 'Max position, as a share of daily volume:']
     frequency = at.sidebar.radio(key='wrds_frequency_input')
     assert frequency.options == ['Semi-annual', 'Quarterly', 'Monthly'] and frequency.value == 'Quarterly'
     assert not at.sidebar.toggle

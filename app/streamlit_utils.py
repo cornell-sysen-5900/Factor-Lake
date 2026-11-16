@@ -551,6 +551,8 @@ def open_saved_analysis(text: str) -> Dict[str, Any]:
     # The WRDS Hold choice, in the settings only when it is not the top 10% (as the sidebar gives it)
     hold = ({'top_n': job['top_n']} if job.get('top_n') is not None else
             {'top_pct': job['top_pct']} if job.get('top_pct', 10.0) != 10.0 else {})
+    # WRDS jobs with no liquidity limit (and those saved before it) have no liquidity_limit
+    limit = {'liquidity_limit': job['liquidity_limit']} if job.get('liquidity_limit') is not None else {}
     factor_labels = [job['factor_labels'].get(f, f) for f in job['factors']]
     run_id = st.session_state.next_run_id
     compute = {'hash': saved['id'], 'opened': True, 'cached': True,
@@ -566,7 +568,8 @@ def open_saved_analysis(text: str) -> Dict[str, Any]:
             'factor_directions': dict(job['factor_directions']),
             'settings': {'data_mode': 'wrds', **{k: job[k] for k in (
                 'frequency', 'start_year', 'end_year', 'initial_aum', 'use_market_cap_weight',
-                'factor_combination', 'restrict_fossil_fuels', 'selected_sectors')}, **gics, **hold, **costs},
+                'factor_combination', 'restrict_fossil_fuels', 'selected_sectors')}, **gics, **hold, **limit,
+                         **costs},
             'universe': {'restrict_fossil_fuels': job['restrict_fossil_fuels'],
                          'selected_sectors': list(job['selected_sectors']), **gics},
             'calculation_preview': wrds_preview(job),

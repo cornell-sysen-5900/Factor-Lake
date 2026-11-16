@@ -8,6 +8,10 @@ filter of the sidebar's Filter level; with it, selected_sectors is []. Files wit
 WRDS settings have the sidebar's Hold choice only when it is not the top 10%: top_pct (a
 whole percent, 1 to 100) or top_n (a whole number of stocks from 1), never both. Files
 without them (older ones too) hold the top 10%. At top_pct 100 a file may have no factors.
+
+WRDS settings have liquidity_limit (20, 10 or 5: the most a position may be, in percent of
+the stock's daily dollar volume; src/wrds_liquidity.py) only when a limit is set. Files
+without it (older ones too) open at No limit.
 """
 import json
 import math
@@ -18,13 +22,16 @@ from src.trading_costs import MAX_TRADING_COST_BPS
 from src.wrds_calendar import FIRST_YEAR, LAST_YEAR
 from src.wrds_factors import WRDS_SECTORS
 from src.wrds_gics import GICS_LEVELS, level_names, parent_code, validate_gics_filter
+from src.wrds_liquidity import job_liquidity_limit, limit_label
 
 MAX_FILE_BYTES = 64 * 1024
 COMMON = {'start_year', 'end_year', 'initial_aum', 'restrict_fossil_fuels',
           'use_market_cap_weight', 'factor_combination', 'selected_sectors',
           'sector_filter_enabled', 'trading_cost_bps'}
 # WRDS settings that are there only when set
-WRDS_OPTIONAL = {'gics_filter', 'top_pct', 'top_n'}
+WRDS_OPTIONAL = {'gics_filter', 'top_pct', 'top_n', 'liquidity_limit'}
+# Sidebar widget of the WRDS liquidity limit (app/liquidity_ui.LIQUIDITY_KEY)
+LIQUIDITY_INPUT = 'wrds_liquidity_limit_input'
 # The WRDS Hold choice's sidebar widgets (app/components/sidebar.py): the choice, and the
 # number input of each option, with their defaults
 HOLD_INPUT, TOP_PCT_INPUT, TOP_N_INPUT = 'wrds_hold_input', 'wrds_top_pct_input', 'wrds_top_n_input'
@@ -104,6 +111,12 @@ def validate(document):
     if 'top_n' in s:
         require(whole_number(s['top_n']) and s['top_n'] >= 1, 'top_n must be a whole number of at least 1.')
         require('top_pct' not in s, 'Settings hold either top_pct or top_n, not both.')
+    if 'liquidity_limit' in s:
+        try:
+            limit = job_liquidity_limit(s['liquidity_limit'])
+        except ValueError as exc:
+            raise ValueError(f'Invalid liquidity limit: {exc}') from exc
+        require(limit is not None, 'Leave liquidity_limit out when there is no liquidity limit.')
     factors = document['factors']
     columns = {m['column'] for m in catalog(mode).values()}
     # Holding every stock in the filter (WRDS at 100%) needs no factor
@@ -152,6 +165,8 @@ def build(settings, factors, directions, name='', note='', mode=None):
         s['top_n'] = int(settings['top_n'])
     elif mode == 'wrds' and settings.get('top_pct', 10.0) not in (None, 10.0):
         s['top_pct'] = int(settings['top_pct']) if float(settings['top_pct']).is_integer() else settings['top_pct']
+    if mode == 'wrds' and settings.get('liquidity_limit') is not None:
+        s['liquidity_limit'] = int(settings['liquidity_limit'])
     s.setdefault('trading_cost_bps', 0)
     s.setdefault('sector_filter_enabled', bool(s.get('selected_sectors')))
     if not s['sector_filter_enabled']:
@@ -206,6 +221,8 @@ def widget_values(document):
         values[HOLD_INPUT] = HOLD_COUNT if 'top_n' in s else HOLD_PCT
         values[TOP_PCT_INPUT] = int(s.get('top_pct', DEFAULT_TOP_PCT))
         values[TOP_N_INPUT] = int(s.get('top_n', DEFAULT_TOP_N))
+        # The liquidity limit: a file without one (older files too) has no limit
+        values[LIQUIDITY_INPUT] = limit_label(s.get('liquidity_limit'))
     else:
         values['delisting_strategy_input'] = {
             'zero_return': 'Zero Return', 'hold_cash': 'Hold Cash', 'reinvest': 'Reinvest',

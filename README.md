@@ -52,6 +52,7 @@ Then open http://localhost:8501
 - Market data loaded from AWS S3 (Parquet), shared by all sessions, with Supabase as a fallback
 - Annual rebalancing backtest (configurable period, currently 2002-2024 in UI)
 - WRDS mode: point-in-time WRDS data with semi-annual, quarterly or monthly rebalancing, run in AWS Lambda (user guide section 15; design in `DOCS/WRDS_MODE_DESIGN.md`)
+- Liquidity limit (WRDS): no position above 20%, 10% or 5% of its stock's average daily dollar volume, checked at each rebalance at the portfolio's value; see [Limit positions by daily volume](DOCS/FACTOR_LAKE_USER_GUIDE.md#limit-positions-by-daily-volume)
 - Benchmark comparison vs Russell 2000, Growth, and Value
 - Performance metrics: CAGR, yearly returns, drawdown, Sharpe, Information Ratio, win rate
 - Ranked-stock table and top-vs-bottom cohort analysis

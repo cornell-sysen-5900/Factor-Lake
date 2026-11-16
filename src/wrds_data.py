@@ -14,6 +14,10 @@ then decoded with only the needed columns, the same way from a local folder and 
   and its delisting month, also after it leaves the index.
 - market_monthly.parquet: IWM, IWN and IWO total returns, the risk-free rate, and the
   Fama-French five factors and momentum (for src/factor_risk.py).
+
+Only for backtests with a liquidity limit, dollar_volume_monthly.parquet gives each stock's
+month-end average daily dollar volume (read_s3_dollar_volume). It is built from the folder's
+prices_daily/ by scripts/build_dollar_volume.py (src/wrds_liquidity.read_dollar_volume).
 """
 
 import io
@@ -26,6 +30,7 @@ import numpy as np
 import pandas as pd
 
 from .wrds_factors import WRDS_FACTOR_COLUMNS
+from .wrds_liquidity import LIQUIDITY_COLUMN
 
 # Folder of the WRDS pull under the S3 data prefix (override with FACTOR_LAKE_WRDS_DIR)
 DEFAULT_WRDS_DIR = 'wrds_2026_11'
@@ -35,6 +40,8 @@ PANEL_FILE = 'factor_panel_monthly.parquet'
 RETURNS_FILE = 'returns_monthly.parquet'
 MARKET_FILE = 'market_monthly.parquet'
 WRDS_FILES = (PANEL_FILE, RETURNS_FILE, MARKET_FILE)
+# (date, permno, dollar_vol_3m), read only for jobs with a liquidity limit
+DOLLAR_VOLUME_FILE = 'dollar_volume_monthly.parquet'
 
 # Panel columns besides the factors: keys, display, filters, price and weight, and the
 # four GICS names (shown in the holdings)
@@ -61,6 +68,8 @@ class WrdsData:
 
     returns and delisted are month x permno matrices (rows: months, the market data's
     month ends; columns: permnos), so a holding period's returns are one slice.
+    dollar_volume, set only once a job with a liquidity limit needs it, is each stock's
+    average daily dollar volume indexed by (date, permno) (src/wrds_liquidity.py).
     """
     panel: pd.DataFrame
     months: pd.DatetimeIndex
@@ -68,6 +77,7 @@ class WrdsData:
     returns: np.ndarray
     delisted: np.ndarray
     market: pd.DataFrame
+    dollar_volume: Optional[pd.Series] = None
     _month_dates: Dict[str, pd.Timestamp] = field(default_factory=dict, repr=False)
 
     @classmethod
@@ -125,3 +135,17 @@ def read_s3_wrds_data(manager, data_dir: Optional[str] = None) -> WrdsData:
     """Reads the WRDS files from S3, under <data prefix>/<data_dir>/ (src/s3_client.S3DataManager)."""
     data_dir = data_dir or wrds_dir()
     return read_wrds_data(lambda filename: manager.read_bytes(f'{data_dir}/{filename}'))
+
+
+def dollar_volume_series(table: pd.DataFrame) -> pd.Series:
+    """The (date, permno, dollar_vol_3m) table as the engine reads it: indexed by (date, permno)."""
+    table = table.astype({'permno': 'int32'})
+    table['date'] = pd.to_datetime(table['date']).astype('datetime64[ns]')
+    return table.set_index(['date', 'permno'])[LIQUIDITY_COLUMN]
+
+
+def read_s3_dollar_volume(manager, data_dir: Optional[str] = None) -> pd.Series:
+    """Each stock's month-end average daily dollar volume from <data_dir>/dollar_volume_monthly.parquet."""
+    data_dir = data_dir or wrds_dir()
+    body = io.BytesIO(manager.read_bytes(f'{data_dir}/{DOLLAR_VOLUME_FILE}'))
+    return dollar_volume_series(pd.read_parquet(body, columns=['date', 'permno', LIQUIDITY_COLUMN]))

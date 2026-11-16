@@ -193,6 +193,23 @@ Where the codes and names come from, and how many stocks have no GICS: [GICS map
 
 The run's **Universe** caption and the **Sectors** row in Compare show the filter, e.g. "Industry: Banks, Insurance". The holdings table lists each stock's GICS sector, industry group, industry and sub-industry, and exported settings files keep the level and the choices.
 
+### Limit positions by daily volume
+
+Under **Liquidity Limit** in the sidebar (WRDS only), choose the most a position may be, as a share of its stock's daily volume, so the backtest only buys stocks your portfolio could realistically trade:
+
+- **No limit** (the default): positions of any size, as before.
+- **20%**, **10%** or **5%**: no position above that share of the stock's average daily dollar volume.
+
+Liquidity is the stock's average daily dollar volume (price x shares traded) over its last 63 trading days, computed from the WRDS daily prices. Early Nasdaq volume is not adjusted for double counting, so before about 2004 a Nasdaq stock's volume can be overstated and the limit is looser for it.
+
+At each rebalance, every position is sized at the portfolio's value on that date with the chosen weighting, and a position above the limit is cut to the limit: each stock holds the smaller of its target and the limit times its daily dollar volume. A stock with no volume data gets no position. The money that cannot be placed is held in cash until the next rebalance and earns the risk-free rate. Nothing is redistributed: every other position keeps the weight the strategy gave it, and no stock is left out for being too big.
+
+The limit depends on the money invested: at the default $1,000 nothing is capped and the run is the same as with No limit, while at $100 million many small stocks are capped and much of the portfolio can sit in cash. Try the same strategy at a small and a large **Initial AUM**.
+
+The run's **Liquidity Limit** caption, the **Liquidity Limit** row in Compare and the calculation preview show the limit, and exported settings files keep it. A run with a limit also shows, under Performance Summary, the average cash share, the most cash at one rebalance (with its date) and the average number of positions capped, and **Positions capped at each rebalance** lists every date with its capped positions, stocks without volume data and cash share. Its holdings table adds **Avg Daily $ Volume** and **% of Daily Volume**.
+
+The dollar volume is computed from the daily prices already in the WRDS folder and saved next to them as one small file, so no new data pull is needed. It is loaded the first time a run with a limit needs it, and runs with No limit never load it.
+
 ### Read WRDS results
 
 The results have Legacy's sections, tiles, tables and charts, on dates instead of years:
