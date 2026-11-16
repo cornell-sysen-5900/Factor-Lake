@@ -208,7 +208,7 @@ The limit depends on the money invested: at the default $1,000 nothing is capped
 
 The run's **Liquidity Limit** caption, the **Liquidity Limit** row in Compare and the calculation preview show the limit, and exported settings files keep it. A run with a limit also shows, under Performance Summary, the average cash share, the most cash at one rebalance (with its date) and the average number of positions capped, and **Positions capped at each rebalance** lists every date with its capped positions, stocks without volume data and cash share. Its holdings table adds **Avg Daily $ Volume** and **% of Daily Volume**.
 
-The dollar volume comes from the daily prices already in the WRDS folder, so no new data is needed. It is loaded the first time a run with a limit needs it (about half a minute), and runs with No limit never load it.
+The dollar volume is computed from the daily prices already in the WRDS folder and saved next to them as one small file, so no new data pull is needed. It is loaded the first time a run with a limit needs it, and runs with No limit never load it.
 
 ### Read WRDS results
 

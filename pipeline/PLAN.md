@@ -721,6 +721,13 @@ date, row groups of 250,000, a `_manifest.json` with years, rows, bytes and colu
 mkt_cap_musd instead of the old mkt_cap in $ thousands. **Nothing is uploaded by the pipeline**; the upload is
 `scripts/upload_wrds.py`, run by hand.
 
+**dollar_volume_monthly.parquet (not exported by s08 yet).** The app's liquidity limit reads
+`wrds_YYYY_MM/dollar_volume_monthly.parquet`: (date, permno, dollar_vol_3m), each stock's mean daily price x share
+volume over its last 63 trading days (80% needed) at each month end (`src/wrds_liquidity.read_dollar_volume`). For
+wrds_2026_11 the file was built after the upload from the folder's S3 `prices_daily/` by
+`scripts/build_dollar_volume.py`, which only adds that file. At the next refresh, s08 should export it directly with
+the other outputs (and the dictionary should document it), so the script can be retired.
+
 **Checks:** every file reads back with its source's row count (FAIL); no duplicate keys in any file (FAIL);
 permno int32 and dates datetime64[ns] (FAIL); every output column is in DATA_DICTIONARY.md and every column there
 is in the outputs, read from the written files (FAIL); every output column has a column_stats row and the

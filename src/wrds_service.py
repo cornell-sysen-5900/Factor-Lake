@@ -32,7 +32,7 @@ from .backtest_service import RESULTS_DIR, _error_code, _is_missing, result_file
 from .factor_risk import wrds_factor_risk
 from .s3_client import S3DataManager
 from .wrds_calendar import FREQUENCY_LABELS
-from .wrds_data import WRDS_FILES, WrdsData, read_s3_dollar_volume, read_s3_wrds_data, wrds_dir
+from .wrds_data import DOLLAR_VOLUME_FILE, WRDS_FILES, WrdsData, read_s3_dollar_volume, read_s3_wrds_data, wrds_dir
 from .wrds_engine import rank_stocks, run_wrds_backtest
 from .wrds_holdings import holdings_file, holdings_parquet
 from .wrds_jobs import (
@@ -43,7 +43,7 @@ from .wrds_jobs import (
     validate_wrds_job,
     wrds_code_version,
 )
-from .wrds_liquidity import DAILY_MANIFEST, describe_liquidity_limit
+from .wrds_liquidity import describe_liquidity_limit
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ class WrdsBacktestRunner:
         self.manager = manager or S3DataManager()
         self.data_dir = data_dir or wrds_dir()
         self._data: Optional[Tuple[str, WrdsData]] = None   # (data version, data)
-        self._volume: Optional[Tuple[str, pd.Series]] = None    # (daily manifest's ETag, dollar volume)
+        self._volume: Optional[Tuple[str, pd.Series]] = None    # (volume file's version, dollar volume)
 
     def data_version(self) -> str:
         """
@@ -88,10 +88,19 @@ class WrdsBacktestRunner:
 
     def volume_version(self) -> str:
         """
-        Identifies the daily prices the liquidity limit reads: the S3 ETag of their
-        manifest, which is uploaded last whenever they are republished.
+        Identifies the dollar volume the liquidity limit reads: the S3 ETag of the folder's
+        dollar_volume_monthly.parquet. Raises ValueError (the job is refused) when the
+        folder has no such file.
         """
-        return f"{DAILY_MANIFEST}:{self._etag(DAILY_MANIFEST)}"
+        try:
+            return f"{DOLLAR_VOLUME_FILE}:{self._etag(DOLLAR_VOLUME_FILE)}"
+        except Exception as e:
+            code = str(getattr(e, 'response', {}).get('Error', {}).get('Code', ''))
+            if code not in ('404', 'NoSuchKey', 'NotFound', '403', 'AccessDenied', 'Forbidden'):
+                raise
+            raise ValueError(f"The liquidity limit needs {self.data_dir}/{DOLLAR_VOLUME_FILE}, which is not in "
+                             "S3. Build it with scripts/build_dollar_volume.py, or set Liquidity Limit to No "
+                             "limit.") from None
 
     def _etag(self, filename: str) -> str:
         head = self.manager.client.head_object(Bucket=self.manager.bucket,
@@ -109,13 +118,14 @@ class WrdsBacktestRunner:
         return self._data[1]
 
     def dollar_volume(self) -> pd.Series:
-        """The month-end dollar volume of the liquidity limit, reused while the daily prices are unchanged."""
+        """The month-end dollar volume of the liquidity limit, reused while its file is unchanged."""
         version = self.volume_version()
         if self._volume is None or self._volume[0] != version:
             self._volume = None
             started = time.perf_counter()
             self._volume = (version, read_s3_dollar_volume(self.manager, self.data_dir))
-            logger.info(f"Loaded the dollar volume ({self.data_dir}/prices_daily, {len(self._volume[1]):,} rows) "
+            logger.info(f"Loaded the dollar volume ({self.data_dir}/{DOLLAR_VOLUME_FILE}, "
+                        f"{len(self._volume[1]):,} rows) "
                         f"in {time.perf_counter() - started:.1f} s")
         return self._volume[1]
 
@@ -134,7 +144,7 @@ class WrdsBacktestRunner:
         """
         validate_wrds_job(job)
         data = self.data(version)
-        if job.get('liquidity_limit') is not None:      # only these jobs read the daily prices
+        if job.get('liquidity_limit') is not None:      # only these jobs read the dollar volume
             data.dollar_volume = self.dollar_volume()
         factors, directions, options = engine_arguments(job)
         if job['kind'] == 'backtest':
@@ -172,7 +182,7 @@ class WrdsBacktestService:
         """The job's result, from the cache when possible (see the module docstring)."""
         validate_wrds_job(job)
         base_version = self.runner.data_version()
-        # A job with a liquidity limit also reads the daily prices; other jobs hash as before
+        # A job with a liquidity limit also reads the dollar volume file; other jobs hash as before
         data_version = (f"{base_version}|{self.runner.volume_version()}" if job.get('liquidity_limit') is not None
                         else base_version)
         key = job_hash(job, data_version, self.code_version)
