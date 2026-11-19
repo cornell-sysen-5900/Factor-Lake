@@ -65,21 +65,25 @@ SETUPS = {
 
 
 def _load(monkeypatch, setup):
-    """Loads market data in the real app with the given sidebar settings."""
+    """Exercise retained Legacy loading functions directly, outside the WRDS-only app."""
     monkeypatch.syspath_prepend(str(APP_DIR))
-    at = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=60)
+    def legacy_components(settings):
+        import streamlit as st
+
+        from app import streamlit_utils as utils
+        utils.initialize_session_state()
+        if st.button('Load Market Data'):
+            utils.load_and_process_data(settings)
+        if st.button('Run Portfolio Analysis'):
+            utils.run_backtest_logic(settings, ['ROE using 9/30 Data'], {'ROE using 9/30 Data': 'top'})
+    settings = dict(start_year=setup.get('start', 2002), end_year=2024,
+                    selected_sectors=setup.get('sectors'), restrict_fossil_fuels=setup.get('fossil', False),
+                    initial_aum=1000.0, use_market_cap_weight=False, factor_combination='mixing',
+                    delisting_strategy='zero_return', use_lambda=False)
+    at = AppTest.from_function(legacy_components, args=(settings,), default_timeout=60)
     raw = _universe()
     at.session_state['raw_data'] = raw
     at.run()
-    at.button(key='factor_add_roe').click().run()
-    if setup.get('start'):
-        at.number_input(key='start_year_input').set_value(setup['start']).run()
-    if setup.get('fossil'):
-        next(c for c in at.sidebar.checkbox if c.label == 'Restrict Fossil Fuel Companies').check().run()
-    if setup.get('sectors'):
-        next(c for c in at.sidebar.checkbox if c.label == 'Enable Sector Filter').check().run()
-        next(m for m in at.sidebar.multiselect
-             if m.label == 'Include following sectors:').set_value(setup['sectors']).run()
     next(b for b in at.button if b.label == 'Load Market Data').click().run()
     assert not at.exception, [e.value for e in at.exception]
     return at, raw

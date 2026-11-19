@@ -31,7 +31,6 @@ def _start(new_session):
 
 def _wrds(at, *factor_keys):
     """WRDS mode, quarterly 2010-2012 (the synthetic data), with these factors added."""
-    at.sidebar.radio(key='data_mode_input').set_value('WRDS').run()
     at.sidebar.number_input(key='wrds_start_year_input').set_value(2010).run()
     at.sidebar.number_input(key='wrds_end_year_input').set_value(2012).run()
     for key in factor_keys:
@@ -60,7 +59,7 @@ def _holdings_counts(at, run):
 
 def test_hold_is_next_to_the_weighting_with_one_input_that_changes_with_it(new_session):
     at = _start(new_session)
-    assert HOLD not in [r.key for r in at.sidebar.radio]                 # Legacy: no Hold choice
+    assert HOLD in [r.key for r in at.sidebar.radio]                     # WRDS is the default
     _wrds(at)
     radios = [r.key for r in at.sidebar.radio]
     assert radios.index(HOLD) == radios.index('weighting_method_input') + 1

@@ -7,9 +7,9 @@ session_state['raw_data'], so no data source access is needed.
 from pathlib import Path
 
 import pytest
-from streamlit.testing.v1 import AppTest
 
 from app.streamlit_config import FACTOR_GROUPS, FACTOR_METADATA
+from tests.legacy_components import legacy_app_test
 from tests.unit.test_saved_runs import _synthetic_universe
 
 APP_DIR = Path(__file__).resolve().parents[2] / 'app'
@@ -38,7 +38,7 @@ EXPECTED_DEFAULTS = {
 def at(monkeypatch):
     # `streamlit run` puts app/ on sys.path; AppTest does not.
     monkeypatch.syspath_prepend(str(APP_DIR))
-    app = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=60)
+    app = legacy_app_test()
     app.session_state['raw_data'] = _synthetic_universe()
     app.run()
     return app

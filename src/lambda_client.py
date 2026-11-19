@@ -40,6 +40,45 @@ class BacktestLambdaClient:
             )
         self.client = client
 
+    def preview(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Fetch bounded sample rows without entering the backtest/result-download path."""
+        from .wrds_preview import MAX_RESPONSE_BYTES, PREVIEW_COLUMNS, ROWS_PER_YEAR, validate_request
+        validate_request(request)
+        try:
+            response = self.client.invoke(FunctionName=self.function_name, InvocationType='RequestResponse',
+                                          Payload=json.dumps({'action': 'wrds_preview', 'request': request}).encode())
+            stream = response['Payload']
+            try:
+                body = stream.read(MAX_RESPONSE_BYTES + 1)
+            finally:
+                stream.close()
+            if len(body) > MAX_RESPONSE_BYTES or response.get('FunctionError'):
+                raise ValueError('Invalid preview response')
+            payload = json.loads(body)
+            if payload.get('status') in ('disabled', 'unavailable'):
+                from .wrds_preview import DISABLED_MESSAGE, NOT_READY_MESSAGE
+                return {'status': payload['status'], 'message': DISABLED_MESSAGE
+                        if payload['status'] == 'disabled' else NOT_READY_MESSAGE}
+            if payload.get('status') != 'ok':
+                raise ValueError('Preview unavailable')
+            preview = payload['preview']
+            if preview['columns'] != list(PREVIEW_COLUMNS) or preview['rows_per_year'] != ROWS_PER_YEAR:
+                raise ValueError('Invalid preview columns or limit')
+            counts = {}
+            for row in preview['rows']:
+                if set(row) != set(PREVIEW_COLUMNS):
+                    raise ValueError('Invalid preview fields')
+                year = int(row['date'][:4])
+                if not request['start_year'] <= year <= request['end_year']:
+                    raise ValueError('Invalid preview year')
+                counts[year] = counts.get(year, 0) + 1
+                if counts[year] > ROWS_PER_YEAR:
+                    raise ValueError('Invalid preview row count')
+            return payload
+        except Exception as exc:
+            raise BacktestLambdaError('The WRDS preview could not be loaded. Check the development Lambda '
+                                      'deployment and try again.') from exc
+
     def run(self, job: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
         Runs a job (src/backtest_jobs.build_job) in Lambda.

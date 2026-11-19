@@ -46,21 +46,20 @@ Then open http://localhost:8501
 
 ## Features
 
-- Clean factor selection (13 core factors: Momentum, Value, Quality, Growth, Profitability)
+- WRDS factor selection with definitions, default directions and reviewed Legacy relationships
 - ESG exclusion (fossil fuel filter)
-- Sector filtering (configurable sector universe)
-- Market data loaded from AWS S3 (Parquet), shared by all sessions, with Supabase as a fallback
-- Annual rebalancing backtest (configurable period, currently 2002-2024 in UI)
-- WRDS mode: point-in-time WRDS data with semi-annual, quarterly or monthly rebalancing, run in AWS Lambda (user guide section 15; design in `DOCS/WRDS_MODE_DESIGN.md`)
+- Universe filtering at all four GICS levels: sector, industry group, industry and sub-industry
+- New analyses use WRDS only, with data in AWS S3 and backtests in AWS Lambda; saved Legacy analyses remain viewable.
+- WRDS: point-in-time WRDS data with semi-annual, quarterly or monthly rebalancing, run in AWS Lambda (user guide section 15; design in `DOCS/WRDS_MODE_DESIGN.md`)
 - Liquidity limit (WRDS): no position above 20%, 10% or 5% of its stock's average daily dollar volume, checked at each rebalance at the portfolio's value; see [Limit positions by daily volume](DOCS/FACTOR_LAKE_USER_GUIDE.md#limit-positions-by-daily-volume)
-- Benchmark comparison vs Russell 2000, Growth, and Value
-- Performance metrics: CAGR, yearly returns, drawdown, Sharpe, Information Ratio, win rate
+- WRDS benchmark comparison against IWM, IWN and IWO ETF total returns
+- Performance metrics: CAGR, period and calendar-year returns, drawdown, Sharpe, Information Ratio, win rate
 - Ranked-stock table and top-vs-bottom cohort analysis
-- Calculation preview (Legacy and WRDS): the engine's calculation as a formula on the Analysis tab, live and without loading data, and the one each run used in Results; see [Check the calculation preview](DOCS/FACTOR_LAKE_USER_GUIDE.md#check-the-calculation-preview)
+- Calculation preview: live WRDS strategy formulas in Analysis and the original saved calculation in Results.
 - Saved runs: each backtest run is kept as its own tab in Results (newest first, last 5; cleared when the page is refreshed), shows the settings that produced it, and can be removed
-- Strategy files and names: export/import Legacy or WRDS settings as JSON, name backtests and add notes, and edit annotations in Results without changing calculations. See [Save, import and name backtests](DOCS/STRATEGY_SETTINGS.md).
-- Clear and rerun: on the Analysis tab, click **Clear Parameters** to remove selected factors and restore the analysis settings to their defaults. Choose new inputs, then **Run Portfolio Analysis**. For local backtests, click **Load Market Data** first to apply the new filters using the cached source data. Saved runs, analysis history, the Lambda execution preference and the data source (Legacy or WRDS) are kept; in WRDS mode the frequency and years return to Quarterly, 2008-2026. No page refresh or app restart is needed.
-- Data Viewer tab: filter the loaded market data by date range, sector and industry, view it, and download it as CSV (no extra data downloads)
+- Strategy files and names: export settings, import WRDS JSON, and rename saved runs. Legacy exports remain available for reference; new Legacy runs are disabled.
+- Clear and rerun: Clear Parameters restores WRDS defaults without changing saved runs or analysis history.
+- Data Viewer: up to five WRDS rows per year from Lambda, with four GICS levels, no download and an approval gate. See [WRDS preview](DOCS/WRDS_DATA_PREVIEW.md).
 
 ## Project Layout
 
@@ -71,7 +70,7 @@ Factor-Lake/
 │   ├── streamlit_utils.py  # Session state / orchestration helpers
 │   ├── streamlit_config.py # Factor and UI metadata
 │   ├── saved_runs.py       # Saved-run list helpers (Results tabs)
-│   ├── viewer_data.py      # Data Viewer filtering and CSV helpers
+│   ├── viewer_data.py      # Retained Legacy viewer helpers
 │   └── components/         # Sidebar, factor selection, results, data viewer, about
 ├── src/                    # Library & core logic
 │   ├── backtest_engine.py

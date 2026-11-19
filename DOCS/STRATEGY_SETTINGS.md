@@ -16,16 +16,15 @@ To restore a configuration from a file, open **Import settings from file** on th
 tab (below the factors, above the run buttons) and choose the file. The settings are applied
 as soon as the file is chosen: the factors and sidebar show them, and the box says
 **Settings imported** (or why the file could not be imported) and empties, ready for another
-file. Import does not execute a backtest or fetch market data; local backtests require
-**Load Market Data**. If the file has a name, the next run gets it
+file. Import does not execute a backtest or fetch market data. If the file has a name, the next run gets it
 (shown above the run buttons); **Clear Parameters** forgets it. **Clear Parameters**
 preserves saved runs and their names, notes and results.
 
-Both Legacy and WRDS are supported, including factors and directions, years, investment,
-weighting, factor combination, ESG and sector filters, trading costs, and the applicable
-Legacy delisting strategy or WRDS rebalancing frequency. Import restores the file's data
-mode. WRDS import requires a configured backtest Lambda. The Legacy execution preference
-is local to the app and is not exported or overwritten.
+New runs support WRDS settings, including factors and directions, years, investment, weighting, factor
+combination, ESG and GICS filters, trading costs, holding size, liquidity limit and rebalancing frequency.
+WRDS import requires a configured backtest Lambda. Legacy files remain parseable and exportable for reference,
+but the app rejects their import for a new run and disables Use these settings on saved Legacy runs.
+Opening the original Legacy result by ID or share link remains supported.
 
 Files contain inputs and annotations only: no credentials, source data, calculation
 results, AWS configuration or analysis IDs. Exporting and importing the same file restores
@@ -60,10 +59,10 @@ keeps the run's tab open and renames it in **This session's analyses** too. Anno
 edits affect session presentation only; they do not alter engine inputs, results, shared
 analysis IDs or cache keys. Historical/shared analysis records retain their original labels.
 
-## Demo (local Legacy mode)
+## Demo (WRDS)
 
-1. Select **ROA %**, choose **Lower is better**, and set 2010-2020 and $2,500.
-2. Load market data and run the analysis.
+1. Select **ROA**, choose **Lower is better**, and set 2010-2020 and $2,500.
+2. Run the analysis in the development Lambda.
 3. **Rename** the run to **Value hypothesis** with a short note; show that its metrics stay the
    same. Click **Export settings (JSON)**.
 4. Return to Analysis and click Clear Parameters. The saved run remains available.

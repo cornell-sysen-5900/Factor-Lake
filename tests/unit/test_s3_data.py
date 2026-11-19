@@ -12,13 +12,13 @@ import pandas as pd
 import pytest
 import streamlit as st
 from botocore.exceptions import ClientError, NoCredentialsError
-from streamlit.testing.v1 import AppTest
 
 from app import streamlit_utils
 from scripts import publish_data_to_s3 as publisher
 from src.data_standardization import validate_universe
 from src.s3_client import DELISTING_FILE, UNIVERSE_FILE, S3DataError, S3DataManager
 from src.supabase_client import SupabaseManager
+from tests.legacy_components import legacy_app_test
 
 APP_DIR = Path(__file__).resolve().parents[2] / 'app'
 
@@ -218,9 +218,8 @@ def test_app_shows_a_clear_error_when_the_data_source_fails(monkeypatch):
     monkeypatch.syspath_prepend(str(APP_DIR))
     st.cache_resource.clear()
 
-    at = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=60)
+    at = legacy_app_test()
     at.run()
-    assert any('AWS S3' in c.value for c in at.sidebar.caption)
     next(b for b in at.button if b.label == 'Load Market Data').click().run()
 
     assert not at.exception

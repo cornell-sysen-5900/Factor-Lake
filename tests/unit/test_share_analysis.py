@@ -14,11 +14,11 @@ import json
 
 import pytest
 from botocore.exceptions import ClientError
-from streamlit.testing.v1 import AppTest
 
 from src.backtest_jobs import decode_saved, encode_result, results_match
 from src.backtest_service import BacktestService, result_file
 from src.saved_analyses import SavedAnalysisError, load_saved_analysis, normalize_analysis_id
+from tests.legacy_components import legacy_app_test
 from tests.unit.test_backtest_lambda import (
     APP_DIR,
     BUCKET,
@@ -118,7 +118,7 @@ def new_session(monkeypatch, manager):
     browser_like_widget_states(monkeypatch)
 
     def start():
-        at = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=60)
+        at = legacy_app_test()
         at.run()
         at.fake_lambda = fake_lambda
         return at

@@ -98,7 +98,10 @@ def _mode(at):
 
 
 def _switch(at, mode):
-    _mode(at).set_value(mode).run()
+    # Compatibility helper for WRDS tests: WRDS is now the only new-run mode.
+    assert mode == 'WRDS'
+    assert at.session_state['data_mode_input'] == 'WRDS'
+    assert not any(r.key == 'data_mode_input' for r in at.sidebar.radio)
     _assert_clean(at)
 
 
@@ -131,58 +134,16 @@ def _captions(at):
 # The switch
 # ---------------------------------------------------------------------------
 
-def test_legacy_is_the_default_and_wrds_needs_lambda(at):
-    _assert_clean(at)
-    assert _mode(at).value == 'Legacy' and _mode(at).options == ['Legacy', 'WRDS']
-    assert _mode(at).disabled
-    assert 'WRDS mode runs in AWS Lambda, which is not configured for this app.' in _captions(at)
 
 
-def test_with_lambda_the_switch_is_enabled_and_starts_on_legacy(lambda_at):
-    _assert_clean(lambda_at)
-    assert _mode(lambda_at).value == 'Legacy' and not _mode(lambda_at).disabled
-    assert 'WRDS mode runs in AWS Lambda, which is not configured for this app.' not in _captions(lambda_at)
 
 
-def test_switching_resets_the_factor_selection(lambda_at):
-    at = lambda_at
-    _add(at, FACTOR_METADATA, 'ROA %', '1-Yr Price Vol %')
-    at.button_group(key=f"factor_dir_{FACTOR_METADATA['ROA %']['key']}").set_value(LOWER).run()
-    assert list(at.session_state['factor_builder_selected']) == ['ROA %', '1-Yr Price Vol %']
-
-    _switch(at, 'WRDS')
-    assert at.session_state['factor_builder_selected'] == {}
-    assert 'No factors added yet. Click one above.' in [c.value for c in at.caption]
-    assert not any(k.startswith('factor_dir_') for k in at.session_state.filtered_state)
-
-    _add(at, WRDS_FACTOR_METADATA, 'Book/Price')
-    assert at.session_state['factor_builder_selected'] == {'Book/Price': 'top'}
-    _switch(at, 'Legacy')
-    assert at.session_state['factor_builder_selected'] == {}
-
-    # Legacy factors come back with their defaults, not the directions chosen before the switch
-    _add(at, FACTOR_METADATA, 'ROA %')
-    assert at.button_group(key=f"factor_dir_{FACTOR_METADATA['ROA %']['key']}").value == HIGHER
 
 
 # ---------------------------------------------------------------------------
 # Controls of each mode
 # ---------------------------------------------------------------------------
 
-def test_legacy_controls_are_as_on_main(lambda_at):
-    at = lambda_at
-    assert _sidebar_radio_labels(at) == ['Data source', 'Select weighting method:', 'Combine factors',
-                                         'How to treat delisted positions:']
-    assert [t.key for t in at.sidebar.toggle] == ['use_lambda_input']
-    years = _number_inputs(at)
-    assert (years['start_year_input'].min, years['start_year_input'].max, years['start_year_input'].value) \
-        == (2002, 2023, 2002)
-    assert (years['end_year_input'].min, years['end_year_input'].max, years['end_year_input'].value) \
-        == (2002, 2024, 2024)
-    assert 'wrds_start_year_input' not in years
-    assert 'Load Market Data' in _labels(at)
-    assert {f"factor_add_{m['key']}" for m in FACTOR_METADATA.values()} <= {b.key for b in at.button}
-    assert not any((b.key or '').startswith('factor_add_w_') for b in at.button)
 
 
 def test_wrds_controls(lambda_at):
@@ -191,7 +152,7 @@ def test_wrds_controls(lambda_at):
 
     # The Hold choice after the weighting, frequency instead of the delisting option, and no
     # Lambda switch (WRDS always runs in Lambda)
-    assert _sidebar_radio_labels(at) == ['Data source', 'Select weighting method:', 'Hold', 'Combine factors',
+    assert _sidebar_radio_labels(at) == ['Select weighting method:', 'Hold', 'Combine factors',
                                          'Rebalancing frequency', 'Max position, as a share of daily volume:']
     frequency = at.sidebar.radio(key='wrds_frequency_input')
     assert frequency.options == ['Semi-annual', 'Quarterly', 'Monthly'] and frequency.value == 'Quarterly'
@@ -257,44 +218,8 @@ def test_wrds_run_sends_a_wrds_job_built_from_the_sidebar(lambda_at):
     assert at.session_state['saved_runs'] == []
 
 
-def test_without_lambda_a_stale_wrds_choice_falls_back_to_legacy(monkeypatch):
-    monkeypatch.syspath_prepend(str(APP_DIR))
-    monkeypatch.setenv('FACTOR_LAKE_BACKTEST_LAMBDA', '')
-    at = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=60)
-    at.session_state['data_mode_input'] = 'WRDS'
-    at.run()
-    _assert_clean(at)
-    assert _mode(at).value == 'Legacy'
-    assert 'How to treat delisted positions:' in _sidebar_radio_labels(at)
 
 
 # ---------------------------------------------------------------------------
 # Legacy settings and jobs unchanged
 # ---------------------------------------------------------------------------
-
-def test_legacy_settings_are_exactly_as_on_main(at):
-    _add(at, FACTOR_METADATA, 'ROE using 9/30 Data')
-    _button(at, 'Load Market Data').click().run()
-    _button(at, 'Run Portfolio Analysis').click().run()
-    _assert_clean(at)
-    assert at.session_state['saved_runs'][0]['settings'] == LEGACY_DEFAULT_SETTINGS
-
-
-def test_legacy_lambda_job_is_exactly_as_on_main_even_after_a_wrds_visit(lambda_at, monkeypatch):
-    # One session runs Legacy straight away, a second one visits WRDS first
-    for visit_wrds in (False, True):
-        at = lambda_at if not visit_wrds else _app(monkeypatch, LAMBDA_NAME)
-        if visit_wrds:
-            _switch(at, 'WRDS')
-            _switch(at, 'Legacy')
-        _add(at, FACTOR_METADATA, 'ROE using 9/30 Data')
-        _button(at, 'Run Portfolio Analysis').click().run()
-        _assert_clean(at)
-        assert at.session_state['saved_runs'][0]['settings'] == dict(LEGACY_DEFAULT_SETTINGS, use_lambda=True)
-
-    first, second = lambda_at.fake_lambda.jobs
-    expected = build_job('backtest', ['ROE_using_9-30_Data'], {'ROE_using_9-30_Data': 'top'},
-                         dict(LEGACY_DEFAULT_SETTINGS, use_lambda=True),
-                         factor_labels={'ROE_using_9-30_Data': 'ROE using 9/30 Data'})
-    assert first == second == expected
-    assert tuple(first) == JOB_FIELDS and 'data_mode' not in first

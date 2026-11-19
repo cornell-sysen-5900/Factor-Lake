@@ -243,7 +243,6 @@ def test_wrds_preview_frequency_top_pct_and_trading_cost_match_the_wrds_engine(n
         return real(data, factors, directions, **options)
     monkeypatch.setattr(service, "run_wrds_backtest", spy)    # what the Lambda's WRDS engine receives
     at = new_session()
-    at.sidebar.radio(key="data_mode_input").set_value("WRDS").run()
     at.sidebar.number_input(key="wrds_start_year_input").set_value(2010).run()
     at.sidebar.number_input(key="wrds_end_year_input").set_value(2012).run()
     at.sidebar.radio(key="wrds_frequency_input").set_value(frequency).run()

@@ -23,6 +23,7 @@ from tests.unit.test_saved_runs import (
     _run_tab_labels,  # noqa: F401 (fixture)
     at,
 )
+from tests.unit.test_share_analysis import new_session as legacy_session  # noqa: F401 (fixture)
 from tests.unit.test_wrds_saved import OLD_IDS, _run_wrds, manager, new_session, s3  # noqa: F401 (fixtures)
 
 COST_KEY = 'trading_cost_bps_input'
@@ -149,7 +150,8 @@ def test_clear_parameters_resets_the_cost(at):
     assert at.sidebar.number_input(key=COST_KEY).value == 0
 
 
-def test_a_legacy_lambda_run_sends_the_cost_and_its_history_and_listing_show_it(new_session):
+def test_a_legacy_lambda_run_sends_the_cost_and_its_history_and_listing_show_it(legacy_session):
+    new_session = legacy_session
     at = new_session()
     _set_cost(at, 25)
     _click_main_tab(at, 'Analysis')

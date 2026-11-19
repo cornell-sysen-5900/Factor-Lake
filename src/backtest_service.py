@@ -74,6 +74,7 @@ class BacktestService:
         self.code_version = code_version()
         self._universe: Optional[Tuple[str, pd.DataFrame]] = None   # (data version, data)
         self._wrds = None   # WrdsBacktestService, created on the first WRDS job
+        self._preview = None
 
     @property
     def wrds(self):
@@ -92,6 +93,19 @@ class BacktestService:
         try:
             if event.get('action') == 'ping':
                 return {'status': 'ok', 'code_version': self.code_version}
+            if event.get('action') == 'wrds_preview':
+                from .wrds_preview import WrdsPreviewService
+                if self._preview is None:
+                    self._preview = WrdsPreviewService(self.manager)
+                try:
+                    return self._preview.preview(event.get('request'))
+                except ValueError:
+                    return {'status': 'error', 'error_type': 'invalid_request',
+                            'message': 'The preview request or index is invalid. Check the years and GICS filter.'}
+                except Exception:
+                    # Do not expose AWS errors, paths, credentials or sample rows to the client/logs.
+                    return {'status': 'error', 'error_type': 'preview_unavailable',
+                            'message': 'The WRDS preview could not be loaded. Please try again later.'}
             return self.run(event.get('job', event))
         except ValueError as e:
             return {'status': 'error', 'error_type': 'invalid_request', 'error': str(e)}

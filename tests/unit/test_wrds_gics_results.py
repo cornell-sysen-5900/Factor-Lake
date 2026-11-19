@@ -123,7 +123,6 @@ def _universe_captions(at):
 def test_a_run_with_a_gics_filter_shows_and_saves_it(new_session):
     at = new_session()
     _click_main_tab(at, 'Analysis')
-    at.sidebar.radio(key='data_mode_input').set_value('WRDS').run()
     at.sidebar.number_input(key='wrds_start_year_input').set_value(2010).run()
     at.sidebar.number_input(key='wrds_end_year_input').set_value(2012).run()
     at.button(key='factor_add_w_roe').click().run()

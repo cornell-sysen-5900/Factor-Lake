@@ -20,17 +20,25 @@ COST_KEY = 'trading_cost_bps_input'
 
 
 def _run_legacy(at, bps=0):
-    at.sidebar.number_input(key=COST_KEY).set_value(bps).run()
-    _click_main_tab(at, 'Analysis')
-    _add_factor(at, 'ROE using 9/30 Data')
-    _click(at, 'Run Portfolio Analysis')
+    # Prepare an archived Legacy result through the retained engine, then open it
+    # through the real app. Creating Legacy runs is no longer a UI workflow.
+    from src.backtest_jobs import build_job
+    from tests.unit.test_wrds_mode_switch import LEGACY_DEFAULT_SETTINGS
+    job = build_job('backtest', ['ROE_using_9-30_Data'], {'ROE_using_9-30_Data': 'top'},
+                    dict(LEGACY_DEFAULT_SETTINGS, trading_cost_bps=bps,
+                         initial_aum=at.number_input(key='initial_aum_input').value),
+                    factor_labels={'ROE_using_9-30_Data': 'ROE using 9/30 Data'})
+    saved = at.fake_lambda.service.run(job)
+    _click_main_tab(at, 'Results')
+    at.text_input(key='open_analysis_id').set_value(saved['hash']).run()
+    at.button(key='open_analysis_btn').click().run()
     _assert_clean(at)
-    return at.session_state['saved_runs'][0]['compute']['hash']
+    return saved['hash']
 
 
 def _run_wrds_at(at, frequency, bps, *factors):
     at.sidebar.number_input(key=COST_KEY).set_value(bps).run()
-    if at.sidebar.radio(key='data_mode_input').value == 'WRDS':
+    if at.session_state['data_mode_input'] == 'WRDS':
         at.sidebar.radio(key='wrds_frequency_input').set_value(frequency).run()
     run = _run_wrds(at, *factors)
     if run['results']['frequency'] != frequency.lower():
@@ -484,8 +492,7 @@ def test_add_to_comparison_in_results_with_every_box_full_shows_a_message(saved)
 
 
 def test_runs_computed_in_the_app_have_no_add_to_comparison(monkeypatch):
-    from streamlit.testing.v1 import AppTest
-
+    from tests.legacy_components import legacy_app_test
     from tests.unit.test_saved_runs import (
         APP_DIR,
         _add_roe_and_load,
@@ -496,7 +503,7 @@ def test_runs_computed_in_the_app_have_no_add_to_comparison(monkeypatch):
     monkeypatch.setenv('FACTOR_LAKE_BACKTEST_LAMBDA', '')
     monkeypatch.syspath_prepend(str(APP_DIR))
     browser_like_widget_states(monkeypatch)
-    at = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=60)
+    at = legacy_app_test()
     at.session_state['raw_data'] = _synthetic_universe()
     at.run()
     _add_roe_and_load(at)

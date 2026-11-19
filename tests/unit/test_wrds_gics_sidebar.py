@@ -96,10 +96,13 @@ def test_no_choice_at_the_level_sends_no_filter(lambda_at):
     assert 'gics_filter' not in job and job['selected_sectors'] == []
 
 
-def test_switching_back_to_legacy_shows_the_legacy_sector_list(lambda_at):
+def test_stale_legacy_state_cannot_restore_the_legacy_sector_list(lambda_at):
     at = lambda_at
     _enable(at)
     at.sidebar.radio(key=LEVEL).set_value('Industry').run()
-    _switch(at, 'Legacy')
-    assert _lists(at) == ['selected_sectors_input']
-    assert 'Filter level' not in _sidebar_radio_labels(at)
+    at.session_state['data_mode_input'] = 'Legacy'
+    at.run()
+    _assert_clean(at)
+    assert at.session_state['data_mode_input'] == 'WRDS'
+    assert 'selected_sectors_input' not in _lists(at)
+    assert 'Data Source' not in _sidebar_radio_labels(at)

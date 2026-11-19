@@ -19,9 +19,9 @@ import sys
 from pathlib import Path
 
 import pytest
-from streamlit.testing.v1 import AppTest
 
 from app.calculation_preview import SAVED_LABEL, STEPS_LABEL
+from tests.legacy_components import legacy_app_test
 from tests.unit.test_saved_runs import (
     _assert_clean,
     _click_main_tab,
@@ -157,6 +157,8 @@ def without_strategy_controls(render: dict) -> dict:
         'button': {'Apply', 'Use these settings'},
         'expander': {'Import settings from file'},
         'caption': {
+            "Load a WRDS settings file (JSON, from a run's Export settings) into these inputs. "
+            'It replaces the current inputs and runs nothing.',
             "Load a settings file (JSON, from a run's Export settings) into these inputs. "
             'It replaces the current inputs and runs nothing.',
             'Names and notes are kept for this session and included in exported settings files.',
@@ -172,7 +174,7 @@ def legacy_results_snapshot() -> dict:
         mp.setenv('FACTOR_LAKE_BACKTEST_LAMBDA', '')
         mp.syspath_prepend(str(APP_DIR))
         browser_like_widget_states(mp)
-        at = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=120)
+        at = legacy_app_test()
         at.session_state['raw_data'] = _synthetic_universe()
         at.run()
         snapshot = {}
