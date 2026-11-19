@@ -68,8 +68,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
-      # --leave-lifecycle-rules: CI never rewrites the shared bucket's lifecycle settings (the
-      # 90-day rule on backtest-results/ is an admin's job); the script only checks them.
+      # --leave-lifecycle-rules: CI never rewrites the shared bucket's lifecycle settings; the script
+      # only checks that no rule deletes saved results before 1 year (the weekly "Delete old results"
+      # workflow deletes them after 1 year).
       # The WRDS data folder is the code's (src/wrds_data.DEFAULT_WRDS_DIR, as --wrds-dir defaults
       # to it here, where FACTOR_LAKE_WRDS_DIR is unset), so a new WRDS pull is one code change;
       # the check step fails if the function reads any other folder.

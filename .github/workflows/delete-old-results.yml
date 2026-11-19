@@ -1,0 +1,53 @@
+name: Delete old results
+
+# Deletes saved backtest results older than 1 year (src/backtest_service.RESULT_RETENTION_DAYS),
+# with their WRDS holdings files, so s3://.../factor-lake-data/backtest-results/ does not grow
+# forever and no S3 lifecycle rule (an AWS admin's job) is needed. Only backtest-results/ is
+# touched; the market data never is. See scripts/delete_old_results.py.
+#
+# Weekly, it deletes. Run by hand (Actions -> Delete old results -> Run workflow), it is a dry
+# run that only lists what it would delete, unless "Delete them" is ticked.
+# The job summary shows how many files were deleted and their total size.
+#
+# Required repo secrets: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY (the deploy's keys; they need
+# s3:ListBucket on the prefix and s3:GetObject / s3:DeleteObject on backtest-results/).
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"   # Mondays, 06:17 UTC
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Delete them (unticked: dry run, only list what would be deleted)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: delete-old-results
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      AWS_DEFAULT_REGION: us-east-1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Delete saved results older than 1 year
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          # The weekly run deletes; a run by hand deletes only when "Delete them" is ticked
+          APPLY: ${{ github.event_name == 'schedule' || inputs.apply }}
+        run: uv run python scripts/delete_old_results.py $([ "$APPLY" = "true" ] && echo --apply)

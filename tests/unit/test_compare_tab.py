@@ -383,7 +383,7 @@ def test_bad_duplicate_expired_cohort_and_pre_sharing_ids_show_an_error_in_their
     errors = [e.value for e in at.error]
     assert errors == ["Not an analysis ID: an ID is 64 characters of 0-9 and a-f.",
                       "Same analysis as box 1.",
-                      "No saved analysis has this ID: it is mistyped, or expired (analyses are kept 90 days)."]
+                      "No saved analysis has this ID: it is mistyped, or expired (analyses are kept 1 year)."]
     assert not at.table and any(i.value == "Enter at least 2 valid analysis IDs to compare." for i in at.info)
 
     # The rest still compare when at least 2 are valid

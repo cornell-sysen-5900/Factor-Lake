@@ -34,6 +34,7 @@ from app.streamlit_utils import (
     run_cohort,
 )
 from components.strategy_settings import render_run_actions
+from src.backtest_service import RESULT_RETENTION_TEXT
 from src.saved_analyses import SavedAnalysisError
 from src.trading_costs import has_trading_costs, job_trading_cost
 from src.wrds_gics import describe_gics_filter
@@ -591,7 +592,7 @@ def render_all_saved_analyses(button: Optional[ListButton] = None, key_prefix: s
         if not expander.open:
             return
         st.caption("Every analysis saved by anyone using this app, newest first. Saved analyses are "
-                   "deleted after 90 days.")
+                   f"deleted after {RESULT_RETENTION_TEXT}.")
         try:
             with st.spinner("Listing saved analyses in S3..."):
                 listing = list_all_saved_analyses(LISTED_ANALYSES)

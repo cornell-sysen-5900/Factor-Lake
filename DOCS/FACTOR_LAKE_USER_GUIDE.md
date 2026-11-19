@@ -26,6 +26,8 @@ A completed run opens Results. The calculation used by each saved run remains at
 Results shows each run's settings, holdings, charts and performance measures. Use the Analysis ID or **Copy share
 link** to open the stored result in another session. This works for both WRDS and saved Legacy results and does
 not start a backtest or load the full market dataset. Invalid, missing or expired IDs show a message.
+Saved analyses last **1 year**: a weekly cleanup deletes results saved more than a year ago, so an older ID
+shows the expired message. Run the analysis again to get a new ID.
 Localhost links work on the computer running the app; deployed links use the deployed app's address.
 
 Use **Add to comparison** or enter IDs in Compare to compare two to four saved analyses. Legacy results retain
@@ -205,5 +207,5 @@ The metrics are the ones the analysis's Results show (and the Compare tab's): th
 
 **Comparing fairly.** Analyses cover different periods and start with different amounts. Rank by Sharpe, CAGR or another rate rather than final value, which only compares at the same initial amount, and use **Period within** for a like-for-like ranking. A WRDS analysis's frequency is in its Source column.
 
-Only saved analyses are ranked, so only runs done in AWS Lambda appear. Cohort comparisons and ranked lists are not analyses and are left out. Analyses saved before sharing existed have no settings to score, so the scoreboard leaves them out and says how many; they are still listed under **All saved analyses** in Results. Saved analyses are deleted after 90 days, and they leave the scoreboard then.
+Only saved analyses are ranked, so only runs done in AWS Lambda appear. Cohort comparisons and ranked lists are not analyses and are left out. Analyses saved before sharing existed have no settings to score, so the scoreboard leaves them out and says how many; they are still listed under **All saved analyses** in Results. Saved analyses are deleted after 1 year, and they leave the scoreboard then.
 
