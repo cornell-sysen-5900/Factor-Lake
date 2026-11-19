@@ -77,7 +77,7 @@ def test_text_that_is_not_an_id_is_explained(text, message):
 def test_missing_or_expired_id_is_explained(manager, s3, code):
     s3.can_list = code == 'NoSuchKey'
     with pytest.raises(SavedAnalysisError,
-                       match=r'No saved analysis has the ID ffffffff…ffff\. .*deleted after 90 days'):
+                       match=r'No saved analysis has the ID ffffffff…ffff\. .*deleted after 1 year'):
         load_saved_analysis(MISSING_ID, manager)
 
 
@@ -169,7 +169,7 @@ def test_shared_id_shows_the_same_analysis_in_a_colleagues_session(new_session):
 
 @pytest.mark.parametrize('text, message', [
     ('not-an-id', 'is not an analysis ID'),
-    (MISSING_ID, 'deleted after 90 days'),
+    (MISSING_ID, 'deleted after 1 year'),
 ])
 def test_invalid_or_expired_id_shows_a_clear_error_in_the_app(new_session, text, message):
     at = new_session()

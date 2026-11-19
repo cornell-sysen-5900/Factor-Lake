@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .analysis_scores import SCORES_FIELD, decode_scores
 from .backtest_jobs import decode_result, decode_saved
-from .backtest_service import RESULT_RETENTION_DAYS, RESULTS_DIR, result_file
+from .backtest_service import RESULT_RETENTION_TEXT, RESULTS_DIR, result_file
 from .s3_client import S3DataManager
 
 ANALYSIS_ID_PATTERN = re.compile(r'^[0-9a-f]{64}$')
@@ -172,7 +172,7 @@ def load_saved_analysis(text: Optional[str], manager: Optional[S3DataManager] = 
 
     Raises:
         SavedAnalysisError: the text is not an ID, no analysis has that ID (mistyped,
-        or deleted after RESULT_RETENTION_DAYS days), or it cannot be opened.
+        or deleted after RESULT_RETENTION_TEXT), or it cannot be opened.
     """
     analysis_id = normalize_analysis_id(text)
     manager = manager or S3DataManager()
@@ -187,7 +187,7 @@ def load_saved_analysis(text: Optional[str], manager: Optional[S3DataManager] = 
             raise SavedAnalysisError(
                 f"No saved analysis has the ID {analysis_id[:8]}…{analysis_id[-4:]}. "
                 "Check that the whole ID was copied. "
-                f"Saved analyses are deleted after {RESULT_RETENTION_DAYS} days, so an older one has expired; "
+                f"Saved analyses are deleted after {RESULT_RETENTION_TEXT}, so an older one has expired; "
                 f"run it again to get a new ID.",
                 reason='not_found',
             ) from e

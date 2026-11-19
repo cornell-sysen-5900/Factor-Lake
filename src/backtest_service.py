@@ -9,7 +9,7 @@ For each job (see src/backtest_jobs.py) the service:
    files) and the backtest code version.
 2. Returns the saved result for that hash when one exists, without rerunning.
 3. Otherwise reads the market data from S3, runs the backtest and saves the result
-   under backtest-results/<hash>.json (an S3 lifecycle rule deletes it after 90 days),
+   under backtest-results/<hash>.json (deleted after 1 year by scripts/delete_old_results.py),
    with its kind, a short summary and an analysis's scores (src/analysis_scores.py) as
    S3 metadata, read by the list of saved analyses and the scoreboard.
 4. Returns the result in the response, or a temporary S3 link when it is too big
@@ -36,8 +36,10 @@ RESULTS_DIR = 'backtest-results'
 INLINE_LIMIT_BYTES = 5_000_000
 # How long the S3 link to a large result stays valid
 LINK_EXPIRY_SECONDS = 3600
-# Saved results are deleted after this many days (S3 lifecycle rule, set by scripts/deploy_backtest_lambda.py)
-RESULT_RETENTION_DAYS = 90
+# Saved results are deleted after this many days, by the weekly "Delete old results" GitHub Action
+# (scripts/delete_old_results.py), and the same in words for the app's messages
+RESULT_RETENTION_DAYS = 365
+RESULT_RETENTION_TEXT = '1 year'
 
 
 def result_file(key: str) -> str:

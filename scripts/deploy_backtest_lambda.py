@@ -1,8 +1,8 @@
 """
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: scripts/deploy_backtest_lambda.py
-PURPOSE: Creates or updates the backtest Lambda, its IAM role and the 90-day result expiry rule.
-VERSION: 1.1.0
+PURPOSE: Creates or updates the backtest Lambda and its IAM role, and checks how long saved results are kept.
+VERSION: 1.2.0
 
 Usage (from the project root, with AWS keys in .env or the environment):
     uv run python scripts/deploy_backtest_lambda.py              # deploy, then ping the function
@@ -23,8 +23,11 @@ What it sets up:
   environment runs, so Lambda computes with the same libraries as the app (and no
   Lambda layer permission is needed). The package is too big for a direct upload,
   so it goes to S3 first.
-- An S3 lifecycle rule deleting saved results after 90 days. Other lifecycle rules
-  on the bucket are kept.
+- Saved results are deleted after 1 year (RESULT_RETENTION_DAYS) by the weekly "Delete old
+  results" GitHub Action (scripts/delete_old_results.py), so no lifecycle rule is needed. When
+  these keys may change the bucket's lifecycle rules (and --leave-lifecycle-rules is not given),
+  it also adds a rule expiring them after the same 1 year, keeping the bucket's other rules.
+  Either way, it warns if a lifecycle rule would delete results sooner than that.
 """
 
 import argparse
@@ -240,10 +243,16 @@ def deploy_function(lam, name: str, role_arn: str, code: Dict[str, str],
     logger.info(f"Created Lambda {name}")
 
 
+def _weekly_job_note(bucket: str, prefix: str, days: int) -> str:
+    return (f"Saved results in s3://{bucket}/{prefix}/{RESULTS_DIR}/ are deleted after {days} days by the weekly "
+            f"'Delete old results' GitHub Action (scripts/delete_old_results.py).")
+
+
 def set_result_expiry(s3, bucket: str, prefix: str, days: int) -> bool:
     """
     Adds (or updates) the rule deleting saved results after `days` days, keeping other
-    rules. Returns False (with instructions) when these keys may not change lifecycle rules.
+    rules. When these keys may not change lifecycle rules, the weekly cleanup job is
+    enough: returns True either way.
     """
     from botocore.exceptions import ClientError
     try:
@@ -258,31 +267,39 @@ def set_result_expiry(s3, bucket: str, prefix: str, days: int) -> bool:
     except ClientError as e:
         if e.response['Error']['Code'] not in ('AccessDenied', 'AccessDeniedException'):
             raise
-        logger.warning(f"These keys may not change the bucket's lifecycle rules, so saved results will not "
-                       f"expire yet. Ask an AWS admin to add an S3 lifecycle rule on s3://{bucket}: prefix "
-                       f"'{prefix}/{RESULTS_DIR}/', expire current versions after {days} days.")
-        return False
+        logger.info(f"These keys may not change the bucket's lifecycle rules, so none was added. "
+                    f"{_weekly_job_note(bucket, prefix, days)}")
+        return True
     logger.info(f"s3://{bucket}/{prefix}/{RESULTS_DIR}/ results now expire after {days} days "
                 f"({len(rules) - 1} other lifecycle rule(s) kept)")
     return True
 
 
-def expiry_rule_covers(rules: List[Dict[str, Any]], prefix: str) -> bool:
+def expiry_days(rules: List[Dict[str, Any]], prefix: str) -> Optional[int]:
     """
-    True when an enabled lifecycle rule expires everything under <prefix>/backtest-results/:
-    the result JSON and the WRDS holdings Parquet files both live there.
+    The fewest days after which an enabled lifecycle rule expires everything under
+    <prefix>/backtest-results/ (the result JSON and the WRDS holdings Parquet files both live
+    there), or None when no rule does.
     """
     results = f'{prefix}/{RESULTS_DIR}/'
-    for rule in rules:
-        rule_prefix = rule.get('Filter', {}).get('Prefix', rule.get('Prefix'))
-        if (rule.get('Status') == 'Enabled' and rule_prefix is not None and results.startswith(rule_prefix)
-                and rule.get('Expiration', {}).get('Days')):
-            return True
-    return False
+    days = [rule['Expiration']['Days'] for rule in rules
+            if rule.get('Status') == 'Enabled' and rule.get('Expiration', {}).get('Days')
+            and (rule_prefix := rule.get('Filter', {}).get('Prefix', rule.get('Prefix'))) is not None
+            and results.startswith(rule_prefix)]
+    return min(days) if days else None
 
 
-def check_result_expiry(s3, bucket: str, prefix: str) -> bool:
-    """Reads (never writes) the bucket's lifecycle rules and says whether saved results expire."""
+def expiry_rule_covers(rules: List[Dict[str, Any]], prefix: str) -> bool:
+    """True when an enabled lifecycle rule expires everything under <prefix>/backtest-results/."""
+    return expiry_days(rules, prefix) is not None
+
+
+def check_result_expiry(s3, bucket: str, prefix: str, days: int = RESULT_RETENTION_DAYS) -> bool:
+    """
+    Reads (never writes) the bucket's lifecycle rules. Returns False (with a warning) only when
+    a rule deletes saved results sooner than `days` days; without a rule, or without access to
+    the rules, the weekly cleanup job deletes them after `days` days.
+    """
     from botocore.exceptions import ClientError
     try:
         rules = s3.get_bucket_lifecycle_configuration(Bucket=bucket)['Rules']
@@ -291,17 +308,19 @@ def check_result_expiry(s3, bucket: str, prefix: str) -> bool:
         if code == 'NoSuchLifecycleConfiguration':
             rules = []
         elif code in ('AccessDenied', 'AccessDeniedException'):
-            logger.warning(f"These keys may not read the lifecycle rules of s3://{bucket}; ask an AWS admin to "
-                           f"check that '{prefix}/{RESULTS_DIR}/' expires.")
-            return False
+            logger.info("These keys may not read the bucket's lifecycle rules. "
+                        + _weekly_job_note(bucket, prefix, days))
+            return True
         else:
             raise
-    if expiry_rule_covers(rules, prefix):
-        logger.info(f"Lifecycle rules left as they are; s3://{bucket}/{prefix}/{RESULTS_DIR}/ (results and "
-                    f"holdings) expires.")
-        return True
-    logger.warning(f"No enabled lifecycle rule expires s3://{bucket}/{prefix}/{RESULTS_DIR}/.")
-    return False
+    rule_days = expiry_days(rules, prefix)
+    if rule_days is not None and rule_days < days:
+        logger.warning(f"A lifecycle rule on s3://{bucket} deletes {prefix}/{RESULTS_DIR}/ after {rule_days} days, "
+                       f"before the {days} days saved analyses are meant to last. Ask an AWS admin to remove it "
+                       f"or set it to {days} days.")
+        return False
+    logger.info(f"Lifecycle rules left as they are. {_weekly_job_note(bucket, prefix, days)}")
+    return True
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -380,7 +399,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 1
     logger.info(f"Ping OK (backtest code version {reply['code_version']}). "
                 f"Set FACTOR_LAKE_BACKTEST_LAMBDA={args.function_name} for the app."
-                + ("" if expiry_set else " (Result expiry still needs an admin, see the warning above.)"))
+                + ("" if expiry_set else " (A lifecycle rule deletes results too soon, see the warning above.)"))
     return 0
 
 

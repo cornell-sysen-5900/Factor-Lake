@@ -45,6 +45,7 @@ from app.compare_state import (
 )
 from app.streamlit_utils import load_compared_analysis
 from components.results_tab import render_all_saved_analyses, render_analysis_history, render_earlier_analyses
+from src.backtest_service import RESULT_RETENTION_TEXT
 from src.saved_analyses import SavedAnalysisError, normalize_analysis_id
 from Visualizations.compare_growth_plot import COMPARE_COLORS, plot_compare_growth
 
@@ -66,7 +67,7 @@ def short_error(error: SavedAnalysisError) -> str:
     if error.reason == 'not_an_id':
         return "Not an analysis ID: an ID is 64 characters of 0-9 and a-f."
     if error.reason == 'not_found':
-        return "No saved analysis has this ID: it is mistyped, or expired (analyses are kept 90 days)."
+        return f"No saved analysis has this ID: it is mistyped, or expired (analyses are kept {RESULT_RETENTION_TEXT})."
     if error.reason == 'kind':
         what = {'cohort': 'a cohort comparison', 'ranked': 'a ranked stock list'}.get(error.kind, 'another job')
         return f"This ID is {what}, not an analysis."

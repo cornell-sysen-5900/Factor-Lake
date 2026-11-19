@@ -78,6 +78,19 @@ class FakeS3:
         assert CopySource == {'Bucket': Bucket, 'Key': Key} and MetadataDirective == 'REPLACE'
         self.put_object(Bucket, Key, self.objects[Key][0], ContentType, Metadata)
 
+    def delete_objects(self, Bucket, Delete):
+        """Batch delete (scripts/delete_old_results.py). Keys in fail_deletes are not deleted and reported."""
+        assert len(Delete['Objects']) <= 1000
+        self.delete_requests = getattr(self, 'delete_requests', 0) + 1
+        errors = []
+        for obj in Delete['Objects']:
+            if obj['Key'] in getattr(self, 'fail_deletes', ()):
+                errors.append({'Key': obj['Key'], 'Code': 'AccessDenied', 'Message': 'Access Denied'})
+            else:
+                self.objects.pop(obj['Key'], None)
+                self.modified.pop(obj['Key'], None)
+        return {'Errors': errors} if errors else {}
+
     def list_objects_v2(self, Bucket, Prefix, ContinuationToken=None):
         if not self.can_list:
             raise ClientError({'Error': {'Code': 'AccessDenied'}}, 'ListObjectsV2')

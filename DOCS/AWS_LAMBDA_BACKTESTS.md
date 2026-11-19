@@ -15,13 +15,13 @@ Streamlit app ──inputs──▶ Lambda factor-lake-backtest ──reads─�
 3. **Cached by hash.** The result is saved under a SHA-256 hash of the inputs, the data version (the S3 ETags of the market data files) and the backtest code version (a hash of the engine's source files). Republishing the data or deploying new backtest code gives fresh results.
 4. **Repeats are instant.** When a result with that hash exists, Lambda returns it without rerunning the backtest. Results are shared, so a run by any user is cached for everyone.
 5. **Result or link.** Results up to 5 MB come back in the Lambda response (Lambda's limit is 6 MB). Bigger results come back as a temporary S3 link (valid for 1 hour), which the app downloads.
-6. **90-day expiry.** An S3 lifecycle rule deletes saved results after 90 days.
+6. **1-year expiry.** The weekly "Delete old results" GitHub Action deletes saved results older than 1 year, with their holdings files (section 12).
 
 The Results tab shows how each run was produced, for example "Computed: Returned from the AWS Lambda result cache in 0.4 s (first computed 2026-10-22 18:03:11 UTC)".
 
 ## 2. Deploy the Lambda
 
-Needs AWS keys that can create IAM roles and Lambda functions, and change the bucket's lifecycle rules.
+Needs AWS keys that can create IAM roles and Lambda functions.
 
 ```bash
 uv run python scripts/deploy_backtest_lambda.py
@@ -33,7 +33,7 @@ It is safe to run again: it creates what is missing and updates the rest. It set
 |---|---|
 | IAM role `factor-lake-backtest-lambda` | Read `factor-lake-data/*`, write `factor-lake-data/backtest-results/*`, CloudWatch logs |
 | Lambda `factor-lake-backtest` | Python 3.12, 3008 MB, 10-minute timeout. pandas, numpy and pyarrow are bundled in the package at the versions your environment runs (Linux builds fetched with `uv`; unused parts such as test suites and pyarrow's Flight libraries removed), so Lambda computes with the same libraries as the app and needs no Lambda layer. The package (about 62 MB zipped, 199 MB unzipped; Lambda allows 250 MB) is uploaded to `factor-lake-data/_deploy/` first, because direct uploads are limited to 50 MB |
-| S3 lifecycle rule `factor-lake-expire-backtest-results` | Deletes `factor-lake-data/backtest-results/` objects after 90 days. Other rules on the bucket are kept |
+| S3 lifecycle rule `factor-lake-expire-backtest-results` (optional) | Only when the keys may change the bucket's lifecycle rules: deletes `factor-lake-data/backtest-results/` objects after 1 year, like the weekly cleanup. Other rules on the bucket are kept |
 
 **Keys without IAM access** (such as the class `Sysen5900Student` user, which is denied all IAM actions) cannot create the role. Deploy with an existing role instead: `--role-arn <the role's ARN>` (the script then makes no IAM calls). In the class account that is the course's Lambda role:
 
@@ -41,7 +41,7 @@ It is safe to run again: it creates what is missing and updates the rest. It set
 uv run python scripts/deploy_backtest_lambda.py --role-arn arn:aws:iam::620832638024:role/Sysen5900LambdaExecRole --function-name sysen5900-factor-lake-backtest
 ```
 
-Without a usable role, run `uv run python scripts/deploy_backtest_lambda.py --print-role-policy` and send the output to an AWS admin. If the keys may not change the bucket's lifecycle rules, the deploy still finishes and says what to ask an admin for.
+Without a usable role, run `uv run python scripts/deploy_backtest_lambda.py --print-role-policy` and send the output to an AWS admin. If the keys may not change the bucket's lifecycle rules, the deploy still finishes: the weekly cleanup deletes old results, so no admin is needed for that.
 
 It finishes by pinging the function. Options: `--memory`, `--timeout`, `--function-name`, `--role-arn`, `--package-only out.zip` (build the zip without deploying).
 
@@ -103,7 +103,7 @@ Before the call: deploy (section 2), add `FACTOR_LAKE_BACKTEST_LAMBDA` to `.env`
 4. **Any change is a new backtest.** Change the AUM or a factor direction and run again: it computes (new result ID).
 5. **Same results as before.** Turn the Lambda switch off, click **Load Market Data**, and run the same settings as step 2. The new run tab shows the same final value, CAGR and holdings as the Lambda run. For the precise check, run `scripts/check_backtest_lambda.py` in a terminal: "match: yes" with the largest difference for each backtest, and "cached=True" for every repeat.
 6. **Cohort comparison.** In a Lambda run's tab, open **Run Cohort Comparison** and click **Generate Comparison**: the caption says it ran in Lambda.
-7. **Where results live.** In the AWS console: S3 → `sysen-5900-factor-lake` → `factor-lake-data/backtest-results/` shows one JSON file per result hash. Management → Lifecycle rules shows the 90-day expiry (in the class account an admin has to add it; see section 2). Lambda → `factor-lake-backtest` (`sysen5900-factor-lake-backtest` in the class account) → Monitor shows the invocations, and its CloudWatch logs show "Computed ..." and "Cache hit ..." lines.
+7. **Where results live.** In the AWS console: S3 → `sysen-5900-factor-lake` → `factor-lake-data/backtest-results/` shows one JSON file per result hash. Old results are deleted by the weekly "Delete old results" GitHub Action (section 12). Lambda → `factor-lake-backtest` (`sysen5900-factor-lake-backtest` in the class account) → Monitor shows the invocations, and its CloudWatch logs show "Computed ..." and "Cache hit ..." lines.
 
 ## 6. Share an analysis by its ID
 
@@ -160,7 +160,7 @@ uv run python scripts/deploy_backtest_lambda.py --function-name sysen5900-factor
     --role-arn <the course role's ARN> --leave-lifecycle-rules
 ```
 
-- `--leave-lifecycle-rules` does not write the bucket's lifecycle rules (a normal deploy rewrites them, and the bucket is shared with the live app). It only reads them and says whether `backtest-results/` expires.
+- `--leave-lifecycle-rules` does not write the bucket's lifecycle rules (a normal deploy rewrites them, and the bucket is shared with the live app). It only reads them, and warns if a rule would delete `backtest-results/` before 1 year.
 - `--wrds-dir wrds_YYYY_MM` points the function at another WRDS folder (default `DEFAULT_WRDS_DIR` in `src/wrds_data.py`, now `wrds_2026_11`).
 
 To point a local app at the dev function, set the function name next to the AWS keys in `.streamlit/secrets.toml` (top level):
@@ -217,9 +217,9 @@ One sub-industry job, Regional Banks (GICS 40101015), Book/Price (higher is bett
 
 Top N in Mixing holds N stocks in total (the factors take turns). The same Regional Banks job with two factors, Book/Price then 12-1 Mo Momentum, at Top 20 (computed fresh, 5.0 s as the first job after the deploy, CAGR 3.55%) held exactly 20 stocks at all 92 rebalances, 10 picked by each factor. Each date's picks, and the factor that picked each stock, match the turn rule recomputed separately from the S3 panel's z-scores. The two factors' top 20s shared stocks on 39 of the 92 dates (up to 4).
 
-### Admin: confirm the 90-day rule
+### Expiry of WRDS holdings
 
-Saved results and WRDS holdings both live under `factor-lake-data/backtest-results/`, so one lifecycle rule on that prefix expires both. The class keys cannot read the bucket's lifecycle rules, so **an AWS admin must confirm** that the rule `factor-lake-expire-backtest-results` (prefix `factor-lake-data/backtest-results/`, expire after 90 days) is enabled on `sysen-5900-factor-lake`.
+Saved results and WRDS holdings both live under `factor-lake-data/backtest-results/`. The weekly cleanup (section 12) deletes a holdings file with its result, and a holdings file whose result is already gone once it is older than 1 year.
 
 ## 10. Trading costs
 
@@ -291,5 +291,21 @@ uv run python scripts/score_saved_analyses.py            # dry run: lists what i
 uv run python scripts/score_saved_analyses.py --apply    # rewrite their metadata
 ```
 
-A metadata rewrite changes an object's `LastModified`, which the 90-day rule counts from. So the rewritten result is kept 90 days from the rewrite, and its first save time is kept in its metadata (`first-saved`), which the listings show and sort by. The key needs `s3:GetObject` and `s3:PutObject` on `backtest-results/`. Running it twice changes nothing: scored analyses are skipped.
+A metadata rewrite changes an object's `LastModified`, so its first save time is kept in its metadata (`first-saved`), which the listings show and sort by, and from which the weekly cleanup counts its year (section 12). The key needs `s3:GetObject` and `s3:PutObject` on `backtest-results/`. Running it twice changes nothing: scored analyses are skipped.
 
+## 12. Deleting old results
+
+Saved results last **1 year** (`RESULT_RETENTION_DAYS = 365` in `src/backtest_service.py`). The **Delete old results** GitHub Action (`.github/workflows/delete-old-results.yml`) runs `scripts/delete_old_results.py` every Monday at 06:17 UTC and deletes older ones, so the bucket doesn't grow forever and no S3 lifecycle rule, and so no AWS admin, is needed.
+
+- **What it deletes.** Only files under `factor-lake-data/backtest-results/`; the market data is never touched. A saved result (`<ID>.json`: an analysis, cohort comparison or ranked list) is deleted once it is more than 365 days old, counted from when it was first saved (its `first-saved` metadata if the scoreboard backfill rewrote it, else its `LastModified`). Its WRDS holdings file (`<ID>.holdings.parquet`) goes with it; a holdings file whose result is already gone is deleted once it is more than 365 days old. Any other file there is left alone.
+- **Job summary.** Each run's summary (on the run's page in GitHub Actions) says how many files it deleted, results and holdings, and their total size, and lists up to 50 of them.
+- **By hand.** Actions → **Delete old results** → **Run workflow** is a dry run that only lists what it would delete, unless **Delete them** is ticked. Locally:
+
+```bash
+uv run python scripts/delete_old_results.py            # dry run
+uv run python scripts/delete_old_results.py --apply    # delete
+```
+
+- **Keys.** It uses the repository secrets `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (the deploy's), which need `s3:ListBucket` on the prefix and `s3:GetObject` and `s3:DeleteObject` on `backtest-results/`.
+- **Scheduled runs** use the workflow file on `main`, and GitHub pauses schedules in a repository with no activity for 60 days.
+- **The deploy** (section 2) no longer needs an admin for expiry. It only warns if a bucket lifecycle rule would delete saved results before 1 year.

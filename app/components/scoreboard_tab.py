@@ -28,6 +28,7 @@ from app.scoreboard import (
 )
 from app.streamlit_utils import list_scored_analyses, open_saved_analysis
 from components.results_tab import OPENED_MESSAGE_KEY
+from src.backtest_service import RESULT_RETENTION_TEXT
 from src.saved_analyses import SavedAnalysisError
 
 # Set by Open: open the Results tab on the next run (the analysis is its newest run tab)
@@ -77,7 +78,7 @@ def render_scoreboard_tab() -> None:
     st.header("Backtest scoreboard")
     st.caption("Every analysis saved by anyone using this app, ranked by the metric you choose. The metrics "
                "are the ones its Results show, saved with it, so nothing is downloaded or rerun. Saved analyses "
-               "are deleted after 90 days.")
+               f"are deleted after {RESULT_RETENTION_TEXT}.")
     if MESSAGE_KEY in st.session_state:
         st.warning(st.session_state.pop(MESSAGE_KEY))
     try:

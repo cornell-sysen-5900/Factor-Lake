@@ -288,7 +288,7 @@ The key is computed by the unchanged `job_hash(job, data_version, code_version)`
 | `backtest-results/<hash>.json` | the same envelope as Legacy, `{'format': 2, 'job': ..., 'result': ...}`. A WRDS backtest result holds everything except the holdings, plus `holdings: {'file', 'dates', 'rows', 'bytes'}` |
 | `backtest-results/<hash>.holdings.parquet` | WRDS backtest holdings, one row group per rebalance date (section 5.5) |
 
-- Both are under `backtest-results/`, so the existing 90-day lifecycle rule and the Lambda role's write permission already cover them.
+- Both are under `backtest-results/`, so the result expiry (now the weekly cleanup after 1 year, `scripts/delete_old_results.py`) and the Lambda role's write permission already cover them.
 - The Parquet file is written **before** the JSON, so a cache hit (the JSON exists) normally has its holdings. A cached backtest whose holdings file is missing anyway (deleted by hand, or expired first) is computed again rather than shown without holdings. With the Lambda role's s3:ListBucket missing, S3 answers 403 for a missing file, which counts as missing too.
 - The result JSON's `holdings` entry is `{'file': 'backtest-results/<hash>.holdings.parquet', 'bytes', 'dates', 'rows'}`: the row groups' dates (rebalance dates on which something was bought) in order, and their row counts.
 - The WRDS code version hashes `WRDS_ENGINE_SOURCES` (`src/wrds_jobs.py`): the `wrds_*.py` modules plus the shared files they use (`backtest_jobs.py`, `performance_metrics.py`, `s3_client.py`). Legacy's `ENGINE_SOURCES` list is unchanged, so editing WRDS code never recomputes Legacy results.
