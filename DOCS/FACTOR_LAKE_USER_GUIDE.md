@@ -1,174 +1,73 @@
-# Factor Lake User Workflow
+# Factor-Lake User Guide
 
-Use this guide when you want to run a factor experiment in the [Factor-Lake Streamlit App](https://cornellfactorlake.streamlit.app/) and turn it into a class result.
+Factor-Lake builds factor-based stock portfolios and compares their historical performance. **WRDS is the only
+source for new analyses.** Older Legacy analyses remain available by ID or share link in Results and Compare.
 
-## 1. Open the project links
+## 1. Configure an analysis
 
-| Tool | Link |
-|---|---|
-| Streamlit App | [Factor-Lake Streamlit App](https://cornellfactorlake.streamlit.app/) |
+Choose the period, initial AUM, weighting and factor-combination method in the sidebar. Set the rebalancing
+frequency, holdings percentage or count, GICS filters, fossil-fuel restriction, trading costs and optional
+liquidity limit. Add factors and review their Higher/Lower directions and tooltip explanations.
+Holding 100% of the filtered universe needs no factor. Other holdings rules require a factor.
 
-## 2. Understand the app in one sentence
+## 2. Check the calculation preview
 
-Factor Lake lets you choose a group of stock-selection factors, rank stocks by those factors, run a historical backtest, and compare the result to benchmarks.
+Expand **Calculation preview** below the factor controls. It reflects the current WRDS settings and requires no
+market-data download. **Step-by-step calculation** explains selection, weighting and returns.
 
-## 3. Start each analysis with the same order
+## 3. Run the analysis
 
-1. Open the Streamlit app.
-2. Set sidebar controls.
-3. Choose factors.
-4. Load data.
-5. Run the backtest.
-6. Read the results.
+Click **Run Portfolio Analysis**. The configured AWS Lambda reads the WRDS data, runs or retrieves the backtest,
+and returns the result. There is no Load Market Data step. Without a configured Lambda, the Run button is disabled.
+A completed run opens Results. The calculation used by each saved run remains attached to its original settings.
 
-## 4. Set the sidebar first
+## 4. Review and share saved results
 
-The steps below are for the default **Legacy** data source. For WRDS data with semi-annual, quarterly or monthly rebalancing, see [15. Use WRDS mode](#15-use-wrds-mode).
+Results shows each run's settings, holdings, charts and performance measures. Use the Analysis ID or **Copy share
+link** to open the stored result in another session. This works for both WRDS and saved Legacy results and does
+not start a backtest or load the full market dataset. Invalid, missing or expired IDs show a message.
+Localhost links work on the computer running the app; deployed links use the deployed app's address.
 
-1. Decide whether to restrict fossil fuel companies.
-2. Choose equal weight or market cap weight.
-3. Choose how multiple factors are combined:
-   - Mixing (default): each factor buys its own top stocks with an equal share of the money. A stock picked by two factors is held twice.
-   - Integrating: stocks are ranked by their average score across all the factors and the top ones are bought once each. Stocks missing any selected factor are left out.
-   With one factor, both give the same portfolio.
-4. Turn on sector filtering only if you need it.
-5. Set the start and end years.
-6. Set the initial investment amount.
-7. Pick the delisting strategy you want to test.
-8. Set the trading cost in basis points per trade, or leave it at 0. See [16. Trading costs](#16-trading-costs).
+Use **Add to comparison** or enter IDs in Compare to compare two to four saved analyses. Legacy results retain
+their original source labels and methodology; they are not converted to WRDS.
 
-## 5. Choose factors and directions
+## 5. Save settings and reset inputs
 
-1. Open the Analysis tab.
-2. Select one or more factors.
-3. Decide whether each selected factor should rank high-to-low or low-to-high.
-4. Keep the direction consistent with the financial meaning of the factor.
-5. If you are unsure, start with one factor and add more later.
+**Export settings (JSON)** saves a run's inputs. Import a WRDS file or use a WRDS run's **Use these settings** to
+prepare another analysis. Names and notes are included in settings files; renaming does not change calculations.
+Legacy files can be retained/exported for reference, but cannot prepare a new run. Their saved analyses still open.
+See [Strategy settings](STRATEGY_SETTINGS.md).
 
-### Check the calculation preview
+**Clear Parameters** resets factors and sidebar inputs to WRDS defaults and clears any preview table. Saved runs,
+IDs, results and names remain available. Choose new inputs and run again.
 
-Expand **Calculation preview** below Factor Selection to see the strategy as a formula before you load any data. It is collapsed, so Load Market Data and Run stay next to the factors. It updates as you change the factors, directions, combination method, weighting, delisting strategy, ESG filter, sectors, years, initial investment or trading cost, and needs no market data or cloud credentials. With no factors it shows a placeholder. Inside it, expand **Step-by-step calculation** for normalization, selection, allocation, delisting and compounding.
+## 6. Preview WRDS fields
 
-After a run, its tab in Results has **Calculation used in this run**, collapsed below Performance Summary: the formula that run used. Later sidebar changes do not change it, and opened saved analyses rebuild it from their stored inputs. If you change the sectors, ESG filter or years after Load Market Data, a run in the app applies them to the cached data, so the run matches the preview.
+After Prof. Steward approves sample display and the team enables it, open **Data Viewer**, choose preview years,
+and filter by Sector, Industry group, Industry or Sub-industry. Click **Load preview** for up to five matching
+rows per year. Filters apply before sampling. Empty years and filters are explained. The preview uses native
+field units, is not representative of a portfolio, and has no download control.
 
-This formula is Legacy's annual backtest. WRDS mode shows the WRDS engine's own: see **Check the calculation preview** in [15. Use WRDS mode](#15-use-wrds-mode).
+Preview filters are independent of the Analysis sidebar. Changing filters, pressing **Clear preview**, or leaving
+the viewer releases its rows. The full WRDS dataset stays outside the app. Until approval, the viewer shows an
+availability message. See [preview behavior and release process](WRDS_DATA_PREVIEW.md).
 
-## 6. Load the market data
+## 7. Moving from Legacy
 
-1. Click Load Market Data.
-2. Wait for the app to fetch data.
-3. Confirm the filters you chose are applied.
-4. Make sure the app says the data loaded successfully.
-
-## 7. Run the backtest
-
-1. Click Run Portfolio Analysis.
-2. Wait for the simulation to complete.
-3. Confirm you see a success message. It names the saved run, e.g. "Run 2: ROA %".
-4. Open the Results tab. The newest run's tab is selected automatically.
-
-### Saved runs
-
-1. Every successful run is saved as its own tab in Results, newest first.
-2. The captions at the top of each tab show the factors and directions, period, initial AUM, universe, factor combination method, weighting, and delisting strategy that run used.
-3. Saved tabs do not change when you edit the sidebar or factors afterwards. Run the analysis again to create a new tab.
-4. Click Remove this run to delete a tab you no longer need.
-5. Only the last 5 runs are kept, and all saved runs are cleared when you refresh the page, so record your numbers.
-
-### Share an analysis or open it later
-
-When backtests run in AWS Lambda, every analysis is saved for 90 days under an **analysis ID**.
-
-1. The ID is shown at the top of each run's tab. Click **Copy share link** beside it and send the link. Opening it goes directly to that saved run in **Results**, for both Legacy and WRDS. No backtest runs and no market dataset is loaded. If clipboard access is blocked, a selectable link appears for manual copying. The original ID copy button still works.
-2. To open an analysis (yours or a colleague's), go to **Results → Open a saved analysis**, paste the ID and click **Open analysis**. It opens as a new tab, labelled "(opened)", with the original results, factors and settings. It loads from S3 and does not rerun the backtest.
-3. **This session's analyses** in the Results tab lists every analysis you ran or opened since the page was loaded, with its ID, including runs no longer shown as tabs. It never shows other people's analyses.
-4. Forgot to copy an ID? **Earlier analyses on this browser** lists the analyses you ran or opened in earlier sessions on the same browser, each with its ID and an **Open** button. They are kept in your browser only, so they don't follow you to another computer and disappear if you clear the site's data.
-5. **All saved analyses** lists everyone's saved analyses (newest 20), with their factors, method, period and starting amount, and an **Open** button. It loads only when you expand it. WRDS analyses start with "WRDS" and their frequency, e.g. "WRDS, Quarterly | ROE (higher), ROA (higher) | ...", and the two lists above show the same line under a WRDS run.
-6. Runs computed in the app (with the Lambda switch off) are not saved, so they have no ID.
-7. A mistyped, missing, or expired ID in a share link shows a clear message while the app remains usable. A normal app URL without an ID opens normally. Shared links retain the same 90-day lifetime as the saved result.
-8. To see 2 to 4 saved analyses side by side, use the **Compare** tab ([17. Compare analyses](#17-compare-analyses)).
-9. To see which saved analyses did best, use the **Scoreboard** tab ([18. Backtest scoreboard](#18-backtest-scoreboard)).
-
-## 8. Read the results in order
-
-1. Pick the run tab you want and check its captions.
-2. Start with Performance Summary.
-3. Check the Holdings and Ranks table. Pick a rebalance year to see every stock the backtest bought that year: its rank, score, factor values, weight, shares, buy price, dollar value, period return, contribution and whether it was delisted. Mixing runs also show which factors picked each stock. The contributions add up to the portfolio return shown above the table. Download CSV exports the full table.
-4. Review Portfolio Growth Over Time.
-5. Review Year-by-Year Performance.
-6. Review Top vs Bottom Cohort Analysis. It uses the settings of the run tab it is in.
-7. Review Advanced Backtest Statistics.
-8. Review Yearly Win/Loss Summary.
-
-With a trading cost above 0, every number is after costs, and the views add what the costs did: see [16. Trading costs](#16-trading-costs).
-
-### Check the raw data
-
-1. Open the Data Viewer tab after loading market data in the Analysis tab. It uses that data and downloads nothing new.
-2. Pick a date range, and optionally one or more sectors or industries. Leaving a list empty means all of them.
-3. Click Load data to see the matching rows, then Download CSV to save exactly that table.
-4. Changing a filter or clicking Clear removes the table. Click Load data again to see it.
-
-## 9. Keep the factor logic straight
-
-1. ROE and ROA are profitability signals.
-2. Momentum signals look for continuation in price performance.
-3. Price-to-book and earnings yield are valuation signals.
-4. Volatility and accruals are quality/risk proxies.
-5. Asset growth and CapEx growth are growth signals.
-
-## 10. Know what the app is measuring
-
-1. Returns come from the Next-Year Return % field.
-2. Delisting handling depends on the strategy you choose.
-3. The backtest is historical, not predictive.
-4. One strong result is not enough on its own.
-
-## 11. Avoid the common mistakes
-
-1. Do not run the backtest before loading data.
-2. Changing settings does not update saved tabs. Run again to create a new tab. If you change sectors, the fossil-fuel filter, or years, click Load Market Data first.
-3. Do not compare experiments with different time windows without noting it.
-4. Do not assume one factor is always best.
-
-## 12. Troubleshoot when results look wrong
-
-1. If you get no records, broaden the filters.
-2. If results are empty, try a different factor or longer time window.
-3. If data fails to load, check the Supabase-related guides.
-4. If the UI changed, check the Streamlit guide for maintainers.
-
-## 13. Write up your experiment the same way every time
-
-1. State your research question.
-2. Note the run label and list the factors and directions.
-3. List your sidebar settings.
-4. Report the main numbers.
-5. Explain the result.
-6. Note any follow-up test you would run.
-
-
-## 14. Reference
-
-Use this section if you want a quick understanding of what the app is doing behind the scenes.
-
-1. Factor categories include momentum, value, profitability, quality, and growth.
-2. The Results tab is where you verify the backtest output.
-3. The app compares your strategy with benchmark behavior.
-4. Returns come from the dataset's next-year return field.
-5. Delisting behavior changes the outcome, so keep that setting recorded in every experiment.
-6. The **Factor Lake Supabase Project** is the backing data source.
+Use the [Legacy-to-WRDS match report](LEGACY_WRDS_MATCHES.md) to find definition matches and related alternatives.
+A similar name is not a guarantee of equivalent values or definitions. Unmatched factors are listed for review,
+not rebuilt. Saved Legacy analyses remain accessible; new Legacy runs are unavailable.
 
 ## 15. Use WRDS mode
 
-WRDS mode is a second data source next to Legacy. It backtests on point-in-time data built from WRDS (CRSP, Compustat, IBES and the Russell 2000 holdings of the IWM fund), and rebalances **semi-annually** (June, December), **quarterly** (March, June, September, December) or **monthly**, at month ends. Legacy is unchanged: annual rebalancing on the 9/30 data, with the same results as before.
+WRDS is the only data source for new analyses. It backtests on point-in-time data built from WRDS (CRSP, Compustat, IBES and the Russell 2000 holdings of the IWM fund), and rebalances **semi-annually** (June, December), **quarterly** (March, June, September, December) or **monthly**, at month ends. Saved Legacy results retain their original annual 9/30 methodology.
 
 **Point in time.** At each rebalance date the universe is the Russell 2000 members known on that date, the factors use only data public by then, and returns start after the date. Each holding period is buy and hold until the next rebalance.
 
 ### Run a WRDS backtest
 
-1. In the sidebar, set **Data Source** to **WRDS**. It is only available when the app is connected to AWS Lambda, because WRDS backtests run there; otherwise it is greyed out with a note.
-2. Switching the data source clears the selected factors, because the two modes offer different factors.
+1. Open Analysis. WRDS is already selected; there is no data-source switch. A configured AWS Lambda is required to run.
+2. Review the selected factors, or use Clear Parameters to restore WRDS defaults.
 3. Pick the **rebalancing frequency** (Quarterly by default) and the start and end years (2002 to 2026). The backtest covers those calendar years, and the caption under the years shows the rebalances, for example "12 quarterly rebalances, 2009-12 to 2012-09; holds to 2012-12".
 4. Weighting, factor combination, sector filter, fossil fuel filter and initial AUM work as in Legacy, and the sector filter can go finer (see **Filter by GICS industry** below). There is no delisting option (see below).
 5. **Hold**, under the weighting, sets how many of the filtered stocks the portfolio holds at each rebalance, best scores first:
@@ -235,11 +134,11 @@ The results have Legacy's sections, tiles, tables and charts, on dates instead o
 - **Before 2008 the index members come from annual Russell 2000 lists.** Each list is used from the June reconstitution until the next one; there are no mid-year additions (IPOs join at the next list), and a stock leaves when it stops trading. From 2008 the members are IWM's monthly holdings.
 - **Sectors are each company's current GICS classification**, applied to all of its history: there is no historical GICS, so a company that changed sector shows its latest one throughout.
 - **Analyst data is thin in the early years.** IBES capital expenditure estimates start in 2006, and EBIT, dividend and cash flow estimates are sparse in 2001-2004, so analyst factors cover fewer stocks then.
-- The Data Viewer shows Legacy data only: the WRDS licence does not allow showing or downloading the raw WRDS rows. The GICS names are in the WRDS holdings table.
+- Data Viewer offers a bounded WRDS preview only after sample-display approval. It has no data download control; see section 6.
 
 ## 16. Trading costs
 
-Set **Trading cost (bps per trade)** in the sidebar (0 to 500, default 0) to see returns after trading costs and how much each strategy's turnover costs it. It works in Legacy and WRDS mode, including the cohort comparison.
+Set **Trading cost (bps per trade)** in the sidebar (0 to 500, default 0) to see returns after trading costs and how much each strategy's turnover costs it. It applies to new WRDS analyses, including the cohort comparison. Saved Legacy results retain their original cost settings.
 
 **What is charged.** Every buy and every sell at each rebalance pays the cost on its dollar value. That includes the first purchase (the backtest starts in cash, so it buys 100% of the portfolio) and putting a delisted stock's cash back into stocks at the next rebalance. Nothing is charged for the delisting itself, for holding cash, or for selling at the end of the backtest.
 

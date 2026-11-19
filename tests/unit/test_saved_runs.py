@@ -10,10 +10,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-from streamlit.testing.v1 import AppTest
 
 import src.backtest_engine as backtest_engine
 from app.saved_runs import add_saved_run, build_run_label, named_run_label, remove_saved_run
+from tests.legacy_components import legacy_app_test
 
 APP_DIR = Path(__file__).resolve().parents[2] / 'app'
 RUN = 'Run Portfolio Analysis'
@@ -163,7 +163,7 @@ def at(monkeypatch):
     # `streamlit run` puts app/ on sys.path; AppTest does not.
     monkeypatch.syspath_prepend(str(APP_DIR))
     browser_like_widget_states(monkeypatch)
-    app = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=60)
+    app = legacy_app_test()
     app.session_state['raw_data'] = _synthetic_universe()
     app.run()
     return app

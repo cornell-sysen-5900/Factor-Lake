@@ -30,7 +30,7 @@ import streamlit_config as config
 import streamlit_css as css
 import streamlit_utils as utils
 from analysis_history import BROWSER_ANALYSES_KEY, earlier_analyses, sync_browser_analyses
-from app.calculation_preview import build_calculation_preview, render_calculation_preview, wrds_analysis_preview
+from app.calculation_preview import render_calculation_preview, wrds_analysis_preview
 from app.share_links import consume_share_link
 from app.streamlit_utils import open_saved_analysis
 from compare_state import OPEN_COMPARE_KEY
@@ -146,7 +146,8 @@ def _render_wrds_run(user_settings, selected_factor_names, factor_directions) ->
     # Holding 100% of the filter needs no factor
     needs_factor = not utils.wrds_holds_whole_filter(user_settings)
     if st.button("Run Portfolio Analysis", type="primary", width="stretch",
-                 disabled=needs_factor and not selected_factor_names, key="run_wrds_analysis"):
+                 disabled=not utils.get_backtest_lambda_name() or (needs_factor and not selected_factor_names),
+                 key="run_wrds_analysis"):
         with st.spinner("Running the WRDS backtest in AWS Lambda..."):
             run = utils.run_wrds_backtest_logic(user_settings, selected_factor_names, factor_directions)
         if run is not None:
@@ -183,12 +184,10 @@ def main():
         st.error(share_error)
 
     # Render Global Sidebar and capture configuration
-    user_settings = sidebar.render_sidebar(config.SECTOR_OPTIONS, utils.describe_data_source(),
+    user_settings = sidebar.render_sidebar(config.SECTOR_OPTIONS, 'WRDS',
                                            utils.get_backtest_lambda_name(),
                                            on_data_mode_change=reset_factor_selection)
-    use_lambda = utils.lambda_backtests_enabled(user_settings)
-    # Legacy settings have no data_mode key
-    data_mode = user_settings.get('data_mode', 'legacy')
+    data_mode = 'wrds'
 
     # A finished run opens the Results tab. The active tab can only be set
     # before st.tabs is drawn, so the run requests it and reruns (see below).
@@ -221,9 +220,7 @@ def main():
             render_analysis_notice()
             if st.session_state.pop(PARAMETERS_CLEARED_KEY, False):
                 # WRDS runs always go to Lambda, without Load Market Data
-                next_step = ("Choose new inputs, then run the analysis." if use_lambda or data_mode == 'wrds' else
-                             "Choose new inputs, then click Load Market Data and Run Portfolio Analysis.")
-                st.info(f"Parameters cleared. {next_step} Your saved results are kept.")
+                st.info('Parameters cleared. Choose new inputs, then run the analysis. Your saved results are kept.')
 
             # Configuration phase: Capture factors and directions
             selected_factor_names, factor_directions = render_factor_selection(data_mode)
@@ -231,16 +228,9 @@ def main():
             render_import_settings()
             render_next_run_name()
 
-            # The engine's calculation for the current selections: WRDS's in WRDS mode, Legacy's otherwise
             render_calculation_preview(
-                wrds_analysis_preview(user_settings, selected_factor_names, factor_directions)
-                if data_mode == 'wrds' else
-                build_calculation_preview(user_settings, selected_factor_names, factor_directions))
-
-            if data_mode == 'wrds':
-                _render_wrds_run(user_settings, selected_factor_names, factor_directions)
-            else:
-                _render_legacy_run(user_settings, use_lambda, selected_factor_names, factor_directions)
+                wrds_analysis_preview(user_settings, selected_factor_names, factor_directions))
+            _render_wrds_run(user_settings, selected_factor_names, factor_directions)
 
     if tab_results.open:
         with tab_results:
@@ -280,12 +270,6 @@ def main():
 
     if tab_viewer.open:
         with tab_viewer:
-            # Raw data inspection and CSV export (reuses the data loaded in Analysis)
-            if data_mode == 'wrds':
-                st.caption(":material/info: The Data Viewer shows the Legacy data, not WRDS: switch the data "
-                           "source to Legacy and click Load Market Data to use it. A WRDS run's GICS sector, "
-                           "industry group, industry and sub-industry names are in its holdings table "
-                           "(Results tab).")
             render_data_viewer_tab()
 
     if tab_about.open:

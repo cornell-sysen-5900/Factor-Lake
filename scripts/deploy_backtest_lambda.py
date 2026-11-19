@@ -50,6 +50,7 @@ from src.backtest_service import RESULT_RETENTION_DAYS, RESULTS_DIR  # noqa: E40
 from src.lambda_client import DEFAULT_FUNCTION_NAME  # noqa: E402
 from src.s3_client import DEFAULT_BUCKET, DEFAULT_PREFIX, DEFAULT_REGION  # noqa: E402
 from src.wrds_data import WRDS_DIR_ENV, wrds_dir  # noqa: E402
+from src.wrds_preview import APPROVAL_ENV  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -318,6 +319,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                         help="Print the role an AWS admin needs to create, and exit")
     parser.add_argument('--wrds-dir', default=wrds_dir(),
                         help=f"Folder of the WRDS data under the prefix (default {wrds_dir()})")
+    parser.add_argument('--preview-approved', action='store_true',
+                        help="Enable sample rows only after Prof. Steward approves their display. Default: disabled.")
     parser.add_argument('--leave-lifecycle-rules', action='store_true',
                         help="Do not write the bucket's lifecycle rules (e.g. for a dev function); only check "
                              "that the result expiry rule exists")
@@ -363,7 +366,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     deploy_function(lam, args.function_name, role_arn, {'S3Bucket': args.bucket, 'S3Key': key},
                     args.memory, args.timeout,
                     {'FACTOR_LAKE_S3_BUCKET': args.bucket, 'FACTOR_LAKE_S3_PREFIX': prefix,
-                     WRDS_DIR_ENV: args.wrds_dir.strip('/')})
+                     WRDS_DIR_ENV: args.wrds_dir.strip('/'),
+                     APPROVAL_ENV: 'true' if args.preview_approved else 'false'})
     if args.leave_lifecycle_rules:
         expiry_set = check_result_expiry(s3, args.bucket, prefix)
     else:

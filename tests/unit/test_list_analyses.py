@@ -8,10 +8,10 @@ Two lists help a user find an ID they forgot to copy:
 - "All saved analyses": everyone's saved analyses, listed from S3.
 """
 import pytest
-from streamlit.testing.v1 import AppTest
 
 from src.backtest_service import BacktestService, result_file, summarize_job
 from src.saved_analyses import SavedAnalysisError, list_saved_analyses
+from tests.legacy_components import legacy_app_test
 from tests.unit.test_backtest_lambda import (
     APP_DIR,
     BUCKET,
@@ -133,7 +133,7 @@ def new_session(monkeypatch, manager, browser):
     browser_like_widget_states(monkeypatch)
 
     def start():
-        at = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=60)
+        at = legacy_app_test()
         at.run()
         return at
     yield start

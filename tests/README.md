@@ -31,6 +31,18 @@ tests/
     └── test_supabase.py             # Connection, pagination, data quality
 ```
 
+## WRDS-only app and retained Legacy coverage
+
+`test_wrds_preview_app`, `test_wrds_saved`, `test_share_links`, `test_compare_tab` and
+WRDS strategy-import tests exercise the real production entry point. They verify
+WRDS-only launches, rejected Legacy imports, saved Legacy IDs, share links and comparisons.
+`test_wrds_preview` tests the gated Lambda contract and compact index with synthetic data.
+
+`legacy_components.py` is an isolated test-only composition of the retained Legacy
+loading, calculation and rendering functions. Legacy-focused tests use it to keep
+historical behavior covered without restoring a Legacy launch path in production.
+Its old viewer/export tests do not describe the current WRDS viewer, which has no download.
+
 ## Running Tests
 
 All commands run from the project root (`Factor-Lake/`).
@@ -41,7 +53,7 @@ All commands run from the project root (`Factor-Lake/`).
 uv run pytest
 ```
 
-`pyproject.toml` sets `testpaths = ["tests/unit"]`, so bare `uv run pytest` runs unit tests only.
+`pyproject.toml` sets `testpaths = ["tests"]`. Bare `uv run pytest` runs the suite; live-data tests skip unless their explicit environment prerequisites are present.
 
 ### Integration tests
 

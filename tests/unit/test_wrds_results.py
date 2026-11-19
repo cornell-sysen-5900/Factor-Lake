@@ -450,15 +450,14 @@ def test_a_reopened_wrds_id_shows_every_view_in_a_new_session(new_session):
     assert any(c.value.startswith('**Computed:** Opened from a saved analysis') for c in theirs.caption)
 
 
-def test_the_data_viewer_says_it_shows_legacy_data_in_wrds_mode(new_session):
+def test_data_viewer_is_wrds_only_and_gated_by_default(new_session, monkeypatch):
+    monkeypatch.delenv('FACTOR_LAKE_WRDS_PREVIEW_APPROVED', raising=False)
     at = new_session()
-    at.sidebar.radio(key='data_mode_input').set_value('WRDS').run()
     _click_main_tab(at, 'Data Viewer')
-    assert any('The Data Viewer shows the Legacy data, not WRDS' in c.value for c in at.main.caption)
-    assert any('GICS sector, industry group, industry and sub-industry names are in its holdings table'
-               in c.value for c in at.main.caption)
-    at.sidebar.radio(key='data_mode_input').set_value('Legacy').run()
-    assert not any('The Data Viewer shows the Legacy data' in c.value for c in at.main.caption)
+    assert any('approval' in i.value for i in at.info)
+    assert not any('Legacy data' in c.value for c in at.main.caption)
+    assert not any(r.key == 'data_mode_input' for r in at.sidebar.radio)
+    assert not at.get('download_button')
 
 
 # The Legacy formula's first line; the WRDS formula's first line
@@ -476,7 +475,6 @@ def test_wrds_shows_the_wrds_calculation_never_the_legacy_one(new_session):
     from app.calculation_preview import PREVIEW_LABEL, SAVED_LABEL, build_calculation_preview, preview_for_run
     from tests.unit.test_calculation_preview import outline, preview_box
     at = new_session()
-    at.sidebar.radio(key='data_mode_input').set_value('WRDS').run()
     at.sidebar.number_input(key='wrds_start_year_input').set_value(2010).run()
     at.sidebar.number_input(key='wrds_end_year_input').set_value(2012).run()
     _click_main_tab(at, 'Analysis')
@@ -521,6 +519,8 @@ def test_legacy_results_tab_renders_exactly_as_on_main(monkeypatch):
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / 'app'))
     monkeypatch.setattr('components.results_tab.render_calculation_preview', lambda *args, **kwargs: None)
     monkeypatch.setattr('app.calculation_preview.render_calculation_preview', lambda *args, **kwargs: None)
+    # The isolated Legacy harness reuses this imported module across tests.
+    monkeypatch.setattr('streamlit_app.render_calculation_preview', lambda *args, **kwargs: None)
     expected = json.loads((FIXTURES / 'legacy_results_render_main.json').read_text(encoding='utf-8'))
     actual = json.loads(json.dumps(legacy_results_snapshot(), sort_keys=True))
     # The changes: the main tab bar's new Compare and Scoreboard tabs, right after Results (and its

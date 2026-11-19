@@ -103,6 +103,6 @@ def test_bad_link_leaves_normal_app_usable(new_session, value, message):
     assert any(message in error.value for error in at.error)
     assert at.session_state['saved_runs'] == []
     assert at.session_state['main_tabs'] == 'Analysis'
-    at.button(key='factor_add_roe').click().run()
+    at.button(key='factor_add_w_roe').click().run()
     assert not at.exception
-    assert at.session_state['factor_builder_selected']['ROE using 9/30 Data'] == 'top'
+    assert at.session_state['factor_builder_selected']['ROE'] == 'top'

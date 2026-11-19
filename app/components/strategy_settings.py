@@ -36,6 +36,8 @@ IMPORT_VERSION_KEY = 'strategy_upload_version'
 # An imported file's name and note, given to the next run (then cleared)
 NEXT_NAME_KEY = 'strategy_name'
 NEXT_NOTE_KEY = 'strategy_note'
+LEGACY_READ_ONLY = ('New analyses use WRDS only. This Legacy settings file cannot start a new run. '
+                    'Open the saved analysis by ID or share link to view or compare its original results.')
 
 
 def apply_import(raw, lambda_available):
@@ -48,6 +50,8 @@ def apply_import(raw, lambda_available):
 
 
 def _apply_document(document, lambda_available):
+    if document['data_mode'] != 'wrds':
+        raise ValueError(LEGACY_READ_ONLY)
     if document['data_mode'] == 'wrds' and not lambda_available:
         raise ValueError('These settings need WRDS mode. Configure the backtest Lambda before loading them.')
     updates = configs.widget_values(document)
@@ -85,8 +89,6 @@ def apply_pending_settings(lambda_available) -> bool:
             message += f' The next run will be named "{document["name"]}".'
     else:
         message = f'Run {run_id}\'s settings are loaded. Change what you like, then run the analysis.'
-    if document['data_mode'] == 'legacy':
-        message += ' For local backtests, click Load Market Data first.'
     st.session_state[IMPORT_SUCCESS_KEY if source == 'file' else ANALYSIS_MESSAGE_KEY] = message
     return source == 'run'
 
@@ -117,7 +119,7 @@ def render_import_settings():
     success = st.session_state.pop(IMPORT_SUCCESS_KEY, None)
     error = st.session_state.pop(IMPORT_ERROR_KEY, None)
     with st.expander('Import settings from file', expanded=bool(success or error)):
-        st.caption('Load a settings file (JSON, from a run\'s Export settings) into these inputs. '
+        st.caption('Load a WRDS settings file (JSON, from a run\'s Export settings) into these inputs. '
                    'It replaces the current inputs and runs nothing.')
         version = st.session_state.get(IMPORT_VERSION_KEY, 0)
         uploaded = st.file_uploader('Settings file', type=['json'], key=f'strategy_upload_{version}',
@@ -206,9 +208,11 @@ def render_run_actions(run, remove: Callable[[], None], keep_open: Callable[[str
             st.download_button('Export settings (JSON)', configs.dumps(document), file_name=f'{filename}.json',
                                mime='application/json', key=f'run_export_{run_id}', on_click='ignore',
                                help='Save this run\'s inputs (no data or results) to reuse or share them.')
+        legacy = document is not None and document['data_mode'] != 'wrds'
         st.button('Use these settings', key=f'run_use_settings_{run_id}', on_click=_use_settings,
-                  args=(run_id, document), disabled=document is None,
-                  help=unavailable or 'Load this run\'s inputs into the Analysis tab, to change and run again.')
+                  args=(run_id, document), disabled=document is None or legacy,
+                  help=LEGACY_READ_ONLY if legacy else unavailable or
+                       'Load this run\'s inputs into the Analysis tab, to change and run again.')
     if run.get('note'):
         st.text(run['note'])
     error = st.session_state.pop(_run_error_key(run_id), None)

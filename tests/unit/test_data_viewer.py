@@ -14,7 +14,6 @@ import numpy as np
 import pandas as pd
 import pytest
 import streamlit as st
-from streamlit.testing.v1 import AppTest
 
 from app.viewer_data import (
     DISPLAY_ROW_LIMIT,
@@ -26,6 +25,7 @@ from app.viewer_data import (
     to_csv_bytes,
 )
 from src.s3_client import S3DataManager
+from tests.legacy_components import legacy_app_test
 from tests.unit.test_saved_runs import _click_main_tab, browser_like_widget_states
 
 APP_DIR = Path(__file__).resolve().parents[2] / 'app'
@@ -133,7 +133,7 @@ def at(monkeypatch):
     # `streamlit run` puts app/ on sys.path; AppTest does not.
     monkeypatch.syspath_prepend(str(APP_DIR))
     browser_like_widget_states(monkeypatch)
-    app = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=60)
+    app = legacy_app_test()
     app.session_state['raw_data'] = _universe()
     app.run()
     return app
@@ -280,7 +280,7 @@ def test_viewer_makes_no_extra_data_source_requests(monkeypatch):
     browser_like_widget_states(monkeypatch)
     st.cache_resource.clear()
     try:
-        at = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=60)
+        at = legacy_app_test()
         at.run()
         _load_market_data(at)
         assert len(calls) == 1                     # the one download done by Load Market Data

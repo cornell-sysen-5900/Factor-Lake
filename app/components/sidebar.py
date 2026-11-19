@@ -20,7 +20,7 @@ from src.wrds_calendar import LAST_YEAR as WRDS_LAST_YEAR
 from src.wrds_calendar import describe_schedule
 from src.wrds_gics import GICS_LEVELS, codes_under, level_names, make_gics_filter, names_to_codes
 
-# Widget key of the Legacy / WRDS switch
+# Session value retained for saved settings and migration of old sessions
 DATA_MODE_KEY = "data_mode_input"
 WRDS_NEEDS_LAMBDA = "WRDS mode runs in AWS Lambda, which is not configured for this app."
 # Widget key of the trading cost input (shared by both data sources)
@@ -44,27 +44,16 @@ GICS_LEVEL_HELP = ("Filter by GICS sector, industry group, industry or sub-indus
 
 
 def _render_data_mode(backtest_lambda: str, on_change: Optional[Callable[[], None]]) -> bool:
-    """
-    The Legacy / WRDS switch. WRDS runs only in AWS Lambda, so without a configured
-    Lambda the switch stays on Legacy and is disabled. Returns True for WRDS.
-    """
-    if not backtest_lambda and st.session_state.get(DATA_MODE_KEY) == 'WRDS':
-        st.session_state[DATA_MODE_KEY] = 'Legacy'
-    choice = st.radio(
-        "Data source",
-        options=config.DATA_MODE_OPTIONS,
-        key=DATA_MODE_KEY,
-        horizontal=True,
-        label_visibility="collapsed",
-        disabled=not backtest_lambda,
-        on_change=on_change,
-        help="Legacy: annual rebalancing on the 9/30 data, as before. WRDS: point-in-time WRDS data "
-             "with semi-annual, quarterly or monthly rebalancing, run in AWS Lambda. "
-             "Switching clears the selected factors."
-    )
+    """New analyses always use WRDS; migrate old in-memory inputs once."""
+    if st.session_state.get(DATA_MODE_KEY) != 'WRDS':
+        if on_change:
+            on_change()
+        st.session_state[DATA_MODE_KEY] = 'WRDS'
+        # Release obsolete locally loaded frames; saved runs own their result references.
+        st.session_state.update(raw_data=None, rdata=None, data_loaded=False, loaded_filters=None)
     if not backtest_lambda:
         st.caption(WRDS_NEEDS_LAMBDA)
-    return choice == 'WRDS'
+    return True
 
 
 # Only analysis inputs are reset; the Lambda execution preference and the data source are kept.
@@ -135,9 +124,9 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
     This interface manages global constraints, including date ranges, initial
     capitalization, sector exposures, and weighting methodologies.
 
-    backtest_lambda is the configured backtest Lambda's name ('' for none); when
-    set, a switch chooses whether backtests run there or in the app, and the WRDS
-    data source can be chosen. on_data_mode_change runs when the data source changes.
+    New analyses use WRDS and the configured backtest Lambda. No source switch is
+    rendered. on_data_mode_change resets factor selections when an old session is
+    migrated to WRDS. Historical Legacy parameter helpers remain for compatibility.
 
     Returns:
         Dict[str, Any]: Standardized dictionary of user-defined parameters. Legacy
@@ -151,7 +140,7 @@ def render_sidebar(sector_options: List[str], data_source_label: str,
 
         # Data Source Information
         st.subheader("Data Source")
-        st.caption(f"Primary Source: {data_source_label}")
+        st.caption('WRDS · saved Legacy analyses remain available in Results and Compare.')
         wrds = _render_data_mode(backtest_lambda, on_data_mode_change)
 
         # Where backtests run

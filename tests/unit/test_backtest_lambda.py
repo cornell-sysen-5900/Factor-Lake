@@ -20,7 +20,6 @@ import numpy as np
 import pandas as pd
 import pytest
 from botocore.exceptions import ClientError
-from streamlit.testing.v1 import AppTest
 
 import src.backtest_service as backtest_service
 from src.backtest_engine import rebalance_portfolio, run_cohort_comparison
@@ -29,6 +28,7 @@ from src.backtest_service import BacktestService, result_file
 from src.lambda_client import BacktestLambdaClient, BacktestLambdaError
 from src.s3_client import DELISTING_FILE, UNIVERSE_FILE, S3DataManager
 from src.universe_selection import select_universe
+from tests.legacy_components import legacy_app_test
 from tests.unit.test_saved_runs import _assert_clean, _click, _click_main_tab, _open_tab, browser_like_widget_states
 
 APP_DIR = Path(__file__).resolve().parents[2] / 'app'
@@ -549,7 +549,7 @@ def lambda_app(monkeypatch, manager):
                         _client_init_with(fake_lambda))
     monkeypatch.syspath_prepend(str(APP_DIR))
     browser_like_widget_states(monkeypatch)
-    at = AppTest.from_file(str(APP_DIR / 'streamlit_app.py'), default_timeout=60)
+    at = legacy_app_test()
     at.run()
     at.fake_lambda = fake_lambda
     at.universe = manager.fetch_all_data()

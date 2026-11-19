@@ -100,11 +100,10 @@ def new_session(monkeypatch, manager):
 def _run_wrds(at, *factor_keys):
     """Runs a quarterly 2010-2012 WRDS backtest from the Analysis tab; returns the saved run."""
     _click_main_tab(at, 'Analysis')
-    if at.sidebar.radio(key='data_mode_input').value != 'WRDS':
-        at.sidebar.radio(key='data_mode_input').set_value('WRDS').run()
-        at.sidebar.number_input(key='wrds_start_year_input').set_value(2010).run()
-        at.sidebar.number_input(key='wrds_end_year_input').set_value(2012).run()
-        for key in factor_keys:
+    at.sidebar.number_input(key='wrds_start_year_input').set_value(2010).run()
+    at.sidebar.number_input(key='wrds_end_year_input').set_value(2012).run()
+    for key in factor_keys:
+        if any(b.key == f'factor_add_{key}' for b in at.button):
             at.button(key=f'factor_add_{key}').click().run()
     _click_main_tab(at, 'Analysis')
     at.button(key='run_wrds_analysis').click().run()
