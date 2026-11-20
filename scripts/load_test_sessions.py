@@ -4,9 +4,12 @@ PROJECT: Factor-Lake Portfolio Analysis
 MODULE: scripts/load_test_sessions.py
 PURPOSE: Runs N simultaneous browser sessions through a full backtest to check the app under load.
 
-Each simulated user opens the app, clicks Load Market Data, selects a factor, runs the
-analysis, opens Results and runs the Top vs Bottom cohort comparison. The script exits
-with status 1 if any session fails or shows an error.
+Each simulated user opens the WRDS-only app, sets its WRDS settings in the sidebar (a
+rebalancing frequency and an initial AUM), selects a factor, clicks Run Portfolio Analysis
+(the backtest runs in AWS Lambda; nothing is loaded in the app), opens Results and runs the
+Top vs Bottom cohort comparison. The AUM differs per session and per script run, so every
+backtest is computed rather than read from the Lambda result cache. The script exits with
+status 1 if any session fails or shows an error.
 
 Usage:
     pip install playwright && playwright install chromium
@@ -26,7 +29,10 @@ from playwright.async_api import Page, async_playwright
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 DEFAULT_URL = "https://cornellfactorlake.streamlit.app/"
-FACTORS = ['12-Mo Momentum %', 'ROE using 9/30 Data', 'ROA %', 'Book/Price', '6-Mo Momentum %']
+# WRDS factor names, as on the Analysis tab's factor buttons
+FACTORS = ['12-1 Mo Momentum', 'ROE', 'ROA', 'Book/Price', '6-Mo Momentum']
+FREQUENCIES = ['Quarterly', 'Monthly', 'Semi-annual']
+READY_BUTTON = "Run Portfolio Analysis"
 STEP_TIMEOUT_MS = 180_000
 
 
@@ -43,10 +49,10 @@ async def _app_root(page: Page) -> Any:
     while time.monotonic() < deadline:
         frame_el = await page.query_selector('iframe[title="streamlitApp"]')
         root: Any = (await frame_el.content_frame()) if frame_el else page
-        if root and await root.get_by_role("button", name="Load Market Data").count():
+        if root and await root.get_by_role("button", name=READY_BUTTON).count():
             return root
         await page.wait_for_timeout(1_000)
-    raise TimeoutError("The app did not show the Load Market Data button")
+    raise TimeoutError(f"The app did not show the {READY_BUTTON} button")
 
 
 async def _idle(root: Any) -> None:
@@ -65,14 +71,15 @@ async def _problems(root: Any) -> List[str]:
     return [" ".join(t.split())[:300] for t in texts]
 
 
-async def simulate_user(browser: Any, url: str, idx: int, round_no: int,
+async def simulate_user(browser: Any, url: str, idx: int, round_no: int, aum: int,
                         screenshot_dir: Optional[Path]) -> Dict[str, Any]:
-    """One user's full backtest. Returns timings in ms and any problems seen."""
+    """One user's full WRDS backtest. Returns timings in ms and any problems seen."""
     context = await browser.new_context(viewport={"width": 1400, "height": 900})
     page = await context.new_page()
     page_errors: List[str] = []
     page.on("pageerror", lambda e: page_errors.append(str(e)[:200]))
     factor = FACTORS[idx % len(FACTORS)]
+    frequency = FREQUENCIES[idx % len(FREQUENCIES)]
     timings: Dict[str, int] = {}
     step = "open"
     start = time.monotonic()
@@ -86,16 +93,21 @@ async def simulate_user(browser: Any, url: str, idx: int, round_no: int,
         root = await _app_root(page)
         t = lap("open", start)
 
-        step = "load"
-        await root.get_by_role("button", name="Load Market Data").click()
+        step = "settings"
+        sidebar = root.locator('[data-testid=stSidebar]')
+        await sidebar.get_by_text(frequency, exact=True).click()
         await _idle(root)
-        await root.get_by_text("Universe Refined").first.wait_for(timeout=STEP_TIMEOUT_MS)
-        t = lap("load", t)
+        aum_input = sidebar.locator('input[aria-label="Initial AUM ($)"]')
+        await aum_input.fill(str(aum))
+        await aum_input.press("Enter")
+        await _idle(root)
+        # The factor buttons start with an icon, so match the button holding the factor's exact label
+        await root.locator("button").filter(has=root.get_by_text(factor, exact=True)).first.click()
+        await _idle(root)
+        t = lap("settings", t)
 
         step = "run"
-        await root.get_by_text(factor, exact=True).click()
-        await _idle(root)
-        await root.get_by_role("button", name="Run Portfolio Analysis").click()
+        await root.get_by_role("button", name=READY_BUTTON).click()
         await _idle(root)
         await root.get_by_text("Analysis complete").first.wait_for(timeout=STEP_TIMEOUT_MS)
         t = lap("run", t)
@@ -112,7 +124,9 @@ async def simulate_user(browser: Any, url: str, idx: int, round_no: int,
         await _idle(root)
         await root.get_by_role("button", name="Generate Comparison").click()
         await _idle(root)
-        await root.locator('[data-testid=stTable]').first.wait_for(timeout=STEP_TIMEOUT_MS)
+        # The cohort summary table has rendered (its column header), not just its heading
+        await root.get_by_text("Cohort Performance Summary").first.wait_for(timeout=STEP_TIMEOUT_MS)
+        await root.get_by_text("Top Cohort", exact=True).first.wait_for(timeout=STEP_TIMEOUT_MS)
         lap("cohort", t)
 
         problems = await _problems(root)
@@ -128,7 +142,7 @@ async def simulate_user(browser: Any, url: str, idx: int, round_no: int,
         suffix = "" if result["ok"] else "_FAIL"
         await page.screenshot(path=str(screenshot_dir / f"round{round_no}_user{idx}{suffix}.png"))
     await context.close()
-    result.update({"user": idx, "factor": factor, "ms": timings,
+    result.update({"user": idx, "factor": factor, "frequency": frequency, "aum": aum, "ms": timings,
                    "total_ms": int((time.monotonic() - start) * 1000),
                    "problems": problems, "page_errors": page_errors})
     return result
@@ -141,11 +155,14 @@ async def run(url: str, users: int, rounds: int, screenshot_dir: Optional[Path],
     all_ok = True
     async with async_playwright() as p:
         browser = await p.chromium.launch(executable_path=executable_path)
+        # A different AUM per script run, round and session, so no backtest is a cache hit
+        base_aum = 10_000 + int(time.time()) % 100_000 * 10
         for round_no in range(1, rounds + 1):
             started = time.monotonic()
             # Every user starts at the same moment
             results = await asyncio.gather(*[
-                simulate_user(browser, url, i, round_no, screenshot_dir) for i in range(users)
+                simulate_user(browser, url, i, round_no, base_aum + 1_000_000 * round_no + i, screenshot_dir)
+                for i in range(users)
             ])
             passed = sum(r["ok"] for r in results)
             print(f"ROUND {round_no}: {passed}/{users} sessions completed without errors "
