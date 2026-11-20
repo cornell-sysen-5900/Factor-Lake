@@ -56,7 +56,6 @@ nav:
   - Guides:
     - Factor Lake User Guide: FACTOR_LAKE_USER_GUIDE.md
     - WRDS Data Preview: WRDS_DATA_PREVIEW.md
-    - Legacy Definition Matches: LEGACY_WRDS_MATCHES.md
     - Strategy Settings and Run Names: STRATEGY_SETTINGS.md
     - Developer Onboarding: DEV_ONBOARDING.md
     - Streamlit Admin Guide: STREAMLIT_ADMIN_GUIDE.md

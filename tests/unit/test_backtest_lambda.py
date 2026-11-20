@@ -508,6 +508,62 @@ def test_deploy_without_iam_access_explains_the_admin_step(monkeypatch, caplog):
     assert '--print-role-policy' in caplog.text and '--role-arn' in caplog.text
 
 
+@pytest.mark.parametrize('current, flags, expected', [
+    ({'FACTOR_LAKE_WRDS_PREVIEW_APPROVED': 'true'}, [], 'true'),         # a routine redeploy keeps approval
+    ({'FACTOR_LAKE_WRDS_PREVIEW_APPROVED': 'false'}, [], 'false'),
+    ({}, [], 'false'),                                                   # an existing function without it
+    (None, [], 'false'),                                                 # a new function
+    ({'FACTOR_LAKE_WRDS_PREVIEW_APPROVED': 'true'}, ['--preview-disabled'], 'false'),
+    ({'FACTOR_LAKE_WRDS_PREVIEW_APPROVED': 'false'}, ['--preview-approved'], 'true'),
+    (None, ['--preview-approved'], 'true'),
+])
+def test_deploy_changes_the_preview_gate_only_when_asked(monkeypatch, current, flags, expected):
+    class FakeDeployLambda:
+        def __init__(self):
+            self.configs = []
+
+        def get_function(self, FunctionName):
+            if current is None:
+                raise ClientError({'Error': {'Code': 'ResourceNotFoundException', 'Message': ''}}, 'GetFunction')
+            return {'Configuration': {'Environment': {'Variables': {'OTHER': 'x', **current}}}}
+
+        def update_function_code(self, **kwargs):
+            pass
+
+        def update_function_configuration(self, **kwargs):
+            self.configs.append(kwargs)
+
+        def create_function(self, **kwargs):
+            self.configs.append(kwargs)
+
+        def get_waiter(self, name):
+            return type('Waiter', (), {'wait': lambda self, **kwargs: None})()
+
+        def invoke(self, **kwargs):
+            return {'Payload': io.BytesIO(json.dumps({'status': 'ok', 'code_version': 'test'}).encode())}
+
+    class FakeDeployS3:
+        def upload_fileobj(self, *args):
+            pass
+
+        def get_bucket_lifecycle_configuration(self, Bucket):
+            return {'Rules': []}
+
+    lam = FakeDeployLambda()
+    monkeypatch.setattr(deploy, 'install_libraries', lambda target: None)   # no download in tests
+    monkeypatch.setattr(boto3, 'client', lambda service, **kwargs: lam if service == 'lambda' else FakeDeployS3())
+    assert deploy.main(['--role-arn', 'arn:aws:iam::0:role/test', '--leave-lifecycle-rules', *flags]) == 0
+    [config] = lam.configs
+    variables = config['Environment']['Variables']
+    assert variables['FACTOR_LAKE_WRDS_PREVIEW_APPROVED'] == expected
+    assert 'OTHER' not in variables                                     # only the preview gate is carried over
+
+
+def test_preview_flags_cannot_be_combined():
+    with pytest.raises(SystemExit):
+        deploy.main(['--preview-approved', '--preview-disabled'])
+
+
 def test_unused_library_parts_are_pruned(tmp_path):
     keep = ['pyarrow/libarrow.so.2400', 'pyarrow/libarrow_substrait.so.2400', 'pyarrow/libparquet.so.2400',
             'pyarrow/parquet/core.py', 'pandas/core/frame.py', 'numpy/_core/multiarray.py']

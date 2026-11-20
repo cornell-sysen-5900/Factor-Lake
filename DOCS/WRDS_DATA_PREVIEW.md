@@ -4,7 +4,7 @@ New analyses use WRDS only. The Analysis source switch and local market-data loa
 Saved Legacy results still open by ID or share link in Results and Compare, with their original settings and
 metrics. Legacy settings exports remain readable, but importing one for a new run or using a Legacy run's
 settings is refused with an explanation. The Legacy engines and saved-result decoders remain in the codebase.
-See [Legacy definition matches](LEGACY_WRDS_MATCHES.md) for every Legacy factor's WRDS match or `none`.
+See the [Legacy-to-WRDS table](WRDS_FACTOR_REVIEW.md#legacy-to-wrds) for each Legacy factor's WRDS replacement.
 
 ## Data Viewer
 
@@ -67,7 +67,9 @@ Record that approval in the team's release checklist; this document does not con
    panel version. This upload alone does not enable display.
 
 4. Deploy the reviewed code to the **development** Lambda using the team's normal deployment process.
-   `scripts/deploy_backtest_lambda.py` disables preview by default. Keep production unchanged during acceptance.
+   `scripts/deploy_backtest_lambda.py` creates a new function with preview disabled and, without
+   `--preview-approved` or `--preview-disabled`, keeps an existing function's setting. Keep production unchanged
+   during acceptance.
    The Lambda role needs read access to the panel metadata and its versioned preview index under the WRDS prefix;
    the existing read-prefix policy covers both. The preparer's credentials need write access to the index key.
 5. Before approval, verify the action returns `status: disabled` and no rows. Run the synthetic tests locally:
@@ -78,11 +80,12 @@ Record that approval in the team's release checklist; this document does not con
 
 6. **Only after approval:** deploy with `--preview-approved` or explicitly set the Lambda environment variable
    `FACTOR_LAKE_WRDS_PREVIEW_APPROVED=true`. Set the same variable in Streamlit's environment or secrets, then
-   restart it. A frontend-only flag cannot bypass the backend gate. Redeploying with the default deployment
-   command turns the backend flag off again; pass the approval option intentionally for an approved release.
+   restart it. A frontend-only flag cannot bypass the backend gate. Later redeploys without a preview option
+   keep the backend flag as it is.
 7. Verify unfiltered previews, every GICS level, rare and empty filters, partial years, timeouts, missing index,
    cold/warm latency, and repeated-filter app memory. Reopen real saved WRDS and Legacy IDs in Results and Compare.
-8. To disable display, unset the flag or set it to `false` on both services and restart the app. It will clear
+8. To disable display, deploy with `--preview-disabled` (or set the Lambda variable to `false`), unset the
+   Streamlit flag or set it to `false`, and restart the app. It will clear
    its session's preview on the next viewer render. Already displayed values cannot be recalled from a browser.
 
 All committed tests use synthetic data. Keep real rows, empirical statistics, credentials and private measurement

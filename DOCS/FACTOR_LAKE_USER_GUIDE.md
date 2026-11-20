@@ -56,9 +56,9 @@ availability message. See [preview behavior and release process](WRDS_DATA_PREVI
 
 ## 7. Moving from Legacy
 
-Use the [Legacy-to-WRDS match report](LEGACY_WRDS_MATCHES.md) to find definition matches and related alternatives.
-A similar name is not a guarantee of equivalent values or definitions. Unmatched factors are listed for review,
-not rebuilt. Saved Legacy analyses remain accessible; new Legacy runs are unavailable.
+Use the [Legacy-to-WRDS table](WRDS_FACTOR_REVIEW.md#legacy-to-wrds) to find each Legacy factor's WRDS
+replacement. **Same** means the same definition; **Similar** rows list how the definitions differ, so values are
+not guaranteed to match. Saved Legacy analyses remain accessible; new Legacy runs are unavailable.
 
 ## 15. Use WRDS mode
 

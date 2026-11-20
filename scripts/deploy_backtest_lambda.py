@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: scripts/deploy_backtest_lambda.py
 PURPOSE: Creates or updates the backtest Lambda and its IAM role, and checks how long saved results are kept.
-VERSION: 1.2.0
+VERSION: 1.3.0
 
 Usage (from the project root, with AWS keys in .env or the environment):
     uv run python scripts/deploy_backtest_lambda.py              # deploy, then ping the function
@@ -11,6 +11,9 @@ Usage (from the project root, with AWS keys in .env or the environment):
     # A separate dev function that leaves the bucket's lifecycle rules alone (only checks them):
     uv run python scripts/deploy_backtest_lambda.py --function-name sysen5900-factor-lake-backtest-dev \
         --role-arn <the course role's ARN> --leave-lifecycle-rules
+    # The WRDS data preview keeps its current setting unless one of these is given:
+    uv run python scripts/deploy_backtest_lambda.py --preview-approved   # only after approval
+    uv run python scripts/deploy_backtest_lambda.py --preview-disabled
 
 It is safe to run again: it updates what exists and creates what is missing.
 
@@ -210,19 +213,36 @@ def upload_package(s3, bucket: str, prefix: str, package: bytes) -> str:
     return key
 
 
+def preview_flag(preview_approved: Optional[bool], current: Dict[str, str]) -> str:
+    """
+    The preview gate's value: 'true' / 'false' when --preview-approved / --preview-disabled is
+    given, otherwise the function's current value ('false' for a new function), so a routine
+    redeploy never changes whether the preview is shown.
+    """
+    if preview_approved is None:
+        return current.get(APPROVAL_ENV, 'false')
+    return 'true' if preview_approved else 'false'
+
+
 def deploy_function(lam, name: str, role_arn: str, code: Dict[str, str],
-                    memory: int, timeout: int, environment: Dict[str, str]) -> None:
-    """Creates the function, or updates its code and settings when it exists. code: S3Bucket and S3Key."""
-    config = dict(Role=role_arn, Handler=HANDLER, Runtime=RUNTIME, Layers=[],
-                  MemorySize=memory, Timeout=timeout, Environment={'Variables': environment},
-                  Description='Factor-Lake backtests: reads market data from S3, caches results in S3')
+                    memory: int, timeout: int, environment: Dict[str, str],
+                    preview_approved: Optional[bool] = None) -> None:
+    """
+    Creates the function, or updates its code and settings when it exists. code: S3Bucket and S3Key.
+    preview_approved: True / False sets the preview gate; None keeps the function's current value.
+    """
     try:
-        lam.get_function(FunctionName=name)
+        current = lam.get_function(FunctionName=name)['Configuration'].get('Environment', {}).get('Variables', {})
         exists = True
     except ClientError as e:
         if e.response['Error']['Code'] != 'ResourceNotFoundException':
             raise
-        exists = False
+        current, exists = {}, False
+    flag = preview_flag(preview_approved, current)
+    logger.info(f"{APPROVAL_ENV}={flag}" + (" (kept)" if preview_approved is None and exists else ""))
+    config = dict(Role=role_arn, Handler=HANDLER, Runtime=RUNTIME, Layers=[],
+                  MemorySize=memory, Timeout=timeout, Environment={'Variables': {**environment, APPROVAL_ENV: flag}},
+                  Description='Factor-Lake backtests: reads market data from S3, caches results in S3')
 
     if exists:
         lam.update_function_code(FunctionName=name, **code)
@@ -338,8 +358,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                         help="Print the role an AWS admin needs to create, and exit")
     parser.add_argument('--wrds-dir', default=wrds_dir(),
                         help=f"Folder of the WRDS data under the prefix (default {wrds_dir()})")
-    parser.add_argument('--preview-approved', action='store_true',
-                        help="Enable sample rows only after Prof. Steward approves their display. Default: disabled.")
+    preview = parser.add_mutually_exclusive_group()
+    preview.add_argument('--preview-approved', dest='preview_approved', action='store_const', const=True,
+                         help="Enable sample rows only after Prof. Steward approves their display. Without this "
+                              "or --preview-disabled, the function's current setting is kept (disabled when new).")
+    preview.add_argument('--preview-disabled', dest='preview_approved', action='store_const', const=False,
+                         help="Turn sample rows off.")
     parser.add_argument('--leave-lifecycle-rules', action='store_true',
                         help="Do not write the bucket's lifecycle rules (e.g. for a dev function); only check "
                              "that the result expiry rule exists")
@@ -382,8 +406,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     deploy_function(lam, args.function_name, role_arn, {'S3Bucket': args.bucket, 'S3Key': key},
                     args.memory, args.timeout,
                     {'FACTOR_LAKE_S3_BUCKET': args.bucket, 'FACTOR_LAKE_S3_PREFIX': prefix,
-                     WRDS_DIR_ENV: args.wrds_dir.strip('/'),
-                     APPROVAL_ENV: 'true' if args.preview_approved else 'false'})
+                     WRDS_DIR_ENV: args.wrds_dir.strip('/')},
+                    args.preview_approved)
     if args.leave_lifecycle_rules:
         expiry_set = check_result_expiry(s3, args.bucket, prefix)
     else:

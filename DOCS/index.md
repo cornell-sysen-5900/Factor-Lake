@@ -13,7 +13,6 @@ Factor-Lake lets you compose multi-factor stock selection models, run historical
 | [Factor Lake User Guide](FACTOR_LAKE_USER_GUIDE.md) | Student-focused walkthrough for NBA5220/Equity Research workflows |
 | [Strategy Settings and Run Names](STRATEGY_SETTINGS.md) | Export and import strategy JSON files, name saved runs, and add notes |
 | [WRDS Data Preview](WRDS_DATA_PREVIEW.md) | Bounded sample rows, GICS filtering and approval-gated release |
-| [Legacy Definition Matches](LEGACY_WRDS_MATCHES.md) | Each Legacy factor’s definition match or none, with related alternatives |
 | [WRDS Factor Review](WRDS_FACTOR_REVIEW.md) | The WRDS factor that replaces each Legacy factor, and the default directions with their reasons |
 | [Developer Onboarding](DEV_ONBOARDING.md) | Getting access, workspace setup, and understanding workflow for new team members |
 | [Documentation Contributor](DOCS_CONTRIBUTOR_GUIDE.md) | How to add and edit guides, update navigation, and publish docs to the site |
