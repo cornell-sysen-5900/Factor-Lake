@@ -149,7 +149,7 @@ Re-publishing replaces the yearly files in place and uploads the manifest last. 
 
 ## 6. Check the app under load
 
-`scripts/load_test_sessions.py` opens 5 browser sessions at the same time, and each runs a full backtest: Load Market Data, Run Portfolio Analysis, Results, and the cohort comparison.
+`scripts/load_test_sessions.py` opens 5 browser sessions at the same time, and each runs a full WRDS backtest in AWS Lambda: it sets a rebalancing frequency and an initial AUM (different for every session and run, so nothing comes from the result cache), picks a factor, clicks Run Portfolio Analysis, opens Results and runs the cohort comparison.
 
 1. Run it against the live app from the Actions tab (Load Test → Run workflow, `.github/workflows/load-test.yml`). It only runs when someone starts it. A failed run means at least one session failed; screenshots are attached to the run.
 2. Or run it locally:
