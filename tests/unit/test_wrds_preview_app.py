@@ -6,7 +6,7 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 from app.strategy_config import dumps
-from src.wrds_preview import APPROVAL_ENV, build_index, select_preview
+from src.wrds_preview import APPROVAL_ENV, PREVIEW_ROWS, build_index, select_preview
 from tests.unit.test_saved_runs import _assert_clean, _click_main_tab, browser_like_widget_states
 from tests.unit.test_strategy_config import document
 from tests.unit.test_wrds_preview import panel
@@ -97,11 +97,13 @@ def test_preview_has_all_gics_levels_no_download_and_escaped_html(app_factory):
     _click_main_tab(at, 'Data Viewer')
     assert [m.label for m in at.multiselect if (m.key or '').startswith('preview_gics_')] == [
         'Sector', 'Industry group', 'Industry', 'Sub-industry']
-    at.slider(key='preview_years').set_value((2010, 2012)).run()
+    assert not any(s.key == 'preview_years' for s in at.slider)   # no year picker
     at.button(key='preview_load').click().run()
     _assert_clean(at)
     holder = at.session_state[PREVIEW_STATE_KEY]
-    assert len(holder['preview']['rows']) == 15
+    assert at.gateway.calls == [{'gics_filter': None}]
+    rows = holder['preview']['rows']
+    assert len(rows) == PREVIEW_ROWS == len({r['permno'] for r in rows})
     html = at.get('html')[0].proto.body
     assert '&lt;script&gt;' in html and '<script>' not in html
     assert not at.get('download_button') and not at.dataframe
@@ -112,7 +114,6 @@ def test_preview_has_all_gics_levels_no_download_and_escaped_html(app_factory):
 def test_filters_clear_previous_samples_and_filter_before_sampling(app_factory):
     at = app_factory()
     _click_main_tab(at, 'Data Viewer')
-    at.slider(key='preview_years').set_value((2010, 2012)).run()
     at.button(key='preview_load').click().run()
     at.multiselect(key='preview_gics_sector').set_value(['Financials']).run()
     assert PREVIEW_STATE_KEY not in at.session_state
@@ -140,11 +141,11 @@ def test_leaving_preview_releases_rows(app_factory, tab):
 def test_repeated_loads_replace_one_bounded_response_and_clear_removes_it(app_factory):
     at = app_factory()
     _click_main_tab(at, 'Data Viewer')
-    for years in [(2010, 2010), (2011, 2012), (2010, 2012)] * 3:
-        at.slider(key='preview_years').set_value(years).run()
+    for sectors, count in [(['Energy'], PREVIEW_ROWS), (['Utilities'], 2), ([], PREVIEW_ROWS)] * 3:
+        at.multiselect(key='preview_gics_sector').set_value(sectors).run()
         at.button(key='preview_load').click().run()
         holder = at.session_state[PREVIEW_STATE_KEY]
-        assert len(holder['preview']['rows']) == 5 * (years[1] - years[0] + 1)
+        assert len(holder['preview']['rows']) == count
         assert set(holder) == {'request', 'function', 'preview'}
     at.button(key='preview_clear').click().run()
     assert PREVIEW_STATE_KEY not in at.session_state
@@ -154,7 +155,7 @@ def test_repeated_loads_replace_one_bounded_response_and_clear_removes_it(app_fa
 def test_empty_results_and_failures_are_readable_and_clear_stale_rows(app_factory, monkeypatch):
     at = app_factory()
     _click_main_tab(at, 'Data Viewer')
-    at.slider(key='preview_years').set_value((2020, 2021)).run()
+    at.multiselect(key='preview_gics_sector').set_value(['Health Care']).run()   # not in the panel
     at.button(key='preview_load').click().run()
     assert any('No WRDS rows match' in i.value for i in at.info)
     def fail(_):
