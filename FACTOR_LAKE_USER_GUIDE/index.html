@@ -1,0 +1,3676 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="API Reference and Guides for the Factor-Lake Portfolio Analysis System">
+      
+      
+      
+      
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../WRDS_DATA_PREVIEW/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Factor Lake User Guide - Factor-Lake</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="red" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#factor-lake-user-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Factor-Lake" class="md-header__button md-logo" aria-label="Factor-Lake" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Factor-Lake
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Factor Lake User Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="red" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="red" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/src/analysis_scores/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Factor-Lake" class="md-nav__button md-logo" aria-label="Factor-Lake" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Factor-Lake
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Factor Lake User Guide
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Factor Lake User Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-configure-an-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Configure an analysis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-check-the-calculation-preview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Check the calculation preview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-run-the-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Run the analysis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-review-and-share-saved-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Review and share saved results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-save-settings-and-reset-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Save settings and reset inputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-preview-wrds-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Preview WRDS fields
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-moving-from-legacy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Moving from Legacy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#15-use-wrds-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. Use WRDS mode
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="15. Use WRDS mode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#run-a-wrds-backtest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run a WRDS backtest
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check-the-calculation-preview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check the calculation preview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#filter-by-gics-industry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filter by GICS industry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limit-positions-by-daily-volume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limit positions by daily volume
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#read-wrds-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read WRDS results
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-wrds-mode-treats-delistings-and-gaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How WRDS mode treats delistings and gaps
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#16-trading-costs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16. Trading costs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#17-compare-analyses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17. Compare analyses
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#18-backtest-scoreboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18. Backtest scoreboard
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../WRDS_DATA_PREVIEW/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WRDS Data Preview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../STRATEGY_SETTINGS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy Settings and Run Names
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DEV_ONBOARDING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Onboarding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../STREAMLIT_ADMIN_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streamlit Admin Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DOCS_CONTRIBUTOR_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Contributor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DEPLOYMENT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AWS_S3_DATA/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS S3 Data Source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AWS_LAMBDA_BACKTESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtests in AWS Lambda
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../WRDS_MODE_DESIGN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WRDS Mode Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../WRDS_FACTOR_REVIEW/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WRDS Factor Review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DATA_UPDATE_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WRDS Data Update Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../GICS_MAPPING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GICS Mapping
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SUPABASE_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supabase Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SUPABASE_UPLOAD_TOOL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supabase Upload Tool
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SUPABASE_MAINTENANCE_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supabase Maintenance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../STREAMLIT_STYLING_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streamlit Styling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Bandit%20%26%20Safety/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security Scanning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    src
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    src
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/analysis_scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    analysis_scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/backtest_engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    backtest_engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/backtest_jobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    backtest_jobs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/backtest_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    backtest_service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    benchmarks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/data_standardization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    data_standardization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/factor_registry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factor_registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/factor_risk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factor_risk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/factor_utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factor_utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/factors_doc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factors_doc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/lambda_client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    lambda_client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/performance_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    performance_metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/portfolio/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    portfolio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/portfolio_filters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    portfolio_filters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/s3_client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    s3_client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/saved_analyses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    saved_analyses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/supabase_client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    supabase_client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/trading_costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    trading_costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/universe_selection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    universe_selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_calendar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_calendar
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_factor_evidence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_factor_evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_factors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_factors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_gics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_gics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_holdings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_holdings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_jobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_jobs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_liquidity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_liquidity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_preview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/src/wrds_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    app
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    app
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/analysis_history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    analysis_history
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/calculation_preview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    calculation_preview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/compare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    compare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/compare_state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    compare_state
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_5" id="__nav_3_2_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    components
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    components
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/about/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    about
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/compare_tab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    compare_tab
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/data_viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    data_viewer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/factor_selection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factor_selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/results_tab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    results_tab
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/saved_panel/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    saved_panel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/scoreboard_tab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scoreboard_tab
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/sidebar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidebar
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/strategy_settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    strategy_settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/components/wrds_results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/holdings_table/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    holdings_table
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/liquidity_ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    liquidity_ui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/saved_runs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    saved_runs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/scoreboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scoreboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/share_links/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    share_links
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/strategy_config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    strategy_config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/streamlit_app/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_app
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/streamlit_config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/streamlit_css/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_css
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/streamlit_utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    streamlit_utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/viewer_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    viewer_data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/wrds_factor_review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_factor_review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/app/wrds_tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visualizations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Visualizations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/Visualizations/compare_growth_plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    compare_growth_plot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/Visualizations/portfolio_growth_plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    portfolio_growth_plot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/Visualizations/top_bottom_portfolio_plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    top_bottom_portfolio_plot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/Visualizations/wrds_plots/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wrds_plots
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-configure-an-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Configure an analysis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-check-the-calculation-preview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Check the calculation preview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-run-the-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Run the analysis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-review-and-share-saved-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Review and share saved results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-save-settings-and-reset-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Save settings and reset inputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-preview-wrds-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Preview WRDS fields
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-moving-from-legacy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Moving from Legacy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#15-use-wrds-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. Use WRDS mode
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="15. Use WRDS mode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#run-a-wrds-backtest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run a WRDS backtest
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check-the-calculation-preview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check the calculation preview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#filter-by-gics-industry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filter by GICS industry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limit-positions-by-daily-volume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limit positions by daily volume
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#read-wrds-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read WRDS results
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-wrds-mode-treats-delistings-and-gaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How WRDS mode treats delistings and gaps
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#16-trading-costs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16. Trading costs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#17-compare-analyses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17. Compare analyses
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#18-backtest-scoreboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18. Backtest scoreboard
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="factor-lake-user-guide">Factor-Lake User Guide</h1>
+<p>Factor-Lake builds factor-based stock portfolios and compares their historical performance. <strong>WRDS is the only
+source for new analyses.</strong> Older Legacy analyses remain available by ID or share link in Results and Compare.</p>
+<h2 id="1-configure-an-analysis">1. Configure an analysis</h2>
+<p>Choose the period, initial AUM, weighting and factor-combination method in the sidebar. Set the rebalancing
+frequency, holdings percentage or count, GICS filters, fossil-fuel restriction, trading costs and optional
+liquidity limit. Add factors and review their Higher/Lower directions and tooltip explanations.
+Holding 100% of the filtered universe needs no factor. Other holdings rules require a factor.</p>
+<h2 id="2-check-the-calculation-preview">2. Check the calculation preview</h2>
+<p>Expand <strong>Calculation preview</strong> below the factor controls. It reflects the current WRDS settings and requires no
+market-data download. <strong>Step-by-step calculation</strong> explains selection, weighting and returns.</p>
+<h2 id="3-run-the-analysis">3. Run the analysis</h2>
+<p>Click <strong>Run Portfolio Analysis</strong>. The configured AWS Lambda reads the WRDS data, runs or retrieves the backtest,
+and returns the result. There is no Load Market Data step. Without a configured Lambda, the Run button is disabled.
+A completed run opens Results. The calculation used by each saved run remains attached to its original settings.</p>
+<h2 id="4-review-and-share-saved-results">4. Review and share saved results</h2>
+<p>Results shows each run's settings, holdings, charts and performance measures. Use the Analysis ID or <strong>Copy share
+link</strong> to open the stored result in another session. This works for both WRDS and saved Legacy results and does
+not start a backtest or load the full market dataset. Invalid, missing or expired IDs show a message.
+Saved analyses last <strong>1 year</strong>: a weekly cleanup deletes results saved more than a year ago, so an older ID
+shows the expired message. Run the analysis again to get a new ID.
+Localhost links work on the computer running the app; deployed links use the deployed app's address.</p>
+<p>Use <strong>Add to comparison</strong> or enter IDs in Compare to compare two to four saved analyses. Legacy results retain
+their original source labels and methodology; they are not converted to WRDS.</p>
+<h2 id="5-save-settings-and-reset-inputs">5. Save settings and reset inputs</h2>
+<p><strong>Export settings (JSON)</strong> saves a run's inputs. Import a WRDS file or use a WRDS run's <strong>Use these settings</strong> to
+prepare another analysis. Names and notes are included in settings files; renaming does not change calculations.
+Legacy files can be retained/exported for reference, but cannot prepare a new run. Their saved analyses still open.
+See <a href="../STRATEGY_SETTINGS/">Strategy settings</a>.</p>
+<p><strong>Clear Parameters</strong> resets factors and sidebar inputs to WRDS defaults and clears any preview table. Saved runs,
+IDs, results and names remain available. Choose new inputs and run again.</p>
+<h2 id="6-preview-wrds-fields">6. Preview WRDS fields</h2>
+<p>When the team enables sample display, open <strong>Data Viewer</strong> and filter by Sector, Industry group, Industry or
+Sub-industry. Click <strong>Load preview</strong> for up to 10 matching rows, each a different company (its most recent row).
+Filters apply before sampling. Empty filters are explained. The preview uses native field units, is not
+representative of a portfolio, and has no download control.</p>
+<p>Preview filters are independent of the Analysis sidebar. Changing filters, pressing <strong>Clear preview</strong>, or leaving
+the viewer releases its rows. The full WRDS dataset stays outside the app. Until the preview is enabled, the
+viewer shows "WRDS sample rows aren't available yet." See <a href="../WRDS_DATA_PREVIEW/">preview behavior and release process</a>.</p>
+<h2 id="7-moving-from-legacy">7. Moving from Legacy</h2>
+<p>Use the <a href="../WRDS_FACTOR_REVIEW/#legacy-to-wrds">Legacy-to-WRDS table</a> to find each Legacy factor's WRDS
+replacement. <strong>Same</strong> means the same definition; <strong>Similar</strong> rows list how the definitions differ, so values are
+not guaranteed to match. Saved Legacy analyses remain accessible; new Legacy runs are unavailable.</p>
+<h2 id="15-use-wrds-mode">15. Use WRDS mode</h2>
+<p>WRDS is the only data source for new analyses. It backtests on point-in-time data built from WRDS (CRSP, Compustat, IBES and the Russell 2000 holdings of the IWM fund), and rebalances <strong>semi-annually</strong> (June, December), <strong>quarterly</strong> (March, June, September, December) or <strong>monthly</strong>, at month ends. Saved Legacy results retain their original annual 9/30 methodology.</p>
+<p><strong>Point in time.</strong> At each rebalance date the universe is the Russell 2000 members known on that date, the factors use only data public by then, and returns start after the date. Each holding period is buy and hold until the next rebalance.</p>
+<h3 id="run-a-wrds-backtest">Run a WRDS backtest</h3>
+<ol>
+<li>Open Analysis. WRDS is already selected; there is no data-source switch. A configured AWS Lambda is required to run.</li>
+<li>Review the selected factors, or use Clear Parameters to restore WRDS defaults.</li>
+<li>Pick the <strong>rebalancing frequency</strong> (Quarterly by default) and the start and end years (2002 to 2026). The backtest covers those calendar years, and the caption under the years shows the rebalances, for example "12 quarterly rebalances, 2009-12 to 2012-09; holds to 2012-12".</li>
+<li>Weighting, factor combination, sector filter, fossil fuel filter and initial AUM work as in Legacy, and the sector filter can go finer (see <strong>Filter by GICS industry</strong> below). There is no delisting option (see below).</li>
+<li><strong>Hold</strong>, under the weighting, sets how many of the filtered stocks the portfolio holds at each rebalance, best scores first:</li>
+<li><strong>Top X%</strong>: 1 to 100, default 10 (as in Legacy). In Mixing, each factor's sleeve buys its own top X% with an equal share of the money. At least one stock is always held. <strong>100%</strong> holds every stock in the filter, with or without a score, so the factors do not matter: you can run with no factor, for example to hold a whole sector or sub-industry.</li>
+<li><strong>Top N stocks</strong>: N from 1, default 50. The portfolio holds <strong>N different stocks in total</strong>, weighted across all of them (equal or by market cap). In Mixing the factors take turns in the order they were added: each adds its next-best stock by its own score (ties go to the lower PERMNO), skipping stocks another factor already picked, until N are picked. If the factors run out first, every stock with a score is held. The holdings' <strong>Picked By</strong> names the factor whose turn picked each stock. Integrating holds the top N by the combined score. Top N only ever holds stocks with a score: on a date where fewer than N stocks have one, it holds all of those, even when N is at least the size of the filter (only <strong>Top 100%</strong> holds every stock in the filter). The filter's size changes by date, so a Top N run still needs a factor.
+   The choice is shown in the run's <strong>Universe</strong> line ("Holds: Top 20 stocks"), in Compare's <strong>Hold</strong> row, in the calculation preview, and saved in exported settings files. Files and analyses saved before it hold the top 10%.</li>
+<li>Add factors on the Analysis tab, grouped as <strong>Momentum, Value, Profitability, Quality, Growth, Risk, Analyst and Size</strong>; tinted cards with a link icon replace a Legacy factor, and each tooltip gives the default direction and why. The <a href="../WRDS_FACTOR_REVIEW/">factor review</a> maps every Legacy factor to its WRDS replacement and explains the defaults.</li>
+<li>Click <strong>Run Portfolio Analysis</strong>. There is no Load Market Data step: the backtest reads the WRDS data in AWS.</li>
+</ol>
+<h3 id="check-the-calculation-preview">Check the calculation preview</h3>
+<p>In WRDS mode, <strong>Calculation preview</strong> on the Analysis tab (collapsed, below Factor Selection) shows the WRDS engine's calculation for the backtest the Run button would send: the rebalance dates of your frequency and years, the month-end Russell 2000 universe after the GICS and fossil fuel filters, the z-scores (winsorized at 1% and 99% per date), the top X% or top N stocks with ties broken by PERMNO (or, at 100%, every stock in the filter), the weights, buy-and-hold periods on CRSP total returns with delisting returns included, the trading cost when set, and the IWM benchmark (IWO and IWN shown too). Each WRDS run's tab in Results keeps <strong>Calculation used in this run</strong> below Performance Summary, and a saved WRDS analysis you open shows the one from its stored settings. It never shows Legacy's formula.</p>
+<h3 id="filter-by-gics-industry">Filter by GICS industry</h3>
+<ol>
+<li>Tick <strong>Enable Sector Filter</strong>, then pick a <strong>Filter level</strong>: Sector, Industry group, Industry or Sub-industry.</li>
+<li>One list appears per level down to the one you picked. Each list only offers what is inside your choices above it, so pick the sectors first (or leave all of them), then the industry groups, and so on. An empty list in the middle means all of it.</li>
+<li>The portfolio can only hold stocks in your choices at the picked level. If that list is empty, the filter is off.</li>
+<li>At the Sector level, a stock without GICS is placed by its SIC code, as before. At the finer levels, stocks without GICS are left out.</li>
+</ol>
+<p>Where the codes and names come from, and how many stocks have no GICS: <a href="../GICS_MAPPING/">GICS mapping</a>.</p>
+<p>The run's <strong>Universe</strong> caption and the <strong>Sectors</strong> row in Compare show the filter, e.g. "Industry: Banks, Insurance". The holdings table lists each stock's GICS sector, industry group, industry and sub-industry, and exported settings files keep the level and the choices.</p>
+<h3 id="limit-positions-by-daily-volume">Limit positions by daily volume</h3>
+<p>Under <strong>Liquidity Limit</strong> in the sidebar (WRDS only), choose the most a position may be, as a share of its stock's daily volume, so the backtest only buys stocks your portfolio could realistically trade:</p>
+<ul>
+<li><strong>No limit</strong> (the default): positions of any size, as before.</li>
+<li><strong>20%</strong>, <strong>10%</strong> or <strong>5%</strong>: no position above that share of the stock's average daily dollar volume.</li>
+</ul>
+<p>Liquidity is the stock's average daily dollar volume (price x shares traded) over its last 63 trading days, computed from the WRDS daily prices. Early Nasdaq volume is not adjusted for double counting, so before about 2004 a Nasdaq stock's volume can be overstated and the limit is looser for it.</p>
+<p>At each rebalance, every position is sized at the portfolio's value on that date with the chosen weighting, and a position above the limit is cut to the limit: each stock holds the smaller of its target and the limit times its daily dollar volume. A stock with no volume data gets no position. The money that cannot be placed is held in cash until the next rebalance and earns the risk-free rate. Nothing is redistributed: every other position keeps the weight the strategy gave it, and no stock is left out for being too big.</p>
+<p>The limit depends on the money invested: at the default $1,000 nothing is capped and the run is the same as with No limit, while at $100 million many small stocks are capped and much of the portfolio can sit in cash. Try the same strategy at a small and a large <strong>Initial AUM</strong>.</p>
+<p>The run's <strong>Liquidity Limit</strong> caption, the <strong>Liquidity Limit</strong> row in Compare and the calculation preview show the limit, and exported settings files keep it. A run with a limit also shows, under Performance Summary, the average cash share, the most cash at one rebalance (with its date) and the average number of positions capped, and <strong>Positions capped at each rebalance</strong> lists every date with its capped positions, stocks without volume data and cash share. Its holdings table adds <strong>Avg Daily $ Volume</strong> and <strong>% of Daily Volume</strong>.</p>
+<p>The dollar volume is computed from the daily prices already in the WRDS folder and saved next to them as one small file, so no new data pull is needed. It is loaded the first time a run with a limit needs it, and runs with No limit never load it.</p>
+<h3 id="read-wrds-results">Read WRDS results</h3>
+<p>The results have Legacy's sections, tiles, tables and charts, on dates instead of years:</p>
+<ul>
+<li>The run's tab reads e.g. "Run 2: WRDS, Quarterly".</li>
+<li><strong>Holdings and Ranks</strong>: pick a rebalance date to see what was held from that date, with weights, returns and factor values in percent as in Legacy, and a CSV download. <strong>All ranked stocks on this date</strong> ranks every stock the strategy could buy on that date.</li>
+<li>Legacy's growth chart against <strong>IWM</strong> (Russell 2000), <strong>IWN</strong> (Value) and <strong>IWO</strong> (Growth), and below it each period's return.</li>
+<li><strong>Period-by-Period Performance</strong>: Legacy's Year-by-Year table with one row per period (switch to <strong>By calendar year</strong> for yearly returns). Then the cohort comparison, the statistics annualized by the frequency (the caption says how), <strong>Factor Risk</strong> (below), and a win/loss table per period, e.g. <strong>Quarterly Win/Loss Summary</strong>.</li>
+<li><strong>Factor Risk</strong> shows how much of the return is exposure to common factors rather than alpha. The run's monthly returns after trading costs, minus the risk-free rate, are regressed on the Fama-French five factors (market, size, value, profitability, investment) and momentum, from the same WRDS data. It shows the annualized alpha (the intercept x 12) with its t-stat, R², each factor's exposure and t-stat (Newey-West standard errors), and one line such as "Mostly a value and momentum tilt; alpha not significant." (the two strongest significant tilts; the table has them all). Size is left out of that line: the factors are measured against the whole US market, so every Russell 2000 strategy shows a small-cap (positive Size) exposure, as the note under the table says. A |t| of 2 or more counts as significant. The section needs at least 36 months, so shorter runs do not show it, and neither do WRDS analyses saved before it existed.</li>
+<li>The Analysis ID shares a WRDS run exactly like a Legacy one.</li>
+</ul>
+<h3 id="how-wrds-mode-treats-delistings-and-gaps">How WRDS mode treats delistings and gaps</h3>
+<ul>
+<li><strong>Delistings</strong>: CRSP delisting returns are included. After a stock delists, its money earns the risk-free rate until the next rebalance.</li>
+<li><strong>Missing returns</strong>: a month without a return (not a delisting) counts as 0%. The results say how many stock-months that was.</li>
+<li><strong>Risk-free rate</strong>: Fama-French one-month T-bill. A month it is not published yet is filled from the 3-month T-bill / 12, and the results list those months.</li>
+</ul>
+<h3 id="limitations">Limitations</h3>
+<ul>
+<li><strong>Sectors and industries use today's GICS codes</strong>, not the codes a company had at the time, so the GICS filter is the one input that is not strictly point in time.</li>
+<li><strong>The benchmarks are ETF total returns</strong> (IWM, IWN, IWO): they include dividends and are net of the funds' fees. They differ slightly from the index returns Legacy uses, so do not compare Legacy and WRDS numbers directly.</li>
+<li><strong>The data runs from July 2002 to September 2026.</strong> A backtest ending in 2026 holds until September 2026 (semi-annual: June 2026), and one starting in 2002 starts with the first rebalance month in the data (July 2002 monthly, September 2002 quarterly, December 2002 semi-annual).</li>
+<li><strong>Before 2008 the index members come from annual Russell 2000 lists.</strong> Each list is used from the June reconstitution until the next one; there are no mid-year additions (IPOs join at the next list), and a stock leaves when it stops trading. From 2008 the members are IWM's monthly holdings.</li>
+<li><strong>Sectors are each company's current GICS classification</strong>, applied to all of its history: there is no historical GICS, so a company that changed sector shows its latest one throughout.</li>
+<li><strong>Analyst data is thin in the early years.</strong> IBES capital expenditure estimates start in 2006, and EBIT, dividend and cash flow estimates are sparse in 2001-2004, so analyst factors cover fewer stocks then.</li>
+<li>Data Viewer offers a bounded WRDS preview only after sample-display approval. It has no data download control; see section 6.</li>
+</ul>
+<h2 id="16-trading-costs">16. Trading costs</h2>
+<p>Set <strong>Trading cost (bps per trade)</strong> in the sidebar (0 to 500, default 0) to see returns after trading costs and how much each strategy's turnover costs it. It applies to new WRDS analyses, including the cohort comparison. Saved Legacy results retain their original cost settings.</p>
+<p><strong>What is charged.</strong> Every buy and every sell at each rebalance pays the cost on its dollar value. That includes the first purchase (the backtest starts in cash, so it buys 100% of the portfolio) and putting a delisted stock's cash back into stocks at the next rebalance. Nothing is charged for the delisting itself, for holding cash, or for selling at the end of the backtest.</p>
+<p><strong>The formula.</strong> At each rebalance:</p>
+<ul>
+<li>The weights after drift are last period's weights grown by each stock's return, as shares of the portfolio's value now. A delisted stock's money counts as cash, not as a stock.</li>
+<li>Turnover = the sum over all stocks of |target weight − weight after drift|. Buys and sells both count, so selling one stock to buy another is 2 × its weight. A stock held by two Mixing sleeves is one position.</li>
+<li>Cost = bps / 10,000 × turnover × portfolio value. It comes out of the portfolio at the rebalance, before the next period's return: return after costs = (1 − cost / value) × (1 + return before costs) − 1.</li>
+</ul>
+<p>For example, at 25 bps a rebalance that turns over 100% of a $10,000 portfolio costs $25 (0.25%).</p>
+<p><strong>Typical range.</strong> Russell 2000 stocks often cost roughly <strong>20 to 60 bps per side</strong>, and more for the smallest and least liquid names. 0 bps gives exactly the results the app gave before trading costs existed.</p>
+<p><strong>What the results show</strong> (only when the cost is above 0):</p>
+<ul>
+<li>The Performance Summary is after costs, with a caption giving the cost and the final value, total return and CAGR before costs. CAGR, Sharpe, drawdown and every other statistic use the returns after costs.</li>
+<li>The growth chart adds a dashed <strong>Before costs</strong> line.</li>
+<li><strong>Advanced Backtest Statistics</strong> adds a Trading Costs row: average turnover per rebalance, total cost paid ($), annualized cost drag (CAGR before costs minus CAGR after) and CAGR before costs.</li>
+<li>The Year-by-Year (WRDS: Period-by-Period) table adds <strong>Turnover %</strong> and <strong>Cost %</strong> (percent of the portfolio's value at that rebalance). By calendar year, turnover is summed and cost compounded over the year's rebalances.</li>
+<li><strong>Holdings and Ranks</strong> adds <strong>Traded %</strong> (the stock's |target − weight after drift|) to the table and its CSV, and the caption gives that rebalance's turnover and cost.</li>
+<li>The run tab, its header captions and the saved-analysis summaries show the cost, e.g. "Run 3: ROA % +1 | 25 bps".</li>
+</ul>
+<p>Analyses saved before trading costs existed open at 0 bps.</p>
+<p><strong>Limitation.</strong> The cost is the same for every stock. Real costs are higher for small, illiquid stocks and for large trades; costs by stock size or liquidity are not modelled yet.</p>
+<h2 id="17-compare-analyses">17. Compare analyses</h2>
+<p>The <strong>Compare</strong> tab, after Results, shows 2 to 4 saved analyses side by side, like comparing phones before buying one. Legacy and WRDS analyses can be compared together.</p>
+<ol>
+<li>Open <strong>Compare</strong>. It starts with 2 boxes; <strong>+ Add analysis</strong> adds one, up to 4, and boxes 3 and 4 have a remove button (✕).</li>
+<li>Paste an analysis ID in a box, or add one from the lists under the boxes: <strong>This session's analyses</strong>, <strong>Earlier analyses on this browser</strong> and <strong>All saved analyses</strong>, the same lists as in Results. Each entry's <strong>Add to comparison</strong> button puts its ID in the first empty box (adding a box if all are filled and there are fewer than 4); an entry already in the comparison shows <strong>Added</strong>. If all 4 boxes are full, a short message says so. As in Results, the lists hold analyses only, not cohort comparisons or ranked lists.
+   In Results, each run tab with an analysis ID has <strong>Add to comparison</strong> beside its ID: it adds the run and opens the Compare tab. It shows <strong>In comparison</strong> once the run is there, and a short message instead of switching when all 4 boxes are full. Runs computed in the app have no ID, so they have no button.</li>
+<li>The comparison appears as soon as 2 boxes hold valid IDs; there is nothing to click. The saved results are read from S3 once each and kept for the session, so adding, removing or sorting never reads one again. No backtest runs and no market data is loaded.</li>
+</ol>
+<p>Only saved analysis IDs work, so only runs done in AWS Lambda can be compared. A box with a mistyped or expired ID, the same ID as another box, or the ID of a cohort comparison or ranked list shows a short error, and the other analyses still compare as long as at least 2 are valid. Empty boxes are skipped.</p>
+<p><strong>The table</strong> has one column per analysis, headed by its label and short ID; above the table each analysis has its color, its data source and frequency, and its full ID with a copy button. The rows are grouped:</p>
+<ul>
+<li><strong>Settings</strong>: data source, frequency, period, initial AUM, factors with their directions, factor combination, weighting, sectors, fossil fuels, delisting strategy, benchmark and trading cost.</li>
+<li><strong>Performance</strong>: final portfolio value, total return, CAGR, cumulative outperformance against the analysis's own benchmark (Russell 2000 for Legacy, IWM for WRDS), and its best and worst period.</li>
+<li><strong>Risk</strong>: volatility (raw), Sharpe, max drawdown, beta and information ratio, with the same names and formats as Results, then a WRDS analysis's Factor Risk alpha, alpha t-stat and R² (n/a for Legacy and for WRDS analyses without the section). Sortino and tracking error are not in the backtest statistics, so they are not shown.</li>
+<li><strong>Costs</strong>: CAGR before costs, average turnover per rebalance, total trading cost paid and annualized cost drag. Analyses run without a trading cost, or saved before trading costs existed, show 0 bps, n/a turnover, $0 cost and 0% drag.</li>
+</ul>
+<p><strong>Reading it:</strong></p>
+<ul>
+<li>The best value of each row is green: higher CAGR, return, Sharpe, information ratio and factor alpha; the smallest drawdown; lower volatility, turnover, cost paid and cost drag. When analyses tie for the best value (they look the same), all of them are green; when every analysis ties, none is. Settings, beta, the alpha t-stat, R² and n/a are never highlighted.</li>
+<li>Volatility, Sharpe and information ratio are annualized, so they compare across frequencies as they are. Best and worst period and turnover per rebalance are each analysis's own periods (a year, half-year, quarter or month), so they are highlighted only when the analyses have the same frequency. Likewise, final portfolio value and total trading cost paid are in dollars, so they are highlighted only when every analysis has the same initial AUM; returns, CAGR, ratios and cost drag are always compared.</li>
+<li>A ≠ after a row's name means its values differ. <strong>Show only differences</strong> hides the rows that are the same.</li>
+<li><strong>Sort by</strong> reorders the columns best first by CAGR, total return, Sharpe, max drawdown, volatility, information ratio or cost drag (n/a last, ties in the order entered). <strong>Entered order</strong> puts them back. Sorting never reloads the results.</li>
+</ul>
+<p><strong>The chart</strong> overlays every analysis's portfolio after costs, each in its own color, on one date axis, and draws each benchmark once (one Russell 2000 line, one IWM line), grey and dotted. A benchmark's line comes from the first analysis in the current order that uses it, so sorting can change which period it covers. When the analyses have different initial AUMs, every line (each portfolio and each benchmark) is scaled to start at $1,000 and the title says <strong>Growth of $1,000</strong>; when they match, the lines show dollar values. Each analysis keeps its color when you sort; the legend follows the sort. Legacy's yearly values are placed on September 30, since Legacy rebalances on the 9/30 data.</p>
+<h2 id="18-backtest-scoreboard">18. Backtest scoreboard</h2>
+<p>The <strong>Scoreboard</strong> tab, after Compare, ranks every saved analysis (everyone's, Legacy and WRDS) by the metric you choose, so you can see which factor combinations did best and open the winners.</p>
+<ol>
+<li>Open <strong>Scoreboard</strong>. The table lists the analyses ranked by <strong>Sharpe</strong>, best first, 20 at a time; <strong>Show all</strong> lists the rest.</li>
+<li><strong>Rank by</strong> changes the metric: Sharpe, CAGR, cumulative outperformance, max drawdown, volatility, win rate, total return or final value. The ranked column's header has ▼ (highest first) or ▲ (lowest first, for volatility). Max drawdown is a loss, so the smallest loss ranks first. Analyses that tie (they look the same) share a rank and are listed newest first.</li>
+<li>Narrow it down with the filters: <strong>Data source</strong> (Legacy, or WRDS with its frequency), <strong>Factor combination</strong> (Mixing or Integrating), <strong>Uses every factor</strong> (only analyses with all the factors you pick) and <strong>Period within</strong> (only analyses whose whole period lies within those years).</li>
+<li>Pick an analysis under <strong>Open an analysis</strong> (listed by rank). Its full ID is shown with a copy button. <strong>Open</strong> opens it in Results as a new tab, as if you had pasted its ID; <strong>Compare</strong> adds it to the Compare tab and opens that.</li>
+</ol>
+<p>The metrics are the ones the analysis's Results show (and the Compare tab's): the backtest Lambda saves them with each analysis, so the scoreboard reads them without downloading any result or rerunning anything. It reads them again at most once a minute; <strong>Refresh</strong> reads them now. Outperformance and win rate are against each analysis's own benchmark (Russell 2000 for Legacy, IWM for WRDS).</p>
+<p><strong>Comparing fairly.</strong> Analyses cover different periods and start with different amounts. Rank by Sharpe, CAGR or another rate rather than final value, which only compares at the same initial amount, and use <strong>Period within</strong> for a like-for-like ranking. A WRDS analysis's frequency is in its Source column.</p>
+<p>Only saved analyses are ranked, so only runs done in AWS Lambda appear. Cohort comparisons and ranked lists are not analyses and are left out. Analyses saved before sharing existed have no settings to score, so the scoreboard leaves them out and says how many; they are still listed under <strong>All saved analyses</strong> in Results. Saved analyses are deleted after 1 year, and they leave the scoreboard then.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
