@@ -55,7 +55,6 @@ uploaded and inspected: [`pipeline/README.md`](../pipeline/README.md); the S3 se
 2. The market data lives in AWS S3 as two Parquet files, not in a database.
 3. S3 is always on. It does not pause after a week without traffic the way the free-tier Supabase project did.
 4. The app downloads the data once per server process (about 1–2 seconds) and shares that copy with every user session for 6 hours.
-5. Supabase is still supported as a fallback data source.
 
 | File | Former Supabase table | Contents |
 |---|---|---|
@@ -74,11 +73,10 @@ AWS_SECRET_ACCESS_KEY = "your-secret-access-key"
 AWS_DEFAULT_REGION = "us-east-1"
 ```
 
-1. With AWS credentials present, the app uses S3 automatically. The sidebar's Data Source line shows "AWS S3 (Parquet files)".
-2. Set `FACTOR_LAKE_DATA_SOURCE = "supabase"` to switch back to Supabase without a code change, or `"s3"` to force S3.
-3. Optional: `FACTOR_LAKE_S3_BUCKET` (default `sysen-5900-factor-lake`) and `FACTOR_LAKE_S3_PREFIX` (default `factor-lake-data`) point the app at other files.
-4. The app only needs read access. Ask the AWS account owner for a key whose policy allows just `s3:GetObject` on `arn:aws:s3:::sysen-5900-factor-lake/factor-lake-data/*`, rather than reusing a key that can write or delete.
-5. Never commit keys. `.env` and `.streamlit/secrets.toml` are in `.gitignore`.
+1. The app reads saved analyses and WRDS holdings from S3 with these keys.
+2. Optional: `FACTOR_LAKE_S3_BUCKET` (default `sysen-5900-factor-lake`) and `FACTOR_LAKE_S3_PREFIX` (default `factor-lake-data`) point the app at other files.
+3. The app only needs read access. Ask the AWS account owner for a key whose policy allows just `s3:GetObject` on `arn:aws:s3:::sysen-5900-factor-lake/factor-lake-data/*`, rather than reusing a key that can write or delete.
+4. Never commit keys. `.env` and `.streamlit/secrets.toml` are in `.gitignore`.
 
 ## 3. Publish new data
 

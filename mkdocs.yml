@@ -73,5 +73,4 @@ nav:
     - Supabase Maintenance: SUPABASE_MAINTENANCE_GUIDE.md
     - Streamlit Styling: STREAMLIT_STYLING_GUIDE.md
     - Security Scanning: Bandit & Safety.md
-    - Reorganization Summary: REORGANIZATION_SUMMARY.md
   - API Reference: reference/           # Navigated by the auto-generated SUMMARY.md

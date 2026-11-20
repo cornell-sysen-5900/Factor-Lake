@@ -142,7 +142,6 @@ Changing a backtest engine file (`ENGINE_SOURCES` in `src/backtest_jobs.py`, `WR
 - `DOCS/SUPABASE_SETUP.md` - Environment and credentials setup
 - `DOCS/STREAMLIT_STYLING_GUIDE.md` - Styling and UI customization
 - `DOCS/Bandit & Safety.md` - Security scanning notes
-- `DOCS/REORGANIZATION_SUMMARY.md` - Historical refactor summary (contains legacy context)
 
 ## Deployment
 

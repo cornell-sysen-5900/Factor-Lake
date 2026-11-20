@@ -19,12 +19,12 @@ Use this guide when you need to keep the production [Factor-Lake Streamlit App](
 
 ## 3. Run the production smoke test
 
-1. Leave the default sidebar settings in place.
+1. Leave the default sidebar settings in place. The sidebar should name the backtest Lambda; if it says Lambda
+   is not configured, check `FACTOR_LAKE_BACKTEST_LAMBDA` in the app's secrets.
 2. Select at least one factor in Analysis.
-3. Click Load Market Data.
-4. Click Run Portfolio Analysis.
-5. Confirm the Results tab renders metrics and charts.
-6. Change one factor or direction and run again. Confirm a second run tab appears and is selected, and that clicking the first tab still shows its original settings.
+3. Click Run Portfolio Analysis. There is nothing to load first: the backtest runs in AWS Lambda.
+4. Confirm the Results tab renders metrics and charts, with an Analysis ID.
+5. Change one factor or direction and run again. Confirm a second run tab appears and is selected, and that clicking the first tab still shows its original settings.
 
 ## 4. If the app did not redeploy
 
