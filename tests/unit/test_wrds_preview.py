@@ -151,6 +151,7 @@ def test_gate_is_closed_by_default_and_cannot_be_overridden_by_the_request(store
     service = BacktestService(store)
     result = service.handle_event({'action': 'wrds_preview', 'request': {**request(), 'approved': True}})
     assert result['status'] == 'disabled' and store.client.gets == []
+    assert result['message'] == "WRDS sample rows aren't available yet."
     assert service._wrds is None and service._universe is None
 
 

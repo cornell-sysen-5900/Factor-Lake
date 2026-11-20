@@ -30,7 +30,7 @@ CELL_COLUMNS = ['sector_name', 'gsubind']
 NEWEST_FIRST = dict(by=['date', 'permno'], ascending=[False, True], kind='stable')
 
 APPROVAL_ENV = 'FACTOR_LAKE_WRDS_PREVIEW_APPROVED'
-DISABLED_MESSAGE = 'WRDS sample rows are not enabled yet. Release requires Prof. Steward’s approval.'
+DISABLED_MESSAGE = "WRDS sample rows aren't available yet."
 NOT_READY_MESSAGE = 'The WRDS preview is not ready for this data version. Ask the team to build its preview index.'
 PREVIEW_ROWS = 10
 MAX_INDEX_ROWS = 100_000

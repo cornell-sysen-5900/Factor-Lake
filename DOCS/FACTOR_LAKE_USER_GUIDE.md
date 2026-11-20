@@ -51,8 +51,8 @@ Filters apply before sampling. Empty filters are explained. The preview uses nat
 representative of a portfolio, and has no download control.
 
 Preview filters are independent of the Analysis sidebar. Changing filters, pressing **Clear preview**, or leaving
-the viewer releases its rows. The full WRDS dataset stays outside the app. Until approval, the viewer shows an
-availability message. See [preview behavior and release process](WRDS_DATA_PREVIEW.md).
+the viewer releases its rows. The full WRDS dataset stays outside the app. Until the preview is enabled, the
+viewer shows "WRDS sample rows aren't available yet." See [preview behavior and release process](WRDS_DATA_PREVIEW.md).
 
 ## 7. Moving from Legacy
 

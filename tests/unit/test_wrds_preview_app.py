@@ -86,7 +86,7 @@ def test_disabled_preview_never_calls_lambda(app_factory, monkeypatch):
     monkeypatch.setenv(APPROVAL_ENV, 'false')
     at = app_factory()
     _click_main_tab(at, 'Data Viewer')
-    assert any('approval' in i.value for i in at.info)
+    assert [i.value for i in at.info] == ["WRDS sample rows aren't available yet."]
     assert at.gateway.calls == []
     assert not at.get('download_button')
     assert 'Load preview' not in [b.label for b in at.button]
