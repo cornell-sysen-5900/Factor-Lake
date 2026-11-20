@@ -1,18 +1,19 @@
 # Backtests in AWS Lambda
 
-Backtests can run in AWS Lambda instead of inside the Streamlit app. The app sends only the inputs (factors, directions and sidebar settings). Lambda reads the market data from S3, runs the same backtest code, and saves the result in S3, so the app never has to download or hold the market data to run a backtest.
+Every backtest runs in AWS Lambda. The app sends only the inputs (factors, directions and sidebar settings). Lambda reads the WRDS data from S3, runs the backtest, and saves the result in S3, so the app never downloads or holds the market data. New analyses use WRDS only; older Legacy analyses still open by ID (see [Older saved runs](#older-saved-runs-legacy)).
 
 ## 1. How it works
 
 ```
-Streamlit app ──inputs──▶ Lambda factor-lake-backtest ──reads──▶ s3://.../factor-lake-data/*.parquet
+Streamlit app ──inputs──▶ Lambda factor-lake-backtest ──reads──▶ s3://.../factor-lake-data/wrds_2026_11/*.parquet
       ▲                         │
       └──result or S3 link──────┴──saves──▶ s3://.../factor-lake-data/backtest-results/<hash>.json
+                                                                       (+ <hash>.holdings.parquet)
 ```
 
-1. **Inputs only.** Run Portfolio Analysis (and Generate Comparison) sends a small JSON job: factors, directions, years, AUM, weighting, delisting strategy, factor combination, sectors, the fossil fuel filter and, above 0 bps, the trading cost (section 10). See `src/backtest_jobs.py`.
-2. **Same code, same results.** Lambda filters the data with `src/universe_selection.py` (the code behind Load Market Data) and runs `src/backtest_engine.py`, the code the app runs locally.
-3. **Cached by hash.** The result is saved under a SHA-256 hash of the inputs, the data version (the S3 ETags of the market data files) and the backtest code version (a hash of the engine's source files). Republishing the data or deploying new backtest code gives fresh results.
+1. **Inputs only.** Run Portfolio Analysis (and Generate Comparison) sends a small JSON job: factors, directions, rebalancing frequency, years, AUM, weighting, Hold, factor combination, the GICS filter, the fossil fuel filter, the liquidity limit and, above 0 bps, the trading cost (section 10). See `src/wrds_jobs.py`.
+2. **One engine, checked against a local run.** Lambda runs `src/wrds_service.py` and the vectorized engine `src/wrds_engine.py`. After each deploy, `scripts/check_backtest_lambda.py` runs the same job locally on the S3 data and compares every number (section 4).
+3. **Cached by hash.** The result is saved under a SHA-256 hash of the inputs, the data version (the S3 ETags of the WRDS files) and the backtest code version (a hash of the engine's source files). Republishing the data or deploying new backtest code gives fresh results.
 4. **Repeats are instant.** When a result with that hash exists, Lambda returns it without rerunning the backtest. Results are shared, so a run by any user is cached for everyone.
 5. **Result or link.** Results up to 5 MB come back in the Lambda response (Lambda's limit is 6 MB). Bigger results come back as a temporary S3 link (valid for 1 hour), which the app downloads.
 6. **1-year expiry.** The weekly "Delete old results" GitHub Action deletes saved results older than 1 year, with their holdings files (section 12).
@@ -50,8 +51,8 @@ It finishes by pinging the function. Options: `--memory`, `--timeout`, `--functi
 The app on Streamlit Cloud redeploys from `main` on every merge, and `.github/workflows/deploy-lambda.yml` keeps the Lambda in step with it. A push to `main` that changes `src/`, `aws_lambda/`, `scripts/deploy_backtest_lambda.py` or `uv.lock` (which sets the bundled pandas, numpy and pyarrow versions) runs:
 
 1. **Unit tests.** The workflow calls `tests.yml`. Nothing is deployed unless the tests pass.
-2. **Deploy.** It runs `uv sync --locked`, then the deploy command above with `--role-arn` and `--function-name` from the repository variables, plus `--leave-lifecycle-rules`, so CI never rewrites the shared bucket's lifecycle settings (it only checks them; the 90-day rule is an admin's, section 9). The Python version comes from `.python-version`, so the Lambda gets the library versions locked in `uv.lock`. The WRDS data folder is the code's default (`DEFAULT_WRDS_DIR` in `src/wrds_data.py`), so a new WRDS pull is one code change.
-3. **Check.** It runs `scripts/check_backtest_lambda.py` (section 4) against the new function: the Legacy samples, then one quarterly WRDS backtest end to end.
+2. **Deploy.** It runs `uv sync --locked`, then the deploy command above with `--role-arn` and `--function-name` from the repository variables, plus `--leave-lifecycle-rules`, so CI never rewrites the shared bucket's lifecycle settings (it only checks them; saved results are deleted after 1 year by the weekly cleanup, section 12). The Python version comes from `.python-version`, so the Lambda gets the library versions locked in `uv.lock`. The WRDS data folder is the code's default (`DEFAULT_WRDS_DIR` in `src/wrds_data.py`), so a new WRDS pull is one code change.
+3. **Check.** It runs `scripts/check_backtest_lambda.py` (section 4) against the new function: one quarterly WRDS backtest end to end, plus the Legacy samples that keep older saved runs reproducible.
 
 The run fails if any step fails, so a red run means the Lambda may be behind `main`. To redeploy by hand, open Actions → Deploy Backtest Lambda → Run workflow (only `main` deploys). Deploys never overlap. A push that arrives during a deploy waits for it to finish.
 
@@ -75,7 +76,7 @@ Set the function name next to the AWS keys, in `.env` locally or in the Streamli
 FACTOR_LAKE_BACKTEST_LAMBDA="factor-lake-backtest"
 ```
 
-The app's AWS key also needs `lambda:InvokeFunction` on that function. When the variable is set, the sidebar shows **Run backtests in AWS Lambda** (on by default). Turn it off to run backtests in the app as before (Load Market Data first). Without the variable, the app works exactly as before.
+The app's AWS key also needs `lambda:InvokeFunction` on that function. The sidebar then names the function ("WRDS backtests run in AWS Lambda: …"). Without the variable, the sidebar says "WRDS mode runs in AWS Lambda, which is not configured for this app." and Run Portfolio Analysis is disabled; saved analyses still open by ID if the app can read S3.
 
 ## 4. Check it
 
@@ -83,27 +84,23 @@ The app's AWS key also needs `lambda:InvokeFunction` on that function. When the 
 uv run python scripts/check_backtest_lambda.py
 ```
 
-For five sample backtests (Mixing and Integrating, every delisting strategy, equal and market cap weighting, the fossil fuel filter, a cohort comparison, and the first one again at 25 bps trading cost), it runs each one locally on the S3 data, then in Lambda, and compares every number. It then runs each one in Lambda again and checks that it came from the cache, unchanged. It uses new inputs each time, so the first Lambda call always computes. The Lambda uses the same library versions but runs on Linux x86, so numbers may differ in the last binary digit. The check allows a relative difference of 1e-9 and prints the largest difference it found.
+It checks one quarterly WRDS backtest (2002-2026, the whole data, two factors) end to end, at 0 bps and again at 25 bps. The function must read the WRDS folder the code expects (its `FACTOR_LAKE_WRDS_DIR`). The Lambda's result must match the same job run locally on the WRDS data in S3. The newest rebalance date's holdings, read from the Lambda's holdings file the way the app reads them (two ranged GETs), must match the local holdings of that date. A second Lambda call must come from the cache, unchanged. Each 25 bps run must also come back with its trading cost fields and a lower final value than the same job at 0 bps; the check prints its average turnover, total cost and annual cost drag.
 
-Then it checks one quarterly WRDS backtest (2008-2026, two factors) end to end, at 0 bps and again at 25 bps. The function must read the WRDS folder the code expects (its `FACTOR_LAKE_WRDS_DIR`). The Lambda's result must match the same job run locally on the WRDS data in S3. The newest rebalance date's holdings, read from the Lambda's holdings file the way the app reads them (two ranged GETs), must match the local holdings of that date. A second Lambda call must come from the cache, unchanged. `--skip-wrds` leaves this part out.
+The Lambda uses the same library versions but runs on Linux x86, so numbers may differ in the last binary digit. The check allows a relative difference of 1e-9 and prints the largest difference it found. It also runs the Legacy samples that keep older saved runs reproducible ([Older saved runs](#older-saved-runs-legacy)). `--skip-wrds` leaves the WRDS part out.
 
-Each 25 bps run must also come back with its trading cost fields and a lower final value than the same job at 0 bps; the check prints its average turnover, total cost and annual cost drag.
-
-Holdings are compared stock by stock, leaving out **Rank** and **Score**. Winsorizing gives the top 1% of each factor exactly the same score, and the engine sorts those ties in an order that depends on the machine. So a Mac and Lambda can list tied stocks in a different order, and for a stock bought by several Mixing sleeves, show the Rank and Score from a different sleeve. The stocks held, shares, prices, weights, returns and contributions still have to match. When a percentage cuts through a tied block (for example a 1% cohort), the engine's choice of which tied stocks to buy also depends on the machine and on row order. That is a known engine issue, to be fixed separately with deterministic tie-breaking.
-
-The unit tests (`tests/unit/test_backtest_lambda.py`) run the same Lambda code against a fake S3 and drive the real app, checking that a Lambda run equals a local run for both factor combinations, each delisting strategy and the cohort comparison, and that a repeated run is served from the cache.
+The unit tests (`tests/unit/test_wrds_service.py`, `test_wrds_saved.py`, `test_wrds_check_script.py`) run the same Lambda code against a fake S3 with synthetic WRDS data and drive the real app, checking the holdings files, the cache, and that a repeated run is served from the cache.
 
 ## 5. Demo script (about 5 minutes)
 
 Before the call: deploy (section 2), add `FACTOR_LAKE_BACKTEST_LAMBDA` to `.env`, and start the app with `uv run streamlit run app/streamlit_app.py`. To warm the Lambda up, run one backtest. To keep the "first run computes" moment for the call, pick inputs you have not run yet (for example a new AUM).
 
-1. **The switch.** Point out **Run backtests in AWS Lambda** in the sidebar and the caption with the function name. On the Analysis tab, the caption says the market data does not need to be loaded.
-2. **First run computes in Lambda.** Add two factors (for example ROE using 9/30 Data and ROA %), pick Integrating, and click **Run Portfolio Analysis** without loading data. The confirmation says "computed in AWS Lambda in N s". In the Results tab, the **Computed** line shows the result ID (the first 12 characters of its hash).
-3. **The repeat is cached.** Click **Run Portfolio Analysis** again with the same settings. The new run shows the same result ID and "returned from the AWS Lambda result cache in 0.N s", with the time it was first computed.
-4. **Any change is a new backtest.** Change the AUM or a factor direction and run again: it computes (new result ID).
-5. **Same results as before.** Turn the Lambda switch off, click **Load Market Data**, and run the same settings as step 2. The new run tab shows the same final value, CAGR and holdings as the Lambda run. For the precise check, run `scripts/check_backtest_lambda.py` in a terminal: "match: yes" with the largest difference for each backtest, and "cached=True" for every repeat.
-6. **Cohort comparison.** In a Lambda run's tab, open **Run Cohort Comparison** and click **Generate Comparison**: the caption says it ran in Lambda.
-7. **Where results live.** In the AWS console: S3 → `sysen-5900-factor-lake` → `factor-lake-data/backtest-results/` shows one JSON file per result hash. Old results are deleted by the weekly "Delete old results" GitHub Action (section 12). Lambda → `factor-lake-backtest` (`sysen5900-factor-lake-backtest` in the class account) → Monitor shows the invocations, and its CloudWatch logs show "Computed ..." and "Cache hit ..." lines.
+1. **Where it runs.** Point out the sidebar caption naming the Lambda function. On the Analysis tab, the caption says the backtest runs in AWS Lambda on the WRDS data, with nothing to load in the app.
+2. **First run computes in Lambda.** Add two factors (for example ROE and 12-1 Mo Momentum), keep Quarterly, and click **Run Portfolio Analysis**. The confirmation says "computed in AWS Lambda in N s". In the Results tab, the header shows how it was computed and its Analysis ID.
+3. **The repeat is cached.** Click **Run Portfolio Analysis** again with the same settings. The new run shows the same Analysis ID and "returned from the AWS Lambda result cache in 0.N s", with the time it was first computed.
+4. **Any change is a new backtest.** Change the AUM or a factor direction and run again: it computes (new Analysis ID).
+5. **Same results as a local run.** Run `scripts/check_backtest_lambda.py` in a terminal: it runs a WRDS job locally on the S3 data and in Lambda and prints "match: yes" with the largest difference, and "cached=True" for the repeat.
+6. **Cohort comparison.** In a run's tab, open **Run Cohort Comparison** and click **Generate Comparison**: the caption says it ran in Lambda.
+7. **Where results live.** In the AWS console: S3 → `sysen-5900-factor-lake` → `factor-lake-data/backtest-results/` shows one JSON file per result hash, with a `.holdings.parquet` file next to each WRDS backtest. Old results are deleted by the weekly "Delete old results" GitHub Action (section 12). Lambda → `factor-lake-backtest` (`sysen5900-factor-lake-backtest` in the class account) → Monitor shows the invocations, and its CloudWatch logs show "Computed ..." and "Cache hit ..." lines.
 
 ## 6. Share an analysis by its ID
 
@@ -115,14 +112,14 @@ The hash a result is saved under doubles as its **analysis ID**. Each saved file
 - **Earlier analyses on this browser** (`app/analysis_history.py`) lists IDs from earlier sessions on the same browser. The app has no logins, so they are kept in the browser's `localStorage` (key `factor-lake-analyses`, newest 200). A small inline JavaScript component (`st.components.v2`) adds each session's IDs and reports the stored list to the app once per page load. Reporting more often would rerun the app and clear messages like "Analysis complete".
 - **All saved analyses** lists everyone's newest 20 from S3 (`list_saved_analyses`). It reads only the files' metadata (the Lambda saves a short `summary` and the `kind`, so cohort comparisons and WRDS ranked lists are left out), and only while expanded. Only `<ID>.json` results are listed, never the WRDS holdings files next to them. A WRDS analysis's summary starts with its data source and frequency, e.g. "WRDS, Quarterly | ROE (higher), ROA (higher) | Mixing | 2008-2026 | $1,000", and the session and browser lists show the same line under a WRDS run's label. The app's key needs `s3:ListBucket` on `backtest-results/`; without it the list explains that. Results saved before summaries existed show "Details not recorded".
 - The **Scoreboard** tab ranks everyone's saved analyses by the scores saved in their metadata (section 11).
-- Errors: text that isn't a 64-character ID, an ID with no saved analysis (mistyped, or deleted by the 90-day rule), a result saved before sharing existed, or a cohort comparison's ID.
+- Errors: text that isn't a 64-character ID, an ID with no saved analysis (mistyped, or deleted after 1 year by the weekly cleanup, section 12), a result saved before sharing existed, or a cohort comparison's ID.
 
 Demo (about 2 minutes, after the steps in section 5):
 
 1. In a run's tab, copy its **Analysis ID**.
 2. Open the app in a second browser window (a private window works) to stand in for a colleague. Its **Results** tab shows **Open a saved analysis** and no runs.
 3. Paste the ID and click **Open analysis**. The same final value, CAGR, holdings and charts appear in a tab labelled "(opened)", with "Opened from a saved analysis (first computed …)". Generate Comparison also works there.
-4. Paste a wrong ID (for example drop the last character, or change one character) to show the errors: "is not an analysis ID" and "No saved analysis has the ID … deleted after 90 days".
+4. Paste a wrong ID (for example drop the last character, or change one character) to show the errors: "is not an analysis ID" and "No saved analysis has the ID … Saved analyses are deleted after 1 year".
 5. Back in the first window, **This session's analyses** lists your runs with their IDs. The second window lists only the analysis it opened.
 6. Close both windows, open the app again in the first browser, and go to **Results → Earlier analyses on this browser**: the analyses from before are listed with their IDs. Click **Open** on one, and it opens without pasting anything.
 7. Expand **All saved analyses** to show everyone's recent analyses with their factors and dates, and open one from there.
@@ -139,17 +136,21 @@ Demo (about 2 minutes, after the steps in section 5):
 
 ## 8. Cost
 
-Each uncached backtest is one Lambda invocation of a few seconds. A cold start adds the time to download the 8 MB market data file. Cached repeats take well under a second, and saved results are small JSON files deleted after 90 days. Class use stays far inside the Lambda and S3 free tiers.
+Each uncached backtest is one Lambda invocation of a few seconds. A cold start adds a few seconds to load the WRDS data (section 9). Cached repeats take well under a second. Saved results (small JSON files, plus a holdings Parquet file per WRDS backtest) are deleted after 1 year (section 12). Class use stays far inside the Lambda and S3 free tiers.
 
 ## 9. WRDS mode
 
-WRDS backtests (see the user guide, section 15, and `DOCS/WRDS_MODE_DESIGN.md`) run in the same function. A job with `data_mode: "wrds"` goes to `src/wrds_service.py`; every other job is a Legacy job, handled exactly as before.
+WRDS backtests (see the user guide, section 15, and `DOCS/WRDS_MODE_DESIGN.md`) are the only kind the app runs. Every job it sends has `data_mode: "wrds"` and goes to `src/wrds_service.py`.
 
 - **Data.** The function reads three files under `factor-lake-data/wrds_2026_11/` (`factor_panel_monthly`, `returns_monthly`, `market_monthly`; the panel runs from 2002-07), only the columns it needs, once per container. The folder is set by the function's `FACTOR_LAKE_WRDS_DIR` variable (the deploy script's `--wrds-dir`, which defaults to `DEFAULT_WRDS_DIR` in `src/wrds_data.py`, as CI deploys it). A new WRDS pull goes into a new folder; the previous one, `wrds_2026_10/`, stays for rollback (set `DEFAULT_WRDS_DIR` back and merge).
 - **Cache.** The key hashes the job, the S3 ETags of the three files and a WRDS code version. Legacy keeps its own code version, so WRDS changes never recompute Legacy results.
 - **Holdings.** A WRDS backtest writes `backtest-results/<hash>.holdings.parquet` (one row group per rebalance date) **before** `backtest-results/<hash>.json`. The app reads one date at a time with its own S3 keys, in two ranged GETs. A cached result whose holdings file is missing is computed again.
-- **Listings.** The result JSON's metadata has the job's `kind` and a summary starting "WRDS, <frequency>" (section 6). WRDS results saved before this (on the dev function) have none and show "Details not recorded" until the 90-day rule deletes them.
+- **Listings.** The result JSON's metadata has the job's `kind` and a summary starting "WRDS, <frequency>" (section 6). WRDS results saved before this (on the dev function) have none and show "Details not recorded" until the weekly cleanup deletes them after 1 year (section 12).
 - **Live deploys** come from CI (section 2, "Deploy from CI"), whose check step runs a WRDS backtest end to end.
+
+### Older saved runs (Legacy)
+
+Analyses saved before the app became WRDS-only (PR #87) still open by ID in Results and Compare: the app reads them from S3 and never recomputes them. The function still accepts Legacy jobs (a job without `data_mode`, run by `src/backtest_engine.py`), and the post-deploy check's Legacy samples and `tests/unit/test_legacy_pinned.py` keep those results reproducible. The app no longer sends Legacy jobs.
 
 ### Deploy a dev function
 
@@ -226,7 +227,7 @@ Saved results and WRDS holdings both live under `factor-lake-data/backtest-resul
 Both job types take an optional **`trading_cost_bps`**: the cost of every buy and sell in basis points of its value, a number from 0 to 500 (anything else is refused with a readable error). The engines charge it on each rebalance's turnover; see the user guide, section 16, and `src/trading_costs.py`.
 
 ```json
-{"kind": "backtest", "factors": ["ROE_using_9-30_Data", "ROA"], "...": "...", "trading_cost_bps": 25.0}
+{"kind": "backtest", "data_mode": "wrds", "factors": ["f_roe", "mom_12_1"], "...": "...", "trading_cost_bps": 25.0}
 ```
 
 - **Only above 0.** The app adds the field only when the cost is above 0, and `job_hash` drops an explicit `0`. A 0 bps job is therefore exactly the job it was before trading costs existed, and so is its hash input. WRDS ranked lists never carry the field (ranks do not depend on costs).

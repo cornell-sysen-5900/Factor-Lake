@@ -45,20 +45,20 @@ IDs, results and names remain available. Choose new inputs and run again.
 
 ## 6. Preview WRDS fields
 
-After Prof. Steward approves sample display and the team enables it, open **Data Viewer**, choose preview years,
-and filter by Sector, Industry group, Industry or Sub-industry. Click **Load preview** for up to five matching
-rows per year. Filters apply before sampling. Empty years and filters are explained. The preview uses native
-field units, is not representative of a portfolio, and has no download control.
+When the team enables sample display, open **Data Viewer** and filter by Sector, Industry group, Industry or
+Sub-industry. Click **Load preview** for up to 10 matching rows, each a different company (its most recent row).
+Filters apply before sampling. Empty filters are explained. The preview uses native field units, is not
+representative of a portfolio, and has no download control.
 
 Preview filters are independent of the Analysis sidebar. Changing filters, pressing **Clear preview**, or leaving
-the viewer releases its rows. The full WRDS dataset stays outside the app. Until approval, the viewer shows an
-availability message. See [preview behavior and release process](WRDS_DATA_PREVIEW.md).
+the viewer releases its rows. The full WRDS dataset stays outside the app. Until the preview is enabled, the
+viewer shows "WRDS sample rows aren't available yet." See [preview behavior and release process](WRDS_DATA_PREVIEW.md).
 
 ## 7. Moving from Legacy
 
-Use the [Legacy-to-WRDS match report](LEGACY_WRDS_MATCHES.md) to find definition matches and related alternatives.
-A similar name is not a guarantee of equivalent values or definitions. Unmatched factors are listed for review,
-not rebuilt. Saved Legacy analyses remain accessible; new Legacy runs are unavailable.
+Use the [Legacy-to-WRDS table](WRDS_FACTOR_REVIEW.md#legacy-to-wrds) to find each Legacy factor's WRDS
+replacement. **Same** means the same definition; **Similar** rows list how the definitions differ, so values are
+not guaranteed to match. Saved Legacy analyses remain accessible; new Legacy runs are unavailable.
 
 ## 15. Use WRDS mode
 

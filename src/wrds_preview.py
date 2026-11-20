@@ -1,9 +1,15 @@
 """Bounded WRDS samples served by Lambda, separately from the backtest engine.
 
-The index holds the first five (date, permno) rows in every year/sector/sub-industry
-cell. Every supported GICS filter is a union of these cells, so merging their first
-five rows gives exactly the same sample as filtering the full panel first. This
-keeps cold requests small without dropping rare sub-industries from the preview.
+A preview is at most PREVIEW_ROWS rows, each a different company: every company that
+matches the GICS filter contributes its most recent row, newest first (ties by permno),
+so it is never one company's time series.
+
+The index holds, for every sector/sub-industry cell, the PREVIEW_ROWS companies with
+the most recent rows, one row each (their latest in that cell). Every supported GICS
+filter is a union of these cells, and a company in the filter's top PREVIEW_ROWS is also
+in the top PREVIEW_ROWS of the cell holding its latest row, so selecting from the index
+gives exactly the same sample as filtering the full panel first. This keeps cold
+requests small without dropping rare sub-industries from the preview.
 """
 import hashlib
 import io
@@ -18,16 +24,21 @@ from .wrds_calendar import FIRST_YEAR, LAST_YEAR
 from .wrds_data import PANEL_COLUMNS, PANEL_FILE, wrds_dir
 from .wrds_gics import gics_mask, validate_gics_filter
 
+# A GICS filter keeps whole cells (gics_mask reads only these columns)
+CELL_COLUMNS = ['sector_name', 'gsubind']
+# Newest row first, then the lower permno, so the sample does not depend on the panel's row order
+NEWEST_FIRST = dict(by=['date', 'permno'], ascending=[False, True], kind='stable')
+
 APPROVAL_ENV = 'FACTOR_LAKE_WRDS_PREVIEW_APPROVED'
-DISABLED_MESSAGE = 'WRDS sample rows are not enabled yet. Release requires Prof. Steward’s approval.'
+DISABLED_MESSAGE = "WRDS sample rows aren't available yet."
 NOT_READY_MESSAGE = 'The WRDS preview is not ready for this data version. Ask the team to build its preview index.'
-ROWS_PER_YEAR = 5
+PREVIEW_ROWS = 10
 MAX_INDEX_ROWS = 100_000
 MAX_INDEX_BYTES = 16 * 1024 * 1024
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 # Explicitly exclude next-period returns and all other fields outside the factor catalog.
 PREVIEW_COLUMNS = tuple(PANEL_COLUMNS)
-INDEX_VERSION = 'v1'
+INDEX_VERSION = 'v2'   # v1 held five rows per year and cell
 
 
 def preview_enabled():
@@ -41,19 +52,17 @@ def index_filename(data_dir, etag):
 
 
 def validate_request(request):
-    if not isinstance(request, dict) or set(request) != {'start_year', 'end_year', 'gics_filter'}:
-        raise ValueError('Preview needs start_year, end_year and gics_filter only.')
-    start, end = request['start_year'], request['end_year']
-    if any(type(y) is not int for y in (start, end)) or not FIRST_YEAR <= start <= end <= LAST_YEAR:
-        raise ValueError(f'Preview years must be between {FIRST_YEAR} and {LAST_YEAR}, in ascending order.')
+    if not isinstance(request, dict) or set(request) != {'gics_filter'}:
+        raise ValueError('Preview needs gics_filter only.')
     if request['gics_filter'] is not None:
         validate_gics_filter(request['gics_filter'])
 
 
-def _first_in_cells(frame):
-    frame = frame.sort_values(['date', 'permno'], kind='stable').drop_duplicates(['date', 'permno'])
-    groups = [frame['date'].dt.year, frame['sector_name'], frame['gsubind']]
-    return frame.groupby(groups, observed=True, dropna=False, sort=False).head(ROWS_PER_YEAR).reset_index(drop=True)
+def _latest_companies_in_cells(frame):
+    """Each company's latest row per cell, then the PREVIEW_ROWS newest companies of each cell."""
+    frame = frame.sort_values(**NEWEST_FIRST).drop_duplicates(['permno', *CELL_COLUMNS])
+    cells = frame.groupby(CELL_COLUMNS, observed=True, dropna=False, sort=False)
+    return cells.head(PREVIEW_ROWS).reset_index(drop=True)
 
 
 def build_index(batches):
@@ -70,8 +79,9 @@ def build_index(batches):
         # Normalize categorical keys before grouping; missing GICS remains a real cell.
         frame['sector_name'] = frame['sector_name'].astype('string')
         frame['gsubind'] = pd.to_numeric(frame['gsubind'], errors='coerce').astype('Int64')
-        frame = _first_in_cells(frame)
-        index = _first_in_cells(pd.concat([index, frame], ignore_index=True)) if index is not None else frame
+        frame = _latest_companies_in_cells(frame)
+        index = (_latest_companies_in_cells(pd.concat([index, frame], ignore_index=True))
+                 if index is not None else frame)
         if len(index) > MAX_INDEX_ROWS:
             raise ValueError('The preview index exceeds its row limit.')
     if index is None:
@@ -93,20 +103,15 @@ def encode_index(index, etag):
 
 
 def select_preview(index, request):
+    """Up to PREVIEW_ROWS rows, one per company: each company's latest row in the filter, newest first."""
     validate_request(request)
-    years = index['date'].dt.year
-    frame = index[years.between(request['start_year'], request['end_year']) &
-                  gics_mask(index, request['gics_filter'])]
-    frame = frame.sort_values(['date', 'permno'], kind='stable')
-    frame = frame.groupby(frame['date'].dt.year, sort=True).head(ROWS_PER_YEAR)
+    frame = index[gics_mask(index, request['gics_filter'])]
+    frame = frame.sort_values(**NEWEST_FIRST).drop_duplicates('permno').head(PREVIEW_ROWS)
     frame = frame.loc[:, list(PREVIEW_COLUMNS)].copy()
-    counts = {str(y): int(n) for y, n in frame.groupby(frame['date'].dt.year).size().items()}
     frame['date'] = frame['date'].dt.strftime('%Y-%m-%d')
     # pandas converts NaN/inf/NA to JSON null; never send non-standard JSON numbers.
     result = {'columns': list(PREVIEW_COLUMNS), 'rows': json.loads(frame.to_json(orient='records')),
-              'rows_per_year': ROWS_PER_YEAR,
-              'years': {str(y): counts.get(str(y), 0)
-                        for y in range(request['start_year'], request['end_year'] + 1)}}
+              'row_limit': PREVIEW_ROWS}
     if len(json.dumps(result, allow_nan=False).encode()) > MAX_RESPONSE_BYTES:
         raise ValueError('The preview exceeds its response limit.')
     return result

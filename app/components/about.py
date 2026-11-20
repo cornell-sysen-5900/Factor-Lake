@@ -23,8 +23,8 @@ def render_about_tab() -> None:
 
     ### Data preview
 
-    After Prof. Steward approves sample-row display, Data Viewer can show up to five WRDS
-    rows per year, filtered by sector, industry group, industry or sub-industry. The small
+    When sample-row display is enabled, Data Viewer can show up to 10 WRDS rows, each a
+    different company, filtered by sector, industry group, industry or sub-industry. The small
     preview comes from Lambda and has no download control. It is for inspecting fields,
     not a representative sample for research.
 

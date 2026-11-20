@@ -2,7 +2,9 @@
 
 Status: **built** (all six stages, branch `feature/wrds-mode`), validated on the dev function `sysen5900-factor-lake-backtest-dev`. The review's final decisions are in [Decisions](#decisions) and are worked into the sections below; where the build differs from the first design, the section says so ("As built" notes in 6, 7 and 8, and the stage table in 10). Using WRDS mode: `DOCS/FACTOR_LAKE_USER_GUIDE.md`, section 15. Running and deploying it: `DOCS/AWS_LAMBDA_BACKTESTS.md`, section 9, with the validation table.
 
-WRDS mode is a second data source next to today's data (called **Legacy** below). It backtests on the point-in-time WRDS panel (`pipeline/DATA_DICTIONARY.md`) with semi-annual, quarterly or monthly rebalancing, and it runs **only in AWS Lambda**: the app sends the job and shows the result. Legacy keeps working exactly as it does today.
+WRDS mode was designed as a second data source next to the original data (called **Legacy** below). It backtests on the point-in-time WRDS panel (`pipeline/DATA_DICTIONARY.md`) with semi-annual, quarterly or monthly rebalancing, and it runs **only in AWS Lambda**: the app sends the job and shows the result.
+
+**Now:** WRDS is the only data source for new analyses (PR #87). The data runs from 2002 to 2026 (`wrds_2026_11`, panel from 2002-07). The sidebar has no data source switch, no Lambda switch and no Load Market Data. Legacy analyses saved earlier still open by ID in Results and Compare, and the Legacy engine stays in the code for them. The Data Viewer shows the gated [WRDS data preview](WRDS_DATA_PREVIEW.md). Sections below describe the design as built; where the app has since changed, they say so.
 
 Contents:
 
@@ -31,7 +33,7 @@ Decided in the stage 1 review:
 | 4 | Default directions where research is mixed | Lower is better for all of them. The 1-month factor is named "1-Month Return (Reversal)". Every tooltip that defaults to Lower says why in one short sentence. *Superseded: defaults now follow the data rule in the [WRDS factor review](WRDS_FACTOR_REVIEW.md).* | 2.1 |
 | 5 | Unclassified stocks | Left out when the sector filter is on | 2.2 |
 | 6 | Today's GICS codes for the sector filter | Accepted, documented as a limitation | 2.2, R3 |
-| 7 | Defaults | Quarterly, 2008-2026 | 8 |
+| 7 | Defaults | Quarterly, 2008-2026. *Superseded: the data now starts in 2002-07, and the years default to the whole data, 2002-2026.* | 8 |
 | 8 | Missing return without a delisting | 0% for that month; the result reports how many stock-months that was | 3.3 |
 | 9 | ETF total-return benchmarks | Accepted, labelled for example "IWM (ETF, total return)" | 4.1 |
 | 10 | Missing risk-free month | Filled with `tbill_3m / 12`, and the filled months are flagged in the result | 4.1 |
@@ -46,7 +48,7 @@ Decided in the stage 1 review:
 
 | Layer | Legacy (unchanged) | WRDS (new) | Where the choice is made |
 |---|---|---|---|
-| Sidebar | today's controls | Data source, frequency, GICS sectors, no delisting option, no Lambda switch | `settings['data_mode']`, new key; Legacy controls are drawn by the same code with the same widget keys |
+| Sidebar | today's controls | Data source (removed in PR #87: WRDS only), frequency, GICS sectors, no delisting option, no Lambda switch | `settings['data_mode']`, new key; Legacy controls are drawn by the same code with the same widget keys |
 | Factor list | `FACTOR_METADATA` | `WRDS_FACTOR_METADATA` (section 2) | `render_factor_selection(data_mode)` |
 | Run | `run_backtest_logic` (local or Lambda) | `run_wrds_backtest` (Lambda only) | one `if` at the top of `run_backtest_logic`; the Legacy body below it is not edited |
 | Job | `build_job` (`src/backtest_jobs.py`) | `build_wrds_job` (`src/wrds_jobs.py`) | the job's `data_mode` key: absent means Legacy |
@@ -56,7 +58,7 @@ Decided in the stage 1 review:
 | Benchmarks, metrics | `src/benchmarks.py`, `src/performance_metrics.py` | `src/wrds_metrics.py` (IWM, IWN, IWO, Fama-French rf) | separate modules |
 | Results tab | `render_results_tab` | `render_wrds_results_tab` (new `app/components/wrds_results.py`, reusing Legacy's render helpers read-only) | `run['data_mode']` |
 | Saved IDs | `backtest-results/<hash>.json` | the same file layout, plus `<hash>.holdings.parquet` | the saved job's `data_mode` |
-| Data Viewer | Legacy data | stays Legacy | not split |
+| Data Viewer | Legacy data (no longer shown) | the gated [WRDS data preview](WRDS_DATA_PREVIEW.md): at most 10 rows, each a different company | `app/components/data_viewer.py`, `src/wrds_preview.py` |
 
 ### 1.2 How Legacy results stay unchanged
 
@@ -172,7 +174,7 @@ A rebalance date is the panel's `date` in that month: the last CRSP trading day 
 
 ### 3.2 Start and end years
 
-The sidebar still asks for a start year and an end year, from 2008 to 2026. **The backtest covers the calendar years from start to end**, within the data's bounds (first panel month 2008-04, last month with returns 2026-09):
+The sidebar still asks for a start year and an end year, from 2002 to 2026 (by default the whole range). **The backtest covers the calendar years from start to end**, within the data's bounds (first panel month 2002-07, last month with returns 2026-09):
 
 - The **first rebalance** is the December month end of `start_year - 1`. When that is before the data starts, it is the first rebalance month in the data instead.
 - The **last holding period ends** at the December month end of `end_year`. When that is after the data ends, it ends at the last rebalance month whose whole holding period is in the data. There are no partial periods.
@@ -181,13 +183,13 @@ The sidebar still asks for a start year and an end year, from 2008 to 2026. **Th
 
 | Run | Rebalance dates | Holding periods cover |
 |---|---|---|
-| Monthly, 2008-2026 | 2008-04 ... 2026-08 (221) | May 2008 - Sep 2026 |
-| Quarterly, 2008-2026 | 2008-06 ... 2026-06 (73) | Jul 2008 - Sep 2026 |
-| Semi-annual, 2008-2026 | 2008-06 ... 2025-12 (36) | Jul 2008 - Jun 2026 |
+| Monthly, 2002-2026 | 2002-07 ... 2026-08 (290) | Aug 2002 - Sep 2026 |
+| Quarterly, 2002-2026 | 2002-09 ... 2026-06 (96) | Oct 2002 - Sep 2026 |
+| Semi-annual, 2002-2026 | 2002-12 ... 2025-12 (47) | Jan 2003 - Jun 2026 |
 | Quarterly, 2010-2012 | 2009-12 ... 2012-09 (12) | Jan 2010 - Dec 2012 |
 | Monthly, 2015-2015 | 2014-12 ... 2015-11 (12) | Jan 2015 - Dec 2015 |
 
-`src/wrds_calendar.py` holds this rule as a pure function that works on year-month values, so the sidebar can show "Rebalances: 2009-12 to 2012-09 (12 quarterly)" without any data. The Lambda then maps each month to the panel's trading date and rejects a job whose months are not in the data. The data bounds (`2008-04`, `2026-09`) are constants in `src/wrds_calendar.py`, and a data test checks them against the files.
+`src/wrds_calendar.py` holds this rule as a pure function that works on year-month values, so the sidebar can show "Rebalances: 2009-12 to 2012-09 (12 quarterly)" without any data. The Lambda then maps each month to the panel's trading date and rejects a job whose months are not in the data. The data bounds (`2002-07`, `2026-09`) are constants in `src/wrds_calendar.py`, and a data test checks them against the files.
 
 ### 3.3 Look-ahead rules
 
@@ -258,7 +260,7 @@ A WRDS job is plain JSON like a Legacy job, built by `build_wrds_job` and checke
 | `factor_directions` | `{column: 'top' or 'bottom'}` | |
 | `factor_labels` | `{column: display name}` | shown when an ID is opened |
 | `frequency` | `semiannual`, `quarterly`, `monthly` | |
-| `start_year`, `end_year` | 2008-2026 | section 3.2 |
+| `start_year`, `end_year` | 2002-2026 | section 3.2 |
 | `initial_aum` | > 0 | |
 | `top_pct` | 0 < x <= 100, default 10.0; null when `top_n` is set | a job at 10% has the shape and key it had before |
 | `top_n` | whole number >= 1 | only when the run holds a number of stocks instead of a percent; cohort jobs never have it (they hold `cohort_pct`) |
@@ -443,9 +445,8 @@ for Mixing and Integrating, equal and cap weight, mixed directions, and `top_pct
 
 | Feature | WRDS mode |
 |---|---|
-| Sidebar | **Data source**: Legacy (default) or WRDS. WRDS shows **Rebalancing**: Semi-annual, Quarterly (default), Monthly; ESG filter; weighting; factor combination; the 11 GICS sectors; the period (2008-2026, with a caption naming the first rebalance and the last period end); initial AUM. The Delisting Strategy and **Run backtests in AWS Lambda** controls are hidden. |
-| Mode switch | Changing the data source clears the factor selection and its direction widgets (an `on_change` callback), because the two factor lists differ. Saved run tabs stay. |
-| Analysis tab | The WRDS factor list (section 2). Load Market Data is hidden. The caption says the backtest runs in AWS Lambda on the WRDS data. Run Portfolio Analysis sends a WRDS job. |
+| Sidebar | WRDS only (no data source switch since PR #87). **Rebalancing**: Semi-annual, Quarterly (default), Monthly; ESG filter; weighting; Hold; factor combination; the GICS filter; the liquidity limit; the period (2002-2026, with a caption naming the rebalances and the last period end); initial AUM. There is no Delisting Strategy and no **Run backtests in AWS Lambda** switch. |
+| Analysis tab | The WRDS factor list (section 2). There is no Load Market Data. The caption says the backtest runs in AWS Lambda on the WRDS data. Run Portfolio Analysis sends a WRDS job. |
 | Results tab | Legacy's sections, order, titles, widgets, tables and charts, drawn by Legacy's own render functions in `app/components/results_tab.py` with the WRDS result passed in the shape they expect (`app/components/wrds_results.py`, `app/wrds_tables.py`). Those functions take optional names (benchmarks, periods) and a date axis whose defaults give Legacy's output unchanged. Only the names that must differ do: "Period" for "Year", "Quarterly" for "Yearly", IWM / IWO (Growth) / IWN (Value) for Legacy's indices. |
 | Results header | Legacy's captions in Legacy's order, plus **Data Source:** WRDS with the frequency, number of rebalances, first and last rebalance date. **Delisting Strategy:** CRSP delisting returns included, then the risk-free rate until the next rebalance. How it was computed and the Analysis ID. |
 | Performance Summary | Legacy's four tiles: final value, total return, CAGR over calendar years (n / k), Cumulative Outperformance (its tooltip names IWM). Legacy's "Delisted positions encountered" caption, then captions only for WRDS counts that are not zero: stock-months without a return, filled risk-free months, rebalance dates with nothing to buy. |
@@ -459,29 +460,45 @@ for Mixing and Integrating, equal and cap weight, mixed directions, and `top_pct
 | Saved runs | Each run keeps `data_mode` and `frequency`; tabs read "Run 2: WRDS, Quarterly" ("(opened)" when opened by ID; the factors are in the header). Legacy labels are unchanged. Up to `MAX_SAVED_RUNS` tabs, Legacy and WRDS mixed. |
 | Share by ID | As Legacy (section 5.4). An opened WRDS run loads its holdings and ranked lists the same way. |
 | Session history | As today. |
-| Data Viewer | Stays Legacy. In WRDS mode a one-line note says it shows the Legacy data, and to switch to Legacy and Load Market Data to use it. |
+| Data Viewer | The gated [WRDS data preview](WRDS_DATA_PREVIEW.md): at most 10 rows, each a different company, filtered by GICS, served by the Lambda from a small index. No download. |
 
-**Without Lambda** (`FACTOR_LAKE_BACKTEST_LAMBDA` not set): the Data source control is shown but disabled on Legacy, with the note "WRDS mode runs in AWS Lambda, which is not configured for this app." Everything else is today's app. A WRDS analysis ID can still be opened if the app has S3 read access (results and holdings are read straight from S3). Its Ranked stocks and Generate Comparison buttons are then disabled with the same note.
+**Without Lambda** (`FACTOR_LAKE_BACKTEST_LAMBDA` not set): the sidebar notes "WRDS mode runs in AWS Lambda, which is not configured for this app." and Run Portfolio Analysis is disabled. A saved analysis ID (WRDS or Legacy) can still be opened if the app has S3 read access (results and holdings are read straight from S3). Its Ranked stocks and Generate Comparison buttons are then disabled with the same note.
 
 ---
 
 ## 9. Test plan, open questions and risks
 
-### 9.1 Tests (new files; existing tests are not edited)
+### 9.1 Tests
+
+The WRDS test files in `tests/unit/` (there is no data source switch to test since PR #87):
 
 | File | Checks |
 |---|---|
-| `test_legacy_pinned.py` | fixed Legacy jobs give exactly the results they gave on `main` (section 1.2) |
-| `test_wrds_calendar.py` | the rebalance dates in the section 3.2 table for each frequency; data bounds; `start == end`; out-of-range years rejected; trading-day dates used, not calendar month ends (stage 3, when dates come from the panel) |
-| `test_wrds_factors.py` | the app's factor list and the Lambda allowlist match; keys, groups and tooltips; every Lower default says why; the 11 GICS sectors |
-| `test_wrds_lookahead.py` | changing any row dated after t leaves the holdings at t unchanged; changing returns changes returns only, never the selection; non-allowlisted columns (`ret_next_1m`, `delisted_next_month`, ...) are rejected as factors; a stock that joins later is never held earlier; a stock that leaves mid-period is held to t' with `returns_monthly` returns; a period's return uses exactly the months in (t, t'] |
-| `test_wrds_engine.py` | the Legacy match of section 7.3 (stocks, ranks, scores, weights, returns, Picked By) and per-date z-scores equal to `normalize_series`; drift within a period, delisting then cash at rf, missing-return months at 0% and counted, rf fill from `tbill_3m / 12`, benchmarks compounded; sectors, fossil fuel GICS and SIC codes, buyable stocks, `permno` tie-break, at least one stock; rebalance dates and holding periods per frequency from the 2008 start to the 2026 end; the metrics default equals Legacy and k annualizes volatility, Sharpe and IR |
-| `test_wrds_service.py` | the same data from a local folder and a fake S3, only the needed columns decoded; the runner equals the engine; data reused until a file is republished |
-| `test_wrds_jobs.py` | build and validate; unknown factor or frequency rejected; `ranked` needs a scheduled date; WRDS and Legacy hashes never collide; the app and Lambda allowlists match |
-| `test_wrds_service.py` | with a fake S3, as in `test_backtest_lambda.py`: dispatch on `data_mode`; data version from the WRDS ETags; holdings Parquet written before the JSON; cache hit returns the same result; one row group per date; the Legacy path still returns today's result |
-| `test_wrds_mode_switch.py` | with Streamlit AppTest: Legacy by default; switching resets factors; WRDS disabled without Lambda; WRDS hides delisting, Load Market Data and the Lambda switch; Legacy shows no WRDS control; the factor groups and defaults; Legacy settings and Lambda jobs exactly as on `main`, also after a visit to WRDS |
-| `test_wrds_saved.py` | a Legacy format-2 fixture, a pre-sharing fixture and a WRDS fixture open; WRDS cohort and ranked IDs are refused; holdings load per date |
-| `scripts/check_backtest_lambda.py --wrds` | in AWS: each frequency end to end; a cached repeat equals the first run; the WRDS engine run locally on the S3 files equals the Lambda result |
+| `test_legacy_pinned.py` | fixed Legacy jobs give exactly the results they gave on `main` before WRDS mode (section 1.2), so saved Legacy analyses stay reproducible |
+| `test_wrds_pinned.py` | fixed WRDS backtests on synthetic data give exactly the results and holdings they gave before trading costs, at 0 bps |
+| `test_wrds_calendar.py` | the rebalance dates in the section 3.2 table for each frequency; data bounds (2002-07 to 2026-09); `start == end`; out-of-range years rejected |
+| `test_wrds_factors.py` | the app's factor list and the Lambda allowlist match; names, groups, default directions and tooltips |
+| `test_wrds_factor_review.py` | the Legacy-to-WRDS crosswalk, the explicit defaults and their reasons, the factor picker, and `DOCS/WRDS_FACTOR_REVIEW.md` regenerated from the code |
+| `test_wrds_lookahead.py` | what is bought at t depends only on data known at t; a period's return uses exactly the months in (t, t']; columns about the future can never be factors |
+| `test_wrds_engine.py` | the Legacy match of section 7.3 and per-date z-scores; holding periods, delistings, missing returns, risk-free fill, benchmarks, filters, ties and rebalance dates |
+| `test_wrds_monthly_returns.py` | each month's return inside a holding period, after the rebalance's trading cost, compounding to the period's return |
+| `test_wrds_hold.py` | how many stocks are held: top X% of scored stocks, top N (in Mixing, N in total), 100% of the filter; the job fields keep the default's cache key |
+| `test_wrds_liquidity.py` | the dollar volume file and the cap on each position for jobs with a liquidity limit |
+| `test_wrds_gics.py` | the GICS hierarchy tables, the filter at each of the four levels, stocks without GICS, older jobs with `selected_sectors` |
+| `test_wrds_jobs.py` | building and validating WRDS jobs; unknown factor or frequency rejected; the cache keys of both modes |
+| `test_wrds_service.py` | loading the WRDS data from a local folder and a fake S3, running jobs, the holdings Parquet and the handler's routing |
+| `test_wrds_check_script.py` | the post-deploy check's WRDS part passes on a correct Lambda and fails on the wrong folder, result or holdings |
+| `test_upload_wrds.py` | `scripts/upload_wrds.py` with a fake S3 client |
+| `test_wrds_mode_switch.py` | with Streamlit AppTest: the WRDS sidebar (frequency, years 2002-2026 and their rebalances, GICS sectors, no Lambda switch, no Load Market Data), the grouped factor list with its defaults, and the job Run Portfolio Analysis sends |
+| `test_wrds_gics_sidebar.py`, `test_wrds_hold_sidebar.py` | the sidebar's GICS filter and Hold choice, and the jobs they send |
+| `test_clear_parameters_wrds.py` | Clear Parameters returns the WRDS inputs to their defaults |
+| `test_wrds_results.py` | the Results tab of WRDS runs, drawn by Legacy's render functions and compared with `main`'s Legacy render; the gated Data Viewer by default |
+| `test_wrds_gics_results.py`, `test_wrds_hold_display.py` | the GICS filter and Hold choice in Results, Holdings, Compare, strategy JSON files and opened analyses |
+| `test_wrds_saved.py` | old Legacy IDs (fixtures written by `main`'s code) and WRDS IDs open with the same results and holdings |
+| `test_wrds_lists.py` | WRDS analyses in the session, browser and saved-analysis lists |
+| `test_wrds_preview.py` | the [WRDS data preview](WRDS_DATA_PREVIEW.md): the index gives the same rows as filtering the full panel, 10 different companies at most, the release gate, the versioned index upload and the client's response checks |
+| `test_wrds_preview_app.py` | WRDS-only runs (Legacy inputs and settings cannot come back) and the Data Viewer: GICS lists, no year picker, no download, escaped HTML, rows released when filters change or the tab is left |
+| `scripts/check_backtest_lambda.py` | in AWS after each deploy: one quarterly WRDS backtest end to end (`--skip-wrds` leaves it out); a cached repeat equals the first run; the WRDS engine run locally on the S3 files equals the Lambda result |
 | Stage 6 validation | a monthly cap-weighted run of the whole universe tracks IWM: correlation of monthly returns at least 0.99 and annualized tracking error at most 3%. The prototype passed; the measured numbers stay out of the repo |
 
 Stages 3 to 6 run the full existing suite on every commit, so any change to a Legacy result shows up as a failing Legacy test.
@@ -497,12 +514,12 @@ All eleven questions from the stage 1 review are decided; see [Decisions](#decis
 | R1 | An edit to a shared file changes Legacy results | `test_legacy_pinned.py` compares whole Legacy results with `main`'s; WRDS code lives in new modules (a changed Legacy cache key alone is allowed) |
 | R2 | Look-ahead creeps in through a new factor or filter | factor allowlist; look-ahead tests that change future rows |
 | R3 | The sector filter uses today's GICS | documented in the UI tooltip and in this design; historical GICS would need a new pipeline pull |
-| R4 | Licensed WRDS values are shown in the app (holdings, ranked lists, factor values) and in shared IDs | same private bucket and access model as Legacy; no WRDS data in the repo; the Data Viewer stays Legacy; check the WRDS terms before the class demo |
+| R4 | Licensed WRDS values are shown in the app (holdings, ranked lists, factor values, the Data Viewer preview) and in shared IDs | same private bucket and access model as Legacy; no WRDS data in the repo; the Data Viewer shows only a gated preview of at most 10 rows, with no download ([WRDS data preview](WRDS_DATA_PREVIEW.md)); check the WRDS terms before the class demo |
 | R5 | Big holdings files for many-factor monthly Mixing runs | Parquet with one row group per date, read per date, so the app never downloads the whole file |
 | R6 | Cold starts download about 165 MB | one GET per file per container; warm reuse; at most a few seconds in region |
 | R7 | Rounding differs between the Mac and Lambda | ties broken by `permno`; comparisons use a relative tolerance of 1e-9, as the Legacy check does |
 | R8 | The 2026-09 data end and the late Fama-French month | data bounds in one place with a data test; rf fill flagged in the result |
-| R9 | Monthly plots and tables with 221 points | one date tick per year; no markers over 60 points; scrolling tables; calendar-year view |
+| R9 | Monthly plots and tables with 290 points | one date tick per year; no markers over 60 points; scrolling tables; calendar-year view |
 
 ---
 

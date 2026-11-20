@@ -4,15 +4,16 @@ New analyses use WRDS only. The Analysis source switch and local market-data loa
 Saved Legacy results still open by ID or share link in Results and Compare, with their original settings and
 metrics. Legacy settings exports remain readable, but importing one for a new run or using a Legacy run's
 settings is refused with an explanation. The Legacy engines and saved-result decoders remain in the codebase.
-See [Legacy definition matches](LEGACY_WRDS_MATCHES.md) for every Legacy factor's WRDS match or `none`.
+See the [Legacy-to-WRDS table](WRDS_FACTOR_REVIEW.md#legacy-to-wrds) for each Legacy factor's WRDS replacement.
 
 ## Data Viewer
 
-After sample display is approved and enabled, choose a year range and any of the four cascading GICS lists:
+After sample display is approved and enabled, choose any of the four cascading GICS lists:
 Sector, Industry group, Industry, Sub-industry. The deepest selected level defines the filter; empty lists mean
 all choices within the selected parent. These preview controls are independent of the Analysis sidebar.
-Click **Load preview**. The viewer shows at most five matching rows per year, ordered by date and PERMNO.
-Fewer rows are shown if fewer exist; missing years and empty results are explained. Null values are shown as a dash.
+Click **Load preview**. The viewer shows at most 10 matching rows, each a different company: every company's
+most recent matching row, newest first (ties by PERMNO), so it is never one company's time series. Fewer rows
+are shown if fewer companies match, and an empty result is explained. Null values are shown as a dash.
 These are deterministic examples of fields, not a statistically representative sample or a portfolio.
 
 Only identifiers, classification fields, price, market cap and allowlisted factor fields are included. The raw
@@ -27,18 +28,21 @@ is kept in the app session; neither the panel nor the sample index is loaded int
 
 ## Architecture and performance
 
-The Lambda action `wrds_preview` accepts only `start_year`, `end_year`, and `gics_filter` in `request`.
+The Lambda action `wrds_preview` accepts only `gics_filter` in `request`.
 It never calls the backtest engine, creates an analysis ID, or downloads the returns or market files.
-The server enforces the year bounds and five-row-per-year cap. The client validates the response too.
+The server enforces the 10-row, one-row-per-company cap. The client validates the response too (at most 10 rows,
+no repeated PERMNO).
 
-A preparation script scans projected panel batches and retains five rows per year/sector/sub-industry cell.
-Every supported GICS filter is a union of these cells; merging the first five candidates per cell produces the
-same first five rows as filtering the full panel first. Thus rare classifications can still be previewed.
+A preparation script scans projected panel batches and retains, for every sector/sub-industry cell, the 10
+companies with the most recent rows, one row each (their latest in that cell). Every supported GICS filter is a
+union of these cells, and a company in the filter's top 10 is also in the top 10 of the cell holding its latest
+row, so selecting from the index produces the same 10 rows as filtering the full panel first. Thus rare
+classifications can still be previewed. The index is version `v2`; `v1` indexes (five rows per year) are ignored.
 The compact Parquet index is tied to the panel ETag and an algorithm version. Lambda reads only that index,
 keeps one version in memory, and checks the panel ETag on every request. A changed panel without a rebuilt index
 returns an unavailable message, not stale rows. No per-filter cache accumulates.
 
-Limits: index at most 100,000 rows / 16 MiB compressed; response at most 2 MiB and five rows per requested year.
+Limits: index at most 100,000 rows / 16 MiB compressed; response at most 2 MiB and 10 rows.
 Measure cold and warm Lambda latency and Streamlit RSS on the development deployment. Do not infer cold-start
 latency from a warm request or from the small final row count. The performance target is a few seconds; actual
 acceptance depends on deployed measurements, including Lambda initialization and the network.
@@ -67,7 +71,9 @@ Record that approval in the team's release checklist; this document does not con
    panel version. This upload alone does not enable display.
 
 4. Deploy the reviewed code to the **development** Lambda using the team's normal deployment process.
-   `scripts/deploy_backtest_lambda.py` disables preview by default. Keep production unchanged during acceptance.
+   `scripts/deploy_backtest_lambda.py` creates a new function with preview disabled and, without
+   `--preview-approved` or `--preview-disabled`, keeps an existing function's setting. Keep production unchanged
+   during acceptance.
    The Lambda role needs read access to the panel metadata and its versioned preview index under the WRDS prefix;
    the existing read-prefix policy covers both. The preparer's credentials need write access to the index key.
 5. Before approval, verify the action returns `status: disabled` and no rows. Run the synthetic tests locally:
@@ -78,11 +84,12 @@ Record that approval in the team's release checklist; this document does not con
 
 6. **Only after approval:** deploy with `--preview-approved` or explicitly set the Lambda environment variable
    `FACTOR_LAKE_WRDS_PREVIEW_APPROVED=true`. Set the same variable in Streamlit's environment or secrets, then
-   restart it. A frontend-only flag cannot bypass the backend gate. Redeploying with the default deployment
-   command turns the backend flag off again; pass the approval option intentionally for an approved release.
+   restart it. A frontend-only flag cannot bypass the backend gate. Later redeploys without a preview option
+   keep the backend flag as it is.
 7. Verify unfiltered previews, every GICS level, rare and empty filters, partial years, timeouts, missing index,
    cold/warm latency, and repeated-filter app memory. Reopen real saved WRDS and Legacy IDs in Results and Compare.
-8. To disable display, unset the flag or set it to `false` on both services and restart the app. It will clear
+8. To disable display, deploy with `--preview-disabled` (or set the Lambda variable to `false`), unset the
+   Streamlit flag or set it to `false`, and restart the app. It will clear
    its session's preview on the next viewer render. Already displayed values cannot be recalled from a browser.
 
 All committed tests use synthetic data. Keep real rows, empirical statistics, credentials and private measurement

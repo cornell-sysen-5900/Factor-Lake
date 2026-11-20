@@ -70,7 +70,8 @@ analysis IDs or cache keys. Historical/shared analysis records retain their orig
    direction, dates and investment.
 6. Clear Parameters again, then import the downloaded file under **Import settings from file**.
    The same inputs return, and the next run will be named **Value hypothesis**.
-7. Load market data and rerun. With the same underlying data, the metrics match the first run.
+7. Click **Run Portfolio Analysis**. The same inputs give the same job, so it returns from the Lambda result
+   cache with the first run's Analysis ID and metrics.
 8. Import an invalid JSON file. The error appears in the import box and current inputs remain intact.
 
 ## Developer checks
