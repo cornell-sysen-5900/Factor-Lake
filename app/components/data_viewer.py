@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: app/components/data_viewer.py
 PURPOSE: Data Viewer tab: filter, view and export the market data loaded in the Analysis tab.
-VERSION: 1.1.0
+VERSION: 1.2.0
 """
 
 import gc
@@ -25,9 +25,8 @@ from app.viewer_data import (
     keep_valid_selections,
     to_csv_bytes,
 )
-from src.wrds_calendar import FIRST_YEAR, LAST_YEAR
 from src.wrds_gics import GICS_LEVELS, codes_under, level_names, make_gics_filter, names_to_codes
-from src.wrds_preview import APPROVAL_ENV, DISABLED_MESSAGE, PREVIEW_COLUMNS
+from src.wrds_preview import APPROVAL_ENV, DISABLED_MESSAGE, PREVIEW_COLUMNS, PREVIEW_ROWS
 
 PREVIEW_STATE_KEY = 'wrds_preview'
 
@@ -179,8 +178,9 @@ def render_data_viewer_tab() -> None:
     """Only bounded WRDS sample rows enter app memory; no data-download control."""
     from app.streamlit_utils import get_backtest_lambda_name, get_lambda_client
     st.header('Data Viewer')
-    st.caption('Preview up to five WRDS rows per year, filtered before sampling. '
-               'These examples describe the fields; they are not a representative portfolio.')
+    st.caption(f'Preview up to {PREVIEW_ROWS} WRDS rows, each a different company, filtered before sampling: '
+               'each company’s most recent row, newest first. These examples describe the fields; '
+               'they are not a representative portfolio.')
     if not _preview_approved():
         clear_viewer_data()
         st.info(DISABLED_MESSAGE)
@@ -190,12 +190,10 @@ def render_data_viewer_tab() -> None:
         clear_viewer_data()
         st.info('Configure the backtest Lambda to load a WRDS preview.')
         return
-    years = st.slider('Preview years', FIRST_YEAR, LAST_YEAR, (FIRST_YEAR, LAST_YEAR),
-                      key='preview_years', on_change=clear_viewer_data)
     gics = _preview_gics_filter()
     st.caption('These preview filters are independent of the Analysis sidebar. GICS uses the company’s current '
                'classification across its history; Sector includes SIC fallback, while finer levels require GICS.')
-    request = {'start_year': years[0], 'end_year': years[1], 'gics_filter': gics}
+    request = {'gics_filter': gics}
     holder = st.session_state.get(PREVIEW_STATE_KEY)
     if holder and (holder['request'] != request or holder['function'] != function_name):
         clear_viewer_data()
@@ -221,13 +219,10 @@ def render_data_viewer_tab() -> None:
         return
     preview = holder['preview']
     if not preview['rows']:
-        st.info('No WRDS rows match these years and GICS filters.')
+        st.info('No WRDS rows match these GICS filters.')
         return
     table = pd.DataFrame(preview['rows'], columns=list(PREVIEW_COLUMNS))
-    st.caption(f'{len(table)} sample rows · up to 5 per year. Missing values appear as —.')
-    missing = [year for year, count in preview['years'].items() if not count]
-    if missing:
-        st.caption('No matching rows in: ' + ', '.join(missing))
+    st.caption(f'{len(table)} sample rows · one per company, up to {PREVIEW_ROWS}. Missing values appear as —.')
     # Static, escaped HTML has no dataframe toolbar, CSV export or hidden full dataset.
     st.html('<div style="overflow:auto;max-height:600px" aria-label="WRDS data preview">' +
             table.fillna('—').to_html(index=False, escape=True, na_rep='—', border=0) + '</div>')

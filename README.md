@@ -59,7 +59,7 @@ Then open http://localhost:8501
 - Saved runs: each backtest run is kept as its own tab in Results (newest first, last 5; cleared when the page is refreshed), shows the settings that produced it, and can be removed
 - Strategy files and names: export settings, import WRDS JSON, and rename saved runs. Legacy exports remain available for reference; new Legacy runs are disabled.
 - Clear and rerun: Clear Parameters restores WRDS defaults without changing saved runs or analysis history.
-- Data Viewer: up to five WRDS rows per year from Lambda, with four GICS levels, no download and an approval gate. See [WRDS preview](DOCS/WRDS_DATA_PREVIEW.md).
+- Data Viewer: up to 10 WRDS rows, each a different company, from Lambda, with four GICS levels, no download and an approval gate. See [WRDS preview](DOCS/WRDS_DATA_PREVIEW.md).
 
 ## Project Layout
 

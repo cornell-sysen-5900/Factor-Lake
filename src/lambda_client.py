@@ -2,7 +2,7 @@
 PROJECT: Factor-Lake Portfolio Analysis
 MODULE: src/lambda_client.py
 PURPOSE: Sends backtest jobs from the Streamlit app to the backtest Lambda.
-VERSION: 1.0.0
+VERSION: 1.1.0
 """
 
 import json
@@ -42,7 +42,7 @@ class BacktestLambdaClient:
 
     def preview(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Fetch bounded sample rows without entering the backtest/result-download path."""
-        from .wrds_preview import MAX_RESPONSE_BYTES, PREVIEW_COLUMNS, ROWS_PER_YEAR, validate_request
+        from .wrds_preview import MAX_RESPONSE_BYTES, PREVIEW_COLUMNS, PREVIEW_ROWS, validate_request
         validate_request(request)
         try:
             response = self.client.invoke(FunctionName=self.function_name, InvocationType='RequestResponse',
@@ -62,18 +62,15 @@ class BacktestLambdaClient:
             if payload.get('status') != 'ok':
                 raise ValueError('Preview unavailable')
             preview = payload['preview']
-            if preview['columns'] != list(PREVIEW_COLUMNS) or preview['rows_per_year'] != ROWS_PER_YEAR:
+            if preview['columns'] != list(PREVIEW_COLUMNS) or preview['row_limit'] != PREVIEW_ROWS:
                 raise ValueError('Invalid preview columns or limit')
-            counts = {}
-            for row in preview['rows']:
-                if set(row) != set(PREVIEW_COLUMNS):
-                    raise ValueError('Invalid preview fields')
-                year = int(row['date'][:4])
-                if not request['start_year'] <= year <= request['end_year']:
-                    raise ValueError('Invalid preview year')
-                counts[year] = counts.get(year, 0) + 1
-                if counts[year] > ROWS_PER_YEAR:
-                    raise ValueError('Invalid preview row count')
+            rows = preview['rows']
+            if len(rows) > PREVIEW_ROWS:
+                raise ValueError('Invalid preview row count')
+            if any(set(row) != set(PREVIEW_COLUMNS) for row in rows):
+                raise ValueError('Invalid preview fields')
+            if len({row['permno'] for row in rows}) != len(rows):
+                raise ValueError('Preview rows must be different companies')
             return payload
         except Exception as exc:
             raise BacktestLambdaError('The WRDS preview could not be loaded. Check the development Lambda '

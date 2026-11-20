@@ -15,6 +15,7 @@ from src.wrds_gics import GICS_LEVELS, gics_mask, level_names
 from src.wrds_preview import (
     APPROVAL_ENV,
     PREVIEW_COLUMNS,
+    PREVIEW_ROWS,
     WrdsPreviewService,
     build_index,
     encode_index,
@@ -24,28 +25,39 @@ from src.wrds_preview import (
 )
 from tests.unit.wrds_fixtures import RangeS3
 
+CELLS = [('Energy', 10102010), ('Financials', 40101010), ('Financials', 40301010), ('Energy', None),
+         ('Unclassified', None)]
+UTILITIES = 55101010   # a sub-industry with only two companies, each with many rows
+
 
 def panel():
     rows = []
     for year in (2010, 2011, 2012):
         for day in (1, 2):
-            for i, (sector, sub) in enumerate([('Energy', 10102010), ('Financials', 40101010),
-                                               ('Financials', 40301010), ('Energy', None),
-                                               ('Unclassified', None)]):
-                for stock in range(8):
-                    row = dict.fromkeys(PREVIEW_COLUMNS, 0.2)
-                    row.update(date=pd.Timestamp(year, 1, day), permno=1000 + 10 * i + stock,
-                               ticker=f'T{i}{stock}', security_name='<script>unsafe</script>', sector_name=sector,
-                               gsubind=sub, siccd=1000, gsector_name=sector, ggroup_name='Group',
-                               gind_name='Industry', gsubind_name='Subindustry', f_roa=float('nan'))
-                    rows.append(row)
+            stocks = [(i, sector, sub, stock) for i, (sector, sub) in enumerate(CELLS) for stock in range(12)
+                      # stocks 9-11 of every cell stop after 2011, so older companies fill in
+                      if year < 2012 or stock < 9]
+            stocks += [(len(CELLS), 'Utilities', UTILITIES, stock) for stock in range(2)]
+            for i, sector, sub, stock in stocks:
+                row = dict.fromkeys(PREVIEW_COLUMNS, 0.2)
+                row.update(date=pd.Timestamp(year, 1, day), permno=1000 + 100 * i + stock,
+                           ticker=f'T{i}{stock}', security_name='<script>unsafe</script>', sector_name=sector,
+                           gsubind=sub, siccd=1000, gsector_name=sector, ggroup_name='Group',
+                           gind_name='Industry', gsubind_name='Subindustry', f_roa=float('nan'))
+                rows.append(row)
     frame = pd.DataFrame(rows)
     frame['gsubind'] = frame['gsubind'].astype('Int64')
     return frame
 
 
-def request(gics=None, start=2010, end=2012):
-    return {'start_year': start, 'end_year': end, 'gics_filter': gics}
+def request(gics=None):
+    return {'gics_filter': gics}
+
+
+def expected_sample(full, gics):
+    """Brute force on the full panel: each company's latest row in the filter, newest first."""
+    rows = full[gics_mask(full, gics)].sort_values(['date', 'permno'], ascending=[False, True])
+    return rows.drop_duplicates('permno').head(PREVIEW_ROWS)
 
 
 @pytest.mark.parametrize('level', [None, *GICS_LEVELS])
@@ -57,12 +69,26 @@ def test_index_equals_filtering_full_panel_before_sampling_for_every_gics_code(l
         {'level': level, 'codes': sorted(level_names(level))}]
     for gics in filters:
         result = select_preview(index, request(gics))
-        expected = full[gics_mask(full, gics)].sort_values(['date', 'permno'])
-        expected = expected.groupby(expected['date'].dt.year).head(5)
+        expected = expected_sample(full, gics)
         assert [(r['date'], r['permno']) for r in result['rows']] == list(zip(
             expected['date'].dt.strftime('%Y-%m-%d'), expected['permno']))
-        assert max(result['years'].values()) <= 5
+        assert len(result['rows']) <= PREVIEW_ROWS
         assert all(r['f_roa'] is None for r in result['rows'])
+
+
+def test_rows_are_different_companies_never_one_companys_time_series():
+    index = build_index([panel()])
+    # Two companies with twelve rows each: two rows, not ten rows of the same two
+    rows = select_preview(index, request({'level': 'sub_industry', 'codes': [UTILITIES]}))['rows']
+    assert [(r['permno'], r['date']) for r in rows] == [(1500, '2012-01-02'), (1501, '2012-01-02')]
+    # Twelve companies, three gone after 2011: the nine current ones, then the lowest-permno older one
+    rows = select_preview(index, request({'level': 'sub_industry', 'codes': [10102010]}))['rows']
+    assert [r['permno'] for r in rows] == list(range(1000, 1010))
+    assert [r['date'] for r in rows] == ['2012-01-02'] * 9 + ['2011-01-02']
+    # Unfiltered: ten different companies, all on the latest date
+    rows = select_preview(index, request())['rows']
+    assert len(rows) == PREVIEW_ROWS == len({r['permno'] for r in rows})
+    assert {r['date'] for r in rows} == {'2012-01-02'}
 
 
 def test_sample_is_deterministic_bounded_and_contains_only_allowlisted_fields():
@@ -70,14 +96,17 @@ def test_sample_is_deterministic_bounded_and_contains_only_allowlisted_fields():
     first = build_index([full])
     second = build_index([full.sample(frac=1, random_state=2)])
     pd.testing.assert_frame_equal(first, second)
-    result = select_preview(first, request(start=2011, end=2011))
-    assert len(result['rows']) == 5 and set(result['years']) == {'2011'}
+    # One row per company and cell, at most PREVIEW_ROWS per cell
+    assert not first.duplicated(['permno', 'sector_name', 'gsubind']).any()
+    assert first.groupby(['sector_name', 'gsubind'], dropna=False).size().max() == PREVIEW_ROWS
+    result = select_preview(first, request())
+    assert len(result['rows']) == PREVIEW_ROWS and result['row_limit'] == PREVIEW_ROWS
     assert result['columns'] == list(PREVIEW_COLUMNS)
     assert 'ret_next_1m' not in json.dumps(result) and 'secret_extra' not in json.dumps(result)
 
 
-@pytest.mark.parametrize('bad', [None, {}, request(start=True), request(start=2000), request(end=2027),
-                                 request(start=2012, end=2010), request({'level': 'sector', 'codes': []}),
+@pytest.mark.parametrize('bad', [None, {}, request({'level': 'sector', 'codes': []}),
+                                 {**request(), 'start_year': 2010, 'end_year': 2012},
                                  {**request(), 'limit': 5000}, {**request(), 'approved': True}])
 def test_invalid_requests_are_rejected(bad):
     with pytest.raises(ValueError):
@@ -110,7 +139,7 @@ def test_build_is_explicit_versioned_and_never_overwrites(store, capsys):
     original = dict(store.client.objects)
     assert build_main([], store) == 0 and store.client.puts == []
     assert build_main(['--upload'], store) == 0
-    assert len(store.client.puts) == 1 and '/preview/v1-' in store.client.puts[0]
+    assert len(store.client.puts) == 1 and '/preview/v2-' in store.client.puts[0]
     assert all(store.client.objects[k] == v for k, v in original.items())
     with pytest.raises(ClientError):
         build_main(['--upload'], store)
@@ -180,8 +209,19 @@ def test_client_uses_preview_action_only_and_handles_disabled_and_ready(store, m
     assert client.preview(request())['status'] == 'disabled'
     build_main(['--upload'], store)
     monkeypatch.setenv(APPROVAL_ENV, 'true')
-    assert len(client.preview(request())['preview']['rows']) == 15
+    assert len(client.preview(request())['preview']['rows']) == PREVIEW_ROWS
     assert all(e['action'] == 'wrds_preview' for e in fake.events)
+
+
+def test_client_rejects_repeated_companies():
+    payload = {'status': 'ok', 'preview': select_preview(build_index([panel()]), request())}
+    rows = payload['preview']['rows']
+    rows[1] = {**rows[0], 'date': '2011-01-02'}   # the same company twice
+    class RepeatingLambda:
+        def invoke(self, **kwargs):
+            return {'Payload': io.BytesIO(json.dumps(payload).encode())}
+    with pytest.raises(BacktestLambdaError):
+        BacktestLambdaClient('dev', client=RepeatingLambda()).preview(request())
 
 
 def test_client_rejects_overlarge_samples_and_never_returns_raw_errors():
