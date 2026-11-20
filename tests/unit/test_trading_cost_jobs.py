@@ -6,12 +6,15 @@ of the job and its key. The reference keys below were computed with main's code 
 for the same jobs, data versions and code version string.
 """
 import json
+from pathlib import Path
 
 import pytest
 
 from src.backtest_jobs import JOB_FIELDS, build_job, decode_saved, job_hash, run_job
 from src.backtest_service import result_file, summarize_job
 from src.saved_analyses import list_saved_analyses, load_saved_analysis
+from src.trading_costs import has_trading_costs, job_trading_cost
+from src.wrds_holdings import read_holdings_date
 from src.wrds_jobs import WRDS_JOB_FIELDS, build_wrds_job, describe_wrds_job, engine_arguments, validate_wrds_job
 from src.wrds_service import summarize_wrds_job
 from tests.unit.test_wrds_service import BUCKET, PREFIX, frames, manager, s3, service, wrds_job  # noqa: F401 (fixtures)
@@ -136,7 +139,6 @@ def test_legacy_service_caches_each_cost_separately_and_lists_it(service, manage
 
 
 def test_wrds_service_saves_the_traded_column_and_lists_the_cost(service, s3, manager):
-    from src.wrds_holdings import read_holdings_date
     response = service.handle_event(wrds_job(trading_cost_bps=25))
     result = response['result']
     assert result['trading_cost_bps'] == 25.0 and len(result['turnover_pct']) == len(result['yearly_returns'])
@@ -160,9 +162,7 @@ def test_wrds_cohort_pays_the_cost_on_both_sides(service):
 
 def test_old_ids_open_at_0_bps(manager, s3):
     """A result saved by main has no trading cost fields; its job opens as a 0 bps job."""
-    from pathlib import Path
 
-    from src.trading_costs import has_trading_costs, job_trading_cost
     body = (Path(__file__).resolve().parents[1] / 'fixtures' / 'saved_main_backtest.json').read_bytes()
     old_id = '1' * 64
     s3.objects[f'{PREFIX}/{result_file(old_id)}'] = (body, {})

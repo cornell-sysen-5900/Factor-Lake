@@ -39,6 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.data_standardization import standardize_universe, validate_universe  # noqa: E402
 from src.s3_client import DELISTING_FILE, UNIVERSE_FILE, S3DataManager  # noqa: E402
+from src.supabase_client import SupabaseManager  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -62,7 +63,6 @@ def load_tables(from_supabase: bool, universe_path: Optional[str],
                 delisting_path: Optional[str]) -> Dict[str, pd.DataFrame]:
     """Returns {S3 file name: raw table} for everything that should be published."""
     if from_supabase:
-        from src.supabase_client import SupabaseManager
         manager = SupabaseManager()
         return {filename: manager.fetch_table(table) for filename, table in SUPABASE_TABLES.items()}
 

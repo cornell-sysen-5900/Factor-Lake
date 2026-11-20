@@ -11,7 +11,9 @@ import logging
 import os
 from typing import Any, Dict, Iterable, Optional
 
+import boto3
 import pandas as pd
+from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
 
 from .data_standardization import (
     attach_delisting_info,
@@ -62,7 +64,6 @@ class S3DataManager:
                        else os.environ.get('FACTOR_LAKE_S3_PREFIX', DEFAULT_PREFIX)).strip('/')
         self.region = region or os.environ.get('AWS_DEFAULT_REGION') or DEFAULT_REGION
         if client is None:
-            import boto3
             # Credentials come from the standard AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY variables
             client = boto3.client('s3', region_name=self.region)
         self.client = client
@@ -164,7 +165,6 @@ class S3DataManager:
 
 def _readable_error(error: Exception, action: str, uri: str) -> Exception:
     """Turns AWS errors into a short S3DataError; anything else is returned unchanged."""
-    from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
 
     if isinstance(error, NoCredentialsError):
         return S3DataError("AWS credentials are not configured. Set AWS_ACCESS_KEY_ID and "

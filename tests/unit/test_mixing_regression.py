@@ -17,6 +17,7 @@ import pytest
 import streamlit as st
 
 from src.backtest_engine import rebalance_portfolio
+from tests.unit.test_saved_runs import _synthetic_universe
 
 BASELINE_PATH = Path(__file__).resolve().parents[1] / 'fixtures' / 'mixing_baseline.json'
 STRATEGIES = ('zero_return', 'hold_cash', 'reinvest')
@@ -44,7 +45,6 @@ def multi_year_data() -> pd.DataFrame:
 
 def synthetic_universe() -> pd.DataFrame:
     """Same universe the AppTest tests load (test_saved_runs._synthetic_universe)."""
-    from tests.unit.test_saved_runs import _synthetic_universe
     return _synthetic_universe()
 
 

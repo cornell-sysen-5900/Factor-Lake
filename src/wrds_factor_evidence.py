@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 from .wrds_engine import eligible_universe
+from .wrds_factors import WRDS_FACTOR_COLUMNS
 
 # The default-direction rule. These are the only copies of its parameters.
 START_YEAR, END_YEAR = 2002, 2026
@@ -30,7 +31,6 @@ def monthly_spreads(panel, returns, directions, *, start_year=START_YEAR, end_ye
     and counted, rather than being reported as zero evidence. Both tails use the
     same finite-signal universe. Ties break by PERMNO and tails cannot overlap.
     """
-    from .wrds_factors import WRDS_FACTOR_COLUMNS
     if not directions or not set(directions) <= set(WRDS_FACTOR_COLUMNS):
         raise ValueError('Choose at least one known WRDS factor.')
     if any(type(value) is not bool for value in directions.values()):

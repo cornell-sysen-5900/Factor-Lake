@@ -13,6 +13,8 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 import streamlit as st
 
+# As a module, so its functions are looked up when called (tests replace get_lambda_client there)
+from app import streamlit_utils as app_utils
 from app.viewer_data import (
     DATE_COL,
     DISPLAY_ROW_LIMIT,
@@ -177,7 +179,6 @@ def _preview_gics_filter():
 
 def render_data_viewer_tab() -> None:
     """Only bounded WRDS sample rows enter app memory; no data-download control."""
-    from app.streamlit_utils import get_backtest_lambda_name, get_lambda_client
     st.header('Data Viewer')
     st.caption('Preview up to five WRDS rows per year, filtered before sampling. '
                'These examples describe the fields; they are not a representative portfolio.')
@@ -185,7 +186,7 @@ def render_data_viewer_tab() -> None:
         clear_viewer_data()
         st.info(DISABLED_MESSAGE)
         return
-    function_name = get_backtest_lambda_name()
+    function_name = app_utils.get_backtest_lambda_name()
     if not function_name:
         clear_viewer_data()
         st.info('Configure the backtest Lambda to load a WRDS preview.')
@@ -208,7 +209,7 @@ def render_data_viewer_tab() -> None:
         clear_viewer_data()
         try:
             with st.spinner('Loading WRDS sample rows...'):
-                response = get_lambda_client(function_name).preview(request)
+                response = app_utils.get_lambda_client(function_name).preview(request)
             if response['status'] == 'ok':
                 st.session_state[PREVIEW_STATE_KEY] = {'request': request, 'function': function_name,
                                                       'preview': response['preview']}

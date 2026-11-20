@@ -6,6 +6,7 @@ and a WRDS analysis opened from either list shows its full results and holdings.
 Legacy entries are covered, unchanged, by test_list_analyses.py.
 """
 import pytest
+import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 from src.backtest_service import BacktestService, summarize_job
@@ -63,7 +64,6 @@ def browser():
 @pytest.fixture
 def new_session(monkeypatch, manager, browser):
     """App sessions on one browser, sharing an in-process Lambda and the fake S3 with WRDS data."""
-    import streamlit as st
     st.cache_resource.clear()
     st.cache_data.clear()
     fake_lambda = FakeLambda(BacktestService(manager))

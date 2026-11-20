@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 import pytest
+import streamlit as st
 
 from app.compare import cagr, compact_analysis, outperformance, total_return
 from app.scoreboard import (
@@ -370,7 +371,6 @@ def test_scoreboard_explains_a_listing_error_and_an_empty_bucket(new_session, s3
     assert _scoreboard(at) is None
     assert any('No scored analyses yet' in i.value for i in at.info)
     s3.can_list = False
-    import streamlit as st
     st.cache_data.clear()
     at.run()
     assert any('may not list saved analyses' in e.value for e in at.error)

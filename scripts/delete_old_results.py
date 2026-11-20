@@ -34,6 +34,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from dotenv import load_dotenv
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -133,7 +135,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument('--apply', action='store_true', help="delete them (default: dry run, only list them)")
     args = parser.parse_args(argv)
 
-    from dotenv import load_dotenv
     load_dotenv(PROJECT_ROOT / '.env')
     manager = S3DataManager()
     files = find_old_results(manager)

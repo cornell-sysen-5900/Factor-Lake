@@ -138,7 +138,8 @@ def render_results_tab(run: Dict[str, Any]) -> None:
         st.warning("No backtest results found. Please execute the analysis.")
         return
     if run.get('data_mode') == 'wrds':
-        from components.wrds_results import render_wrds_results
+        # Imported here: components.wrds_results imports this module (a circular import at the top)
+        from components.wrds_results import render_wrds_results  # noqa: PLC0415
         render_wrds_results(run)
         return
     settings = run['settings']

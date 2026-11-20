@@ -28,6 +28,7 @@ from .backtest_jobs import code_version, decode_saved, describe_job, encode_save
 from .data_standardization import validate_universe
 from .s3_client import DELISTING_FILE, UNIVERSE_FILE, S3DataManager
 from .trading_costs import describe_trading_cost, job_trading_cost
+from .wrds_preview import WrdsPreviewService
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,9 @@ class BacktestService:
     def wrds(self):
         """The WRDS backtest service (src/wrds_service.py), sharing this service's S3 and cache."""
         if self._wrds is None:
-            from .wrds_service import WrdsBacktestService
+            # Imported here: wrds_service imports this module (a circular import at the top), and Legacy-only
+            # Lambda containers never load the WRDS code
+            from .wrds_service import WrdsBacktestService  # noqa: PLC0415
             self._wrds = WrdsBacktestService(self)
         return self._wrds
 
@@ -96,7 +99,6 @@ class BacktestService:
             if event.get('action') == 'ping':
                 return {'status': 'ok', 'code_version': self.code_version}
             if event.get('action') == 'wrds_preview':
-                from .wrds_preview import WrdsPreviewService
                 if self._preview is None:
                     self._preview = WrdsPreviewService(self.manager)
                 try:

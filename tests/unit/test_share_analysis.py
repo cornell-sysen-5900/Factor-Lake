@@ -13,6 +13,7 @@ import io
 import json
 
 import pytest
+import streamlit as st
 from botocore.exceptions import ClientError
 
 from src.backtest_jobs import decode_saved, encode_result, results_match
@@ -108,7 +109,6 @@ def test_other_s3_errors_are_reported(manager, s3, monkeypatch):
 @pytest.fixture
 def new_session(monkeypatch, manager):
     """Starts app sessions (browser tabs) that share the in-process Lambda and the fake S3."""
-    import streamlit as st
     st.cache_resource.clear()
     fake_lambda = FakeLambda(BacktestService(manager))
     monkeypatch.setenv('FACTOR_LAKE_BACKTEST_LAMBDA', 'factor-lake-backtest')

@@ -10,9 +10,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+from streamlit.proto.WidgetStates_pb2 import WidgetStates
+from streamlit.testing.v1.element_tree import ElementTree, get_widget_state
 
 import src.backtest_engine as backtest_engine
 from app.saved_runs import add_saved_run, build_run_label, named_run_label, remove_saved_run
+from app.streamlit_config import FACTOR_METADATA
 from tests.legacy_components import legacy_app_test
 
 APP_DIR = Path(__file__).resolve().parents[2] / 'app'
@@ -119,8 +122,6 @@ def browser_like_widget_states(monkeypatch):
       clicks again. For a bar never clicked, the open tab (the browser sends
       nothing and Streamlit keeps the value; AppTest needs it sent).
     """
-    from streamlit.proto.WidgetStates_pb2 import WidgetStates
-    from streamlit.testing.v1.element_tree import ElementTree, get_widget_state
 
     monkeypatch.setattr(ElementTree, 'clicked_tabs', {}, raising=False)   # tab bar id -> last clicked label
 
@@ -204,7 +205,6 @@ def _run_analysis(at):
 
 
 def _add_factor(at, name):
-    from app.streamlit_config import FACTOR_METADATA
     at.button(key=f"factor_add_{FACTOR_METADATA[name]['key']}").click().run()   # a click adds it
 
 

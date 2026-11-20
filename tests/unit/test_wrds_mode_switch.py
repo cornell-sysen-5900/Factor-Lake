@@ -8,6 +8,7 @@ AppTest drives app/streamlit_app.py with the synthetic universe of test_saved_ru
 from pathlib import Path
 
 import pytest
+import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 from app.streamlit_config import FACTOR_METADATA, WRDS_FACTOR_GROUPS, WRDS_FACTOR_METADATA
@@ -74,7 +75,6 @@ class FakeLambdaClient:
 @pytest.fixture
 def lambda_at(monkeypatch):
     """The app with a backtest Lambda configured (served by FakeLambdaClient)."""
-    import streamlit as st
     st.cache_resource.clear()          # get_lambda_client keeps one client per function name
     client = FakeLambdaClient()
 

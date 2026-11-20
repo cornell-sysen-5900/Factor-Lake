@@ -8,7 +8,9 @@ Two lists help a user find an ID they forgot to copy:
 - "All saved analyses": everyone's saved analyses, listed from S3.
 """
 import pytest
+import streamlit as st
 
+from app.analysis_history import earlier_analyses, merge_entries
 from src.backtest_service import BacktestService, result_file, summarize_job
 from src.saved_analyses import SavedAnalysisError, list_saved_analyses
 from tests.legacy_components import legacy_app_test
@@ -38,7 +40,6 @@ def _entry(analysis_id, saved_at, label='Run 1: ROE using 9/30 Data'):
 # ---------------------------------------------------------------------------
 
 def test_merge_keeps_one_entry_per_id_newest_first():
-    from app.analysis_history import merge_entries
     stored = [_entry(ID_A, '2026-10-20T10:00:00Z'), _entry(ID_B, '2026-10-21T10:00:00Z')]
     session = [_entry(ID_A, '2026-10-29T09:00:00Z', 'Run 4: ROA %'), {'analysis_id': None, 'label': 'local run'}]
     merged = merge_entries(stored, session)
@@ -49,7 +50,6 @@ def test_merge_keeps_one_entry_per_id_newest_first():
 
 
 def test_earlier_analyses_leave_out_this_sessions():
-    from app.analysis_history import earlier_analyses
     browser = [_entry(ID_A, '2026-10-29T09:00:00Z'), _entry(ID_B, '2026-10-20T10:00:00Z')]
     assert [e['analysis_id'] for e in earlier_analyses(browser, [_entry(ID_A, '2026-10-29T09:00:00Z')])] == [ID_B]
     assert earlier_analyses(None, []) == []
@@ -108,7 +108,6 @@ class FakeBrowser:
         self.storage = []
 
     def mount(self, data, key, on_stored_change):
-        from app.analysis_history import merge_entries
         self.storage = merge_entries(self.storage, data['add'], limit=data['max_entries'])
         return type('Result', (), {'stored': list(self.storage)})()
 
@@ -121,7 +120,6 @@ def browser():
 @pytest.fixture
 def new_session(monkeypatch, manager, browser):
     """Starts app sessions on one browser, sharing the in-process Lambda and the fake S3."""
-    import streamlit as st
     st.cache_resource.clear()
     st.cache_data.clear()
     fake_lambda = FakeLambda(BacktestService(manager))

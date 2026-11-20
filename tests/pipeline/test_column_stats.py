@@ -5,6 +5,7 @@ import json
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
 import pytest
 
 from pipeline import column_stats as cs
@@ -64,7 +65,6 @@ def test_column_stats_file_is_documented():
 
 
 def test_schema_dictionary_holds_nothing_from_the_data():
-    import pyarrow as pa
     stats = cs.stats_frame([cs.column_stat("t.parquet", "x", pa.chunked_array([[1.23456, 98765.4321, 3.0]])),
                             cs.column_stat("t.parquet", "ticker", pa.chunked_array([["ZZQX", "ZZQX", "AB"]]))])
     values = cs.distinctive_values(stats)

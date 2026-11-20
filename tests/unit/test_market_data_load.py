@@ -68,9 +68,11 @@ def _load(monkeypatch, setup):
     """Exercise retained Legacy loading functions directly, outside the WRDS-only app."""
     monkeypatch.syspath_prepend(str(APP_DIR))
     def legacy_components(settings):
-        import streamlit as st
+        # AppTest.from_function runs this function's source as a standalone app script, so its imports
+        # must be inside it
+        import streamlit as st  # noqa: PLC0415
 
-        from app import streamlit_utils as utils
+        from app import streamlit_utils as utils  # noqa: PLC0415
         utils.initialize_session_state()
         if st.button('Load Market Data'):
             utils.load_and_process_data(settings)

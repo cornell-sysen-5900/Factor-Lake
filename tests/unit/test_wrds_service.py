@@ -3,13 +3,17 @@ Tests for the WRDS side of the backtest Lambda: loading the WRDS data (src/wrds_
 running jobs (src/wrds_service.py), the holdings Parquet (src/wrds_holdings.py) and the
 handler's routing, with the WRDS files in a local folder and in a fake S3.
 """
+import io
 import json
 
 import numpy as np
 import pandas as pd
+import pyarrow.parquet as pq
 import pytest
+from botocore.exceptions import ClientError
 
 from aws_lambda import backtest_handler
+from scripts.deploy_backtest_lambda import expiry_rule_covers, merge_lifecycle_rules
 from src.backtest_jobs import decode_saved, job_hash
 from src.backtest_service import RESULTS_DIR, BacktestService, result_file
 from src.factor_risk import FACTOR_COLUMNS, MIN_MONTHS, wrds_factor_risk
@@ -201,7 +205,6 @@ def test_without_list_bucket_a_missing_holdings_file_still_means_recompute(manag
 
     def head(Bucket, Key):           # S3 answers 403 for a missing object without s3:ListBucket
         if Key not in s3.objects:
-            from botocore.exceptions import ClientError
             raise ClientError({'Error': {'Code': '403'}}, 'HeadObject')
         return original_head(Bucket, Key)
     s3.head_object = head
@@ -234,9 +237,7 @@ def test_holdings_parquet_has_one_row_group_per_date():
     _, holdings = run_wrds_backtest(frames.data(), FACTORS, DIRECTIONS, 'quarterly', 2010, 2012, 1000.0,
                                     first_month='2009-11', last_month='2013-02')
     body, layout = holdings_parquet(holdings)
-    import io
 
-    import pyarrow.parquet as pq
     meta = pq.ParquetFile(io.BytesIO(body)).metadata
     assert meta.num_row_groups == len(layout['dates']) == holdings['rebalance_date'].nunique()
     assert [meta.row_group(i).num_rows for i in range(meta.num_row_groups)] == layout['rows']
@@ -306,7 +307,6 @@ def test_legacy_and_wrds_results_live_side_by_side(service, s3):
 # ---------------------------------------------------------------------------
 
 def test_the_result_expiry_rule_covers_the_holdings_files():
-    from scripts.deploy_backtest_lambda import expiry_rule_covers, merge_lifecycle_rules
     rules = merge_lifecycle_rules([], PREFIX, 90)
     holdings_key = f'{PREFIX}/{holdings_file(RESULTS_DIR, "a" * 64)}'
     assert holdings_key.startswith(rules[0]['Filter']['Prefix'])

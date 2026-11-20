@@ -46,6 +46,10 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import boto3
+from botocore.exceptions import ClientError
+from dotenv import load_dotenv
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -183,7 +187,6 @@ def role_setup_instructions(role_name: str, bucket: str, prefix: str) -> str:
 
 def ensure_role(iam, role_name: str, bucket: str, prefix: str) -> str:
     """Creates the Lambda's role if needed, sets its permissions, and returns its ARN."""
-    from botocore.exceptions import ClientError
     try:
         arn = iam.get_role(RoleName=role_name)['Role']['Arn']
         logger.info(f"Using IAM role {role_name}")
@@ -210,7 +213,6 @@ def upload_package(s3, bucket: str, prefix: str, package: bytes) -> str:
 def deploy_function(lam, name: str, role_arn: str, code: Dict[str, str],
                     memory: int, timeout: int, environment: Dict[str, str]) -> None:
     """Creates the function, or updates its code and settings when it exists. code: S3Bucket and S3Key."""
-    from botocore.exceptions import ClientError
     config = dict(Role=role_arn, Handler=HANDLER, Runtime=RUNTIME, Layers=[],
                   MemorySize=memory, Timeout=timeout, Environment={'Variables': environment},
                   Description='Factor-Lake backtests: reads market data from S3, caches results in S3')
@@ -254,7 +256,6 @@ def set_result_expiry(s3, bucket: str, prefix: str, days: int) -> bool:
     rules. When these keys may not change lifecycle rules, the weekly cleanup job is
     enough: returns True either way.
     """
-    from botocore.exceptions import ClientError
     try:
         try:
             existing = s3.get_bucket_lifecycle_configuration(Bucket=bucket)['Rules']
@@ -300,7 +301,6 @@ def check_result_expiry(s3, bucket: str, prefix: str, days: int = RESULT_RETENTI
     a rule deletes saved results sooner than `days` days; without a rule, or without access to
     the rules, the weekly cleanup job deletes them after `days` days.
     """
-    from botocore.exceptions import ClientError
     try:
         rules = s3.get_bucket_lifecycle_configuration(Bucket=bucket)['Rules']
     except ClientError as e:
@@ -359,9 +359,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         logger.info(f"Wrote {args.package_only}; nothing deployed.")
         return 0
 
-    from dotenv import load_dotenv
     load_dotenv(PROJECT_ROOT / '.env')
-    import boto3
 
     lam = boto3.client('lambda', region_name=args.region)
     s3 = boto3.client('s3', region_name=args.region)
@@ -370,7 +368,6 @@ def main(argv: Optional[List[str]] = None) -> int:
         role_arn = args.role_arn
         logger.info(f"Using IAM role {role_arn} (no IAM calls)")
     else:
-        from botocore.exceptions import ClientError
         try:
             role_arn = ensure_role(boto3.client('iam'), args.role_name, args.bucket, prefix)
         except ClientError as e:

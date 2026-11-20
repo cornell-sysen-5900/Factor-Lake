@@ -4,6 +4,7 @@ from copy import deepcopy
 from io import BytesIO
 
 import pytest
+import streamlit as st
 
 from app import strategy_config as cfg
 from app.streamlit_config import WRDS_FACTOR_METADATA
@@ -56,7 +57,6 @@ def test_invalid_document(field, value):
 
 
 def test_legacy_year_limits_come_from_config():
-    from app.streamlit_config import LEGACY_FIRST_YEAR, LEGACY_LAST_START_YEAR, LEGACY_LAST_YEAR
     ok = document()
     ok['settings'].update(start_year=LEGACY_LAST_START_YEAR, end_year=LEGACY_LAST_YEAR)
     cfg.loads(json.dumps(ok))
@@ -115,7 +115,6 @@ class _UploadedFile(BytesIO):
 def upload(at, monkeypatch, raw):
     # AppTest cannot upload a file. Supply its bytes at that boundary only; exercise the
     # Analysis tab's import box, its rerun, the widgets and the backtest below.
-    import streamlit as st
     file = _UploadedFile(raw)
     monkeypatch.setattr(st, 'file_uploader', lambda *a, **k: file)
     _click_main_tab(at, 'Analysis')
@@ -126,7 +125,6 @@ def _next_run_name_shown(at, name):
 
 
 def test_import_export_run_rename_and_clear(new_session, monkeypatch):
-    from src.backtest_jobs import results_match
     at = new_session()
     doc = document('wrds')
     doc['factors'] = [{'column': 'f_roa', 'direction': 'bottom'}]
@@ -203,11 +201,18 @@ def test_wrds_import_restores_frequency_and_legacy_import_cannot_switch_mode(new
     assert at.session_state['factor_builder_selected'] == {label: 'bottom'}
 
 # Use an in-process Lambda and synthetic S3 to verify WRDS without live credentials.
-from tests.unit.test_wrds_saved import manager, new_session, s3  # noqa: E402,F401
+from app.streamlit_config import LEGACY_FIRST_YEAR, LEGACY_LAST_START_YEAR, LEGACY_LAST_YEAR  # noqa: E402
+from src.backtest_jobs import results_match  # noqa: E402
+from tests.unit.results_snapshot import main_area  # noqa: E402
+from tests.unit.test_wrds_saved import (  # noqa: E402,F401
+    _run_wrds,  # noqa: E402
+    manager,
+    new_session,
+    s3,
+)
 
 
 def test_wrds_round_trip_keeps_cache_identity_and_results(new_session, monkeypatch):
-    from src.backtest_jobs import results_match
     at = new_session()
     doc = document('wrds')
     doc['settings'].update(start_year=2010, end_year=2012, frequency='quarterly')
@@ -278,7 +283,6 @@ def test_rename_keeps_the_run_open_and_renames_it_in_the_history(at):
 
 
 def test_use_wrds_settings_loads_the_run_into_the_analysis_tab(new_session):
-    from tests.unit.test_wrds_saved import _run_wrds
     at = new_session()
     at.button(key='factor_add_w_roa').click().run()
     at.button_group(key='factor_dir_w_roa').set_value('Lower is better').run()
@@ -299,8 +303,8 @@ def test_use_wrds_settings_loads_the_run_into_the_analysis_tab(new_session):
 
 
 def test_saved_analyses_panel_floats_over_the_runs(at):
-    from components.saved_panel import PANEL_CSS, PANEL_KEY
-    from tests.unit.results_snapshot import main_area
+    # The app's components/ package: importable only after the fixture puts app/ on sys.path
+    from components.saved_panel import PANEL_CSS, PANEL_KEY  # noqa: PLC0415
     _add_factor(at, 'ROA %')
     _click(at, 'Load Market Data')
     _click(at, 'Run Portfolio Analysis')

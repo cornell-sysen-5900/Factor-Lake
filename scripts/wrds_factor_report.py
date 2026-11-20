@@ -17,12 +17,19 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
+from dotenv import load_dotenv
+
+try:
+    import tomllib  # Python 3.11+
+except ImportError:
+    import tomli as tomllib  # Python 3.10
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.streamlit_config import WRDS_FACTOR_METADATA  # noqa: E402
 from app.wrds_factor_review import factor_rows, legacy_rows  # noqa: E402
+from src.s3_client import S3DataManager  # noqa: E402
 from src.wrds_data import PANEL_FILE, RETURNS_FILE, wrds_dir  # noqa: E402
 from src.wrds_factor_evidence import (  # noqa: E402
     CONSISTENT_SHARE,
@@ -172,14 +179,9 @@ def render_catalog():
 
 def _load_aws_settings():
     # Standard AWS environment/profile wins. Also support the app's existing local secrets file.
-    from dotenv import load_dotenv
     load_dotenv(PROJECT_ROOT / '.env', override=False)
     path = PROJECT_ROOT / '.streamlit/secrets.toml'
     if path.exists():
-        try:
-            import tomllib
-        except ImportError:
-            import tomli as tomllib
         with path.open('rb') as handle:
             config = tomllib.load(handle)
         for key in ('AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN', 'AWS_DEFAULT_REGION',
@@ -209,7 +211,6 @@ def main(argv=None):
     if not args.catalog_only:
         if args.s3:
             _load_aws_settings()
-            from src.s3_client import S3DataManager
             manager = S3DataManager()
             folder = wrds_dir()
             def read_bytes(name):

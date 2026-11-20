@@ -2,6 +2,7 @@
 Tests for pipeline/stages/s08_export.py and pipeline/dictionary.py on small synthetic stage outputs (no real data).
 """
 import json
+from datetime import date
 
 import numpy as np
 import pandas as pd
@@ -88,7 +89,6 @@ def test_upload_instructions_point_at_the_repo_script_and_a_new_folder():
 
 
 def test_data_version_is_the_build_date_unless_set(monkeypatch):
-    from datetime import date
     monkeypatch.delenv(s08.DATA_VERSION_ENV, raising=False)
     assert s08.data_version() == date.today().isoformat()
     monkeypatch.setenv(s08.DATA_VERSION_ENV, "2026-11-07")

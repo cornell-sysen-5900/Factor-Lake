@@ -47,6 +47,9 @@ import time
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
+import pandas as pd
+from dotenv import load_dotenv
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -163,7 +166,6 @@ def check_wrds(client: BacktestLambdaClient, unique: bool, job: Optional[dict] =
     is the final value of the same job at 0 bps, when known. Returns (number of checks that
     failed, the final value).
     """
-    import pandas as pd
     job = job or wrds_sample_job(unique)
     print(f"\n{describe_wrds_job(job)}")
 
@@ -253,7 +255,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument('--skip-wrds', action='store_true', help="Leave out the WRDS backtest check")
     args = parser.parse_args(argv)
 
-    from dotenv import load_dotenv
     load_dotenv(PROJECT_ROOT / '.env')
 
     function_name = args.function_name or os.environ.get('FACTOR_LAKE_BACKTEST_LAMBDA') or DEFAULT_FUNCTION_NAME

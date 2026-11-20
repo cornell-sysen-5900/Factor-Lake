@@ -10,9 +10,23 @@ import json
 
 import pytest
 
-from app.compare import column_titles, compact_analysis, comparison_table
+from app.compare import SORT_OPTIONS, column_titles, compact_analysis, comparison_table, sort_order
+from src.backtest_jobs import build_job
 from src.saved_analyses import load_saved_analysis
-from tests.unit.test_saved_runs import _add_factor, _assert_clean, _click, _click_main_tab
+from tests.legacy_components import legacy_app_test
+from tests.unit.test_saved_runs import (
+    APP_DIR,
+    _add_factor,
+    _add_roe_and_load,
+    _assert_clean,
+    _click,
+    _click_main_tab,
+    _open_tab,
+    _run_analysis,
+    _synthetic_universe,
+    browser_like_widget_states,
+)
+from tests.unit.test_wrds_mode_switch import LEGACY_DEFAULT_SETTINGS
 from tests.unit.test_wrds_saved import OLD_IDS, _run_wrds, manager, new_session, s3  # noqa: F401 (fixtures)
 from Visualizations.compare_growth_plot import COMPARE_COLORS
 
@@ -22,8 +36,6 @@ COST_KEY = 'trading_cost_bps_input'
 def _run_legacy(at, bps=0):
     # Prepare an archived Legacy result through the retained engine, then open it
     # through the real app. Creating Legacy runs is no longer a UI workflow.
-    from src.backtest_jobs import build_job
-    from tests.unit.test_wrds_mode_switch import LEGACY_DEFAULT_SETTINGS
     job = build_job('backtest', ['ROE_using_9-30_Data'], {'ROE_using_9-30_Data': 'top'},
                     dict(LEGACY_DEFAULT_SETTINGS, trading_cost_bps=bps,
                          initial_aum=at.number_input(key='initial_aum_input').value),
@@ -152,9 +164,9 @@ def test_mixed_legacy_and_wrds_values_match_their_results(saved, manager):
 
 def test_the_best_value_of_a_row_is_highlighted_green(saved, manager):
     at, ids = saved
+    # The app's components/ package imports app modules by bare name: only after the fixture puts app/ on sys.path
+    from app.components.compare_tab import BEST_STYLE  # noqa: PLC0415
     _compare(at, ids['legacy'], ids['quarterly'])
-    from app.compare import comparison_table
-    from app.components.compare_tab import BEST_STYLE
     styles = at.table[0].proto.arrow_data.styler.styles
     best_rows = comparison_table([compact_analysis(load_saved_analysis(i, manager))
                                   for i in (ids['legacy'], ids['quarterly'])], [0, 1], False).attrs['best']
@@ -298,7 +310,6 @@ def test_all_saved_analyses_can_be_added_and_hide_cohorts(saved):
     at, ids = saved
     # A cohort comparison of the Legacy run, saved by the Lambda as kind 'cohort'
     _click_main_tab(at, 'Results')
-    from tests.unit.test_saved_runs import _open_tab
     legacy_run = next(r for r in at.session_state['saved_runs'] if r['compute']['hash'] == ids['legacy'])
     _open_tab(at, legacy_run['label'])
     at.button(key=f"cohort_btn_{legacy_run['id']}").click().run()
@@ -416,7 +427,6 @@ def test_sorting_reorders_the_table_and_legend_without_reloading(saved, manager,
     analyses = [compact_analysis(load_saved_analysis(i, manager)) for i in entered]
     titles = column_titles(analyses)
     gets = len(s3.gets)
-    from app.compare import SORT_OPTIONS, sort_order
     for option in SORT_OPTIONS:
         at.selectbox(key='compare_sort').set_value(option).run()
         _assert_clean(at)
@@ -447,7 +457,6 @@ def test_show_only_differences_hides_the_rows_that_are_the_same(saved):
 
 def _open_run(at, analysis_id):
     """Opens the Results tab on the run with this ID."""
-    from tests.unit.test_saved_runs import _open_tab
     _click_main_tab(at, 'Results')
     run = next(r for r in at.session_state['saved_runs'] if r['compute']['hash'] == analysis_id)
     _open_tab(at, run['label'])
@@ -492,14 +501,6 @@ def test_add_to_comparison_in_results_with_every_box_full_shows_a_message(saved)
 
 
 def test_runs_computed_in_the_app_have_no_add_to_comparison(monkeypatch):
-    from tests.legacy_components import legacy_app_test
-    from tests.unit.test_saved_runs import (
-        APP_DIR,
-        _add_roe_and_load,
-        _run_analysis,
-        _synthetic_universe,
-        browser_like_widget_states,
-    )
     monkeypatch.setenv('FACTOR_LAKE_BACKTEST_LAMBDA', '')
     monkeypatch.syspath_prepend(str(APP_DIR))
     browser_like_widget_states(monkeypatch)

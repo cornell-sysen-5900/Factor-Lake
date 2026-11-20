@@ -17,6 +17,7 @@ import yaml
 from botocore.exceptions import ClientError
 
 import scripts.delete_old_results as cleanup
+from scripts.deploy_backtest_lambda import check_result_expiry, set_result_expiry
 from src.backtest_service import RESULT_RETENTION_DAYS, RESULT_RETENTION_TEXT, result_file
 from src.saved_analyses import FIRST_SAVED_FIELD
 from src.wrds_holdings import holdings_file
@@ -169,14 +170,12 @@ def _rule(days, prefix=f'{PREFIX}/backtest-results/', status='Enabled'):
     (LifecycleS3(rules=[_rule(30, prefix='other/')]), True, "weekly"),
 ])
 def test_the_deploy_check_needs_no_admin_and_warns_only_about_a_shorter_rule(s3_rules, ok, message, caplog):
-    from scripts.deploy_backtest_lambda import check_result_expiry
     caplog.set_level('INFO')
     assert check_result_expiry(s3_rules, BUCKET, PREFIX) is ok
     assert message in caplog.text and 'admin to add' not in caplog.text
 
 
 def test_a_deploy_without_lifecycle_access_still_counts_as_expiring(caplog):
-    from scripts.deploy_backtest_lambda import set_result_expiry
     caplog.set_level('INFO')
     assert set_result_expiry(LifecycleS3(error='AccessDenied'), BUCKET, PREFIX, RESULT_RETENTION_DAYS) is True
     assert "weekly 'Delete old results' GitHub Action" in caplog.text

@@ -11,6 +11,7 @@ import json
 import os
 
 import pandas as pd
+import pyarrow as pa
 import pyarrow.parquet as pq
 
 from .wrds_calendar import FIRST_YEAR, LAST_YEAR
@@ -79,7 +80,6 @@ def build_index(batches):
 
 
 def encode_index(index, etag):
-    import pyarrow as pa
     table = pa.Table.from_pandas(index, preserve_index=False)
     table = table.replace_schema_metadata({**(table.schema.metadata or {}),
                                            b'preview_version': INDEX_VERSION.encode(),

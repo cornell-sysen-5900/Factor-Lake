@@ -16,6 +16,8 @@ No docstrings are required.  mkdocstrings renders signatures and type
 annotations for every symbol regardless of whether a docstring exists.
 """
 
+import posixpath
+import re
 from pathlib import Path
 
 import mkdocs_gen_files
@@ -37,8 +39,6 @@ COPIED_PAGES = {"pipeline/DATA_UPDATE_GUIDE.md": "DATA_UPDATE_GUIDE.md"}
 
 def _github_links(text: str, source: Path) -> str:
     """Relative Markdown links ([x](PLAN.md), [x](../README.md)) -> GitHub blob URLs, from the source's folder."""
-    import posixpath
-    import re
 
     def fix(m):
         target = m.group(2)
