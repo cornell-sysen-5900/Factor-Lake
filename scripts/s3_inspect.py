@@ -29,6 +29,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path, PurePosixPath
 
+import boto3
 import pandas as pd
 import pyarrow.parquet as pq
 
@@ -46,7 +47,6 @@ BLOCK = 1 << 20                                      # ranged reads in 1 MB bloc
 def s3_client(secrets: Path):
     """boto3 S3 client from the Streamlit secrets (top-level AWS_* keys, or a section such as [aws]). The values
     are never printed."""
-    import boto3
     with open(secrets, "rb") as f:
         s = tomllib.load(f)
     found = {k: v for k, v in s.items() if isinstance(v, str)}

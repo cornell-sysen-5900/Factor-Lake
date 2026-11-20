@@ -7,11 +7,16 @@ At 0 bps every view is main's: tests/unit/test_wrds_results.py compares the Lega
 tab with main's snapshot.
 """
 import io
+import json
 
 import pandas as pd
 import pytest
 
+# As a module: the session fixture replaces get_results_store there with the fake S3
+from app import streamlit_utils as app_utils
 from app.holdings_table import TURNOVER_HELP
+from src.backtest_engine import run_cohort_comparison
+from src.saved_analyses import list_saved_analyses
 from tests.unit.test_holdings_table import _downloaded_csv, served_files  # noqa: F401 (fixture)
 from tests.unit.test_saved_runs import (
     _add_factor,
@@ -47,7 +52,6 @@ def _run_legacy(at, bps):
 
 def _record_jobs(at):
     """Records every job the session's in-process Lambda receives, in at.fake_lambda.jobs."""
-    import json
     fake, invoke = at.fake_lambda, at.fake_lambda.invoke
     fake.jobs = []
 
@@ -58,7 +62,6 @@ def _record_jobs(at):
 
 
 def _figure_traces(at, index=0):
-    import json
     return json.loads(at.get('plotly_chart')[index].proto.spec)['data']
 
 
@@ -68,7 +71,6 @@ def _metric_labels(at):
 
 def _assert_turnover_tooltips(at):
     """The turnover tile, the period table's Turnover % and the holdings' Traded % all explain 200%."""
-    import json
     tile = next(m for m in at.metric if m.label == 'Avg Turnover per Rebalance')
     assert tile.proto.help.endswith(TURNOVER_HELP)
     assert json.loads(at.dataframe[0].proto.columns)['Traded %']['help'] == TURNOVER_HELP
@@ -136,7 +138,6 @@ def test_the_legacy_cohort_uses_the_runs_cost(at):
     at.button(key=f"cohort_btn_{run['id']}").click().run()
     _assert_clean(at)
     assert "Both cohorts pay the run's trading cost of 50 bps per trade." in _captions(at)
-    from src.backtest_engine import run_cohort_comparison
     top, _ = run_cohort_comparison(run['data'], run['factors'], run['factor_directions'], 10, run['settings'])
     free, _ = run_cohort_comparison(run['data'], run['factors'], run['factor_directions'], 10,
                                     {k: v for k, v in run['settings'].items() if k != 'trading_cost_bps'})
@@ -161,9 +162,7 @@ def test_a_legacy_lambda_run_sends_the_cost_and_its_history_and_listing_show_it(
     run = at.session_state['saved_runs'][0]
     assert run['label'] == 'Run 1: ROE using 9/30 Data | 25 bps'
     assert at.session_state['analysis_history'][-1]['label'].endswith('| 25 bps')
-    from app.streamlit_utils import get_results_store
-    from src.saved_analyses import list_saved_analyses
-    listing = list_saved_analyses(get_results_store())['entries']
+    listing = list_saved_analyses(app_utils.get_results_store())['entries']
     assert listing[0]['analysis_id'] == run['compute']['hash'] and listing[0]['summary'].endswith('| 25 bps')
 
     # The ID opens in another session with its cost

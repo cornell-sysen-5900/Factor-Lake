@@ -10,6 +10,7 @@ Each column is (meaning, unit, source[, stage]); the stage defaults to the file'
 
 from __future__ import annotations
 
+from pipeline import column_stats
 from pipeline.config import (
     CLIENT_FILL_LAST_MONTH,
     CLIENT_LIST_FIRST_MONTH,
@@ -604,7 +605,6 @@ def columns(name: str) -> dict[str, tuple[str, str, str, str]]:
 def render(manifest: dict, stats=None, coverage=None) -> str:
     """DATA_DICTIONARY.md for teammates who never saw the pipeline; types and row counts from the manifest, a Stats
     table per file from column_stats (stats), and factor coverage by year for factor_panel_monthly."""
-    from pipeline import column_stats
     out = manifest["outputs"]
     md = [f"# Factor-Lake WRDS data: data dictionary (version {manifest['data_version']})", "",
           "Built by the WRDS pipeline in the Factor-Lake repo (`pipeline/`, commit "

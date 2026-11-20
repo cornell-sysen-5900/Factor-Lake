@@ -9,14 +9,16 @@ from streamlit.testing.v1 import AppTest
 
 
 def legacy_components_app():
-    from unittest.mock import patch
+    # AppTest.from_function runs this function's source as a standalone app script, so its imports
+    # must be inside it; the bare app modules also need app/ on sys.path, which that script has
+    from unittest.mock import patch  # noqa: PLC0415
 
-    import streamlit as st
+    import streamlit as st  # noqa: PLC0415
 
-    import streamlit_app as app
-    from app.calculation_preview import build_calculation_preview
-    from components.data_viewer import render_legacy_data_viewer_tab
-    from components.factor_selection import render_factor_selection
+    import streamlit_app as app  # noqa: PLC0415
+    from app.calculation_preview import build_calculation_preview  # noqa: PLC0415
+    from components.data_viewer import render_legacy_data_viewer_tab  # noqa: PLC0415
+    from components.factor_selection import render_factor_selection  # noqa: PLC0415
 
     app.utils.initialize_environment()
     app.utils.initialize_session_state()

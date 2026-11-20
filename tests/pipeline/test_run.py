@@ -7,11 +7,11 @@ import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 
-from pipeline import run
-from pipeline.checks import Check, columns_present, overall_status, values_present
+from pipeline import config, run
+from pipeline.checks import Check, columns_present, overall_status, values_present, vs_last_run
 from pipeline.config import DataPaths
 from pipeline.outputs import fresh_stage_dir, write_parquet, write_summary
-from pipeline.stages import STAGES
+from pipeline.stages import STAGES, s00_inventory, s08_export
 
 
 @pytest.fixture
@@ -68,7 +68,6 @@ def test_folder_options_default_to_the_standard_layout_and_move_everything(tmp_p
 def test_main_passes_the_folder_options(tmp_path, monkeypatch):
     (tmp_path / "raw_v2").mkdir()
     seen = {}
-    from pipeline.stages import s00_inventory
 
     def fake(paths):
         seen["paths"] = paths
@@ -82,7 +81,6 @@ def test_main_passes_the_folder_options(tmp_path, monkeypatch):
 
 
 def test_unwritten_stage_returns_exit_code_2(paths, capsys, monkeypatch):
-    from pipeline.stages import s08_export
 
     def not_written(_):
         raise NotImplementedError("s08_export is not written yet")
@@ -124,8 +122,6 @@ def test_shared_checks():
 
 
 def test_last_run_values_come_from_the_data_folder(tmp_path):
-    from pipeline import config
-    from pipeline.checks import vs_last_run
     saved = (dict(config.LAST_RUN), dict(config.LAST_RUN_COVERAGE_2015))
     try:
         config.LAST_RUN.clear()

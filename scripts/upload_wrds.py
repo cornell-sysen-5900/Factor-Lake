@@ -27,6 +27,11 @@ import sys
 import tempfile
 from pathlib import Path
 
+import boto3
+from boto3.exceptions import S3UploadFailedError
+from boto3.s3.transfer import TransferConfig
+from botocore.exceptions import BotoCoreError, ClientError
+
 try:
     import tomllib  # Python 3.11+
 except ImportError:
@@ -44,7 +49,6 @@ DAILY_MANIFEST = "prices_daily/_manifest.json"
 def s3_client(secrets: Path):
     """boto3 S3 client from the Streamlit secrets (top-level AWS_* keys, or a section such as [aws]). The values are
     never printed."""
-    import boto3
     with open(secrets, "rb") as f:
         s = tomllib.load(f)
     found = {k: v for k, v in s.items() if isinstance(v, str)}
@@ -149,9 +153,6 @@ def check(s3, bucket: str, local: dict[str, Path], remote: dict) -> bool:
 
 def upload(s3, bucket: str, local: dict[str, Path], remote: dict, really: bool, overwrite: bool) -> None:
     """Every Parquet file, then the daily manifest (local's last item) once all of them are verified."""
-    from boto3.exceptions import S3UploadFailedError
-    from boto3.s3.transfer import TransferConfig
-    from botocore.exceptions import BotoCoreError, ClientError
 
     def matches(key, path):
         if key not in remote:

@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from app.calculation_preview import PREVIEW_LABEL, SAVED_LABEL, build_calculation_preview, preview_for_run
 from app.wrds_tables import (
     FACTOR_RISK_SIZE_NOTE,
     GICS_HEADERS,
@@ -34,7 +35,14 @@ from app.wrds_tables import (
 from scripts.check_backtest_lambda import TOLERANCE, max_difference
 from src.factor_risk import FACTOR_COLUMNS, describe_factor_risk
 from src.wrds_engine import rank_stocks, run_wrds_backtest
-from tests.unit.results_snapshot import comparable, legacy_results_snapshot, main_area, without_calculation
+from tests.unit.results_snapshot import (
+    comparable,
+    legacy_results_snapshot,
+    main_area,
+    moved_to_panel,
+    without_calculation,
+    without_strategy_controls,
+)
 from tests.unit.test_backtest_lambda import DELISTING_FILE, UNIVERSE_FILE, _delisting, _parquet, _raw_universe
 from tests.unit.test_saved_runs import _assert_clean, _click_main_tab, _open_tab
 from tests.unit.test_wrds_saved import _run_wrds, manager, new_session  # noqa: F401 (fixtures)
@@ -320,7 +328,6 @@ def test_a_wrds_run_looks_like_legacys_results(new_session, legacy):
     assert run['calculation_preview']['formula'].startswith(WRDS_FORMULA)
     assert run['label'] == 'Run 1: WRDS, Quarterly'
     # The Saved analyses panel beside the runs shows the boxes Legacy's snapshot has above them
-    from tests.unit.results_snapshot import moved_to_panel
     panel = shown.pop('panel')
     assert panel['expander'][0] == 'Open a saved analysis'
     legacy = moved_to_panel(legacy, panel, strict=False)
@@ -472,8 +479,8 @@ def _formulas(at):
 def test_wrds_shows_the_wrds_calculation_never_the_legacy_one(new_session):
     # The Legacy formula describes the Legacy engine (annual rebalance on Next-Years_Return, its
     # delisting options, FactSet industries); WRDS mode, its runs and opened WRDS runs show the WRDS one
-    from app.calculation_preview import PREVIEW_LABEL, SAVED_LABEL, build_calculation_preview, preview_for_run
-    from tests.unit.test_calculation_preview import outline, preview_box
+    # Imported here: test_calculation_preview imports this module's s3 fixture (a circular import at the top)
+    from tests.unit.test_calculation_preview import outline, preview_box  # noqa: PLC0415
     at = new_session()
     at.sidebar.number_input(key='wrds_start_year_input').set_value(2010).run()
     at.sidebar.number_input(key='wrds_end_year_input').set_value(2012).run()
@@ -533,7 +540,6 @@ def test_legacy_results_tab_renders_exactly_as_on_main(monkeypatch):
         render['tabs'].remove('Scoreboard')
     # The Saved analyses panel: beside the runs, it shows the boxes main drew above them (and
     # Import settings). Take it out of both, after checking each of its items is one main showed.
-    from tests.unit.results_snapshot import moved_to_panel, without_strategy_controls
     for step, render in actual.items():
         assert 'Use these settings' in render['button'] and 'Apply' in render['button'], step
         panel = without_strategy_controls(render.pop('panel'))

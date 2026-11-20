@@ -33,6 +33,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from scripts.upload_wrds import s3_client  # noqa: E402
 from src.s3_client import DEFAULT_BUCKET, DEFAULT_PREFIX, S3DataManager  # noqa: E402
 from src.wrds_data import DOLLAR_VOLUME_FILE, wrds_dir  # noqa: E402
 from src.wrds_liquidity import daily_years, read_dollar_volume  # noqa: E402
@@ -75,7 +76,6 @@ def main(argv: list[str] | None = None, s3=None) -> int:
     if not FOLDER.match(data_dir):
         sys.exit(f"Refusing {data_dir!r}: only a WRDS folder (wrds_YYYY_MM) gets this file.")
     if s3 is None:
-        from scripts.upload_wrds import s3_client
         s3 = s3_client(args.secrets)
     manager = S3DataManager(bucket=args.bucket, prefix=DEFAULT_PREFIX, client=s3)
     key = manager.object_key(f'{data_dir}/{DOLLAR_VOLUME_FILE}')

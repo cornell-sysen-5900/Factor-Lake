@@ -62,8 +62,9 @@ extend-exclude = ["site", "factor_lake.egg-info", "tests/fixtures/bad_code.py"]
 force-exclude = true
 
 [tool.ruff.lint]
-# pycodestyle errors and warnings (PEP 8), pep8-naming, and import order
-select = ["E", "W", "N", "I"]
+# pycodestyle errors and warnings (PEP 8), pep8-naming, import order, and imports at the top of the
+# file (PLC0415: an import inside a function needs `# noqa: PLC0415` and a comment saying why)
+select = ["E", "W", "N", "I", "PLC0415"]
 
 [tool.ruff.lint.per-file-ignores]
 # Fake AWS clients in tests take boto3's own argument names (Bucket=, Key=, ...)

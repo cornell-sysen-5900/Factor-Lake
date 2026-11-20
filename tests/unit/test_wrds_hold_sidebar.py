@@ -3,9 +3,12 @@ The WRDS sidebar's Hold choice (app/components/sidebar.py): Top X% or Top N stoc
 weighting, one number input that changes with it, the job each one sends, and runs at 100%
 without factors. Runs go through the in-process Lambda on the synthetic WRDS data.
 """
+import json
+
 import pandas as pd
 
-from src.wrds_engine import WHOLE_FILTER_LABEL
+from app.streamlit_utils import load_wrds_holdings
+from src.wrds_engine import WHOLE_FILTER_LABEL, eligible_universe
 from tests.unit.test_saved_runs import _assert_clean, _click_main_tab
 from tests.unit.test_wrds_results import s3  # noqa: F401 (fixture)
 from tests.unit.test_wrds_saved import manager, new_session  # noqa: F401 (fixtures)
@@ -17,7 +20,6 @@ WHOLE_FILTER_CAPTION = "Holds every stock in the filter, so factors are not used
 
 def _start(new_session):
     """A session whose Lambda records every job it receives (at.jobs)."""
-    import json
     at = new_session()
     at.jobs, invoke = [], at.fake_lambda.invoke
 
@@ -52,7 +54,6 @@ def _sidebar_captions(at):
 
 def _holdings_counts(at, run):
     """Stocks held at each rebalance date, read from the run's holdings file in S3."""
-    from app.streamlit_utils import load_wrds_holdings
     holdings = run['results']['holdings']
     return {date: len(load_wrds_holdings(holdings['file'], i, date)) for i, date in enumerate(holdings['dates'])}
 
@@ -113,7 +114,6 @@ def test_at_100_percent_a_run_needs_no_factor_and_holds_the_whole_filter(new_ses
     assert run['factors'] == [] and run['label'] == 'Run 1: WRDS, Quarterly'
 
     # Every stock in the filter on every date, in a Results tab without cohorts or ranked lists
-    from src.wrds_engine import eligible_universe
     data = at.fake_lambda.service.wrds.runner.data()
     dates = run['results']['holdings']['dates']
     panel = data.panel[data.panel['date'].isin(pd.to_datetime(dates))]

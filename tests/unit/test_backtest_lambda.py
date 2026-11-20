@@ -14,18 +14,39 @@ Definition of done covered here:
 import hashlib
 import io
 import json
+import subprocess  # nosec B404 - runs this Python on a fixed script
+import sys
+import zipfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import boto3
 import numpy as np
 import pandas as pd
 import pytest
+import streamlit as st
 from botocore.exceptions import ClientError
 
+import aws_lambda.backtest_handler as handler_module
+import scripts.check_backtest_lambda as check
+import scripts.deploy_backtest_lambda as deploy
+import src.backtest_engine as engine
 import src.backtest_service as backtest_service
+from app.streamlit_config import FACTOR_METADATA
+from scripts.check_backtest_lambda import sample_jobs
+from scripts.deploy_backtest_lambda import (
+    BASIC_EXECUTION_POLICY,
+    LIFECYCLE_RULE_ID,
+    build_package,
+    main,
+    merge_lifecycle_rules,
+    prune_libraries,
+)
 from src.backtest_engine import rebalance_portfolio, run_cohort_comparison
 from src.backtest_jobs import build_job, code_version, decode_result, encode_result, job_hash, results_match, run_job
 from src.backtest_service import BacktestService, result_file
 from src.lambda_client import BacktestLambdaClient, BacktestLambdaError
+from src.portfolio import Portfolio
 from src.s3_client import DELISTING_FILE, UNIVERSE_FILE, S3DataManager
 from src.universe_selection import select_universe
 from tests.legacy_components import legacy_app_test
@@ -68,7 +89,6 @@ class FakeS3:
                 'Metadata': dict(metadata), 'LastModified': self.modified[Key]}
 
     def put_object(self, Bucket, Key, Body, ContentType=None, Metadata=None):
-        from datetime import datetime, timedelta, timezone
         self.objects[Key] = (bytes(Body), dict(Metadata or {}))
         self.modified[Key] = datetime(2026, 10, 1, tzinfo=timezone.utc) + timedelta(seconds=len(self.puts))
         self.puts.append(Key)
@@ -237,8 +257,6 @@ def test_results_survive_the_json_round_trip(manager):
 
 def test_tied_holdings_are_ordered_by_ticker_whatever_the_float_noise():
     """Seen on AWS: Mixing sleeve leaders tie in score, and the last float bit differs by machine."""
-    import src.backtest_engine as engine
-    from src.portfolio import Portfolio
     df = pd.DataFrame({'Ending_Price': [10.0, 20.0], 'Next-Years_Return': [5.0, 7.0], 'A': [1.0, 2.0],
                        'B': [3.0, 4.0]}, index=pd.Index(['VGR', 'USNA'], name='Ticker'))
     orders = []
@@ -352,7 +370,6 @@ def test_errors_come_back_as_messages(service):
 
 
 def test_lambda_handler_uses_one_service_per_container(monkeypatch, service):
-    import aws_lambda.backtest_handler as handler_module
     monkeypatch.setattr(handler_module, '_service', service)
     assert handler_module.handler({'action': 'ping'}, None)['status'] == 'ok'
 
@@ -400,7 +417,6 @@ class SkewedLambda(FakeLambda):
 
 
 def test_check_script_uses_new_inputs_each_run():
-    from scripts.check_backtest_lambda import sample_jobs
     first, second = sample_jobs(unique=True), sample_jobs(unique=True)
     assert all(a['initial_aum'] != b['initial_aum'] for a, b in zip(first, second))
     assert sample_jobs(unique=False) == sample_jobs(unique=False)
@@ -435,7 +451,6 @@ class OtherStockLambda(FakeLambda):
     (FakeLambda, 0), (SkewedLambda, 1), (ReorderedLambda, 0), (OtherStockLambda, 1),
 ])
 def test_check_script_compares_lambda_with_local(monkeypatch, manager, capsys, lambda_class, exit_code):
-    import scripts.check_backtest_lambda as check
     fake = lambda_class(BacktestService(manager))
     monkeypatch.setattr(check, 'S3DataManager', lambda: manager)
     monkeypatch.setattr(check, 'BacktestLambdaClient', lambda name: BacktestLambdaClient(name, client=fake))
@@ -451,7 +466,6 @@ def test_check_script_compares_lambda_with_local(monkeypatch, manager, capsys, l
 
 
 def test_check_script_fails_when_the_lambda_saves_no_scores(monkeypatch, manager, capsys):
-    import scripts.check_backtest_lambda as check
     monkeypatch.setattr(backtest_service, 'score_metadata', lambda job, result: {})   # a Lambda from before
     monkeypatch.setattr(check, 'S3DataManager', lambda: manager)
     monkeypatch.setattr(check, 'BacktestLambdaClient',
@@ -465,7 +479,6 @@ def test_check_script_fails_when_the_lambda_saves_no_scores(monkeypatch, manager
 # ---------------------------------------------------------------------------
 
 def test_lifecycle_rule_is_added_without_dropping_other_rules():
-    from scripts.deploy_backtest_lambda import LIFECYCLE_RULE_ID, merge_lifecycle_rules
     other = {'ID': 'archive-old-data', 'Filter': {'Prefix': 'archive/'}, 'Status': 'Enabled',
              'Transitions': [{'Days': 30, 'StorageClass': 'GLACIER'}]}
     old_ours = {'ID': LIFECYCLE_RULE_ID, 'Filter': {'Prefix': 'x/'}, 'Status': 'Enabled', 'Expiration': {'Days': 7}}
@@ -476,7 +489,6 @@ def test_lifecycle_rule_is_added_without_dropping_other_rules():
 
 
 def test_role_instructions_for_an_admin_include_both_policies(capsys):
-    from scripts.deploy_backtest_lambda import BASIC_EXECUTION_POLICY, main
     assert main(['--print-role-policy', '--bucket', BUCKET, '--prefix', PREFIX]) == 0
     out = capsys.readouterr().out
     assert 'lambda.amazonaws.com' in out and BASIC_EXECUTION_POLICY in out
@@ -484,9 +496,7 @@ def test_role_instructions_for_an_admin_include_both_policies(capsys):
 
 
 def test_deploy_without_iam_access_explains_the_admin_step(monkeypatch, caplog):
-    import boto3
 
-    import scripts.deploy_backtest_lambda as deploy
 
     class DeniedIam:
         def get_role(self, **kwargs):
@@ -499,7 +509,6 @@ def test_deploy_without_iam_access_explains_the_admin_step(monkeypatch, caplog):
 
 
 def test_unused_library_parts_are_pruned(tmp_path):
-    from scripts.deploy_backtest_lambda import prune_libraries
     keep = ['pyarrow/libarrow.so.2400', 'pyarrow/libarrow_substrait.so.2400', 'pyarrow/libparquet.so.2400',
             'pyarrow/parquet/core.py', 'pandas/core/frame.py', 'numpy/_core/multiarray.py']
     drop = ['pyarrow/libarrow_flight.so.2400', 'pyarrow/libarrow_python_flight.so',
@@ -515,7 +524,6 @@ def test_unused_library_parts_are_pruned(tmp_path):
 
 
 def test_package_over_the_lambda_limit_is_refused(tmp_path, monkeypatch):
-    import scripts.deploy_backtest_lambda as deploy
     (tmp_path / 'big.so').write_bytes(b'0' * 2048)
     monkeypatch.setattr(deploy, 'LAMBDA_UNZIPPED_LIMIT', 1024)
     with pytest.raises(SystemExit, match='250 MB'):
@@ -523,9 +531,7 @@ def test_package_over_the_lambda_limit_is_refused(tmp_path, monkeypatch):
 
 
 def test_lambda_package_has_the_engine_but_not_supabase():
-    import zipfile
 
-    from scripts.deploy_backtest_lambda import build_package
     names = zipfile.ZipFile(io.BytesIO(build_package())).namelist()
     assert 'aws_lambda/backtest_handler.py' in names and 'src/backtest_engine.py' in names
     assert 'src/supabase_client.py' not in names
@@ -534,8 +540,6 @@ def test_lambda_package_has_the_engine_but_not_supabase():
 
 def test_lambda_code_does_not_import_streamlit_or_supabase():
     """The Lambda has no streamlit or supabase package; importing them would fail there."""
-    import subprocess  # nosec B404 - runs this Python on a fixed script
-    import sys
     code = ("import sys, builtins; real = builtins.__import__\n"
             "def guard(name, *a, **k):\n"
             "    if name.split('.')[0] in ('streamlit', 'supabase'): raise ImportError(name)\n"
@@ -554,7 +558,6 @@ def test_lambda_code_does_not_import_streamlit_or_supabase():
 @pytest.fixture
 def lambda_app(monkeypatch, manager):
     """The real app with FACTOR_LAKE_BACKTEST_LAMBDA set and Lambda served by the in-process service."""
-    import streamlit as st
     st.cache_resource.clear()
     fake_lambda = FakeLambda(BacktestService(manager))
     monkeypatch.setenv('FACTOR_LAKE_BACKTEST_LAMBDA', 'factor-lake-backtest')
@@ -578,7 +581,6 @@ def _client_init_with(fake_lambda):
 
 
 def _add(at, name):
-    from app.streamlit_config import FACTOR_METADATA
     at.button(key=f"factor_add_{FACTOR_METADATA[name]['key']}").click().run()
 
 

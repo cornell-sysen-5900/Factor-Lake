@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
+from app.strategy_config import dumps
 from src.wrds_preview import APPROVAL_ENV, build_index, select_preview
 from tests.unit.test_saved_runs import _assert_clean, _click_main_tab, browser_like_widget_states
 from tests.unit.test_strategy_config import document
@@ -68,7 +69,6 @@ def test_legacy_import_and_queued_use_settings_are_rejected_without_mutating_inp
     at = app_factory()
     at.button(key='factor_add_w_roa').click().run()
     before = deepcopy(at.session_state['factor_builder_selected'])
-    from app.strategy_config import dumps
     for source, payload in [('file', dumps(document())), ('run', document())]:
         at.session_state['strategy_pending_settings'] = (source, payload, 1)
         at.run()

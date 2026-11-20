@@ -11,6 +11,7 @@ dates. Text: non-null %, unique count, top 5 values with their share of rows. Bo
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import numpy as np
@@ -193,7 +194,6 @@ def distinctive_values(stats: pd.DataFrame) -> set[str]:
 
 def leaked(md: str, values: set[str]) -> list[str]:
     """The values that appear in md as whole tokens."""
-    import re
     return sorted(v for v in values if re.search(rf"(?<![\w.]){re.escape(v)}(?![\w])", md))
 
 

@@ -9,7 +9,9 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 from app import strategy_config as cfg
+from app.calculation_preview import build_wrds_calculation_preview
 from app.compare import comparison_rows
+from src.wrds_jobs import build_wrds_job
 from tests.unit.test_compare import _legacy, _wrds
 from tests.unit.test_saved_runs import _assert_clean, _click_main_tab
 from tests.unit.test_strategy_config import document, upload
@@ -17,6 +19,7 @@ from tests.unit.test_wrds_hold_sidebar import COUNT, HOLD, PCT, _run, _start
 from tests.unit.test_wrds_hold_sidebar import _wrds as _wrds_mode
 from tests.unit.test_wrds_results import s3  # noqa: F401 (fixture)
 from tests.unit.test_wrds_saved import APP_DIR, manager, new_session  # noqa: F401 (fixtures)
+from tests.unit.wrds_fixtures import WRDS_SETTINGS
 
 
 def _universe_caption(at):
@@ -183,9 +186,6 @@ def test_a_default_and_a_no_factor_run_describe_themselves(new_session):
 # ---------------------------------------------------------------------------
 
 def test_the_preview_at_100_percent_holds_the_filter_and_scores_nothing_without_factors():
-    from app.calculation_preview import build_wrds_calculation_preview
-    from src.wrds_jobs import build_wrds_job
-    from tests.unit.wrds_fixtures import WRDS_SETTINGS
     whole = build_wrds_calculation_preview(build_wrds_job('backtest', [], {}, dict(WRDS_SETTINGS, top_pct=100.0)))
     assert 'Top 100%: H(t) = U(t), every stock in the filter' in whole['formula']
     assert 'floor(' not in whole['formula'] and 'min(' not in whole['formula']

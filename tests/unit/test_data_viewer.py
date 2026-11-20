@@ -15,6 +15,7 @@ import pandas as pd
 import pytest
 import streamlit as st
 
+from app.streamlit_config import FACTOR_METADATA
 from app.viewer_data import (
     DISPLAY_ROW_LIMIT,
     VIEWER_STATE_KEY,
@@ -141,7 +142,6 @@ def at(monkeypatch):
 
 def _load_market_data(at):
     """Loads market data in the Analysis tab, then opens the Data Viewer tab."""
-    from app.streamlit_config import FACTOR_METADATA
     # Load Market Data stays disabled until at least one factor is added
     at.button(key=f"factor_add_{FACTOR_METADATA['ROE using 9/30 Data']['key']}").click().run()
     next(b for b in at.button if b.label == 'Load Market Data').click().run()

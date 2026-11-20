@@ -70,7 +70,8 @@ def test_clear_restores_every_analysis_input_and_factor_direction(at):
 
 
 def test_clear_empty_inputs_is_repeatable_and_does_not_run_or_download(at, monkeypatch):
-    import streamlit_utils as utils
+    # The app's own module name: importable only after the fixture puts app/ on sys.path
+    import streamlit_utils as utils  # noqa: PLC0415
 
     def unexpected(*args, **kwargs):
         pytest.fail('Clearing parameters must not load data or run a backtest')
@@ -89,7 +90,8 @@ def test_clear_empty_inputs_is_repeatable_and_does_not_run_or_download(at, monke
 
 
 def test_local_clear_and_rerun_uses_new_universe_and_keeps_old_results(at, monkeypatch):
-    import streamlit_utils as utils
+    # The app's own module name: importable only after the fixture puts app/ on sys.path
+    import streamlit_utils as utils  # noqa: PLC0415
 
     raw = at.session_state['raw_data']
     raw.loc[raw['Ticker'] >= 'T15', 'Scotts_Sector_5'] = 'Healthcare'

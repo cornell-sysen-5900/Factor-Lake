@@ -1,12 +1,16 @@
 """Preview contract, exact filtering, release gate and bounded storage (synthetic data only)."""
 import io
 import json
+from pathlib import Path
 
 import pandas as pd
 import pytest
 from botocore.exceptions import ClientError
 
+from app.streamlit_config import FACTOR_METADATA, WRDS_FACTOR_METADATA
+from app.wrds_factor_review import REPLACEMENTS, SAME
 from scripts.build_wrds_preview import main as build_main
+from scripts.legacy_wrds_mapping import report
 from src.backtest_service import BacktestService
 from src.lambda_client import BacktestLambdaClient, BacktestLambdaError
 from src.s3_client import S3DataManager
@@ -195,11 +199,7 @@ def test_client_rejects_overlarge_samples_and_never_returns_raw_errors():
 
 
 def test_legacy_report_covers_every_factor_without_promoting_similar_matches():
-    from pathlib import Path
 
-    from app.streamlit_config import FACTOR_METADATA, WRDS_FACTOR_METADATA
-    from app.wrds_factor_review import REPLACEMENTS, SAME
-    from scripts.legacy_wrds_mapping import report
     generated = report()
     assert Path('DOCS/LEGACY_WRDS_MATCHES.md').read_text() == generated
     rows = [line.split('|')[1:-1] for line in generated.splitlines() if line.startswith('| ')]

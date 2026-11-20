@@ -26,6 +26,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from dotenv import load_dotenv
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -34,11 +36,11 @@ from src.backtest_jobs import decode_result, decode_saved  # noqa: E402
 from src.backtest_service import result_file, summarize_job  # noqa: E402
 from src.s3_client import S3DataManager  # noqa: E402
 from src.saved_analyses import FIRST_SAVED_FIELD, NOT_ANALYSES, _list_result_ids, _metadata  # noqa: E402
+from src.wrds_service import summarize_wrds_job  # noqa: E402
 
 
 def _summary(job: Dict) -> str:
     if job.get('data_mode') == 'wrds':
-        from src.wrds_service import summarize_wrds_job
         return summarize_wrds_job(job)
     return summarize_job(job)
 
@@ -86,7 +88,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument('--apply', action='store_true', help="rewrite the metadata (default: dry run)")
     args = parser.parse_args(argv)
 
-    from dotenv import load_dotenv
     load_dotenv(PROJECT_ROOT / '.env')
     counts = score_saved_analyses(S3DataManager(), apply=args.apply)
     print(', '.join(f"{name}: {counts[name]}" for name in

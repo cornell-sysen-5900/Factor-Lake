@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 import pytest
+import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 from src.backtest_jobs import decode_result, decode_saved, results_match
@@ -77,7 +78,6 @@ def test_old_cohort_and_pre_sharing_ids_get_the_same_messages_as_on_main(manager
 @pytest.fixture
 def new_session(monkeypatch, manager):
     """App sessions sharing an in-process Lambda and the fake S3 (as in test_share_analysis.py)."""
-    import streamlit as st
     st.cache_resource.clear()
     st.cache_data.clear()
     fake_lambda = FakeLambda(BacktestService(manager))

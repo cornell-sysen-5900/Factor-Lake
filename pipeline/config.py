@@ -17,6 +17,7 @@ Every folder and upload list can be moved with run.py options (--raw-dir, --proc
 from __future__ import annotations
 
 import datetime as _dt
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -312,7 +313,6 @@ LAST_RUN_TOLERANCE = 0.02
 
 def load_last_run(path: Path) -> bool:
     """Fill LAST_RUN and LAST_RUN_COVERAGE_2015 in place from the data folder's file; False when it is missing."""
-    import json
     if not path.is_file():
         return False
     data = json.loads(path.read_text(encoding="utf-8"))

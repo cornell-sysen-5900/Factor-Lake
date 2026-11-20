@@ -8,12 +8,33 @@ VERSION: 3.4.0
 import hmac
 import os
 import sys
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import streamlit as st
+
+from app.calculation_preview import build_calculation_preview, build_wrds_calculation_preview, wrds_preview
+from app.saved_runs import add_saved_run, build_run_label, trading_cost_suffix
+from app.streamlit_config import FACTOR_METADATA, MAX_SAVED_RUNS, WRDS_FACTOR_METADATA
+from app.wrds_tables import FREQUENCY_LABELS
+
+# The engine as a module, not its functions: tests replace them (e.g. rebalance_portfolio) in src.backtest_engine
+from src import backtest_engine
+from src.backtest_jobs import build_job
+from src.data_standardization import validate_universe
+from src.lambda_client import BacktestLambdaClient
+from src.s3_client import S3DataManager
+from src.saved_analyses import list_saved_analyses, load_saved_analysis
+from src.saved_analyses import list_scored_analyses as list_scored
+from src.supabase_client import SupabaseManager
+from src.trading_costs import job_trading_cost
+from src.universe_selection import select_universe
+from src.wrds_engine import holds_whole_filter
+from src.wrds_holdings import read_holdings_date
+from src.wrds_jobs import build_wrds_job
+from src.wrds_service import summarize_wrds_job
 
 # Where market data can come from (see get_data_source)
 DATA_SOURCES = ('s3', 'supabase')
@@ -136,12 +157,9 @@ def load_shared_universe(source: str) -> pd.DataFrame:
     A failed download raises and is not cached, so the next click retries.
     The returned frame is shared between sessions: copy it before modifying it.
     """
-    from src.data_standardization import validate_universe
     if source == 's3':
-        from src.s3_client import S3DataManager
         df = S3DataManager().fetch_all_data()
     else:
-        from src.supabase_client import SupabaseManager
         df = SupabaseManager().fetch_all_data()
     validate_universe(df, source)
     return df
@@ -158,7 +176,6 @@ def load_and_process_data(user_settings: Dict[str, Any]) -> None:
     the kept rows are copied. When nothing is filtered out, rdata shares
     raw_data's columns, so treat rdata as read-only too.
     """
-    from src.universe_selection import select_universe
     try:
         if st.session_state.raw_data is None:
             st.session_state.raw_data = load_shared_universe(get_data_source())
@@ -206,7 +223,6 @@ def lambda_backtests_enabled(user_settings: Dict[str, Any]) -> bool:
 @st.cache_resource(show_spinner=False)
 def get_lambda_client(function_name: str):
     """One Lambda client shared by every session."""
-    from src.lambda_client import BacktestLambdaClient
     return BacktestLambdaClient(function_name)
 
 def describe_compute(info: Optional[Dict[str, Any]]) -> str:
@@ -237,12 +253,11 @@ def run_cohort(run: Dict[str, Any], cohort_pct: float):
     Returns:
         (top values, bottom values, compute info or None for local runs)
     """
-    from src.backtest_engine import run_cohort_comparison
     if run.get('data_mode') == 'wrds':
         result, info = _run_wrds_job(run, 'cohort', cohort_pct=cohort_pct)
         return result['top'], result['bottom'], info
     if run.get('data') is not None:
-        top, bottom = run_cohort_comparison(
+        top, bottom = backtest_engine.run_cohort_comparison(
             data=run['data'],
             selected_factors=run['factors'],
             factor_directions=run['factor_directions'],
@@ -251,7 +266,6 @@ def run_cohort(run: Dict[str, Any], cohort_pct: float):
         )
         return list(top), list(bottom), None
 
-    from src.backtest_jobs import build_job
     function_name = run['compute'].get('function_name') or get_backtest_lambda_name()
     if not function_name:
         raise RuntimeError("Cohort comparisons for an opened analysis run in AWS Lambda, "
@@ -279,11 +293,6 @@ def run_backtest_logic(user_settings: Dict[str, Any],
     Returns:
         The saved run, or None if the run was rejected or failed (nothing is saved).
     """
-    from app.saved_runs import add_saved_run, build_run_label
-    from app.streamlit_config import FACTOR_METADATA, MAX_SAVED_RUNS
-    from src.backtest_engine import rebalance_portfolio
-    from src.backtest_jobs import build_job
-    from src.trading_costs import job_trading_cost
 
     factor_labels = [f for f in factor_names if f in FACTOR_METADATA]
     if not factor_labels:
@@ -310,7 +319,6 @@ def run_backtest_logic(user_settings: Dict[str, Any],
             data, universe = None, _universe_filters(user_settings)
         else:
             # Apply current filters again: the sidebar may have changed since loading.
-            from src.universe_selection import select_universe
             raw = st.session_state.get('raw_data')
             period = (int(user_settings['start_year']), int(user_settings['end_year']))
             filters_changed = (st.session_state.get('loaded_filters') != _universe_filters(user_settings)
@@ -328,7 +336,7 @@ def run_backtest_logic(user_settings: Dict[str, Any],
             compute = None
             universe = dict(st.session_state.get('loaded_filters') or {})
             # Portfolio simulation execution
-            results = rebalance_portfolio(
+            results = backtest_engine.rebalance_portfolio(
                 data,
                 internal_factor_cols,
                 factor_directions=internal_directions,
@@ -354,7 +362,6 @@ def run_backtest_logic(user_settings: Dict[str, Any],
         )
         return None
 
-    from app.calculation_preview import build_calculation_preview
 
     # Save a snapshot so later sidebar/factor changes never alter this run
     run_id = st.session_state.next_run_id
@@ -373,7 +380,9 @@ def run_backtest_logic(user_settings: Dict[str, Any],
         'compute': compute,
         'cohort': None,
     }
-    from components.strategy_settings import annotate_new_run
+    # Imported here: components/ resolves only when app/ is on sys.path (the running app), not when
+    # tests import app.streamlit_utils; strategy_settings also imports modules that import this one
+    from components.strategy_settings import annotate_new_run  # noqa: PLC0415
     annotate_new_run(run)
     st.session_state.next_run_id = run_id + 1
     st.session_state.saved_runs = add_saved_run(
@@ -387,15 +396,12 @@ def _wrds_run_label(run_id: int, factor_labels: List[str], frequency: str, tradi
     A WRDS run's tab label, e.g. "Run 2: WRDS, Quarterly" (the factors are in its header),
     or "Run 2: WRDS, Quarterly | 25 bps" with a trading cost.
     """
-    from app.saved_runs import trading_cost_suffix
-    from app.wrds_tables import FREQUENCY_LABELS
     return f"Run {run_id}: WRDS, {FREQUENCY_LABELS.get(frequency, frequency)}" + trading_cost_suffix(trading_cost_bps)
 
 
 def _run_wrds_job(run: Dict[str, Any], kind: str, cohort_pct: Optional[float] = None,
                   rebalance_date: Optional[str] = None):
     """Sends a cohort or ranked job for a WRDS run to the backtest Lambda. Returns (result, compute info)."""
-    from src.wrds_jobs import build_wrds_job
     function_name = (run.get('compute') or {}).get('function_name') or get_backtest_lambda_name()
     if not function_name:
         raise RuntimeError(f"WRDS jobs run in AWS Lambda, and no Lambda is configured ({BACKTEST_LAMBDA_ENV}).")
@@ -418,7 +424,6 @@ def load_wrds_holdings(filename: str, row_group: int, date: str) -> pd.DataFrame
     (two ranged GETs: footer and that date's row group). A saved file never changes, so
     every session shares the cache.
     """
-    from src.wrds_holdings import read_holdings_date
     return read_holdings_date(get_results_store(), filename, row_group, date)
 
 
@@ -428,8 +433,6 @@ def wrds_job_for_inputs(user_settings: Dict[str, Any], factor_names: List[str],
     The WRDS backtest job for the sidebar settings and the chosen WRDS factors (display
     names), as the Run button sends it to the Lambda. Raises ValueError like build_wrds_job.
     """
-    from app.streamlit_config import WRDS_FACTOR_METADATA
-    from src.wrds_jobs import build_wrds_job
     labels = [f for f in factor_names if f in WRDS_FACTOR_METADATA]
     columns = [WRDS_FACTOR_METADATA[f]['column'] for f in labels]
     return build_wrds_job('backtest', columns, {c: factor_dirs.get(f, 'top') for f, c in zip(labels, columns)},
@@ -438,7 +441,6 @@ def wrds_job_for_inputs(user_settings: Dict[str, Any], factor_names: List[str],
 
 def wrds_holds_whole_filter(settings: Dict[str, Any]) -> bool:
     """True when WRDS settings hold every stock in the filter (Top 100%), so a run needs no factor."""
-    from src.wrds_engine import holds_whole_filter
     try:
         return holds_whole_filter(settings.get('top_pct'), settings.get('top_n'))
     except ValueError:
@@ -447,7 +449,6 @@ def wrds_holds_whole_filter(settings: Dict[str, Any]) -> bool:
 
 def wrds_run_job(run: Dict[str, Any]) -> Dict[str, Any]:
     """The backtest job of a saved WRDS run, rebuilt from its saved factors and settings."""
-    from src.wrds_jobs import build_wrds_job
     return build_wrds_job('backtest', run['factors'], run['factor_directions'], run['settings'],
                           factor_labels=dict(zip(run['factors'], run['factor_labels'])))
 
@@ -461,9 +462,6 @@ def run_wrds_backtest_logic(user_settings: Dict[str, Any], factor_names: List[st
     Returns:
         The saved run, or None if the run was rejected or failed (nothing is saved).
     """
-    from app.calculation_preview import build_wrds_calculation_preview
-    from app.saved_runs import add_saved_run
-    from app.streamlit_config import MAX_SAVED_RUNS, WRDS_FACTOR_METADATA
 
     factor_labels = [f for f in factor_names if f in WRDS_FACTOR_METADATA]
     if not factor_labels and not wrds_holds_whole_filter(user_settings):
@@ -497,7 +495,8 @@ def run_wrds_backtest_logic(user_settings: Dict[str, Any], factor_names: List[st
         'compute': compute,
         'cohort': None,
     }
-    from components.strategy_settings import annotate_new_run
+    # Imported here: components/ needs app/ on sys.path (see above)
+    from components.strategy_settings import annotate_new_run  # noqa: PLC0415
     annotate_new_run(run)
     st.session_state.next_run_id = run_id + 1
     st.session_state.saved_runs = add_saved_run(st.session_state.saved_runs, run, MAX_SAVED_RUNS)
@@ -514,7 +513,6 @@ def add_to_history(run: Dict[str, Any]) -> None:
     entries also have a summary (data source, frequency, factors), as in the list of
     all saved analyses, because their label only names the frequency.
     """
-    from datetime import datetime, timezone
     compute = run.get('compute') or {}
     now = datetime.now(timezone.utc)
     entry = {
@@ -525,7 +523,6 @@ def add_to_history(run: Dict[str, Any]) -> None:
         'saved_at': now.strftime('%Y-%m-%dT%H:%M:%SZ'),
     }
     if run.get('data_mode') == 'wrds':
-        from src.wrds_service import summarize_wrds_job
         entry['summary'] = summarize_wrds_job(wrds_run_job(run))
     st.session_state.analysis_history = st.session_state.get('analysis_history', []) + [entry]
 
@@ -537,10 +534,6 @@ def open_saved_analysis(text: str) -> Dict[str, Any]:
     Raises:
         SavedAnalysisError: with a message for the user (not an ID, expired, ...).
     """
-    from app.calculation_preview import wrds_preview
-    from app.saved_runs import add_saved_run, build_run_label
-    from app.streamlit_config import MAX_SAVED_RUNS
-    from src.saved_analyses import load_saved_analysis
 
     saved = load_saved_analysis(text, get_results_store())
     job = saved['job']
@@ -609,23 +602,19 @@ def load_compared_analysis(analysis_id: str) -> Dict[str, Any]:
     A saved analysis for the Compare tab (src/saved_analyses.load_saved_analysis): read from
     S3 only, nothing is run. Raises SavedAnalysisError (with its reason) if it cannot be opened.
     """
-    from src.saved_analyses import load_saved_analysis
     return load_saved_analysis(analysis_id, get_results_store())
 
 @st.cache_resource(show_spinner=False)
 def get_results_store():
     """The S3 location saved analyses are read from (the market data's bucket and prefix)."""
-    from src.s3_client import S3DataManager
     return S3DataManager()
 
 @st.cache_data(ttl=60, show_spinner=False)
 def list_scored_analyses() -> Dict[str, Any]:
     """Everyone's saved analyses with their scores (src/saved_analyses.list_scored_analyses), reused for a minute."""
-    from src.saved_analyses import list_scored_analyses as list_scored
     return list_scored(get_results_store())
 
 @st.cache_data(ttl=60, show_spinner=False)
 def list_all_saved_analyses(limit: int) -> Dict[str, Any]:
     """The newest `limit` saved analyses of everyone (src/saved_analyses.list_saved_analyses), reused for a minute."""
-    from src.saved_analyses import list_saved_analyses
     return list_saved_analyses(get_results_store(), limit=limit)

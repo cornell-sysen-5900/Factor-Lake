@@ -4,6 +4,10 @@ import re
 
 import pytest
 
+import app.streamlit_utils as utils
+import src.backtest_engine as engine
+import src.backtest_jobs as jobs
+import src.wrds_service as service
 from app.calculation_preview import (
     PREVIEW_LABEL,
     SAVED_LABEL,
@@ -12,6 +16,8 @@ from app.calculation_preview import (
     preview_for_run,
 )
 from app.streamlit_config import FACTOR_METADATA
+from src.backtest_jobs import run_job
+from src.wrds_calendar import FREQUENCY_LABELS
 from tests.unit.test_local_run_filters import state  # noqa: F401 (fixture)
 from tests.unit.test_saved_runs import (
     _add_factor,
@@ -170,8 +176,6 @@ def test_preview_includes_new_trading_cost_setting():
 
 def _engine_spy(monkeypatch):
     """Records the keyword arguments of every rebalance_portfolio call, local or in a Lambda job."""
-    import src.backtest_engine as engine
-    import src.backtest_jobs as jobs
     calls, real = [], engine.rebalance_portfolio
 
     def spy(*args, **kwargs):
@@ -194,8 +198,6 @@ def _numbers(pattern, text):
     {"top_pct": 33.3, "trading_cost_bps": 0.0, "factor_combination": "integrating"},
 ])
 def test_preview_top_pct_and_trading_cost_match_the_engine(state, monkeypatch, path, chosen):
-    import app.streamlit_utils as utils
-    from src.backtest_jobs import run_job
     calls = _engine_spy(monkeypatch)
     settings = {"start_year": 2002, "end_year": 2006, "initial_aum": 1000.0, "selected_sectors": [],
                 "restrict_fossil_fuels": False, "use_lambda": path == "lambda", **chosen}
@@ -234,8 +236,6 @@ def test_preview_top_pct_and_trading_cost_match_the_engine(state, monkeypatch, p
 ])
 def test_wrds_preview_frequency_top_pct_and_trading_cost_match_the_wrds_engine(new_session, monkeypatch,
                                                                                  frequency, cost, hold):
-    import src.wrds_service as service
-    from src.wrds_calendar import FREQUENCY_LABELS
     calls, real = [], service.run_wrds_backtest
 
     def spy(data, factors, directions, **options):

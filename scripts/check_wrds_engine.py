@@ -18,6 +18,7 @@ written to the repo (pipeline/README.md).
 """
 
 import argparse
+import multiprocessing
 import sys
 import time
 from pathlib import Path
@@ -41,8 +42,9 @@ TEN_FACTORS = ['mom_12_1', 'f_book_to_price', 'f_earnings_to_price', 'f_roe', 'f
 def peak_memory_mb() -> float:
     """Peak resident memory of this process (working set on Windows, max RSS elsewhere)."""
     if sys.platform == 'win32':
-        import ctypes
-        from ctypes import wintypes
+        # Windows-only modules, imported only on Windows
+        import ctypes  # noqa: PLC0415
+        from ctypes import wintypes  # noqa: PLC0415
 
         class Counters(ctypes.Structure):
             _fields_ = [('cb', wintypes.DWORD), ('PageFaultCount', wintypes.DWORD),
@@ -57,7 +59,8 @@ def peak_memory_mb() -> float:
         psapi.GetProcessMemoryInfo.argtypes = [wintypes.HANDLE, ctypes.POINTER(Counters), wintypes.DWORD]
         psapi.GetProcessMemoryInfo(kernel32.GetCurrentProcess(), ctypes.byref(counters), counters.cb)
         return counters.PeakWorkingSetSize / 2**20
-    import resource
+    # Unix-only module, imported only off Windows
+    import resource  # noqa: PLC0415
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     return peak / 2**20 if sys.platform == 'darwin' else peak / 2**10
 
@@ -92,7 +95,6 @@ def main(argv=None) -> int:
     sizes = ', '.join(f"{f} {(folder / f).stat().st_size / 2**20:.1f} MB" for f in WRDS_FILES)
     print(f"Files: {sizes}")
 
-    import multiprocessing
     context = multiprocessing.get_context('spawn')
     cases = {'universe': "Monthly, cap weighted, whole universe",
              '3': "Monthly Mixing, 3 factors, equal weight",

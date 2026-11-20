@@ -11,7 +11,18 @@ import time
 import urllib.request
 from typing import Any, Dict, Optional, Tuple
 
+import boto3
+from botocore.config import Config
+
 from .backtest_jobs import decode_result, decode_saved
+from .wrds_preview import (
+    DISABLED_MESSAGE,
+    MAX_RESPONSE_BYTES,
+    NOT_READY_MESSAGE,
+    PREVIEW_COLUMNS,
+    ROWS_PER_YEAR,
+    validate_request,
+)
 
 DEFAULT_FUNCTION_NAME = 'factor-lake-backtest'
 # A cold Lambda downloads the market data before it runs; allow up to the Lambda's own limit
@@ -29,8 +40,6 @@ class BacktestLambdaClient:
                  client: Optional[Any] = None):
         self.function_name = function_name or os.environ.get('FACTOR_LAKE_BACKTEST_LAMBDA') or DEFAULT_FUNCTION_NAME
         if client is None:
-            import boto3
-            from botocore.config import Config
             client = boto3.client(
                 'lambda',
                 region_name=region or os.environ.get('AWS_DEFAULT_REGION') or 'us-east-1',
@@ -42,7 +51,6 @@ class BacktestLambdaClient:
 
     def preview(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Fetch bounded sample rows without entering the backtest/result-download path."""
-        from .wrds_preview import MAX_RESPONSE_BYTES, PREVIEW_COLUMNS, ROWS_PER_YEAR, validate_request
         validate_request(request)
         try:
             response = self.client.invoke(FunctionName=self.function_name, InvocationType='RequestResponse',
@@ -56,7 +64,6 @@ class BacktestLambdaClient:
                 raise ValueError('Invalid preview response')
             payload = json.loads(body)
             if payload.get('status') in ('disabled', 'unavailable'):
-                from .wrds_preview import DISABLED_MESSAGE, NOT_READY_MESSAGE
                 return {'status': payload['status'], 'message': DISABLED_MESSAGE
                         if payload['status'] == 'disabled' else NOT_READY_MESSAGE}
             if payload.get('status') != 'ok':

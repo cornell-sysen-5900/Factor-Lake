@@ -8,6 +8,22 @@ from the WRDS job it receives. A WRDS run never shows the Legacy formula.
 import calendar
 from typing import Any, Dict, List, Optional, Tuple
 
+import streamlit as st
+
+from app.streamlit_config import WRDS_FACTOR_METADATA
+from src.trading_costs import BPS, job_trading_cost
+from src.wrds_calendar import FIRST_MONTH, FREQUENCY_LABELS, LAST_MONTH, REBALANCE_MONTHS, period_boundaries
+from src.wrds_engine import (
+    BENCHMARK_LABELS,
+    FOSSIL_GSUBIND,
+    FOSSIL_SIC,
+    RISK_FREE_SOURCE,
+    WINSORIZE_PCT,
+    hold_rule,
+)
+from src.wrds_gics import describe_gics_filter, job_gics_filter, level_label, level_names
+from src.wrds_liquidity import LIQUIDITY_COLUMN, describe_liquidity_limit, job_liquidity_limit
+
 
 def build_calculation_preview(settings: Dict[str, Any], factors: List[str],
                               directions: Dict[str, str]) -> Dict[str, Any]:
@@ -102,18 +118,6 @@ def build_wrds_calculation_preview(job: Dict[str, Any]) -> Dict[str, Any]:
     factors yet (the Analysis tab before any is added). Raises ValueError for years
     without a complete holding period, like the job itself.
     """
-    from src.trading_costs import BPS, job_trading_cost
-    from src.wrds_calendar import FIRST_MONTH, FREQUENCY_LABELS, LAST_MONTH, REBALANCE_MONTHS, period_boundaries
-    from src.wrds_engine import (
-        BENCHMARK_LABELS,
-        FOSSIL_GSUBIND,
-        FOSSIL_SIC,
-        RISK_FREE_SOURCE,
-        WINSORIZE_PCT,
-        hold_rule,
-    )
-    from src.wrds_gics import describe_gics_filter, job_gics_filter, level_label, level_names
-    from src.wrds_liquidity import LIQUIDITY_COLUMN, describe_liquidity_limit, job_liquidity_limit
 
     frequency, start, end = job["frequency"], int(job["start_year"]), int(job["end_year"])
     months = period_boundaries(frequency, start, end)
@@ -326,8 +330,8 @@ def wrds_analysis_preview(settings: Dict[str, Any], factor_names: List[str],
     The Analysis tab's WRDS preview: the calculation of the job the Run button would send.
     Before any factor is added, the same job without factors.
     """
-    from app.streamlit_config import WRDS_FACTOR_METADATA
-    from app.streamlit_utils import wrds_holds_whole_filter, wrds_job_for_inputs
+    # Imported here: app.streamlit_utils imports this module (a circular import at the top)
+    from app.streamlit_utils import wrds_holds_whole_filter, wrds_job_for_inputs  # noqa: PLC0415
     names = [f for f in factor_names if f in WRDS_FACTOR_METADATA]
     try:
         if names or wrds_holds_whole_filter(settings):      # at 100% the job needs no factor
@@ -348,7 +352,8 @@ def preview_for_run(run: Dict[str, Any]) -> Dict[str, Any]:
     if run.get("data_mode") == "wrds":
         if stored and stored.get("mode") == "wrds":
             return stored
-        from app.streamlit_utils import wrds_run_job
+        # Imported here: app.streamlit_utils imports this module (a circular import at the top)
+        from app.streamlit_utils import wrds_run_job  # noqa: PLC0415
         return wrds_preview(wrds_run_job(run))
     if stored:
         return stored
@@ -370,7 +375,6 @@ def render_calculation_preview(preview: Dict[str, Any], *, saved: bool = False) 
     The formula and its steps in one expander, collapsed so it does not compete with the
     factors (Analysis) or the results (Results); the steps are a nested expander.
     """
-    import streamlit as st
     with st.expander(SAVED_LABEL if saved else PREVIEW_LABEL, expanded=False):
         st.caption("Saved run inputs; changing current selections does not change this formula." if saved else
                    "Updates with your selections. Data is not required; "

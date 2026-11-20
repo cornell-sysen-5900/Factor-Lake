@@ -114,7 +114,7 @@ uv run ruff check .          # list problems
 uv run ruff check --fix .    # fix whitespace, import order and other safe fixes
 ```
 
-The rules are in `pyproject.toml` (`[tool.ruff]`): PEP 8's errors and warnings (`E`, `W`), its naming rules (`N`) and import order (`I`), with lines up to **120 characters**, the width the code was already written at. Three exceptions are allowed, each explained there: the fake AWS clients in `tests/` take boto3's argument names (`Bucket=`, `Key=`), `app/streamlit_app.py` sets up the environment before its imports, and the `Visualizations` package keeps its capitalized name.
+The rules are in `pyproject.toml` (`[tool.ruff]`): PEP 8's errors and warnings (`E`, `W`), its naming rules (`N`), import order (`I`) and imports at the top of the file (`PLC0415`), with lines up to **120 characters**, the width the code was already written at. Three exceptions are allowed, each explained there: the fake AWS clients in `tests/` take boto3's argument names (`Bucket=`, `Key=`), `app/streamlit_app.py` sets up the environment before its imports, and the `Visualizations` package keeps its capitalized name. An import inside a function is allowed only with `# noqa: PLC0415` and a comment saying why it can't be at the top: a circular import, a module that exists only on some platforms, an app module that needs `app/` on `sys.path`, or a function that `AppTest.from_function` runs as its own script. When a test replaces a function in its home module, import the module (`from src import backtest_engine`) rather than the function, so the replacement is seen.
 
 ### Commit hook: fix lint errors before you commit
 

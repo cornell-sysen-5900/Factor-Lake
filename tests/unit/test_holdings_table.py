@@ -7,12 +7,14 @@ pure display/CSV/default-year functions in app/holdings_table.py. AppTest tests
 drive the real app with the synthetic universe from test_saved_runs.
 """
 import io
+import json
 import math
 
 import numpy as np
 import pandas as pd
 import pytest
 import streamlit as st
+from streamlit.runtime.memory_media_file_storage import MemoryFile, MemoryMediaFileStorage
 
 from app.holdings_table import (
     build_holdings_display_table,
@@ -33,7 +35,17 @@ from src.backtest_engine import (
 from src.benchmarks import get_benchmark_list
 from src.factor_utils import normalize_series
 from tests.unit.test_mixing_regression import delisting_universe
-from tests.unit.test_saved_runs import RUN, _add_factor, _assert_clean, _captions, _click, _open_tab, _run_analysis, at  # noqa: F401
+from tests.unit.test_saved_runs import (  # noqa: F401
+    RUN,
+    _add_factor,
+    _assert_clean,
+    _captions,
+    _click,
+    _click_main_tab,
+    _open_tab,
+    _run_analysis,
+    at,
+)
 
 FACTORS = ['ROE_using_9-30_Data', 'ROA']
 DIRECTIONS = {'ROE_using_9-30_Data': 'top', 'ROA': 'bottom'}
@@ -377,7 +389,6 @@ def _run_two_factor_backtest(at, method='Mixing'):
 @pytest.fixture
 def served_files(monkeypatch):
     """Records every file AppTest stores for a download, by file id."""
-    from streamlit.runtime.memory_media_file_storage import MemoryFile, MemoryMediaFileStorage
     files = {}
     original = MemoryMediaFileStorage.load_and_get_id
 
@@ -439,7 +450,6 @@ def test_integrating_run_hides_picked_by_and_shows_the_method(at):
 def test_mixing_and_integrating_runs_differ_and_cohort_follows(at):
     _run_two_factor_backtest(at, 'Mixing')               # Run 1
     at.button(key='cohort_btn_1').click().run()
-    from tests.unit.test_saved_runs import _click_main_tab
     _click_main_tab(at, 'Analysis')
     at.radio(key='factor_combination_input').set_value('Integrating').run()
     _click(at, RUN)                                      # Run 2
@@ -458,7 +468,6 @@ def test_single_factor_run_is_the_same_for_both_methods(at):
     _add_factor(at, 'ROA %')
     _click(at, 'Load Market Data')
     _click(at, RUN)                                      # Run 1: Mixing
-    from tests.unit.test_saved_runs import _click_main_tab
     _click_main_tab(at, 'Analysis')
     at.radio(key='factor_combination_input').set_value('Integrating').run()
     _click(at, RUN)                                      # Run 2: Integrating
@@ -482,7 +491,6 @@ def test_downloaded_csv_matches_table_on_screen(at, served_files):
 
 
 def test_screen_rounds_but_downloaded_csv_is_unrounded(at, served_files):
-    import json
     _run_two_factor_backtest(at)
     table = at.dataframe[0]
     formats = {col: cfg['type_config']['format']

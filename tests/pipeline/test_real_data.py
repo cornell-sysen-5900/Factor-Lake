@@ -11,8 +11,11 @@ import json
 import os
 from pathlib import Path
 
+import pandas as pd
 import pyarrow.parquet as pq
 import pytest
+
+from pipeline import column_stats as cs
 
 DATA = Path(os.environ["FACTOR_LAKE_DATA_DIR"]) if os.environ.get("FACTOR_LAKE_DATA_DIR") else None
 PROCESSED = (DATA / os.environ.get("FACTOR_LAKE_PROCESSED_DIR", "processed")) if DATA else None
@@ -40,9 +43,7 @@ def test_final_files_match_the_manifest():
 
 
 def test_repo_dictionary_holds_no_value_from_the_data():
-    import pandas as pd
 
-    from pipeline import column_stats as cs
     stats = pd.read_parquet(PROCESSED / "final" / "column_stats.parquet")
     schema = (Path(__file__).resolve().parents[2] / "pipeline" / "DATA_DICTIONARY.md").read_text(encoding="utf-8")
     assert cs.leaked(schema, cs.distinctive_values(stats)) == []

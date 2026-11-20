@@ -13,6 +13,7 @@ TODO(supabase): Once credentials are restored, verify:
   - The Supabase project URL is valid (current secrets.toml points to a dead project).
 """
 import os
+import time
 
 import pandas as pd
 import pytest
@@ -156,7 +157,6 @@ class TestSupabasePerformance:
     @pytest.mark.slow
     def test_load_data_reasonable_time(self):
         """Test that data loads in reasonable time"""
-        import time
 
         start = time.time()
         data = _load_data()

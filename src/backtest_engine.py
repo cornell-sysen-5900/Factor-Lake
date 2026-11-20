@@ -5,6 +5,7 @@ PURPOSE: Backtesting engine with integrated on-the-fly filtering.
 VERSION: 2.5.0
 """
 
+import datetime
 import math
 from typing import Any, Dict, List, Optional, Tuple  # Added Tuple and Optional
 
@@ -481,7 +482,6 @@ def _value_positions(portfolios: List[Portfolio], df_year: pd.DataFrame,
     Returns:
         (annual_return, delisted_count, positions)
     """
-    import datetime
 
     holding_end = datetime.date(rebalance_year + 1, 12, 31)
     has_delist_date = 'Delist_Date' in df_year.columns
